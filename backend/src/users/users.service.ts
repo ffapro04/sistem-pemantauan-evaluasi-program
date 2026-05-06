@@ -30,14 +30,19 @@ export class UsersService {
     });
   }
 
-  // --- 2. AMBIL SATU USER BERDASARKAN ID ---
+  // --- 2. AMBIL SATU USER BERDASARKAN ID (DENGAN PASSWORD) ---
   async findOne(id: number) {
     if (!id) throw new BadRequestException('ID User wajib disertakan');
 
-    const user = await this.userRepo.findOne({
-      where: { id_user: id },
-      relations: ['role', 'wilayah', 'sekolah'],
-    });
+    // Gunakan QueryBuilder agar bisa memanggil field yang di-hide (select: false)
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.wilayah', 'wilayah')
+      .leftJoinAndSelect('user.sekolah', 'sekolah')
+      .addSelect('user.password') // <--- INI KUNCINYA: Memaksa password ikut ditarik
+      .where('user.id_user = :id', { id })
+      .getOne();
 
     if (!user)
       throw new NotFoundException(`User dengan ID #${id} tidak ditemukan`);
