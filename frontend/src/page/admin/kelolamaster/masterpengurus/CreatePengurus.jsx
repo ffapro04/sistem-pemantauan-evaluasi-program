@@ -53,33 +53,42 @@ const CreatePengurus = () => {
     if (formData.jabatan !== "Admin") setAdminKey("");
   }, [formData.jabatan]);
 
+  // Di dalam CreatePengurus.jsx (Bagian handleSubmit)
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Validasi Master Key (tetap ada)
     if (formData.jabatan === "Admin" && adminKey !== MASTER_AUTH_KEY) {
       return Swal.fire({
         icon: "error",
-        title: "Akses Otoritas Ditolak",
-        text: "Master Key tidak valid!",
+        title: "Akses Ditolak",
+        text: "Master Key Salah!",
       });
     }
+
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      await axios.post("http://localhost:3000/users/register", formData, {
+
+      // --- LOGIKA MAPPING ID ROLE ---
+      const finalData = {
+        ...formData,
+        // Jika jabatan "Admin", kirim id_role 1. Jika selain itu, kirim id_role 2.
+        id_role: formData.jabatan === "Admin" ? 1 : 2,
+      };
+
+      await axios.post("http://localhost:3000/users/register", finalData, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       Swal.fire({
         icon: "success",
         title: "Berhasil",
-        text: "Akun telah diaktifkan.",
+        text: "Data personil telah diaktifkan.",
       });
       navigate("/admin/pengurus");
     } catch (err) {
-      Swal.fire(
-        "Gagal",
-        err.response?.data?.message || "Kesalahan server",
-        "error",
-      );
+      Swal.fire("Gagal", "Gagal menyimpan data", "error");
     } finally {
       setLoading(false);
     }
@@ -247,6 +256,6 @@ const CreatePengurus = () => {
       </main>
     </PageWrapper>
   );
-};
+};;
 
 export default CreatePengurus;

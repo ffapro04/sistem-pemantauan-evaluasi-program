@@ -4,13 +4,13 @@ import { VendorService } from './vendor.service';
 import { VendorController } from './vendor.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Vendor } from './entities/vendor.entity';
-import { UsersModule } from '../users/users.module'; // 👈 1. Import Module-nya
+import { User } from '../users/user.entity'; // tambah import ini
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  // Tambahkan UsersModule di sini agar VendorService bisa pakai UsersService
   imports: [
-    TypeOrmModule.forFeature([Vendor]),
-    UsersModule, // 👈 2. Daftarkan di sini
+    TypeOrmModule.forFeature([Vendor, User]), // tambah User di sini
+    UsersModule,
   ],
   controllers: [VendorController],
   providers: [VendorService],

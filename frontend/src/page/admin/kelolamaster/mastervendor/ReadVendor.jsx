@@ -6,42 +6,59 @@ import {
   Plus,
   Search as SearchIcon,
   Database,
-  Phone,
-  Mail,
-  ShieldCheck,
   Handshake,
   Filter,
-  User,
-  Tags,
-  FileCheck,
   Eye,
+  Edit3,
+  Tags,
+  CheckCircle,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
-// Komponen Atomik
 import Sidebar from "../../../../components/Sidebar";
+import Card from "../../../../components/Card";
 import Button from "../../../../components/Button";
 import Input from "../../../../components/Input";
 import Table from "../../../../components/Table";
 import PageWrapper from "../../../../components/PageWrapper";
 import Pagination from "../../../../components/Pagination";
-import Label from "../../../../components/Label";
 import Dropdown from "../../../../components/Dropdown";
+import Label from "../../../../components/Label";
 
-// Action Buttons
-import {
-  EditButton,
-  ToggleStatusButton,
-} from "../../../../components/ActionButtons";
+const Toast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+});
 
 const ReadVendor = () => {
+  const navigate = useNavigate();
+
+  const [searchTerm, setSearchTerm] = useState(
+    localStorage.getItem("vnd_search") || "",
+  );
+  const [filterStatus, setFilterStatus] = useState(
+    localStorage.getItem("vnd_status") || "all",
+  );
+  const [filterPilar, setFilterPilar] = useState(
+    localStorage.getItem("vnd_pilar") || "all",
+  );
+  const [currentPage, setCurrentPage] = useState(
+    Number(localStorage.getItem("vnd_page")) || 1,
+  );
+
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Semua");
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 7;
-  const navigate = useNavigate();
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    localStorage.setItem("vnd_search", searchTerm);
+    localStorage.setItem("vnd_status", filterStatus);
+    localStorage.setItem("vnd_pilar", filterPilar);
+    localStorage.setItem("vnd_page", currentPage);
+  }, [searchTerm, filterStatus, filterPilar, currentPage]);
 
   const fetchVendors = async () => {
     try {
@@ -52,8 +69,7 @@ const ReadVendor = () => {
       });
       setVendors(res.data);
     } catch (err) {
-      console.error(err);
-      Swal.fire("Error", "Gagal memuat data rekanan vendor", "error");
+      Toast.fire({ icon: "error", title: "Gagal sinkronisasi data vendor" });
     } finally {
       setLoading(false);
     }
@@ -64,44 +80,38 @@ const ReadVendor = () => {
   }, []);
 
   const handleToggleStatus = async (id, name, currentStatus) => {
-    const isActivating = currentStatus === "Tidak Bermitra";
-    const result = await Swal.fire({
-      title: isActivating ? "Aktifkan Kemitraan?" : "Non-Aktifkan Kemitraan?",
-      text: `Status ${name} akan diubah menjadi ${isActivating ? '"Bermitra"' : '"Tidak Bermitra"'}.`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: isActivating ? "#10B981" : "#EF4444",
-      confirmButtonText: "Ya, Update!",
-      cancelButtonText: "Batal",
-    });
-
-    if (result.isConfirmed) {
-      try {
-        const token = localStorage.getItem("token");
-        await axios.patch(
-          `http://localhost:3000/vendor/${id}`,
-          { status: isActivating ? "Bermitra" : "Tidak Bermitra" },
-          { headers: { Authorization: `Bearer ${token}` } },
-        );
-        Swal.fire("Berhasil", "Status telah diperbarui.", "success");
-        fetchVendors();
-      } catch (err) {
-        Swal.fire("Gagal", "Sistem gagal memperbarui status", "error");
-      }
+    const isBermitra = currentStatus === "Bermitra";
+    const nextStatus = isBermitra ? "Tidak Bermitra" : "Bermitra";
+    try {
+      const token = localStorage.getItem("token");
+      await axios.patch(
+        `http://localhost:3000/vendor/${id}`,
+        { status: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      await fetchVendors();
+      Toast.fire({
+        icon: "success",
+        title: `${name} kini ${nextStatus}`,
+      });
+    } catch {
+      Toast.fire({ icon: "error", title: "Gagal memperbarui status" });
     }
   };
 
-  const filteredData = vendors.filter((v) => {
-    const search = searchTerm.toLowerCase();
-    const matchSearch =
-      v.nama_vendor?.toLowerCase().includes(search) ||
-      v.pj_1?.toLowerCase().includes(search) ||
-      v.pilar?.toLowerCase().includes(search);
-    const matchStatus = statusFilter === "Semua" || v.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const filteredData = vendors
+    .filter((v) => {
+      const matchSearch =
+        v.nama_vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        v.pj_1?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = filterStatus === "all" || v.status === filterStatus;
+      const matchPilar = filterPilar === "all" || v.pilar === filterPilar;
+      return matchSearch && matchStatus && matchPilar;
+    })
+    .sort((a, b) => b.id_vendor - a.id_vendor);
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
@@ -110,35 +120,24 @@ const ReadVendor = () => {
   const tableColumns = [
     {
       header: "NO",
-      align: "text-center w-[50px]",
-      render: (_, index) => (
+      align: "text-left pl-8 w-[70px]",
+      render: (_, i) => (
         <span className="text-[10px] font-mono font-bold text-gray-400">
-          {String((currentPage - 1) * itemsPerPage + index + 1).padStart(
-            2,
-            "0",
-          )}
+          {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
         </span>
       ),
     },
     {
       header: "LEMBAGA VENDOR",
-      align: "text-left w-[28%]",
+      align: "text-left w-[30%]",
       render: (row) => (
-        <div className="flex items-center gap-3 py-1">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E5AA5] font-black text-[10px] border border-blue-100 shadow-sm shrink-0 uppercase">
-            {row.nama_vendor?.charAt(0)}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-black text-gray-800 uppercase text-[11px] truncate leading-none">
-              {row.nama_vendor}
-            </span>
-            <div className="flex items-center gap-1.5 mt-1.5 text-gray-400">
-              <FileCheck size={10} className="text-[#1E5AA5]" />
-              <span className="text-[8px] font-bold uppercase tracking-widest">
-                Reg: {row.no_register || "-"}
-              </span>
-            </div>
-          </div>
+        <div className="flex flex-col py-3.5">
+          <span className="font-black text-gray-800 uppercase text-[11px] tracking-tight truncate">
+            {row.nama_vendor}
+          </span>
+          <span className="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
+            REG: {row.no_register || "-"}
+          </span>
         </div>
       ),
     },
@@ -146,163 +145,200 @@ const ReadVendor = () => {
       header: "BIDANG / PILAR",
       align: "text-left w-[18%]",
       render: (row) => (
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-50 rounded-lg border border-gray-100">
-          <Tags size={10} className="text-[#1E5AA5]" />
-          <span className="text-[9px] font-black text-gray-600 uppercase tracking-tighter">
-            {row.pilar}
+        <span className="text-[11px] font-black text-gray-700 uppercase tracking-tight py-3.5">
+          {row.pilar || "-"}
+        </span>
+      ),
+    },
+    {
+      header: "PENANGGUNG JAWAB",
+      align: "text-left w-[22%]",
+      render: (row) => (
+        <div className="flex flex-col py-3.5">
+          <span className="font-black text-gray-800 uppercase text-[11px] tracking-tight">
+            {row.pj_1 || "-"}
+          </span>
+          <span className="text-[9px] text-gray-400 font-bold mt-1 lowercase italic">
+            {row.telp_pj_1 || "-"}
           </span>
         </div>
       ),
     },
     {
-      header: "PENANGGUNG JAWAB (PJ 1)",
-      align: "text-left w-[24%]",
-      render: (row) => (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-gray-800">
-            <User size={11} className="text-[#1E5AA5]" />
-            <span className="text-[10px] font-black uppercase tracking-tight">
-              {row.pj_1 || "N/A"}
-            </span>
-          </div>
-
-          {/* UPDATE DISINI: Row.user.email */}
-          <div className="flex items-center gap-2 text-gray-500">
-            <Mail size={10} className="text-blue-400" />
-            <span className="text-[9px] font-bold lowercase italic">
-              {/* Kita cek di user dulu, kalau gak ada baru cek field telp_pj_1 */}
-              {row.user?.email || row.telp_pj_1 || "-"}
-            </span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "STATUS",
-      align: "text-center w-[15%]",
+      header: "KONTROL OTORITAS",
+      align: "text-left w-[240px]",
       render: (row) => {
         const isBermitra = row.status === "Bermitra";
         return (
-          <div className="flex justify-center">
-            <span
-              className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-[0.15em] border ${
-                isBermitra
-                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                  : "bg-red-50 text-red-600 border-red-100"
-              }`}
+          <div className="flex gap-3 items-center py-3.5">
+            <div className="flex">
+              <Button
+                icon={<Eye size={16} />}
+                onClick={() =>
+                  navigate(`/admin/vendor/detail/${row.id_vendor}`)
+                }
+                className="!p-2 !bg-transparent !text-gray-400 hover:!text-blue-600 !shadow-none"
+              />
+              <Button
+                icon={<Edit3 size={15} />}
+                onClick={() => navigate(`/admin/vendor/edit/${row.id_vendor}`)}
+                className="!p-2 !bg-transparent !text-gray-400 hover:!text-amber-500 !shadow-none"
+              />
+            </div>
+            <div
+              onClick={() =>
+                handleToggleStatus(row.id_vendor, row.nama_vendor, row.status)
+              }
+              className="flex items-center gap-3 cursor-pointer active:scale-95 transition-all"
             >
-              ● {row.status}
-            </span>
+              <div
+                className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isBermitra ? "bg-emerald-500 shadow-lg shadow-emerald-100" : "bg-gray-300"} p-1`}
+              >
+                <div
+                  className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${isBermitra ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </div>
+              <span
+                className={`text-[9px] font-black uppercase tracking-widest ${isBermitra ? "text-emerald-600" : "text-gray-400"}`}
+              >
+                {isBermitra ? "Bermitra" : "Non-Aktif"}
+              </span>
+            </div>
           </div>
         );
       },
-    },
-    {
-      header: "AKSI",
-      align: "text-center w-[150px]",
-      render: (row) => (
-        <div className="flex justify-center gap-2 items-center">
-          {/* TOMBOL DETAIL (MATA) */}
-          <button
-            onClick={() => navigate(`/admin/vendor/detail/${row.id_vendor}`)}
-            className="p-2 rounded-lg bg-blue-50 text-[#1E5AA5] hover:bg-[#1E5AA5] hover:text-white transition-all shadow-sm"
-            title="Lihat Detail"
-          >
-            <Eye size={14} strokeWidth={3} />
-          </button>
-
-          <EditButton
-            onClick={() => navigate(`/admin/vendor/edit/${row.id_vendor}`)}
-          />
-
-          <ToggleStatusButton
-            isActive={row.status === "Bermitra"}
-            onClick={() =>
-              handleToggleStatus(row.id_vendor, row.nama_vendor, row.status)
-            }
-          />
-        </div>
-      ),
     },
   ];
 
   return (
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10">
-        <div className="flex-1 rounded-t-[2.5rem] shadow-2xl bg-white flex flex-col overflow-hidden relative">
-          <div className="px-10 pt-8 pb-6 bg-white shrink-0 border-b border-gray-50">
-            <header className="flex flex-row items-center justify-between mb-8">
+      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-10 pt-10 pb-6">
+        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-[2.5rem] shadow-2xl bg-white overflow-hidden">
+          <div className="px-10 pt-8 pb-6 shrink-0">
+            <header className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-4">
                 <div className="p-3.5 bg-gradient-to-br from-[#1E5AA5] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                  <Handshake size={22} />
+                  <Handshake size={24} />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-xl font-black text-gray-800 tracking-tight uppercase">
-                    Manajemen <span className="text-[#1E5AA5]">Vendor</span>
+                  <Label
+                    text="Educational Partner Registry"
+                    className="!text-[8px] !text-[#1E5AA5] !font-black !italic uppercase"
+                  />
+                  <h1 className="text-xl font-black text-gray-800 uppercase leading-none">
+                    Manajemen <span className="text-[#2E5AA7]">Vendor</span>
                   </h1>
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">
-                    Educational Partner Registry
-                  </p>
                 </div>
               </div>
               <Button
                 text="REGISTRASI VENDOR"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/vendor/create")}
-                className="!bg-[#1E5AA5] !rounded-xl !px-6 !py-3 !text-[10px] font-black text-white shadow-lg uppercase"
+                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95 transition-all"
               />
             </header>
 
-            <div className="flex flex-row items-center gap-4">
-              <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50 text-[#1E5AA5] rounded-xl border border-blue-100 font-black text-[9px] uppercase tracking-widest shrink-0">
-                <Database size={14} className={loading ? "animate-spin" : ""} />
-                Total: {filteredData.length} Entities
-              </div>
+            <div className="flex flex-col md:flex-row gap-3 mb-6">
               <div className="relative flex-1">
                 <Input
-                  placeholder="Cari Vendor, PJ, atau Pilar..."
+                  placeholder="Cari nama vendor atau PJ..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full !pl-12 !py-2.5 !bg-gray-50 !rounded-xl !text-[11px] !font-bold"
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full !pl-11 !py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[11px] font-bold"
                 />
                 <SearchIcon
                   className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
                   size={16}
                 />
               </div>
-              <div className="w-[220px]">
+              <div className="w-52">
                 <Dropdown
+                  icon={CheckCircle}
+                  value={filterStatus}
                   items={[
-                    { value: "Semua", label: "SEMUA STATUS" },
+                    { value: "all", label: "SEMUA STATUS" },
                     { value: "Bermitra", label: "BERMITRA" },
                     { value: "Tidak Bermitra", label: "TIDAK BERMITRA" },
                   ]}
-                  value={statusFilter}
-                  onChange={(val) => setStatusFilter(val)}
-                  className="!rounded-xl"
+                  onChange={(v) => {
+                    setFilterStatus(v);
+                    setCurrentPage(1);
+                  }}
+                  className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
+                />
+              </div>
+              <div className="w-52">
+                <Dropdown
+                  icon={Tags}
+                  value={filterPilar}
+                  items={[
+                    { value: "all", label: "SEMUA PILAR" },
+                    { value: "Akademik", label: "AKADEMIK" },
+                    { value: "Karakter", label: "KARAKTER" },
+                    { value: "Seni Budaya", label: "SENI BUDAYA" },
+                    { value: "Kecakapan Hidup", label: "KECAKAPAN HIDUP" },
+                  ]}
+                  onChange={(v) => {
+                    setFilterPilar(v);
+                    setCurrentPage(1);
+                  }}
+                  className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="flex-1 overflow-hidden flex flex-col px-10 py-6">
-            <div className="flex-1 bg-white border border-gray-100 rounded-[2rem] overflow-hidden flex flex-col shadow-sm">
-              <Table columns={tableColumns} data={currentData} />
+            <div className="flex items-center justify-between">
+              <div className="px-4 py-2 bg-blue-50/50 text-[#1E5AA5] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
+                <Filter size={12} className="inline mr-2" /> Hasil: {totalItems}{" "}
+                Entities
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterStatus("all");
+                  setFilterPilar("all");
+                  setCurrentPage(1);
+                }}
+                className="text-[8px] font-black text-gray-400 hover:text-rose-500 uppercase tracking-widest transition-colors"
+              >
+                Reset Filter
+              </button>
             </div>
           </div>
 
-          <div className="px-10 py-6 bg-gray-50/50 shrink-0 border-t border-gray-100">
+          <div className="flex-none px-10 pb-4 overflow-hidden">
+            <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
+              <Table
+                columns={tableColumns}
+                data={currentData}
+                className="min-w-full border-collapse"
+              />
+              {!loading && currentData.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 opacity-20 text-gray-900">
+                  <Database size={40} className="mb-2" />
+                  <p className="text-xs font-black uppercase tracking-widest">
+                    Data Tidak Ditemukan
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="px-10 py-5 mt-auto border-t border-gray-100 bg-gray-50/30">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filteredData.length}
+              totalItems={totalItems}
               itemsPerPage={itemsPerPage}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={setCurrentPage}
               loading={loading}
             />
           </div>
-        </div>
+        </Card>
       </main>
     </PageWrapper>
   );

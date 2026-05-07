@@ -9,26 +9,31 @@ import {
   Award,
   Database,
   Edit3,
-  Info,
-  Map as MapIcon,
-  Globe,
-  Navigation,
   ShieldCheck,
   BookOpen,
+  RefreshCw,
+  UserCheck,
+  Lock,
+  Mail,
+  Hash,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
-// Komponen Premium
 import Sidebar from "../../../../components/Sidebar";
 import Button from "../../../../components/Button";
 import PageWrapper from "../../../../components/PageWrapper";
 import Label from "../../../../components/Label";
+
+const MASTER_AUTH_KEY = "Y4y4s4n4str4";
 
 const DetailSekolah = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -39,7 +44,7 @@ const DetailSekolah = () => {
         });
         setData(res.data);
       } catch (err) {
-        Swal.fire("Error", "Gagal memuat profil sekolah", "error");
+        Swal.fire("Error", "Gagal memuat profil unit", "error");
         navigate("/admin/sekolah");
       } finally {
         setLoading(false);
@@ -48,231 +53,203 @@ const DetailSekolah = () => {
     fetchDetail();
   }, [id, navigate]);
 
+  const handleRevealRequest = async () => {
+    if (showPassword) {
+      setShowPassword(false);
+      return;
+    }
+
+    const { value: inputKey } = await Swal.fire({
+      title: `<span class="text-lg font-black uppercase tracking-tighter">Security Verification</span>`,
+      html: `<p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Masukkan Master Otoritas Key untuk dekripsi password akses sekolah.</p>`,
+      input: "password",
+      inputPlaceholder: "••••••••••••",
+      showCancelButton: true,
+      confirmButtonText: "AUTHORIZE",
+      cancelButtonText: "CANCEL",
+      confirmButtonColor: "#1E5AA5",
+      cancelButtonColor: "#EF4444",
+      customClass: {
+        popup: "rounded-[3rem] p-10 shadow-2xl",
+        input:
+          "rounded-2xl border-2 border-gray-100 text-center tracking-[0.5em] font-black focus:border-[#1E5AA5]",
+        confirmButton:
+          "rounded-full px-8 py-3 text-[10px] font-black tracking-widest uppercase",
+        cancelButton:
+          "rounded-full px-8 py-3 text-[10px] font-black tracking-widest uppercase",
+      },
+    });
+
+    if (inputKey === MASTER_AUTH_KEY) {
+      setShowPassword(true);
+      Swal.fire({
+        icon: "success",
+        title: "ACCESS GRANTED",
+        timer: 1500,
+        showConfirmButton: false,
+        toast: true,
+        position: "top-end",
+      });
+    } else if (inputKey) {
+      Swal.fire({
+        icon: "error",
+        title: "ACCESS DENIED",
+        text: "Kunci Otoritas Tidak Valid!",
+        confirmButtonColor: "#EF4444",
+      });
+    }
+  };
+
   if (loading)
     return (
       <div className="h-screen flex items-center justify-center bg-[#EEF5FF]">
-        <div className="flex flex-col items-center gap-4 text-[#1E5AA5]">
-          <div className="w-12 h-12 border-4 border-blue-200 border-t-[#1E5AA5] rounded-full animate-spin"></div>
-          <span className="font-black text-[10px] tracking-[0.3em] uppercase italic">
-            Retrieving Educational Metadata...
-          </span>
-        </div>
+        <RefreshCw className="animate-spin text-[#1E5AA5]" size={40} />
       </div>
     );
-
-  const jenjangColor =
-    data?.jenjang === "SD"
-      ? "bg-red-50 text-red-600 border-red-100"
-      : data?.jenjang === "SMP"
-        ? "bg-blue-50 text-blue-600 border-blue-100"
-        : "bg-emerald-50 text-emerald-600 border-emerald-100";
 
   return (
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] !rounded-b-none border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
-          {/* 1. TOP HEADER BAR */}
-          <div className="px-8 md:px-16 pt-10 pb-8 flex flex-col md:flex-row items-center justify-between bg-[#1E5AA5] shrink-0 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
-            <div className="flex items-center gap-6 relative z-10">
+      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-10 pb-0">
+        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
+          <div className="px-8 md:px-16 pt-10 pb-8 bg-[#1E5AA5] shrink-0">
+            <div className="flex items-center gap-6">
               <button
                 onClick={() => navigate("/admin/sekolah")}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg backdrop-blur-md group"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all"
               >
-                <ArrowLeft
-                  size={16}
-                  strokeWidth={3}
-                  className="group-hover:-translate-x-1 transition-transform"
-                />
+                <ArrowLeft size={16} strokeWidth={3} />
               </button>
               <div>
-                <h1 className="text-xl font-black text-white tracking-tighter uppercase leading-none">
+                <h1 className="text-xl font-black text-white uppercase tracking-tighter">
                   PROFIL <span className="text-blue-200">UNIT SEKOLAH</span>
                 </h1>
-                <p className="text-[8px] font-bold text-blue-100/70 tracking-widest uppercase italic mt-1.5">
-                  Verified Educational Entity Information
+                <p className="text-[8px] font-bold text-blue-100/70 tracking-widest uppercase italic">
+                  Verified Educational Hub Control Center
                 </p>
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/10 rounded-xl border border-white/20 text-white font-black text-[8px] uppercase tracking-widest backdrop-blur-md relative z-10 shadow-inner">
-              <Database size={12} className="text-blue-200" />
-              NPSN: {data?.npsn || "00000000"}
-            </div>
           </div>
 
-          {/* 2. AREA CONTENT */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar bg-white px-8 md:px-16 pt-12">
-            <div className="max-w-7xl mx-auto flex flex-col gap-12 pb-16">
-              {/* Header Profile Section */}
-              <div className="flex flex-col md:flex-row items-center md:items-start gap-8 border-b border-gray-50 pb-12">
-                <div className="relative group shrink-0">
-                  <div className="absolute -inset-1.5 bg-[#1E5AA5] rounded-[2.5rem] blur opacity-10"></div>
-                  <div className="relative w-28 h-28 bg-gray-50 rounded-[2.5rem] border-4 border-white shadow-xl flex items-center justify-center text-[#1E5AA5]">
-                    <School size={48} strokeWidth={1.5} />
-                  </div>
+          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-10 bg-white">
+            <div className="max-w-6xl w-full mx-auto space-y-12">
+              <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-gray-100">
+                <div className="relative w-32 h-32 bg-gray-50 rounded-[2.5rem] border-4 border-white shadow-2xl flex items-center justify-center text-[#1E5AA5]">
+                  <School size={48} strokeWidth={1.5} />
                 </div>
-
-                <div className="flex-1 flex flex-col gap-3 text-center md:text-left">
-                  <div className="flex flex-wrap justify-center md:justify-start gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-lg text-[8px] font-black border uppercase tracking-widest ${jenjangColor}`}
-                    >
-                      Jenjang {data?.jenjang}
-                    </span>
-                    <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-black rounded-lg uppercase tracking-widest">
-                      ● Active Binaan
-                    </span>
+                <div className="text-center md:text-left space-y-4 flex-1">
+                  <div
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${data?.status ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
+                  >
+                    <UserCheck size={12} />{" "}
+                    {data?.status ? "Binaan YPAMDR" : "Bukan Binaan YPAMDR"}
                   </div>
-                  <h2 className="text-4xl font-[900] text-gray-800 uppercase tracking-tighter leading-tight">
+                  <h2 className="text-4xl font-[900] text-gray-800 uppercase tracking-tighter leading-none">
                     {data?.nama_sekolah}
                   </h2>
                   <div className="flex items-center justify-center md:justify-start gap-4 text-gray-400 font-bold text-[10px] uppercase tracking-widest italic">
                     <div className="flex items-center gap-1.5">
                       <MapPin size={12} className="text-[#1E5AA5]" />{" "}
-                      {data?.wilayah?.nama_wilayah?.split("/").pop()}
+                      {data?.wilayah?.nama_wilayah
+                        ?.split("/")
+                        .filter(Boolean)
+                        .pop()}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <Award size={12} className="text-orange-500" /> Akreditasi{" "}
-                      {data?.akreditasi || "Proses"}
+                      <Award size={12} className="text-orange-500" /> Grade{" "}
+                      {data?.akreditasi}
                     </div>
                   </div>
                 </div>
-
                 <Button
-                  text="MODIFIKASI UNIT"
+                  text="MODIFIKASI"
                   icon={<Edit3 size={12} />}
                   onClick={() => navigate(`/admin/sekolah/edit/${id}`)}
-                  className="!bg-[#2E5AA7] !text-white !px-10 !py-3.5 !rounded-xl !text-[8px] font-black shadow-lg shadow-blue-900/10 active:scale-95 border-none uppercase tracking-widest shrink-0"
+                  className="!bg-[#2E5AA7] !text-white !px-10 !py-2.5 !rounded-full !text-[9px] font-black shadow-lg"
                 />
               </div>
 
-              {/* Data Detail Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                {/* Left Column */}
-                <div className="lg:col-span-5 space-y-8">
-                  <div className="p-8 bg-gray-50/50 rounded-[3rem] border border-gray-100 space-y-8">
-                    <div className="flex items-center gap-3">
-                      <div className="w-1.5 h-4 bg-[#1E5AA5] rounded-full"></div>
-                      <h3 className="text-[10px] font-black uppercase text-gray-800 tracking-widest">
-                        Master Identity
-                      </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
+                <div className="space-y-3">
+                  <Label
+                    text="Nomor NPSN"
+                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                  />
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400">
+                      <Hash size={18} />
                     </div>
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-5 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
-                            Nomor NPSN
-                          </span>
-                          <span className="text-sm font-black text-gray-700 font-mono tracking-widest">
-                            {data?.npsn || "00000000"}
-                          </span>
-                        </div>
-                        <BookOpen size={20} className="text-blue-200" />
-                      </div>
-                      <div className="flex items-center justify-between p-5 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
-                            Wilayah Penugasan
-                          </span>
-                          <span className="text-sm font-black text-[#1E5AA5] uppercase truncate max-w-[200px]">
-                            {data?.wilayah?.nama_wilayah || "Global Area"}
-                          </span>
-                        </div>
-                        <Globe size={20} className="text-gray-200" />
-                      </div>
-                      <div className="flex items-center justify-between p-5 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">
-                            Status Kelembagaan
-                          </span>
-                          <span className="text-sm font-black text-emerald-600 uppercase">
-                            YPA-MDR Certified
-                          </span>
-                        </div>
-                        <ShieldCheck size={20} className="text-emerald-200" />
-                      </div>
+                    <span className="font-bold text-gray-700 text-sm tracking-widest font-mono">
+                      {data?.npsn}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <Label
+                    text="Email Akses Terdaftar"
+                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                  />
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400">
+                      <Mail size={18} />
                     </div>
+                    <span className="font-bold text-gray-700 text-sm lowercase">
+                      {data?.email_login}
+                    </span>
                   </div>
                 </div>
 
-                {/* Right Column */}
-                <div className="lg:col-span-7 space-y-10">
-                  <div className="space-y-4">
-                    <Label
-                      text="Alamat Operasional Lengkap"
-                      className="!text-[10px] text-[#1E5AA5] uppercase tracking-[0.3em]"
-                    />
-                    <div className="p-8 bg-gray-50/50 rounded-[3rem] border border-gray-100 flex gap-6 min-h-[160px] items-center">
-                      <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-[#1E5AA5] shadow-sm shrink-0 border border-blue-50">
-                        <MapIcon size={24} />
+                <div className="space-y-3">
+                  <Label
+                    text="Kata Sandi Login"
+                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                  />
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/50 border border-gray-100 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm">
+                        <Lock size={18} />
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <p className="text-sm font-bold text-gray-600 leading-relaxed italic first-letter:uppercase whitespace-pre-line">
-                          {data?.alamat || data?.alamat_lengkap ? (
-                            `"${data?.alamat || data?.alamat_lengkap}"`
-                          ) : (
-                            <span className="text-gray-400 not-italic font-medium text-[11px] uppercase tracking-tighter">
-                              Detail lokasi alamat resmi sekolah belum
-                              diperbarui dalam database.
-                            </span>
-                          )}
-                        </p>
-                      </div>
+                      <span
+                        className={`font-mono font-black text-sm tracking-widest ${showPassword ? "text-blue-600" : "text-gray-300"}`}
+                      >
+                        {showPassword ? data?.password_login : "••••••••"}
+                      </span>
                     </div>
+                    <button
+                      onClick={handleRevealRequest}
+                      className="p-2 rounded-lg hover:bg-white text-gray-400 hover:text-[#1E5AA5] transition-all"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-6 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:bg-blue-50 transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#1E5AA5] shrink-0">
-                        <Navigation size={18} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-gray-400 uppercase">
-                          Latitude
-                        </span>
-                        <span className="text-xs font-mono font-bold text-gray-700">
-                          {data?.latitude || "0.000"}
-                        </span>
-                      </div>
+                <div className="space-y-3">
+                  <Label
+                    text="Status Kelembagaan"
+                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                  />
+                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400">
+                      <ShieldCheck size={18} />
                     </div>
-                    <div className="p-6 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center gap-4 group hover:bg-blue-50 transition-all">
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#1E5AA5] shrink-0">
-                        <Globe size={18} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-gray-400 uppercase">
-                          Longitude
-                        </span>
-                        <span className="text-xs font-mono font-bold text-gray-700">
-                          {data?.longitude || "0.000"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-4 bg-amber-50/50 p-6 rounded-[2.5rem] border border-amber-100">
-                    <Info
-                      size={20}
-                      className="text-amber-600 shrink-0 mt-0.5"
-                    />
-                    <p className="text-[9px] text-amber-700 font-bold leading-relaxed uppercase tracking-tight">
-                      Informasi koordinat geospasial digunakan untuk integrasi
-                      pada peta monitoring sebaran program nasional YPA-MDR.
-                    </p>
+                    <span
+                      className={`font-black text-sm uppercase ${data?.status ? "text-emerald-600" : "text-rose-600"}`}
+                    >
+                      {data?.status ? "Binaan YPAMDR" : "Bukan Binaan YPAMDR"}
+                    </span>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* 3. ACTION BAR */}
-          <div className="px-8 md:px-16 py-8 bg-gray-50/50 border-t border-gray-100 flex justify-end shrink-0">
-            <Button
-              text="KEMBALI KE MASTER"
-              onClick={() => navigate("/admin/sekolah")}
-              className="!bg-white !text-gray-400 !px-10 !py-3.5 !rounded-xl !text-[8px] font-black hover:!bg-gray-50 border border-gray-100 uppercase tracking-widest shadow-sm"
-            />
+              <div className="flex justify-end pt-6 pb-16">
+                <Button
+                  text="KEMBALI KE LIST"
+                  onClick={() => navigate("/admin/sekolah")}
+                  className="!px-10 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </main>

@@ -11,9 +11,10 @@ import {
   Info,
   Database,
   BookOpen,
-  Hash, // Icon tambahan untuk NPSN
+  Hash,
   User,
   LockKeyhole,
+  ShieldCheck,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -24,6 +25,7 @@ import Label from "../../../../components/Label";
 import Button from "../../../../components/Button";
 import Dropdown from "../../../../components/Dropdown";
 import PageWrapper from "../../../../components/PageWrapper";
+import Textarea from "../../../../components/Textarea";
 
 const CreateSekolah = () => {
   const navigate = useNavigate();
@@ -31,7 +33,7 @@ const CreateSekolah = () => {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    npsn: "", // TAMBAHKAN INI
+    npsn: "",
     nama_sekolah: "",
     jenjang: "SD",
     akreditasi: "A",
@@ -39,6 +41,7 @@ const CreateSekolah = () => {
     alamat: "",
     email_login: "",
     password_login: "",
+    id_role: 5, // Sesuai mapping: Role Sekolah adalah ID 5
   });
 
   useEffect(() => {
@@ -48,10 +51,18 @@ const CreateSekolah = () => {
         const res = await axios.get("http://localhost:3000/wilayah", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const formatted = res.data.map((w) => ({
-          value: w.id_wilayah,
-          label: w.nama_wilayah, // Pakai nama full dulu buat ngetes
-        }));
+
+        // FIX: Parsing nama wilayah agar tidak kosong (Lampung, bukan Indonesia/Lampung/)
+        const formatted = res.data
+          .filter((w) => w.status === true)
+          .map((w) => ({
+            value: w.id_wilayah,
+            label: w.nama_wilayah
+              .split("/")
+              .filter(Boolean)
+              .pop()
+              .toUpperCase(),
+          }));
         setWilayahList(formatted);
       } catch (err) {
         console.error("Gagal ambil wilayah", err);
@@ -63,19 +74,10 @@ const CreateSekolah = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validasi awal di frontend
     if (!formData.id_wilayah) {
       return Swal.fire(
         "Peringatan",
-        "Pilih wilayah penugasan terlebih dahulu",
-        "warning",
-      );
-    }
-
-    if (!formData.email_login || !formData.password_login) {
-      return Swal.fire(
-        "Peringatan",
-        "Email login dan password wajib diisi",
+        "Pilih wilayah penugasan unit!",
         "warning",
       );
     }
@@ -83,60 +85,40 @@ const CreateSekolah = () => {
     if (formData.password_login.length < 8) {
       return Swal.fire(
         "Peringatan",
-        "Password minimal harus 8 karakter",
+        "Password minimal 8 karakter demi keamanan!",
         "warning",
       );
     }
 
     setLoading(true);
-
     try {
       const token = localStorage.getItem("token");
-
-      // Pastikan payload bersih dan tipe data benar
       const payload = {
         ...formData,
-        id_wilayah: Number(formData.id_wilayah), // Konversi manual tetap bagus untuk keamanan
-        // Pastikan key email_login dan password_login ada di formData jika form ini sekaligus register login
+        id_wilayah: Number(formData.id_wilayah),
       };
 
       await axios.post("http://localhost:3000/sekolah", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      await Swal.fire({
+      Swal.fire({
         icon: "success",
-        title: "Berhasil",
-        text: "Unit sekolah baru telah didaftarkan",
+        title: "REGISTRASI BERHASIL",
+        text: "Unit sekolah dan akun akses telah diaktifkan.",
         timer: 2000,
         showConfirmButton: false,
       });
 
       navigate("/admin/sekolah");
     } catch (err) {
-      // --- PROSES ERROR BIAR GAK MUNCUL [OBJECT OBJECT] ---
-      const errorResponse = err.response?.data;
-      let pesanError = "Terjadi kesalahan internal pada server.";
-
-      if (errorResponse?.message) {
-        // Jika NestJS kirim banyak error (Array), kita gabung pakai <br>
-        if (Array.isArray(errorResponse.message)) {
-          pesanError = errorResponse.message.join("<br>");
-        } else {
-          pesanError = errorResponse.message;
-        }
-      }
-
-      // Tampilkan menggunakan 'html' supaya tag <br> terbaca sebagai baris baru
+      const errorMsg =
+        err.response?.data?.message || "Terjadi kesalahan server";
       Swal.fire({
         icon: "error",
-        title: "Gagal Simpan",
-        html: `<div style="text-align: left; font-size: 14px;">${pesanError}</div>`,
-        confirmButtonText: "Perbaiki Data",
-        confirmButtonColor: "#ef4444",
+        title: "GAGAL SIMPAN",
+        html: `<div style="text-align: left; font-size: 12px;">${Array.isArray(errorMsg) ? errorMsg.join("<br>") : errorMsg}</div>`,
       });
-
-      console.error("Detail Error:", errorResponse);
     } finally {
       setLoading(false);
     }
@@ -145,30 +127,29 @@ const CreateSekolah = () => {
   return (
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] !rounded-b-none border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
-          {/* HEADER BAR */}
-          <div className="px-8 md:px-16 pt-12 pb-10 flex flex-col md:flex-row items-center justify-between bg-[#1E5AA5] shrink-0 relative overflow-hidden">
+      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-10 pb-0">
+        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
+          {/* HEADER BANNER */}
+          <div className="px-8 md:px-16 pt-12 pb-10 bg-[#1E5AA5] shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
             <div className="flex items-center gap-6 relative z-10">
               <button
                 onClick={() => navigate("/admin/sekolah")}
-                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg backdrop-blur-md group"
+                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg"
               >
-                <ArrowLeft
-                  size={18}
-                  strokeWidth={3}
-                  className="group-hover:-translate-x-1 transition-transform"
-                />
+                <ArrowLeft size={18} strokeWidth={3} />
               </button>
               <div>
-                <h1 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">
+                <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">
                   REGISTRASI <span className="text-blue-200">UNIT SEKOLAH</span>
                 </h1>
                 <p className="text-[9px] font-bold text-blue-100/70 tracking-widest uppercase italic mt-2">
-                  Educational Entity Registry System
+                  Educational Entity Registry & Access Management
                 </p>
               </div>
+            </div>
+            <div className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-white/10 rounded-2xl border border-white/20 text-white font-black text-[9px] uppercase tracking-widest">
+              <Database size={14} className="text-blue-200" /> SYSTEM CORE V.2
             </div>
           </div>
 
@@ -179,31 +160,30 @@ const CreateSekolah = () => {
               className="max-w-6xl mx-auto h-full flex flex-col"
             >
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-10 pt-5 flex-1">
-                {/* KOLOM KIRI */}
+                {/* KOLOM KIRI: IDENTITAS SEKOLAH */}
                 <div className="space-y-8">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-4 bg-[#1E5AA5] rounded-full"></div>
+                    <div className="w-1 h-4 bg-[#1E5AA5] rounded-full"></div>
                     <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
                       School Identity
                     </h3>
                   </div>
 
-                  {/* BARIS NPSN & NAMA (Grid 1:2) */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-1 space-y-2">
                       <Label
                         text="NPSN"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
                       <div className="relative">
                         <Input
-                          placeholder="8 digit"
+                          placeholder="8 Digit"
                           value={formData.npsn}
                           onChange={(e) =>
                             setFormData({ ...formData, npsn: e.target.value })
                           }
-                          className="!py-4 !pl-10 !bg-white !border-gray-200 !rounded-2xl font-mono font-bold"
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-mono font-bold"
                           required
                         />
                         <Hash
@@ -214,13 +194,13 @@ const CreateSekolah = () => {
                     </div>
                     <div className="col-span-2 space-y-2">
                       <Label
-                        text="Nama Lengkap Sekolah"
+                        text="Nama Lengkap Unit"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
                       <div className="relative">
                         <Input
-                          placeholder="SMKN 01 Purworejo"
+                          placeholder="Ketik nama sekolah..."
                           value={formData.nama_sekolah}
                           onChange={(e) =>
                             setFormData({
@@ -228,7 +208,7 @@ const CreateSekolah = () => {
                               nama_sekolah: e.target.value,
                             })
                           }
-                          className="!py-4 !pl-10 !bg-white !border-gray-200 !rounded-2xl font-bold"
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
                           required
                         />
                         <School
@@ -242,9 +222,9 @@ const CreateSekolah = () => {
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label
-                        text="Jenjang"
+                        text="Jenjang Pendidikan"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
                       <Dropdown
                         icon={BookOpen}
@@ -258,14 +238,14 @@ const CreateSekolah = () => {
                           { label: "SMA", value: "SMA" },
                           { label: "SMK", value: "SMK" },
                         ]}
-                        className="!py-4 !rounded-2xl font-bold"
+                        className="!py-4 !bg-gray-50/50 !rounded-2xl font-bold"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label
                         text="Akreditasi"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
                       <Dropdown
                         icon={Award}
@@ -278,132 +258,137 @@ const CreateSekolah = () => {
                           { label: "Grade B", value: "B" },
                           { label: "Grade C", value: "C" },
                         ]}
-                        className="!py-4 !rounded-2xl font-bold"
+                        className="!py-4 !bg-gray-50/50 !rounded-2xl font-bold"
                       />
                     </div>
                   </div>
+
+                  <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100 border-dashed flex gap-4">
+                    <ShieldCheck
+                      size={20}
+                      className="text-[#1E5AA5] shrink-0 mt-1"
+                    />
+                    <p className="text-[10px] text-blue-400 font-medium leading-relaxed italic">
+                      Data identitas unit sekolah akan disinkronkan dengan
+                      pangkalan data pendidikan pusat YPA-MDR.
+                    </p>
+                  </div>
                 </div>
 
-                {/* KOLOM KANAN */}
+                {/* KOLOM KANAN: PENEMPATAN & AKSES */}
                 <div className="space-y-8">
                   <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                    <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
                     <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                      Regional Placement
+                      Regional & Auth
                     </h3>
                   </div>
 
                   <div className="space-y-2">
                     <Label
-                      text="Wilayah Penugasan"
+                      text="Wilayah Operasional"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                     />
                     <Dropdown
                       icon={MapPin}
-                      label="PILIH WILAYAH"
+                      label="PILIH WILAYAH BINAAN"
                       value={formData.id_wilayah}
                       onChange={(val) =>
                         setFormData({ ...formData, id_wilayah: val })
                       }
                       items={wilayahList}
-                      className="!py-4 !rounded-2xl font-bold"
+                      className="!py-4 !bg-gray-50/50 !rounded-2xl font-bold"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label
-                      text="Alamat Lengkap"
+                      text="Alamat Lengkap Unit"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                     />
-                    <textarea
-                      className="w-full p-5 bg-gray-50 rounded-[2rem] outline-none h-28 text-xs font-bold focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all border border-gray-100"
+                    <Textarea
                       placeholder="Input alamat detail..."
                       value={formData.alamat}
                       onChange={(e) =>
                         setFormData({ ...formData, alamat: e.target.value })
                       }
+                      className="!bg-gray-50/50 !border-gray-200 !rounded-2xl !text-[10px]"
+                      rows={3}
                       required
                     />
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="w-1.5 h-4 bg-orange-500 rounded-full"></div>
-                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                      Login Credentials
-                    </h3>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      text="Email Login"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase"
-                    />
-                    <div className="relative">
-                      <Input
-                        type="email"
-                        placeholder="admin@sekolah.com"
-                        value={formData.email_login}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            email_login: e.target.value,
-                          })
-                        }
-                        className="!py-4 !pl-10 !bg-white !border-gray-200 !rounded-2xl font-bold"
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label
+                        text="Email Login Akun"
                         required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
-                      <User
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={14}
-                      />
+                      <div className="relative">
+                        <Input
+                          type="email"
+                          placeholder="admin@sekolah.com"
+                          value={formData.email_login}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              email_login: e.target.value,
+                            })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <User
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      text="Password Login"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase"
-                    />
-                    <div className="relative">
-                      <Input
-                        type="password"
-                        placeholder="Minimal 8 karakter"
-                        value={formData.password_login}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            password_login: e.target.value,
-                          })
-                        }
-                        className="!py-4 !pl-10 !bg-white !border-gray-200 !rounded-2xl font-bold"
+                    <div className="space-y-2">
+                      <Label
+                        text="Password Login"
                         required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
-                      <LockKeyhole
-                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={14}
-                      />
+                      <div className="relative">
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          value={formData.password_login}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              password_login: e.target.value,
+                            })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <LockKeyhole
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* ACTION BUTTONS */}
-              <div className="flex justify-end items-center gap-4 pt-10 pb-10">
+              <div className="flex justify-end items-center gap-3 pt-12 pb-16 shrink-0">
                 <Button
-                  text="BATALKAN"
+                  text="KEMBALI"
                   onClick={() => navigate("/admin/sekolah")}
-                  className="!bg-white !text-gray-400 !px-10 !py-3 !rounded-xl !text-[9px] font-black border border-gray-100 uppercase"
+                  className="!px-8 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 active:scale-95 shadow-sm transition-all"
                 />
                 <Button
-                  text={loading ? "SAVING..." : "SIMPAN UNIT SEKOLAH"}
+                  text={loading ? "SAVING..." : "SIMPAN UNIT"}
                   type="submit"
                   disabled={loading}
-                  icon={<Save size={14} />}
-                  className="!bg-[#2E5AA7] !text-white !px-12 !py-3 !rounded-xl !text-[9px] font-black shadow-xl border-none uppercase"
+                  className="!px-10 !py-2.5 !bg-[#2E5AA7] hover:!bg-[#1c4d94] !text-white !rounded-full !text-[9px] font-black shadow-lg shadow-blue-900/10 active:scale-95 transition-all border-none"
                 />
               </div>
             </form>

@@ -37,8 +37,6 @@ const Toast = Swal.mixin({
 });
 
 const ReadPengurus = () => {
-  // --- INISIALISASI STATE DARI LOCAL STORAGE ---
-  // Kita cek apakah ada filter yang tersimpan sebelumnya, jika tidak pakai default "all"
   const [searchTerm, setSearchTerm] = useState(
     localStorage.getItem("filter_search") || "",
   );
@@ -51,19 +49,15 @@ const ReadPengurus = () => {
   const [currentPage, setCurrentPage] = useState(
     Number(localStorage.getItem("filter_page")) || 1,
   );
-
   const [pengurus, setPengurus] = useState([]);
   const [loading, setLoading] = useState(true);
   const itemsPerPage = 5;
   const navigate = useNavigate();
 
   const filterJabatanOptions = [
-    { value: "all", label: "SEMUA JABATAN" },
-    { value: "Admin", label: "SUPER ADMIN" },
-    { value: "Ketua Pengurus", label: "KETUA PENGURUS" },
-    { value: "Sekretaris", label: "SEKRETARIS" },
-    { value: "Bendahara", label: "BENDAHARA" },
-    { value: "Anggota Pengurus", label: "ANGGOTA PENGURUS" },
+    { value: "all", label: "SEMUA OTORITAS" },
+    { value: "1", label: "SUPER ADMIN" },
+    { value: "2", label: "PENGURUS PUSAT" },
   ];
 
   const filterStatusOptions = [
@@ -72,7 +66,6 @@ const ReadPengurus = () => {
     { value: "inactive", label: "STATUS: NONAKTIF" },
   ];
 
-  // --- SIMPAN SETIAP PERUBAHAN KE LOCAL STORAGE ---
   useEffect(() => {
     localStorage.setItem("filter_search", searchTerm);
     localStorage.setItem("filter_status", statusFilter);
@@ -87,8 +80,9 @@ const ReadPengurus = () => {
       const response = await axios.get("http://localhost:3000/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
+      // FIX: Ambil Role 1 (Admin) dan Role 2 (Pengurus)
       const data = response.data.filter(
-        (u) => Number(u.id_role) === 0 || Number(u.id_role) === 1,
+        (u) => Number(u.id_role) === 1 || Number(u.id_role) === 2,
       );
       setPengurus(data);
     } catch (error) {
@@ -127,7 +121,7 @@ const ReadPengurus = () => {
     }
   };
 
-  // --- LOGIKA FILTER & SORTING ---
+  // --- LOGIKA FILTER & SORTING (FIXED ID 1 & 2) ---
   const filteredData = pengurus
     .filter((p) => {
       const matchesSearch =
@@ -141,18 +135,19 @@ const ReadPengurus = () => {
           : statusFilter === "active"
             ? isActive
             : !isActive;
-      const isSuper = Number(p.id_role) === 0 || p.id_user === 1;
+
+      // Filter Jabatan berdasarkan ID 1 atau 2
       const matchesJabatan =
         jabatanFilter === "all"
           ? true
-          : jabatanFilter === "Admin"
-            ? isSuper
-            : p.jabatan === jabatanFilter;
+          : Number(p.id_role) === Number(jabatanFilter);
+
       return matchesSearch && matchesStatus && matchesJabatan;
     })
     .sort((a, b) => {
-      const isASuper = Number(a.id_role) === 0 || a.id_user === 1;
-      const isBSuper = Number(b.id_role) === 0 || b.id_user === 1;
+      // Prioritas: Role 1 (Super Admin) Selalu di Atas
+      const isASuper = Number(a.id_role) === 1;
+      const isBSuper = Number(b.id_role) === 1;
       if (isASuper && !isBSuper) return -1;
       if (!isASuper && isBSuper) return 1;
       return b.id_user - a.id_user;
@@ -179,7 +174,7 @@ const ReadPengurus = () => {
       header: "IDENTITAS PENGURUS",
       align: "text-left w-[30%]",
       render: (row) => {
-        const isSuper = Number(row.id_role) === 0 || row.id_user === 1;
+        const isSuper = Number(row.id_role) === 1; // FIX: Admin adalah ID 1
         return (
           <div className="flex flex-col py-3">
             <div className="flex items-center gap-2">
@@ -199,10 +194,12 @@ const ReadPengurus = () => {
       header: "JABATAN STRUKTURAL",
       align: "text-left w-[25%]",
       render: (row) => {
-        const isSuper = Number(row.id_role) === 0 || row.id_user === 1;
+        const isSuper = Number(row.id_role) === 1;
         return (
           <span
-            className={`px-3 py-1 rounded-lg text-[8px] font-black border ${isSuper ? "bg-gray-900 border-gray-800 text-white" : "bg-blue-50 border-blue-100 text-blue-600"}`}
+            className={`text-[10px] font-black uppercase tracking-tight ${
+              isSuper ? "text-gray-800" : "text-[#1E5AA5]"
+            }`}
           >
             {isSuper ? "SUPER ADMINISTRATOR" : row.jabatan || "PENGURUS"}
           </span>
@@ -213,7 +210,7 @@ const ReadPengurus = () => {
       header: "KONTROL OTORITAS",
       align: "text-left w-[240px]",
       render: (row) => {
-        const isSuper = Number(row.id_role) === 0 || row.id_user === 1;
+        const isSuper = Number(row.id_role) === 1; // FIX: Admin adalah ID 1
         const isActive =
           row.status === true ||
           row.status === "true" ||
@@ -246,10 +243,10 @@ const ReadPengurus = () => {
                 className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
               >
                 <div
-                  className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isActive ? "bg-emerald-500 shadow-lg shadow-emerald-100" : "bg-gray-300"} p-1`}
+                  className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isActive ? "bg-emerald-500" : "bg-gray-300"} p-1`}
                 >
                   <div
-                    className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${isActive ? "translate-x-4" : "translate-x-0"}`}
+                    className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-4" : "translate-x-0"}`}
                   />
                 </div>
                 <span
@@ -291,7 +288,7 @@ const ReadPengurus = () => {
                 text="TAMBAH PENGURUS"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/pengurus/create")}
-                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg"
+                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
               />
             </header>
 
@@ -335,8 +332,6 @@ const ReadPengurus = () => {
                   className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
                 />
               </div>
-
-              {/* Tombol Reset Filter jika diperlukan */}
               <button
                 onClick={() => {
                   setSearchTerm("");
@@ -349,13 +344,11 @@ const ReadPengurus = () => {
                 Reset Filter
               </button>
             </div>
-
             <div className="px-4 py-2 bg-blue-50/50 text-[#1E5AA5] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
               <Filter size={12} className="inline mr-2" /> Hasil: {totalItems}{" "}
               Personnel
             </div>
           </div>
-
           <div className="flex-none px-10 pb-4 overflow-hidden">
             <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
               <Table
@@ -365,7 +358,6 @@ const ReadPengurus = () => {
               />
             </div>
           </div>
-
           <div className="px-10 py-5 mt-auto border-t border-gray-100 bg-gray-50/30">
             <Pagination
               currentPage={currentPage}
