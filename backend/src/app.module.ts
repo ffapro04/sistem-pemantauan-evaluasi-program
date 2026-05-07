@@ -17,7 +17,7 @@ import { VendorModule } from './vendor/vendor.module';
       host: 'localhost',
       port: 5432,
       username: 'postgres',
-      password: 'ypamdr17',
+      password: 'gesa123',
       database: 'sistem_monitoring_evaluasi_program',
       autoLoadEntities: true,
       synchronize: true,

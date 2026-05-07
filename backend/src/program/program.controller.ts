@@ -99,24 +99,23 @@ export class ProgramController {
       storage: diskStorage({
         destination: './uploads/mou',
         filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, `MOU-EDIT-${uniqueSuffix}${extname(file.originalname)}`);
         },
       }),
     }),
   )
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateData: any,
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    console.log(`--- Controller: Update Program ID ${id} ---`);
-    console.log('Update Data:', updateData);
-
+    console.log(`--- [DEBUG] Update Request Masuk ID: ${id} ---`);
+    
     if (!authHeader) throw new UnauthorizedException('Token tidak ada');
 
+    // Ambil ID User dari Token
     const token = authHeader.split(' ')[1];
     let id_user = null;
     try {
@@ -130,6 +129,48 @@ export class ProgramController {
       throw new UnauthorizedException('Token tidak valid');
     }
 
+    // Panggil Service Update
     return this.programService.update(+id, updateData, file, id_user);
   }
 }
+
+  // @Patch(':id')
+  // @UseInterceptors(
+  //   FileInterceptor('file_mou', {
+  //     storage: diskStorage({
+  //       destination: './uploads/mou',
+  //       filename: (req, file, cb) => {
+  //         const uniqueSuffix =
+  //           Date.now() + '-' + Math.round(Math.random() * 1e9);
+  //         cb(null, `MOU-EDIT-${uniqueSuffix}${extname(file.originalname)}`);
+  //       },
+  //     }),
+  //   }),
+  // )
+  // update(
+  //   @Param('id') id: string,
+  //   @Body() updateData: any,
+  //   @UploadedFile() file: Express.Multer.File,
+  //   @Headers('authorization') authHeader: string,
+  // ) {
+  //   console.log(`--- Controller: Update Program ID ${id} ---`);
+  //   console.log('Update Data:', updateData);
+
+  //   if (!authHeader) throw new UnauthorizedException('Token tidak ada');
+
+  //   const token = authHeader.split(' ')[1];
+  //   let id_user = null;
+  //   try {
+  //     const payloadBase64Url = token.split('.')[1];
+  //     const payloadJson = Buffer.from(
+  //       payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/'),
+  //       'base64',
+  //     ).toString('utf-8');
+  //     id_user = JSON.parse(payloadJson).sub;
+  //   } catch (e) {
+  //     throw new UnauthorizedException('Token tidak valid');
+  //   }
+
+  //   return this.programService.update(+id, updateData, file, id_user);
+  // }
+

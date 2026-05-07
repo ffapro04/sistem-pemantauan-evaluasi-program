@@ -29,8 +29,7 @@ export class ProgramService {
     await queryRunner.startTransaction();
 
     try {
-      // --- 🔍 BAGIAN DEBUGGING (Lihat di Terminal VS Code) ---
-      console.log('--- [DEBUG] DATA DARI FRONTEND ---');
+      
       console.log('User ID:', id_user);
       console.log('Raw id_sekolah:', createProgramDto.id_sekolah);
       console.log('Raw id_pengawas:', createProgramDto.id_pengawas);
@@ -60,6 +59,8 @@ export class ProgramService {
           createProgramDto.tahun && !isNaN(Number(createProgramDto.tahun))
             ? Number(createProgramDto.tahun)
             : null,
+
+        harga_vendor: createProgramDto.harga_vendor ? Number(createProgramDto.harga_vendor) : 0,
 
         dibuat_oleh: id_user,
         file_mou: file ? file.filename : null,
@@ -141,40 +142,89 @@ export class ProgramService {
     }
   }
 
-  async findOne(id: number) {
-    try {
-      return await this.programRepo.findOne({
-        where: { id_program: id },
-        relations: [
-          'fases',
+async findOne(id: number) {
+  try {
+    const data = await this.programRepo.findOne({
+      where: { id_program: id },
+      relations: [
+        'pengawas', 
+        'vendor',
+        'sekolah',
+        'fases',
           'fases.kegiatans',
           'fases.kegiatans.termin',
           'fases.kegiatans.termin.chats',
-        ],
-      });
-    } catch (error) {
-      throw new InternalServerErrorException('Data program tidak ditemukan');
+      ],
+    });
+    
+    if (!data) throw new Error('Data memang tidak ada');
+    return data;
+
+  } catch (error) {
+    // Tampilkan error aslinya di terminal, jangan cuma "Data tidak ditemukan"
+    console.error('--- [ERROR FINDONE] ---', error.message);
+    throw new InternalServerErrorException(`Detail Error: ${error.message}`);
+  }
+}
+
+
+  async update(id: number, updateData: any, file: Express.Multer.File, id_user: number) {
+  try {
+    const existing = await this.programRepo.findOne({ where: { id_program: id } });
+    if (!existing) {
+      throw new Error('Program tidak ditemukan di database');
     }
-  }
 
-  async update(
-    id: number,
-    updateData: any,
-    file: Express.Multer.File,
-    id_user: number,
-  ) {
-    try {
-      const dataToSave = { ...updateData };
-      if (file) dataToSave.file_mou = file.filename;
+    const { fases, kegiatans, sekolah, pengawas, vendor, dibuat_oleh, created_at, ...dataToUpdate } = updateData;
 
-      await this.programRepo.update(id, dataToSave);
-      return this.findOne(id);
-    } catch (error) {
-      throw new InternalServerErrorException('Gagal update program');
+    let finalVendorIds = existing.id_vendor;
+
+    if (updateData.id_vendor) {
+      // Kita cek apakah datanya string "[1,2]" (dari JSON.stringify di frontend)
+      let parsed = updateData.id_vendor;
+      if (typeof updateData.id_vendor === 'string') {
+        try {
+          parsed = JSON.parse(updateData.id_vendor);
+        } catch (e) {
+          parsed = updateData.id_vendor; // biarkan saja kalau gagal parse
+        }
+      }
+
+      // Pastikan jadi Array of Numbers dan buang yang bukan angka (NaN)
+      if (Array.isArray(parsed)) {
+        finalVendorIds = parsed.map(v => Number(v)).filter(v => !isNaN(v));
+      } else {
+        const singleId = Number(updateData.id_vendor);
+        finalVendorIds = !isNaN(singleId) ? [singleId] : existing.id_vendor;
+      }
     }
-  }
 
-  remove(id: number) {
-    return this.programRepo.delete(id);
+    const finalData = {
+      ...dataToUpdate,
+      id_sekolah: updateData.id_sekolah ? Number(updateData.id_sekolah) : existing.id_sekolah,
+      id_pengawas: updateData.id_pengawas ? Number(updateData.id_pengawas) : existing.id_pengawas,
+      tahun: updateData.tahun ? Number(updateData.tahun) : existing.tahun,
+
+      harga_vendor: updateData.harga_vendor ? Number(updateData.harga_vendor) : existing.harga_vendor,
+      id_vendor: finalVendorIds,
+      // Fix Array format untuk PostgreSQL
+      // id_vendor: updateData.id_vendor ? [Number(updateData.id_vendor)] : existing.id_vendor,
+      updated_at: new Date(),
+    };
+
+    if (file) {
+      finalData.file_mou = file.filename;
+    }
+
+    // Eksekusi Update
+    await this.programRepo.update(id, finalData);
+
+    // Langsung return objek sukses saja daripada panggil findOne lagi yang rawan error relasi
+    return { message: 'Update Berhasil', id_program: id }; 
+    
+  } catch (error) {
+    console.error('--- [ERROR UPDATE SERVICE] ---', error.message);
+    throw new InternalServerErrorException(`Gagal update: ${error.message}`);
   }
+}
 }

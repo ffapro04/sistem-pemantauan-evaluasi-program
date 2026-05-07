@@ -1,6 +1,10 @@
 /* eslint-disable prettier/prettier */
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
 import { Fase } from './fase.entity';
+import { User } from 'src/users/user.entity';
+import { Vendor } from 'src/vendor/entities/vendor.entity';
+import { Sekolah } from 'src/sekolah/entities/sekolah.entity';
+
 
 @Entity('t_program')
 export class Program {
@@ -19,11 +23,27 @@ export class Program {
   @Column()
   id_sekolah: number;
 
-  @Column('int', { name: 'id_vendor', array: true, nullable: true }) // <--- Tambahkan 'int' dan array: true
+   @ManyToOne(() => Sekolah)
+  sekolah : Sekolah;
+
+  @Column('int', { name: 'id_vendor', array: true, nullable: true })
   id_vendor: number[];
+
+  @ManyToOne(() => Vendor)
+  vendor : Vendor;
+
 
   @Column({ nullable: true })
   id_pengawas: number;
+
+  @ManyToOne(() => User) // Program punya banyak ke satu User (Pengawas)
+  @JoinColumn({ name: 'id_pengawas' }) // Ini ngasih tau TypeORM kalau kolom kuncinya adalah id_pengawas
+  pengawas: User;
+
+  @Column({ type: 'float', nullable: true, default: 0 }) // Lebih fleksibel dibanding numeric(15,2)
+  harga_vendor: number;
+//   @Column({ type: 'numeric', precision: 20, scale: 2, nullable: true, default: 0 })
+// harga_vendor: number;
 
   @Column()
   kategori: string;

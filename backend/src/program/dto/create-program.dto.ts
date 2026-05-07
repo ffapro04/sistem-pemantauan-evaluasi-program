@@ -63,6 +63,11 @@ export class CreateProgramDto {
   id_pengawas: number;
 
   @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  harga_vendor?: number;
+
+  @IsOptional()
   @Transform(({ value }) => {
     if (Array.isArray(value)) return value.map(Number);
     if (typeof value === 'string' && value.trim() !== '') {

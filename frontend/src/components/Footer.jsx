@@ -106,7 +106,7 @@ const Footer = () => {
           {/* Section 4: Kontak */}
           <div className="lg:col-span-4">
             <h4 className="text-[12px] font-black tracking-[0.25em] uppercase mb-8 text-white/50 border-l-2 border-blue-300 pl-3">
-              Hubungi Kami
+              Hubungi Kamis
             </h4>
             <div className="space-y-6">
               <div className="flex gap-5 items-start">
