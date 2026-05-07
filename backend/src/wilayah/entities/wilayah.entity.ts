@@ -107,7 +107,4 @@ export class Wilayah {
     },
   })
   longitude: number;
-
-  @Column({ type: 'varchar', length: 50, default: 'Absolute', nullable: true })
-  keterangan: string;
 }

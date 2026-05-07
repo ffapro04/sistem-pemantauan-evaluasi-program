@@ -1,7 +1,6 @@
 /* eslint-disable prettier/prettier */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
-// Hapus import bcrypt karena sudah tidak dipakai
 import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
@@ -12,30 +11,28 @@ export class AuthService {
   ) {}
 
   async login(email: string, passwordInput: string) {
+    // findByEmail sudah kita pastikan men-select password & id_role
     const user = await this.usersService.findByEmail(email);
-
-    console.log('User ditemukan:', user);
 
     if (!user) {
       throw new UnauthorizedException('User tidak ditemukan');
     }
 
-    console.log('DB Pass:', user.password, '| Input Pass:', passwordInput);
-
-    // BANDINGKAN STRING LANGSUNG (Plain Text)
-    // Sesuai dengan data di users.service yang tidak di-hash lagi
+    // Perbandingan Plain Text Password
     if (user.password !== passwordInput) {
       throw new UnauthorizedException('Password salah');
     }
 
-    // PAYLOAD ini yang bakal dibaca sama Sidebar.jsx kamu di Frontend
+    // PAYLOAD: Ini data yang akan di-decode oleh jwtDecode di Sidebar.jsx
     const payload = {
       sub: user.id_user,
       email: user.email,
-      role: user?.role?.nama_role || 'No Role', // Misal: "Admin" atau "HO"
-      id_sekolah: user.id_sekolah,
       nama: user.nama,
-      jenis: user.jenis, // Penting buat filter menu Akademik/Non-Akademik
+      // SANGAT PENTING: Masukkan id_role (angka) agar Sidebar tidak "NO ROLE"
+      id_role: user.id_role || (user.role ? user.role.id_role : null),
+      role: user?.role?.nama_role || 'No Role',
+      id_sekolah: user.id_sekolah,
+      jenis: user.jenis,
     };
 
     return {

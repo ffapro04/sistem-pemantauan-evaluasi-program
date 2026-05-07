@@ -9,11 +9,8 @@ import {
   MapPin,
   Search as SearchIcon,
   Database,
-  Globe,
-  Calendar,
-  Info,
   Layers,
-  Map as MapIcon,
+  Navigation,
 } from "lucide-react";
 import {
   MapContainer,
@@ -26,16 +23,14 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Swal from "sweetalert2";
 
-// Komponen Internal Premium
 import Sidebar from "../../../../components/Sidebar";
 import Button from "../../../../components/Button";
 import Label from "../../../../components/Label";
 import Input from "../../../../components/Input";
 import PageWrapper from "../../../../components/PageWrapper";
 import Dropdown from "../../../../components/Dropdown";
-import Textarea from "../../../../components/Textarea"; // Import Textarea
+import Textarea from "../../../../components/Textarea";
 
-// Fix icon Marker Leaflet
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
@@ -57,6 +52,9 @@ function ChangeView({ center }) {
   return null;
 }
 
+const DEFAULT_LAT = -6.2;
+const DEFAULT_LNG = 106.816666;
+
 const CreateWilayah = () => {
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
@@ -64,18 +62,18 @@ const CreateWilayah = () => {
   const [searchValue, setSearchValue] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isLocationSelected, setIsLocationSelected] = useState(false);
 
   const [formData, setFormData] = useState({
     nama_wilayah: "",
-    latitude: -6.2,
-    longitude: 106.816666,
+    latitude: DEFAULT_LAT,
+    longitude: DEFAULT_LNG,
     deskripsi: "",
-    alamat_lengkap: "", // Field Baru
+    alamat_lengkap: "",
     tahun_awal_binaan: new Date().getFullYear(),
     status: true,
     tipe_wilayah: "Binaan",
-    jenis_wilayah: "Non-Akademik",
-    keterangan: "Absolute",
+    jenis_wilayah: "Absolute", // ✅ Default Absolute
   });
 
   useEffect(() => {
@@ -136,25 +134,24 @@ const CreateWilayah = () => {
       kota.replace("Kabupaten ", "").replace("Kota ", "");
 
     const formatNama = `Indonesia/${prov}/${kota}/${namaDetail}`
-      .replace(/\/+/g, "/")
-      .trim();
+      .split("/")
+      .filter(Boolean)
+      .join("/");
 
     try {
       const token = localStorage.getItem("token");
-      const safeName = encodeURIComponent(formatNama);
       const response = await axios.get(
-        `http://localhost:3000/wilayah/check-name?nama=${safeName}`,
+        `http://localhost:3000/wilayah/check-name?nama=${encodeURIComponent(formatNama)}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (response.data.isDuplicate) {
         Swal.fire({
           icon: "warning",
-          title: "WILAYAH SUDAH TERDATA",
-          text: `Entitas "${namaDetail}" di wilayah ini sudah ada dalam database.`,
-          confirmButtonColor: "#2E5AA7",
+          title: "WILAYAH TERDUPLIKASI",
+          text: `Area "${namaDetail}" sudah terdaftar di sistem.`,
+          confirmButtonColor: "#1E5AA5",
         });
-        setSearchValue("");
         return;
       }
 
@@ -166,21 +163,20 @@ const CreateWilayah = () => {
         prov,
       ].filter((val, index, self) => val && self.indexOf(val) === index);
 
-      const deskripsiFinal = deskripsiParts.join(", ") + " - Indonesia";
-
       setFormData((prev) => ({
         ...prev,
         nama_wilayah: formatNama,
-        deskripsi: deskripsiFinal,
-        alamat_lengkap: display_name, // Otomatis mengisi alamat lengkap dari API
+        deskripsi: deskripsiParts.join(", ") + " - Indonesia",
+        alamat_lengkap: display_name,
         latitude: parseFloat(lat),
         longitude: parseFloat(lon),
       }));
 
+      setIsLocationSelected(true);
       setSearchValue(namaDetail);
       setShowDropdown(false);
     } catch (error) {
-      console.error("Gagal sinkronisasi data wilayah", error);
+      console.error(error);
     }
   };
 
@@ -208,40 +204,49 @@ const CreateWilayah = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.alamat_lengkap) {
+    if (!isLocationSelected) {
       return Swal.fire({
         icon: "warning",
-        title: "DATA BELUM LENGKAP",
-        text: "Mohon isi Alamat Lengkap wilayah tersebut!",
+        title: "LOKASI BELUM DIPILIH",
+        text: "Mohon pilih lokasi terlebih dahulu melalui kotak pencarian atau klik langsung di peta!",
+        confirmButtonColor: "#1E5AA5",
       });
     }
 
-    if (!formData.deskripsi.toLowerCase().includes("indonesia")) {
+    if (!formData.alamat_lengkap) {
       return Swal.fire({
-        icon: "error",
-        title: "WILAYAH ILEGAL",
-        text: "Pilih lokasi di Indonesia!",
+        icon: "warning",
+        title: "DATA TIDAK LENGKAP",
+        text: "Mohon isi Alamat Lengkap spesifik wilayah!",
+        confirmButtonColor: "#1E5AA5",
       });
     }
 
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
+
+      // ✅ Tulis field satu per satu, jangan pakai ...formData
       const payload = {
-        ...formData,
+        nama_wilayah: formData.nama_wilayah,
         latitude: parseFloat(formData.latitude),
         longitude: parseFloat(formData.longitude),
-        tahun_awal_binaan:
-          parseInt(formData.tahun_awal_binaan) || new Date().getFullYear(),
+        deskripsi: formData.deskripsi,
+        alamat_lengkap: formData.alamat_lengkap,
+        tahun_awal_binaan: parseInt(formData.tahun_awal_binaan),
+        status: formData.status,
+        tipe_wilayah: formData.tipe_wilayah,
+        jenis_wilayah: formData.jenis_wilayah,
       };
 
       await axios.post("http://localhost:3000/wilayah", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
       Swal.fire({
         icon: "success",
-        title: "Berhasil",
-        text: "Data Tersimpan!",
+        title: "BERHASIL",
+        text: "Area Binaan Baru Telah Didaftarkan",
         timer: 2000,
         showConfirmButton: false,
       });
@@ -250,7 +255,7 @@ const CreateWilayah = () => {
       Swal.fire({
         icon: "error",
         title: "GAGAL SIMPAN",
-        text: error.response?.data?.message || "Kesalahan pada koordinat!",
+        text: error.response?.data?.message || "Kesalahan sistem",
       });
     } finally {
       setLoading(false);
@@ -261,36 +266,29 @@ const CreateWilayah = () => {
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
       <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] !rounded-b-none border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
+        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
           {/* HEADER */}
-          <div className="px-8 md:px-16 pt-10 pb-8 flex flex-col md:flex-row items-center justify-between bg-[#1E5AA5] shrink-0 relative overflow-hidden">
+          <div className="px-8 md:px-16 pt-10 pb-8 bg-[#1E5AA5] shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
             <div className="flex items-center gap-6 relative z-10">
               <button
                 onClick={() => navigate("/admin/wilayah")}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg backdrop-blur-md group"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20"
               >
-                <ArrowLeft
-                  size={16}
-                  strokeWidth={3}
-                  className="group-hover:-translate-x-1 transition-transform"
-                />
+                <ArrowLeft size={16} strokeWidth={3} />
               </button>
               <div>
-                <h1 className="text-xl font-black text-white tracking-tighter uppercase leading-none">
+                <h1 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
                   SET <span className="text-blue-200">AREA BINAAN</span>
                 </h1>
                 <p className="text-[8px] font-bold text-blue-100/70 tracking-widest uppercase italic mt-1.5">
-                  Spatial Data Management & Geolocation
+                  Spatial Data Management & Geolocation System
                 </p>
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-3 px-4 py-2 bg-white/10 rounded-xl border border-white/20 text-white font-black text-[8px] uppercase tracking-widest backdrop-blur-md relative z-10 shadow-inner">
-              <Globe size={12} className="text-blue-200" /> CENTRAL GEODETIC V.2
-            </div>
           </div>
 
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
             {/* MAP SIDE */}
             <div className="flex-[6] relative bg-gray-50 border-r border-gray-100 min-h-[300px]">
               <MapContainer
@@ -305,51 +303,69 @@ const CreateWilayah = () => {
                 <MapEvents />
               </MapContainer>
               <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 backdrop-blur px-4 py-2 rounded-xl shadow-xl border border-blue-100 flex items-center gap-3">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                <div
+                  className={`w-2 h-2 rounded-full ${isLocationSelected ? "bg-emerald-500 animate-pulse" : "bg-orange-400 animate-pulse"}`}
+                ></div>
                 <span className="text-[9px] font-black text-[#1E5AA5] uppercase tracking-widest">
-                  Live Coordinate Tracking
+                  {isLocationSelected
+                    ? "Lokasi Terpilih"
+                    : "Belum Ada Lokasi Dipilih"}
                 </span>
               </div>
             </div>
 
             {/* FORM SIDE */}
-            <div className="flex-[4] flex flex-col h-full overflow-hidden">
-              <div className="flex-1 overflow-y-auto custom-scrollbar px-8 md:px-12 py-10">
-                <form onSubmit={handleSubmit} className="space-y-8">
-                  {/* SEARCH */}
-                  <div className="space-y-4" ref={dropdownRef}>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-1.5 h-4 bg-[#1E5AA5] rounded-full"></div>
+            <div className="flex-[4] flex flex-col h-full overflow-hidden bg-white">
+              <div className="flex-1 overflow-y-auto custom-scrollbar px-8 md:px-12 py-8">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Banner peringatan */}
+                  {!isLocationSelected && (
+                    <div className="flex items-start gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-2xl">
+                      <MapPin
+                        size={14}
+                        className="text-orange-500 shrink-0 mt-0.5"
+                      />
+                      <p className="text-[9px] font-bold text-orange-600 leading-relaxed">
+                        Pilih lokasi terlebih dahulu dengan mengetik di kotak
+                        pencarian, atau klik langsung pada peta.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Geo-Search */}
+                  <div className="space-y-3" ref={dropdownRef}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-[#1E5AA5] rounded-full"></div>
                       <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                        Location Search
+                        Geo-Search
                       </h3>
                     </div>
-                    <div className="space-y-2 relative">
+                    <div className="relative">
                       <Label
-                        text="Cari Nama Wilayah / Alamat"
+                        text="Cari Lokasi / Alamat"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black mb-1.5"
                       />
                       <div className="relative">
                         <Input
                           value={searchValue}
                           onChange={(e) => setSearchValue(e.target.value)}
-                          placeholder="Ketik wilayah (contoh: Jakarta)..."
-                          className="!py-4 !pl-12 !bg-gray-50 !border-gray-100 !rounded-2xl font-bold"
+                          placeholder="Ketik wilayah (contoh: Banyumas)..."
+                          className="!py-3.5 !pl-12 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
                         />
                         <SearchIcon
                           className="absolute left-4 top-1/2 -translate-y-1/2 text-[#1E5AA5]"
-                          size={16}
+                          size={15}
                         />
                       </div>
                       {showDropdown && suggestions.length > 0 && (
-                        <div className="absolute left-0 right-0 z-[1001] bg-white border border-blue-100 rounded-2xl shadow-2xl mt-2 overflow-hidden">
-                          <ul className="max-h-[250px] overflow-y-auto">
+                        <div className="absolute left-0 right-0 z-[1001] bg-white border border-blue-100 rounded-2xl shadow-2xl mt-1 overflow-hidden border-t-4 border-t-[#1E5AA5]">
+                          <ul className="max-h-[220px] overflow-y-auto custom-scrollbar">
                             {suggestions.map((suggestion, i) => (
                               <li
                                 key={i}
                                 onClick={() => handleSelectLocation(suggestion)}
-                                className="px-6 py-4 hover:bg-blue-50 cursor-pointer border-b border-gray-50 flex flex-col gap-1 transition-colors"
+                                className="px-5 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-50 flex flex-col gap-0.5 transition-colors"
                               >
                                 <span className="font-black text-[#1E5AA5] text-[10px] uppercase">
                                   {suggestion.display_name.split(",")[0]}
@@ -365,59 +381,66 @@ const CreateWilayah = () => {
                     </div>
                   </div>
 
-                  {/* DETAILS */}
-                  <div className="space-y-6 pt-4 border-t border-gray-50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label
-                          text="Nama Wilayah Terpilih"
-                          className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
-                        />
-                        <Input
-                          value={formData.nama_wilayah}
-                          readOnly
-                          className="!py-3 !bg-blue-50/30 !border-blue-100 !text-[#1E5AA5] !font-black !text-[10px] !rounded-xl"
-                        />
-                      </div>
-                      <div className="space-y-2">
+                  {/* Metadata */}
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    {/* Nama Wilayah */}
+                    <div className="space-y-1.5">
+                      <Label
+                        text="Label Nama Wilayah"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                      />
+                      <Input
+                        value={
+                          formData.nama_wilayah || "Pilih lokasi di peta..."
+                        }
+                        readOnly
+                        className="!py-2.5 !bg-blue-50/30 !border-blue-100 !text-[#1E5AA5] !font-black !text-[10px] !rounded-xl"
+                      />
+                    </div>
+
+                    {/* Tahun & Jenis */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
                         <Label
                           text="Tahun Awal Binaan"
-                          className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                          className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                         />
                         <Input
                           type="number"
                           value={formData.tahun_awal_binaan}
-                          onChange={(val) =>
-                            setFormData({ ...formData, tahun_awal_binaan: val })
+                          onChange={(v) =>
+                            setFormData({ ...formData, tahun_awal_binaan: v })
                           }
-                          className="!py-3 !rounded-xl font-bold"
+                          className="!py-2.5 !rounded-xl font-bold"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label
+                          text="Jenis Wilayah"
+                          className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                        />
+                        {/* ✅ Dropdown jenis_wilayah ganti keterangan */}
+                        <Dropdown
+                          icon={Layers}
+                          value={formData.jenis_wilayah}
+                          onChange={(val) =>
+                            setFormData({ ...formData, jenis_wilayah: val })
+                          }
+                          items={[
+                            { value: "Absolute", label: "ABSOLUTE" },
+                            { value: "Independent", label: "INDEPENDENT" },
+                          ]}
+                          className="!py-2.5 !rounded-xl font-black text-gray-700"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Alamat */}
+                    <div className="space-y-1.5">
                       <Label
-                        text="Deskripsi Geografis"
-                        className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
-                      />
-                      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex gap-4">
-                        <Info
-                          size={16}
-                          className="text-gray-400 shrink-0 mt-1"
-                        />
-                        <p className="text-[10px] font-bold text-gray-500 italic leading-relaxed">
-                          {formData.deskripsi ||
-                            "Silakan pilih titik di peta atau cari lokasi melalui kolom pencarian."}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* KOMPONEN BARU: TEXTAREA ALAMAT LENGKAP */}
-                    <div className="space-y-2">
-                      <Label
-                        text="Alamat Lengkap (Spesifik)"
+                        text="Alamat Lengkap Spesifik"
                         required
-                        className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
                       />
                       <Textarea
                         value={formData.alamat_lengkap}
@@ -427,43 +450,46 @@ const CreateWilayah = () => {
                             alamat_lengkap: e.target.value,
                           })
                         }
-                        placeholder="Masukkan detail alamat (No Rumah, RT/RW, Patokan)..."
+                        placeholder="Detail alamat: No, RT/RW, Kecamatan..."
                         className="!bg-white !border-gray-200 !rounded-2xl !text-[10px] font-bold shadow-sm"
                         rows={3}
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label
-                        text="Status Independensi"
-                        required
-                        className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                    {/* Koordinat */}
+                    <div className="p-3 bg-gray-50 rounded-2xl border border-gray-200 flex gap-3">
+                      <Navigation
+                        size={14}
+                        className="text-[#1E5AA5] shrink-0 mt-0.5"
                       />
-                      <Dropdown
-                        icon={Layers}
-                        value={formData.keterangan}
-                        onChange={(val) =>
-                          setFormData({ ...formData, keterangan: val })
-                        }
-                        items={[
-                          { value: "Absolute", label: "ABSOLUTE" },
-                          { value: "Independent", label: "INDEPENDENT" },
-                        ]}
-                        className="!py-3.5 !rounded-2xl font-black text-gray-700"
-                      />
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[9px] font-black text-gray-800 uppercase tracking-tight">
+                          Geo-Reference
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-400 italic leading-tight">
+                          {isLocationSelected
+                            ? `${formData.latitude}, ${formData.longitude}`
+                            : "Koordinat akan muncul setelah lokasi dipilih"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </form>
               </div>
 
-              {/* ACTION BUTTON */}
-              <div className="p-8 bg-gray-50/50 border-t border-gray-100 flex justify-end shrink-0">
+              {/* ACTION BAR */}
+              <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-3 shrink-0">
                 <Button
-                  text={loading ? "SAVING..." : "DAFTARKAN WILAYAH"}
+                  text="BATALKAN"
+                  onClick={() => navigate("/admin/wilayah")}
+                  className="!px-8 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 active:scale-95 transition-all shadow-sm"
+                />
+                <Button
+                  text={loading ? "SAVING..." : "SIMPAN AREA"}
                   icon={<Database size={14} />}
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="!bg-[#2E5AA7] !text-white !px-12 !py-4 !rounded-2xl !text-[10px] font-black shadow-xl uppercase tracking-[0.2em]"
+                  className="!bg-[#2E5AA7] !text-white !px-10 !py-2.5 !rounded-full !text-[9px] font-black shadow-lg shadow-blue-900/10 active:scale-95 transition-all border-none"
                 />
               </div>
             </div>

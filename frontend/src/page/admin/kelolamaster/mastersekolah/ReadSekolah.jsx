@@ -9,6 +9,11 @@ import {
   MapPin,
   Database,
   Filter,
+  Award,
+  Eye,
+  Edit3,
+  Trash2,
+  Globe,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -21,25 +26,45 @@ import Table from "../../../../components/Table";
 import PageWrapper from "../../../../components/PageWrapper";
 import Pagination from "../../../../components/Pagination";
 import Dropdown from "../../../../components/Dropdown";
+import Label from "../../../../components/Label";
 
-// Action Buttons
-import {
-  EditButton,
-  DetailButton,
-  DeleteButton,
-} from "../../../../components/ActionButtons";
+// Konfigurasi Toast
+const Toast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+});
 
 const ReadSekolah = () => {
-  const [sekolah, setSekolah] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterWilayah, setFilterWilayah] = useState("Semua");
-  const [filterAkreditasi, setFilterAkreditasi] = useState("Semua");
-  const [listWilayah, setListWilayah] = useState([]);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 8;
   const navigate = useNavigate();
+
+  // --- PERSISTENSI FILTER ---
+  const [searchTerm, setSearchTerm] = useState(
+    localStorage.getItem("sch_search") || "",
+  );
+  const [filterWilayah, setFilterWilayah] = useState(
+    localStorage.getItem("sch_wilayah") || "all",
+  );
+  const [filterAkreditasi, setFilterAkreditasi] = useState(
+    localStorage.getItem("sch_akred") || "all",
+  );
+  const [currentPage, setCurrentPage] = useState(
+    Number(localStorage.getItem("sch_page")) || 1,
+  );
+
+  const [sekolah, setSekolah] = useState([]);
+  const [listWilayah, setListWilayah] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const itemsPerPage = 5;
+
+  useEffect(() => {
+    localStorage.setItem("sch_search", searchTerm);
+    localStorage.setItem("sch_wilayah", filterWilayah);
+    localStorage.setItem("sch_akred", filterAkreditasi);
+    localStorage.setItem("sch_page", currentPage);
+  }, [searchTerm, filterWilayah, filterAkreditasi, currentPage]);
 
   const fetchData = async () => {
     try {
@@ -56,8 +81,7 @@ const ReadSekolah = () => {
       setSekolah(resSekolah.data);
       setListWilayah(resWilayah.data);
     } catch (err) {
-      console.error(err);
-      Swal.fire("Error", "Gagal mengambil data", "error");
+      Toast.fire({ icon: "error", title: "Gagal sinkronisasi data" });
     } finally {
       setLoading(false);
     }
@@ -67,14 +91,48 @@ const ReadSekolah = () => {
     fetchData();
   }, []);
 
+  const handleToggleStatus = async (id, name, currentStatus) => {
+    // Paksa ke boolean murni
+    const nextStatus = !(
+      currentStatus === true ||
+      currentStatus === "true" ||
+      Number(currentStatus) === 1
+    );
+
+    try {
+      const token = localStorage.getItem("token");
+
+      // Pastikan URL-nya benar: /sekolah/:id
+      await axios.patch(
+        `http://localhost:3000/sekolah/${id}`,
+        { status: nextStatus }, // Body hanya mengirim field status
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      await fetchData(); // Refresh data tabel
+
+      Toast.fire({
+        icon: "success",
+        title: `${name} sekarang ${nextStatus ? "Aktif" : "Nonaktif"}`,
+      });
+    } catch (e) {
+      // Lihat console log untuk detail error 500-nya
+      console.error("Error detail:", e.response?.data);
+      Toast.fire({ icon: "error", title: "Gagal memperbarui status unit" });
+    }
+  };
+
   const handleDelete = async (id, name) => {
     const result = await Swal.fire({
-      title: "Hapus Sekolah?",
-      text: `Unit ${name} akan dihapus secara permanen.`,
+      title: "Hapus Unit Sekolah?",
+      text: `Unit ${name} akan dihapus permanen dari sistem.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#EF4444",
       confirmButtonText: "Ya, Hapus!",
+      cancelButtonText: "Batal",
+      reverseButtons: true,
+      customClass: { popup: "rounded-[2rem]" },
     });
 
     if (result.isConfirmed) {
@@ -83,135 +141,171 @@ const ReadSekolah = () => {
         await axios.delete(`http://localhost:3000/sekolah/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        Swal.fire("Berhasil", "Data sekolah telah dihapus.", "success");
+        Toast.fire({ icon: "success", title: "Unit berhasil dihapus" });
         fetchData();
       } catch (err) {
-        Swal.fire("Gagal", "Tidak dapat menghapus data", "error");
+        Toast.fire({ icon: "error", title: "Gagal menghapus data" });
       }
     }
   };
 
-  const filteredData = sekolah.filter((s) => {
-    const matchSearch =
-      s.nama_sekolah?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.npsn?.includes(searchTerm);
-    const matchWilayah =
-      filterWilayah === "Semua" || s.wilayah?.nama_wilayah === filterWilayah;
-    const matchAkreditasi =
-      filterAkreditasi === "Semua" || s.akreditasi === filterAkreditasi;
-    return matchSearch && matchWilayah && matchAkreditasi;
-  });
+  // --- LOGIKA FILTER ---
+  const filteredData = sekolah
+    .filter((s) => {
+      const matchSearch =
+        s.nama_sekolah?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.npsn?.includes(searchTerm);
+      const matchWilayah =
+        filterWilayah === "all" || s.wilayah?.nama_wilayah === filterWilayah;
+      const matchAkreditasi =
+        filterAkreditasi === "all" || s.akreditasi === filterAkreditasi;
+      return matchSearch && matchWilayah && matchAkreditasi;
+    })
+    .sort((a, b) => b.id_sekolah - a.id_sekolah);
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalItems = filteredData.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
 
-  // --- MAPPING DATA OPTIONS ---
   const wilayahOptions = [
-    { value: "Semua", label: "SEMUA WILAYAH" },
+    { value: "all", label: "SEMUA WILAYAH" },
     ...listWilayah.map((w) => ({
       value: w.nama_wilayah,
-      label: w.nama_wilayah.split("/").pop().toUpperCase(),
+      label: w.nama_wilayah.split("/").filter(Boolean).pop().toUpperCase(),
     })),
-  ];
-
-  const akreditasiOptions = [
-    { value: "Semua", label: "SEMUA AKREDITASI" },
-    { value: "A", label: "GRADE A" },
-    { value: "B", label: "GRADE B" },
-    { value: "C", label: "GRADE C" },
   ];
 
   const tableColumns = [
     {
-      header: "NPSN",
-      align: "text-center w-[120px]",
-      render: (row) => (
-        <span className="text-[10px] font-mono font-black text-[#1E5AA5] bg-blue-50 px-2 py-1 rounded-md border border-blue-100 shadow-sm">
-          {row.npsn || "PENDING"}
+      header: "NO",
+      align: "text-left pl-8 w-[70px]",
+      render: (_, i) => (
+        <span className="text-[10px] font-mono font-bold text-gray-400">
+          {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
         </span>
       ),
     },
     {
-      header: "UNIT PEMBINAAN",
-      align: "text-left w-[30%]",
+      header: "NPSN",
+      align: "text-left w-[120px]",
       render: (row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-[10px] uppercase shadow-sm shrink-0">
-            {row.jenjang?.substring(0, 3)}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="font-black text-gray-800 uppercase text-[11px] truncate leading-none">
-              {row.nama_sekolah}
-            </span>
-            <span className="text-[8px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
-              {row.jenjang} Education
-            </span>
-          </div>
-        </div>
+        <span className="text-[11px] font-mono font-black text-[#1E5AA5] tracking-widest py-3.5">
+          {row.npsn || "00000000"}
+        </span>
       ),
     },
     {
-      header: "WILAYAH",
-      align: "text-center w-[20%]",
+      header: "NAMA SEKOLAH",
+      align: "text-left w-[25%]",
       render: (row) => (
-        <div className="flex justify-center">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-lg text-[9px] font-black text-gray-600 uppercase border border-gray-100">
-            <MapPin size={10} className="text-[#1E5AA5]" />
-            {row.wilayah?.nama_wilayah?.split("/").pop() || "NON-REGIONAL"}
-          </div>
-        </div>
-      ),
-    },
-    {
-      header: "AKREDITASI",
-      align: "text-center w-[15%]",
-      render: (row) => (
-        <div className="flex justify-center">
-          <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black border border-emerald-100 shadow-sm">
-            Grade {row.akreditasi || "-"}
+        <div className="flex flex-col py-3.5">
+          <span className="font-black text-gray-800 uppercase text-[11px] tracking-tight truncate">
+            {row.nama_sekolah}
+          </span>
+          <span className="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-widest">
+            {row.jenjang} EDUCATION
           </span>
         </div>
       ),
     },
     {
-      header: "AKSI",
-      align: "text-center w-[160px]",
+      header: "NAMA WILAYAH",
+      align: "text-left w-[20%]",
       render: (row) => (
-        <div className="flex justify-center gap-2 scale-90">
-          <DetailButton
-            onClick={() => navigate(`/admin/sekolah/detail/${row.id_sekolah}`)}
-          />
-          <EditButton
-            onClick={() => navigate(`/admin/sekolah/edit/${row.id_sekolah}`)}
-          />
-          <DeleteButton
-            onClick={() => handleDelete(row.id_sekolah, row.nama_sekolah)}
-          />
-        </div>
+        <span className="text-[11px] font-black text-gray-700 uppercase tracking-tight py-3.5">
+          {row.wilayah?.nama_wilayah?.split("/").filter(Boolean).pop() ||
+            "PUSAT"}
+        </span>
       ),
+    },
+    {
+      header: "AKREDITASI",
+      align: "text-left w-[12%]",
+      render: (row) => (
+        <span className="text-[11px] font-black text-gray-800 uppercase py-3.5">
+          {row.akreditasi ? `Grade ${row.akreditasi}` : "Proses"}
+        </span>
+      ),
+    },
+    {
+      header: "KONTROL OTORITAS",
+      align: "text-left w-[240px]",
+      render: (row) => {
+        const isActive =
+          row.status === true ||
+          row.status === "true" ||
+          Number(row.status) === 1;
+        return (
+          <div className="flex gap-3 items-center py-3.5">
+            <div className="flex">
+              <Button
+                icon={<Eye size={16} />}
+                onClick={() =>
+                  navigate(`/admin/sekolah/detail/${row.id_sekolah}`)
+                }
+                className="!p-2 !bg-transparent !text-gray-400 hover:!text-blue-600 !shadow-none"
+              />
+              <Button
+                icon={<Edit3 size={15} />}
+                onClick={() =>
+                  navigate(`/admin/sekolah/edit/${row.id_sekolah}`)
+                }
+                className="!p-2 !bg-transparent !text-gray-400 hover:!text-amber-500 !shadow-none"
+              />
+              <Button
+                icon={<Trash2 size={15} />}
+                onClick={() => handleDelete(row.id_sekolah, row.nama_sekolah)}
+                className="!p-2 !bg-transparent !text-gray-400 hover:!text-rose-500 !shadow-none"
+              />
+            </div>
+
+            {/* SLIDING TOGGLE STATUS */}
+            <div
+              onClick={() =>
+                handleToggleStatus(row.id_sekolah, row.nama_sekolah, row.status)
+              }
+              className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
+            >
+              <div
+                className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isActive ? "bg-emerald-500 shadow-lg shadow-emerald-100" : "bg-gray-300"} p-1`}
+              >
+                <div
+                  className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-4" : "translate-x-0"}`}
+                />
+              </div>
+              <span
+                className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-gray-400"}`}
+              >
+                {isActive ? "Aktif" : "Nonaktif"}
+              </span>
+            </div>
+          </div>
+        );
+      },
     },
   ];
 
   return (
-    <PageWrapper
-      className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0"
-      style={{ fontFamily: "'Poppins', sans-serif" }}
-    >
+    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-12 pt-10">
-        <Card className="flex-1 rounded-t-[2.5rem] bg-white flex flex-col overflow-hidden relative shadow-2xl">
-          <div className="px-10 pt-8 pb-6 bg-white shrink-0">
+      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-10 pt-10 pb-6">
+        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-[2.5rem] shadow-2xl bg-white overflow-hidden">
+          <div className="px-10 pt-8 pb-6 shrink-0">
             <header className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-4">
-                <div className="p-3.5 bg-[#2E5AA7] rounded-2xl text-white shadow-xl">
-                  <School size={22} />
+                <div className="p-3.5 bg-gradient-to-br from-[#1E5AA5] to-[#164a8a] rounded-2xl text-white shadow-xl">
+                  <School size={24} />
                 </div>
-                <div>
+                <div className="flex flex-col">
+                  <Label
+                    text="Educational Entity Database"
+                    className="!text-[8px] !text-[#1E5AA5] !font-black !italic uppercase"
+                  />
                   <h1 className="text-xl font-black text-gray-800 uppercase leading-none">
-                    Master <span className="text-[#2E5AA7]">Sekolah</span>
+                    Master <span className="text-[#2E5AA7]">Unit Sekolah</span>
                   </h1>
                 </div>
               </div>
@@ -219,84 +313,88 @@ const ReadSekolah = () => {
                 text="REGISTRASI UNIT"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/sekolah/create")}
-                className="!bg-[#2E5AA7] !rounded-xl !text-[10px] font-black text-white shadow-lg active:scale-95 transition-all"
+                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
               />
             </header>
 
-            <div className="flex flex-col gap-4">
-              <div className="flex gap-4 items-center">
-                <div className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 text-[#1E5AA5] rounded-xl font-black text-[9px] uppercase tracking-widest border border-blue-100">
-                  <Database size={14} /> Total: {filteredData.length} Unit
-                </div>
-                <div className="relative flex-1">
-                  <Input
-                    placeholder="Cari nama sekolah atau NPSN..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                    className="w-full !pl-12 !py-2.5 !bg-gray-50 !rounded-xl !text-[11px] font-bold"
-                  />
-                  <SearchIcon
-                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                    size={16}
-                  />
-                </div>
+            <div className="flex flex-col md:flex-row gap-3 mb-6">
+              <div className="relative flex-1">
+                <Input
+                  placeholder="Cari nama atau NPSN..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full !pl-11 !py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[11px] font-bold outline-none"
+                />
+                <SearchIcon
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                  size={16}
+                />
               </div>
-
-              {/* --- FILTER SECTION --- */}
-              <div className="flex flex-row items-center gap-4">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Filter size={12} strokeWidth={3} />
-                  <span className="text-[9px] font-black uppercase tracking-tighter">
-                    Filter:
-                  </span>
-                </div>
-
-                <div className="w-[220px]">
-                  {listWilayah.length > 0 ? (
-                    <Dropdown
-                      items={wilayahOptions}
-                      value={filterWilayah}
-                      onChange={(val) => {
-                        setFilterWilayah(val);
-                        setCurrentPage(1);
-                      }}
-                      className="!py-3 !rounded-xl text-[10px] font-black"
-                    />
-                  ) : (
-                    <div className="h-10 w-full bg-gray-50 animate-pulse rounded-xl" />
-                  )}
-                </div>
-
-                <div className="w-[220px]">
-                  <Dropdown
-                    items={akreditasiOptions}
-                    value={filterAkreditasi}
-                    onChange={(val) => {
-                      setFilterAkreditasi(val);
-                      setCurrentPage(1);
-                    }}
-                    className="!py-3 !rounded-xl text-[10px] font-black"
-                  />
-                </div>
+              <div className="w-56">
+                <Dropdown
+                  icon={Globe}
+                  value={filterWilayah}
+                  items={wilayahOptions}
+                  onChange={(v) => {
+                    setFilterWilayah(v);
+                    setCurrentPage(1);
+                  }}
+                  className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
+                />
               </div>
+              <div className="w-52">
+                <Dropdown
+                  icon={Award}
+                  value={filterAkreditasi}
+                  items={[
+                    { value: "all", label: "SEMUA AKREDITASI" },
+                    { value: "A", label: "GRADE A" },
+                    { value: "B", label: "GRADE B" },
+                    { value: "C", label: "GRADE C" },
+                  ]}
+                  onChange={(v) => {
+                    setFilterAkreditasi(v);
+                    setCurrentPage(1);
+                  }}
+                  className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="px-4 py-2 bg-blue-50/50 text-[#1E5AA5] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
+                <Filter size={12} className="inline mr-2" /> Hasil: {totalItems}{" "}
+                Units
+              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setFilterWilayah("all");
+                  setFilterAkreditasi("all");
+                  setCurrentPage(1);
+                }}
+                className="text-[8px] font-black text-gray-400 hover:text-rose-500 uppercase tracking-widest transition-colors"
+              >
+                Reset Filter
+              </button>
             </div>
           </div>
 
-          <div className="flex-1 overflow-hidden flex flex-col px-10 pb-4">
-            <div className="flex-1 bg-white border border-gray-100 rounded-3xl overflow-hidden flex flex-col shadow-sm">
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex-none px-10 pb-4 overflow-hidden">
+            <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
                 <Table
                   columns={tableColumns}
                   data={currentData}
-                  className="min-w-full"
+                  className="min-w-full border-collapse"
                 />
-                {!loading && filteredData.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
-                    <School size={48} className="text-gray-400 mb-2" />
-                    <p className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                {!loading && currentData.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-20 text-gray-900">
+                    <Database size={40} className="mb-2" />
+                    <p className="text-xs font-black uppercase tracking-widest">
                       Data Tidak Ditemukan
                     </p>
                   </div>
@@ -305,14 +403,13 @@ const ReadSekolah = () => {
             </div>
           </div>
 
-          {/* PAGINATION PANEL */}
-          <div className="px-10 py-5 bg-gray-50/50 shrink-0 border-t border-gray-100">
+          <div className="px-10 py-5 mt-auto border-t border-gray-100 bg-gray-50/30">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filteredData.length}
+              totalItems={totalItems}
               itemsPerPage={itemsPerPage}
-              onPageChange={(page) => setCurrentPage(page)}
+              onPageChange={setCurrentPage}
               loading={loading}
             />
           </div>

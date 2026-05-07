@@ -1,15 +1,26 @@
+/* eslint-disable no-unused-vars */
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ArrowLeft, Save, Banknote, CreditCard, Landmark } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  Banknote,
+  CreditCard,
+  Landmark,
+  FileText,
+  Database,
+} from "lucide-react";
 import Swal from "sweetalert2";
 
-// Komponen Atomik
 import Sidebar from "../../../../components/Sidebar";
 import Card from "../../../../components/Card";
 import Input from "../../../../components/Input";
 import Label from "../../../../components/Label";
 import Button from "../../../../components/Button";
+import PageWrapper from "../../../../components/PageWrapper";
+import Dropdown from "../../../../components/Dropdown";
+import Textarea from "../../../../components/Textarea";
 
 const CreateFinance = () => {
   const navigate = useNavigate();
@@ -29,118 +40,188 @@ const CreateFinance = () => {
       await axios.post("http://localhost:3000/finance", formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      Swal.fire("Berhasil", "Akun finance telah terdaftar", "success");
+      Swal.fire({
+        icon: "success",
+        title: "REGISTRASI BERHASIL",
+        text: "Sumber dana baru telah diaktifkan dalam sistem.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
       navigate("/admin/finance");
     } catch (err) {
-      Swal.fire("Gagal", "Periksa koneksi database", "error");
+      Swal.fire({
+        icon: "error",
+        title: "GAGAL SIMPAN",
+        text: "Pastikan nomor rekening unik dan koneksi stabil.",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen bg-[#F4F7FE] overflow-hidden font-sans text-gray-800">
+    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0 font-poppins">
       <Sidebar />
-      <main className="flex-1 flex flex-col p-4 lg:p-8 overflow-hidden bg-[#F4F7FE]">
-        <header className="flex-none flex items-center gap-4 bg-white p-5 rounded-3xl shadow-sm mb-8 border border-gray-50">
-          <button
-            onClick={() => navigate("/admin/finance")}
-            className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-[#1E5AA5] transition-all"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-black uppercase tracking-tight">
-              Registrasi <span className="text-[#1E5AA5]">Finance</span>
-            </h1>
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-              Input Sumber Dana Baru
-            </p>
+      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-10 pb-0">
+        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
+          {/* HEADER BANNER */}
+          <div className="px-8 md:px-16 pt-12 pb-10 bg-[#1E5AA5] shrink-0 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
+            <div className="flex items-center gap-6 relative z-10">
+              <button
+                onClick={() => navigate("/admin/finance")}
+                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg"
+              >
+                <ArrowLeft size={18} strokeWidth={3} />
+              </button>
+              <div>
+                <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">
+                  REGISTRASI <span className="text-blue-200">FINANCE</span>
+                </h1>
+                <p className="text-[9px] font-bold text-blue-100/70 tracking-widest uppercase italic mt-2">
+                  Budget Allocation & Funding Registry
+                </p>
+              </div>
+            </div>
           </div>
-        </header>
 
-        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-          <form
-            onSubmit={handleSubmit}
-            className="max-w-4xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-6 pb-10"
-          >
-            <Card className="!p-8 !rounded-[2.5rem] !bg-white space-y-6">
-              <h3 className="text-sm font-black uppercase border-b pb-3 flex items-center gap-2">
-                <Banknote size={18} className="text-[#1E5AA5]" /> Informasi Dana
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <Label text="Nama Akun (Sumber Dana)" required />
-                  <Input
-                    placeholder="Contoh: CSR Astra 2026"
-                    value={formData.nama_akun}
-                    onChange={(e) =>
-                      setFormData({ ...formData, nama_akun: e.target.value })
-                    }
-                  />
+          {/* FORM AREA */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar px-8 md:px-16 py-10 bg-white">
+            <form
+              onSubmit={handleSubmit}
+              className="max-w-5xl mx-auto h-full flex flex-col"
+            >
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-10 pt-5">
+                {/* KOLOM KIRI: SUMBER DANA */}
+                <div className="space-y-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-4 bg-[#1E5AA5] rounded-full"></div>
+                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                      Identitas Sumber Dana
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      text="Nama Akun / Alokasi Dana"
+                      required
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                    />
+                    <div className="relative">
+                      <Input
+                        value={formData.nama_akun}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            nama_akun: e.target.value,
+                          })
+                        }
+                        placeholder="Contoh: CSR ASTRA 2026"
+                        className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                        required
+                      />
+                      <Database
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                        size={14}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      text="Pilih Institusi Perbankan"
+                      required
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                    />
+                    <Dropdown
+                      icon={Landmark}
+                      value={formData.bank}
+                      onChange={(val) =>
+                        setFormData({ ...formData, bank: val })
+                      }
+                      items={[
+                        { label: "BANK PERMATA", value: "Permata" },
+                        { label: "BCA", value: "BCA" },
+                        { label: "MANDIRI", value: "Mandiri" },
+                        { label: "BNI", value: "BNI" },
+                      ]}
+                      className="!py-4 !bg-gray-50/50 !rounded-2xl font-bold"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label text="Pilih Bank" required />
-                  <select
-                    className="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl font-bold text-gray-700 outline-none cursor-pointer"
-                    value={formData.bank}
-                    onChange={(e) =>
-                      setFormData({ ...formData, bank: e.target.value })
-                    }
-                  >
-                    <option value="Permata">Bank Permata</option>
-                    <option value="BCA">BCA</option>
-                    <option value="Mandiri">Mandiri</option>
-                    <option value="BNI">BNI</option>
-                  </select>
+
+                {/* KOLOM KANAN: REKENING */}
+                <div className="space-y-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-4 bg-emerald-500 rounded-full"></div>
+                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                      Detail Rekening & Catatan
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      text="Nomor Rekening"
+                      required
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                    />
+                    <div className="relative">
+                      <Input
+                        value={formData.nomor_rekening}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            nomor_rekening: e.target.value,
+                          })
+                        }
+                        placeholder="Masukan angka tanpa spasi..."
+                        className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold font-mono tracking-widest"
+                        required
+                      />
+                      <CreditCard
+                        className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                        size={14}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      text="Keterangan / Memo (Opsional)"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                    />
+                    <Textarea
+                      value={formData.keterangan}
+                      onChange={(e) =>
+                        setFormData({ ...formData, keterangan: e.target.value })
+                      }
+                      placeholder="Input informasi tambahan alokasi..."
+                      className="!bg-gray-50/50 !border-gray-200 !rounded-2xl !text-[11px] font-bold"
+                      rows={3}
+                    />
+                  </div>
                 </div>
               </div>
-            </Card>
 
-            <Card className="!p-8 !rounded-[2.5rem] !bg-white flex flex-col space-y-6">
-              <h3 className="text-sm font-black uppercase border-b pb-3 flex items-center gap-2">
-                <CreditCard size={18} className="text-[#1E5AA5]" /> Detail
-                Rekening
-              </h3>
-              <div className="space-y-4 flex-1">
-                <div>
-                  <Label text="Nomor Rekening" required />
-                  <Input
-                    icon={<Landmark size={18} />}
-                    placeholder="0000-0000-0000"
-                    value={formData.nomor_rekening}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        nomor_rekening: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label text="Keterangan" />
-                  <textarea
-                    className="w-full p-4 bg-gray-50 rounded-2xl h-20 outline-none focus:bg-white text-sm font-medium"
-                    placeholder="Opsional..."
-                    value={formData.keterangan}
-                    onChange={(e) =>
-                      setFormData({ ...formData, keterangan: e.target.value })
-                    }
-                  />
-                </div>
+              {/* ACTION BUTTONS */}
+              <div className="flex justify-end items-center gap-3 mt-auto pt-12 pb-16">
+                <Button
+                  text="KEMBALI"
+                  onClick={() => navigate("/admin/finance")}
+                  className="!px-8 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 active:scale-95 shadow-sm transition-all"
+                />
+                <Button
+                  text={loading ? "SAVING..." : "SIMPAN SUMBER DANA"}
+                  type="submit"
+                  disabled={loading}
+                  className="!px-10 !py-2.5 !bg-[#2E5AA7] hover:!bg-[#1c4d94] !text-white !rounded-full !text-[9px] font-black shadow-lg shadow-blue-900/10 active:scale-95 transition-all border-none"
+                />
               </div>
-              <Button
-                type="submit"
-                disabled={loading}
-                text={loading ? "Proses..." : "Simpan Akun"}
-                icon={<Save size={18} />}
-                className="!bg-[#1E5AA5] !py-4 !rounded-2xl shadow-xl font-black uppercase mt-6 hover:brightness-110 active:scale-95 transition-all"
-              />
-            </Card>
-          </form>
+            </form>
+          </div>
         </div>
       </main>
-    </div>
+    </PageWrapper>
   );
 };
 

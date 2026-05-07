@@ -24,6 +24,9 @@ export class Sekolah {
   @Column()
   id_wilayah: number;
 
+  @Column({ default: true })
+  status: boolean;
+
   @Column({ nullable: true, length: 20 })
   npsn: string;
 
@@ -43,10 +46,8 @@ export class Sekolah {
   @Column({ unique: true, nullable: true })
   email_login: string;
 
-  // REVISI DI SINI: Tambahkan nullable: true
-  @Column({ select: false, nullable: true })
+  @Column({ nullable: true }) // Hapus select: false
   password_login: string;
-
   // REVISI DI SINI: Tambahkan nullable: true
   @Column({ default: 'sekolah', nullable: true })
   role: string;

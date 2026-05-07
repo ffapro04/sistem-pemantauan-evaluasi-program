@@ -1,29 +1,27 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   ArrowLeft,
-  RefreshCcw,
-  Mail,
-  UserPlus,
-  Shield,
-  Phone,
   User,
-  Lock,
-  Database,
+  Mail,
   Briefcase,
+  Database,
+  Lock,
+  Building2,
   Layers,
+  ShieldCheck,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
 // Komponen Custom
 import Sidebar from "../../../../components/Sidebar";
-import Button from "../../../../components/Button";
 import Input from "../../../../components/Input";
 import Label from "../../../../components/Label";
-import Dropdown from "../../../../components/Dropdown";
+import Button from "../../../../components/Button";
 import PageWrapper from "../../../../components/PageWrapper";
+import Dropdown from "../../../../components/Dropdown";
 
 const CreateHO = () => {
   const navigate = useNavigate();
@@ -33,45 +31,58 @@ const CreateHO = () => {
     nama: "",
     email: "",
     password: "",
-    jenis: "akademik",
-    sub_jenis: "SD & SMP",
     jabatan: "Staff Head Office",
-    no_telp: "",
-    id_role: 2, // HO role id in current database
+    id_role: 3, // FIX: Selalu 3 untuk Head Office
+    jenis: "akademik", // akademik / non-akademik
+    sub_jenis: "SD & SMP", // SD & SMP / SMK / null
   });
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const deptOptions = [
+    { value: "akademik", label: "AKADEMIK" },
+    { value: "non-akademik", label: "NON-AKADEMIK" },
+  ];
 
-  const handleDropdownChange = (name, value) => {
-    const selectedValue = value?.target ? value.target.value : value;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: selectedValue,
-      ...(name === "jenis" && selectedValue === "non-akademik"
-        ? { sub_jenis: "" }
-        : {}),
-      ...(name === "jenis" && selectedValue === "akademik"
-        ? { sub_jenis: "SD & SMP" }
-        : {}),
-    }));
-  };
+  const tingkatOptions = [
+    { value: "SD & SMP", label: "SD & SMP" },
+    { value: "SMK", label: "SMK" },
+  ];
+
+  // Logic: Jika pilih Non-Akademik, sub_jenis dikosongkan
+  useEffect(() => {
+    if (formData.jenis === "non-akademik") {
+      setFormData((prev) => ({ ...prev, sub_jenis: null }));
+    } else if (formData.jenis === "akademik" && !formData.sub_jenis) {
+      setFormData((prev) => ({ ...prev, sub_jenis: "SD & SMP" }));
+    }
+  }, [formData.jenis]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const token = localStorage.getItem("token");
-      await axios.post("http://localhost:3000/users/register", formData, {
+
+      // Kirim data dengan id_role murni angka 3
+      const payload = {
+        ...formData,
+        id_role: 3,
+      };
+
+      await axios.post("http://localhost:3000/users/register", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      Swal.fire("Berhasil", "Akun Head Office telah diaktifkan", "success");
+
+      Swal.fire({
+        icon: "success",
+        title: "Registrasi Berhasil",
+        text: "Personil Head Office telah terdaftar di sistem.",
+      });
       navigate("/admin/ho");
-    } catch (error) {
+    } catch (err) {
       Swal.fire(
         "Gagal",
-        error.response?.data?.message || "Periksa kembali input data anda",
+        err.response?.data?.message || "Terjadi kesalahan pada server",
         "error",
       );
     } finally {
@@ -83,223 +94,197 @@ const CreateHO = () => {
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
       <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] !rounded-b-none border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
-          {/* TOP HEADER BAR - BLUE LUXURY */}
+        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
+          {/* Header Banner (Konsisten dengan CreatePengurus) */}
           <div className="px-8 md:px-16 pt-12 pb-10 flex flex-col md:flex-row items-center justify-between bg-[#1E5AA5] shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
             <div className="flex items-center gap-6 relative z-10">
               <button
                 onClick={() => navigate("/admin/ho")}
-                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg backdrop-blur-md group"
+                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20 shadow-lg backdrop-blur-md"
               >
-                <ArrowLeft
-                  size={18}
-                  strokeWidth={3}
-                  className="group-hover:-translate-x-1 transition-transform"
-                />
+                <ArrowLeft size={18} strokeWidth={3} />
               </button>
               <div>
-                <h1 className="text-2xl font-black text-white tracking-tighter uppercase leading-none">
+                <h1 className="text-2xl font-black text-white uppercase leading-none">
                   REGISTRASI <span className="text-blue-200">HEAD OFFICE</span>
                 </h1>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
-                  <p className="text-[9px] font-bold text-blue-100/70 tracking-widest uppercase italic">
-                    Central Authority Management
-                  </p>
-                </div>
+                <p className="text-[9px] font-bold text-blue-100/70 uppercase italic mt-2 tracking-widest">
+                  Personnel Management System
+                </p>
               </div>
             </div>
-            <div className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-white/10 rounded-2xl border border-white/20 text-white font-black text-[9px] uppercase tracking-widest backdrop-blur-md relative z-10 shadow-inner">
+            <div className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-white/10 rounded-2xl border border-white/20 text-white font-black text-[9px] uppercase tracking-widest">
               <Database size={14} className="text-blue-200" /> SYSTEM CORE V.2
             </div>
           </div>
 
-          {/* AREA FORM - SCROLLABLE */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-8 md:px-16 py-10 bg-white">
+          {/* Form Content */}
+          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-10 bg-white">
             <form
               onSubmit={handleSubmit}
-              className="max-w-5xl mx-auto h-full flex flex-col"
+              className="max-w-6xl mx-auto h-full flex flex-col"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 pt-10 flex-1">
-                {/* KOLOM KIRI: PERSONAL */}
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-1.5 h-4 bg-[#1E5AA5] rounded-full"></div>
-                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                      Personal Identity
-                    </h3>
-                  </div>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 flex-1">
+                {/* Kolom Kiri: Kredensial Login */}
+                <div className="space-y-6">
                   <div className="space-y-2">
                     <Label
-                      text="Nama Lengkap Personel"
+                      text="Nama Lengkap Personil"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
                     />
                     <div className="relative">
                       <Input
-                        name="nama"
-                        value={formData.nama}
-                        onChange={handleChange}
+                        onChange={(e) =>
+                          setFormData({ ...formData, nama: e.target.value })
+                        }
                         placeholder="Ketik nama lengkap..."
-                        className="!py-4.5 !pl-12 !bg-white !border-gray-200 !rounded-2xl font-bold shadow-sm"
+                        className="!py-4 !pl-12 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold focus:!bg-white transition-all"
                         required
                       />
                       <User
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={16}
+                        size={18}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label
-                      text="Email Korporat"
+                      text="Email Institusi"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
                     />
                     <div className="relative">
                       <Input
                         type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        placeholder="ho@ypamdr.or.id"
-                        className="!py-4.5 !pl-12 !bg-white !border-gray-200 !rounded-2xl font-bold shadow-sm"
+                        onChange={(e) =>
+                          setFormData({ ...formData, email: e.target.value })
+                        }
+                        placeholder="nama.ho@ypamdr.or.id"
+                        className="!py-4 !pl-12 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold focus:!bg-white transition-all"
                         required
                       />
                       <Mail
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={16}
+                        size={18}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label
-                      text="Access Password"
+                      text="Kata Sandi (Password)"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
                     />
                     <div className="relative">
                       <Input
                         type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        placeholder="••••••••"
-                        className="!py-4.5 !pl-12 !bg-white !border-gray-200 !rounded-2xl font-bold shadow-sm"
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                        placeholder="Buat password keamanan..."
+                        className="!py-4 !pl-12 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold focus:!bg-white transition-all"
                         required
                       />
                       <Lock
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={16}
+                        size={18}
                       />
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    {/* <Label
-                      text="Nomor WhatsApp"
-                      className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
-                    /> */}
-                    {/* <div className="relative">
-                      <Input
-                        name="no_telp"
-                        value={formData.no_telp}
-                        onChange={handleChange}
-                        placeholder="0812xxxx"
-                        className="!py-4.5 !pl-12 !bg-white !border-gray-200 !rounded-2xl font-bold shadow-sm"
-                      />
-                      <Phone
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={16}
-                      />
-                    </div> */}
-                  </div>
                 </div>
 
-                {/* KOLOM KANAN: ASSIGNMENT */}
-                <div className="space-y-8">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
-                    <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                      Assignment Focus
-                    </h3>
+                {/* Kolom Kanan: Penempatan & Jabatan */}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label
+                      text="Jabatan Struktural"
+                      required
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
+                    />
+                    <div className="relative">
+                      <Input
+                        value={formData.jabatan}
+                        onChange={(e) =>
+                          setFormData({ ...formData, jabatan: e.target.value })
+                        }
+                        placeholder="Misal: Staff HO / Manager..."
+                        className="!py-4 !pl-12 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold focus:!bg-white transition-all"
+                        required
+                      />
+                      <Briefcase
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                        size={18}
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label
-                      text="Bidang Tugas Utama"
+                      text="Department (Jenis)"
                       required
-                      className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
                     />
                     <Dropdown
-                      icon={Briefcase}
+                      icon={Building2}
                       value={formData.jenis}
-                      onChange={(val) => handleDropdownChange("jenis", val)}
-                      items={[
-                        { label: "AKADEMIK", value: "akademik" },
-                        { label: "NON-AKADEMIK", value: "non-akademik" },
-                      ]}
-                      className="!py-4.5 !bg-white !border-gray-200 !rounded-2xl font-extrabold text-gray-700 shadow-sm"
+                      onChange={(val) =>
+                        setFormData({ ...formData, jenis: val })
+                      }
+                      items={deptOptions}
+                      className="!py-4 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-extrabold"
                     />
                   </div>
 
-                  {formData.jenis === "akademik" && (
-                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <Label
-                        text="Tingkat Pengawasan"
-                        required
-                        className="!text-[9px] text-[#1E5AA5] uppercase tracking-widest"
-                      />
-                      <Dropdown
-                        icon={Layers}
-                        value={formData.sub_jenis}
-                        onChange={(val) =>
-                          handleDropdownChange("sub_jenis", val)
-                        }
-                        items={[
-                          { label: "SD & SMP", value: "SD & SMP" },
-                          { label: "SMK", value: "SMK" },
-                        ]}
-                        className="!py-4.5 !bg-white !border-gray-200 !rounded-2xl font-extrabold text-gray-700 shadow-sm"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex items-start gap-4 bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100">
-                    <Shield
-                      size={20}
-                      className="text-[#1E5AA5] shrink-0 mt-0.5"
+                  <div
+                    className={`space-y-2 transition-all duration-500 ${formData.jenis !== "akademik" ? "opacity-30 pointer-events-none" : "opacity-100"}`}
+                  >
+                    <Label
+                      text="Fokus Bidang (Tingkat)"
+                      className="!text-[9px] text-[#1E5AA5] uppercase font-black tracking-widest"
                     />
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-black text-[#1E5AA5] uppercase tracking-tighter">
-                        Otoritas Global HO
-                      </span>
-                      <p className="text-[9px] text-blue-600/70 font-bold leading-relaxed">
-                        Akses Head Office bersifat global. Pemilihan bidang akan
-                        membatasi data monitoring yang dapat dikelola secara
-                        spesifik.
+                    <Dropdown
+                      icon={Layers}
+                      value={formData.sub_jenis}
+                      disabled={formData.jenis !== "akademik"}
+                      onChange={(val) =>
+                        setFormData({ ...formData, sub_jenis: val })
+                      }
+                      items={tingkatOptions}
+                      className="!py-4 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-extrabold"
+                    />
+                  </div>
+
+                  <div className="p-5 rounded-[2rem] bg-blue-50/30 border border-blue-100 border-dashed">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck
+                        size={16}
+                        className="text-blue-400 shrink-0 mt-0.5"
+                      />
+                      <p className="text-[10px] text-blue-400 font-medium leading-relaxed italic">
+                        Personil HO akan mendapatkan akses dashboard sesuai
+                        dengan Department yang dipilih (Akademik/Non-Akademik).
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* ACTION BUTTONS - POJOK KANAN BAWAH */}
+              {/* Action Buttons (Compact & Consistent) */}
               <div className="flex justify-end items-center gap-3 pt-12 pb-16 shrink-0">
                 <Button
-                  text="BATALKAN"
+                  text="KEMBALI"
                   onClick={() => navigate("/admin/ho")}
-                  className="!bg-white !text-gray-400 !px-7 !py-2.5 !rounded-xl !text-[9px] font-black hover:!bg-gray-50 transition-all border border-gray-100 uppercase tracking-[0.2em]"
+                  className="!px-8 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 shadow-sm active:scale-95 transition-all"
                 />
                 <Button
-                  text={loading ? "SAVING..." : "AKTIVASI AKUN HEAD OFFICE"}
+                  text={loading ? "SAVING..." : "SIMPAN DATA"}
                   type="submit"
                   disabled={loading}
-                  className="!bg-[#2E5AA7] !text-white !px-10 !py-2.5 !rounded-xl !text-[9px] font-black shadow-lg shadow-blue-900/10 active:scale-95 transition-all border-none uppercase tracking-[0.2em]"
+                  className="!px-10 !py-2.5 !bg-[#2E5AA7] hover:!bg-[#1c4d94] !text-white !rounded-full !text-[9px] font-black shadow-lg shadow-blue-900/10 active:scale-95 transition-all border-none"
                 />
               </div>
             </form>

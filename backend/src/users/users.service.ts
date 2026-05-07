@@ -30,26 +30,33 @@ export class UsersService {
     });
   }
 
-  // --- 2. AMBIL SATU USER BERDASARKAN ID ---
+  // --- 2. AMBIL SATU USER (FIX REVEAL PASSWORD) ---
   async findOne(id: number) {
     if (!id) throw new BadRequestException('ID User wajib disertakan');
 
-    const user = await this.userRepo.findOne({
-      where: { id_user: id },
-      relations: ['role', 'wilayah', 'sekolah'],
-    });
+    // Menggunakan QueryBuilder untuk memaksa kolom password yang di-hide (select: false) agar muncul
+    const user = await this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.wilayah', 'wilayah')
+      .leftJoinAndSelect('user.sekolah', 'sekolah')
+      .addSelect('user.password') // <--- Paksa password keluar untuk detail
+      .where('user.id_user = :id', { id })
+      .getOne();
 
     if (!user)
       throw new NotFoundException(`User dengan ID #${id} tidak ditemukan`);
-    return user;
+
+    // Return sebagai plain object agar tidak terkena Interceptor Serialization NestJS
+    return { ...user };
   }
 
-  // --- 3. AMBIL BERDASARKAN ROLE (AO / HO / PENGURUS) ---
+  // --- 3. AMBIL BERDASARKAN ROLE ---
   async getUsersByRole(roleName: string) {
     return this.userRepo.find({
       where: {
         role: {
-          nama_role: roleName, // Ini akan mencari string 'HO' atau 'PENGURUS' sesuai yang dikirim Controller
+          nama_role: roleName,
         },
       },
       relations: ['role', 'wilayah', 'sekolah'],
@@ -57,31 +64,25 @@ export class UsersService {
     });
   }
 
-  // --- 4. CARI BERDASARKAN EMAIL (VALIDASI) ---
+  // --- 4. CARI BERDASARKAN EMAIL (LOGIN VALIDASI) ---
+  // ✅ SESUDAH
   async findByEmail(email: string) {
-    return this.userRepo.findOne({
-      where: { email },
-      relations: ['role', 'wilayah', 'sekolah'],
-      select: [
-        'id_user',
-        'email',
-        'password',
-        'nama',
-        'jabatan',
-        'status',
-        'jenis',
-        'sub_jenis',
-      ],
-    });
+    return this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.wilayah', 'wilayah')
+      .leftJoinAndSelect('user.sekolah', 'sekolah')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
   }
 
-  // --- 5. CREATE USER (AO / PENGURUS / HO) ---
+  // --- 5. CREATE USER (ADMIN / PENGURUS / HO / AO) ---
   async create(data: any) {
     const existing = await this.findByEmail(data.email);
     if (existing) throw new ConflictException('Email sudah terdaftar');
 
     try {
-      // A. Simpan User
       const newUser = this.userRepo.create({
         nama: data.nama,
         email: data.email,
@@ -90,33 +91,36 @@ export class UsersService {
         no_telp: data.no_telp,
         jenis: data.jenis || null,
         sub_jenis: data.sub_jenis || null,
+        // Konversi ke Number untuk memastikan integritas ID Role
         role: data.id_role ? ({ id_role: Number(data.id_role) } as any) : null,
       });
 
       const savedUser = await this.userRepo.save(newUser);
 
-      // B. LOGIKA MULTI-WILAYAH (1 AO -> Banyak Wilayah)
       if (data.id_wilayahs && Array.isArray(data.id_wilayahs)) {
         await this.wilayahRepo.update(
           { id_wilayah: In(data.id_wilayahs) },
-          { user: savedUser }, // 👈 SUDAH DIGANTI: Menggunakan 'user' sesuai Entity
+          { user: savedUser },
         );
       }
 
       return savedUser;
     } catch (error) {
-      console.error('ERROR_CREATE:', error.message);
-      throw new InternalServerErrorException('Gagal menyimpan user.');
+      throw new InternalServerErrorException(
+        'Gagal menyimpan user ke database.',
+      );
     }
   }
 
-  // --- 6. UPDATE USER (PATCH) ---
+  // --- 6. UPDATE USER ---
   async update(id: number, data: any) {
-    const user = await this.findOne(id);
+    // Gunakan findOne yang sudah kita perbaiki agar data lengkap terambil
+    const user = await this.userRepo.findOne({ where: { id_user: id } });
+    if (!user) throw new NotFoundException('User tidak ditemukan');
+
     const { id_role, id_wilayahs, id_sekolah, ...updateFields } = data;
 
     try {
-      // A. Update Field Standar
       Object.assign(user, updateFields);
 
       if (id_role !== undefined) {
@@ -130,43 +134,35 @@ export class UsersService {
 
       const updatedUser = await this.userRepo.save(user);
 
-      // B. UPDATE RELASI MULTI-WILAYAH
       if (id_wilayahs && Array.isArray(id_wilayahs)) {
-        // Step 1: Lepaskan wilayah lama (set null)
-        await this.wilayahRepo.update(
-          { user: { id_user: id } as any }, // 👈 SUDAH DIGANTI: Menggunakan 'user'
-          { user: null } as any,
-        );
-
-        // Step 2: Pasangkan wilayah baru
+        await this.wilayahRepo.update({ user: { id_user: id } as any }, {
+          user: null,
+        } as any);
         await this.wilayahRepo.update(
           { id_wilayah: In(id_wilayahs) },
-          { user: updatedUser }, // 👈 SUDAH DIGANTI: Menggunakan 'user'
+          { user: updatedUser },
         );
       }
 
       return updatedUser;
     } catch (error) {
-      console.error('ERROR_UPDATE:', error.message);
       throw new InternalServerErrorException('Gagal memperbarui data user.');
     }
   }
 
   // --- 7. DELETE USER ---
   async remove(id: number) {
-    const user = await this.findOne(id);
+    const user = await this.userRepo.findOne({ where: { id_user: id } });
+    if (!user) throw new NotFoundException('User tidak ada');
 
-    // Lepaskan dulu wilayah-wilayah yang dia pegang
-    await this.wilayahRepo.update(
-      { user: { id_user: id } as any }, // 👈 SUDAH DIGANTI: Menggunakan 'user'
-      { user: null } as any,
-    );
-
+    await this.wilayahRepo.update({ user: { id_user: id } as any }, {
+      user: null,
+    } as any);
     await this.userRepo.delete(id);
-    return { success: true, message: `User ${user.nama} berhasil dihapus` };
+    return { success: true, message: `User berhasil dihapus` };
   }
 
-  // --- 8. REGISTER (GURU / UMUM) ---
+  // --- 8. REGISTER (UMUM / SEKOLAH) ---
   async register(data: any) {
     const existing = await this.findByEmail(data.email);
     if (existing) throw new ConflictException('Email sudah terdaftar');
@@ -178,9 +174,10 @@ export class UsersService {
       no_telp: data.no_telp,
       jenis: data.jenis,
       sub_jenis: data.sub_jenis,
+      // Default untuk pendaftaran mandiri biasanya SEKOLAH (ID 5 sesuai mapping baru kamu)
       role: data.id_role
         ? ({ id_role: Number(data.id_role) } as any)
-        : { id_role: 3 },
+        : { id_role: 5 },
       sekolah: data.id_sekolah
         ? ({ id_sekolah: Number(data.id_sekolah) } as any)
         : null,

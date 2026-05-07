@@ -46,10 +46,6 @@ export class CreateWilayahDto {
   status?: boolean;
 
   @IsOptional()
-  @IsString()
-  keterangan?: string;
-
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   jumlah_sd?: number;
