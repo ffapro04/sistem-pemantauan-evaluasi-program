@@ -5,19 +5,11 @@ import axios from "axios";
 import {
   ArrowLeft,
   MapPin,
-  Globe,
-  Database,
-  ShieldCheck,
   Edit3,
-  Navigation,
-  Calendar,
-  Info,
-  Users,
-  GraduationCap,
   School,
   RefreshCcw,
-  Layers,
   Globe2,
+  Layers,
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
@@ -25,14 +17,12 @@ import "leaflet/dist/leaflet.css";
 import Swal from "sweetalert2";
 import { motion } from "framer-motion";
 
-// --- SOLUSI AMPUH: Custom Icon dari CDN (Pasti Muncul) ---
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
 const pinIcon = new L.Icon({
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
@@ -43,6 +33,58 @@ import Sidebar from "../../../../components/Sidebar";
 import Button from "../../../../components/Button";
 import PageWrapper from "../../../../components/PageWrapper";
 import Label from "../../../../components/Label";
+
+// ✅ Map nama provinsi ke kode bendera/emoji
+const PROVINCE_FLAG = {
+  Aceh: "🏴",
+  "Sumatera Utara": "🌋",
+  "Sumatera Barat": "🏔️",
+  Riau: "🌴",
+  "Kepulauan Riau": "🏝️",
+  Jambi: "🌿",
+  Bengkulu: "🌊",
+  "Sumatera Selatan": "🏞️",
+  "Kepulauan Bangka Belitung": "🏖️",
+  Lampung: "🌺",
+  Banten: "🕌",
+  "DKI Jakarta": "🏙️",
+  "Jawa Barat": "🏯",
+  "Jawa Tengah": "🎭",
+  "DI Yogyakarta": "🎨",
+  "Jawa Timur": "⛩️",
+  Bali: "🌺",
+  "Nusa Tenggara Barat": "🏔️",
+  "Nusa Tenggara Timur": "🌊",
+  "Kalimantan Barat": "🌳",
+  "Kalimantan Tengah": "🦧",
+  "Kalimantan Selatan": "💎",
+  "Kalimantan Timur": "🛢️",
+  "Kalimantan Utara": "🌲",
+  "Sulawesi Utara": "🐠",
+  Gorontalo: "🌾",
+  "Sulawesi Tengah": "🏝️",
+  "Sulawesi Barat": "🌴",
+  "Sulawesi Selatan": "⛵",
+  "Sulawesi Tenggara": "🐢",
+  Maluku: "🌺",
+  "Maluku Utara": "🏝️",
+  "Papua Barat": "🦜",
+  Papua: "🌿",
+  "Papua Pegunungan": "⛰️",
+  "Papua Selatan": "🌊",
+  "Papua Tengah": "🌳",
+};
+
+// ✅ Ambil provinsi dari nama_wilayah (posisi index 1)
+const getProvince = (namaWilayah) => {
+  const parts = namaWilayah?.split("/").filter(Boolean) || [];
+  return parts[1] || "";
+};
+
+const getProvinceEmoji = (namaWilayah) => {
+  const prov = getProvince(namaWilayah);
+  return PROVINCE_FLAG[prov] || "🗺️";
+};
 
 const DetailWilayah = () => {
   const { id } = useParams();
@@ -80,12 +122,11 @@ const DetailWilayah = () => {
 
   const locationParts = data?.nama_wilayah?.split("/").filter(Boolean) || [];
   const mainTitle = locationParts[locationParts.length - 1] || "Unknown Area";
+  const province = getProvince(data?.nama_wilayah);
+  const provinceEmoji = getProvinceEmoji(data?.nama_wilayah);
 
-  // Konversi koordinat ke Float
   const lat = parseFloat(data?.latitude);
   const lng = parseFloat(data?.longitude);
-
-  // Cek apakah koordinat valid (bukan NaN)
   const isValidCoords = !isNaN(lat) && !isNaN(lng);
 
   return (
@@ -97,7 +138,7 @@ const DetailWilayah = () => {
           animate={{ opacity: 1, y: 0 }}
           className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative"
         >
-          {/* HEADER BANNER */}
+          {/* HEADER */}
           <div className="px-8 md:px-16 pt-10 pb-12 bg-[#1E5AA5] shrink-0 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 to-transparent pointer-events-none"></div>
             <div className="flex items-center justify-between relative z-10">
@@ -126,93 +167,107 @@ const DetailWilayah = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-12 bg-white custom-scrollbar">
-            <div className="max-w-6xl w-full mx-auto space-y-16">
+          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-8 bg-white custom-scrollbar">
+            <div className="max-w-6xl w-full mx-auto space-y-8">
               {/* IDENTITY SECTION */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-                <div className="lg:col-span-4 flex justify-center">
-                  <div className="relative group">
-                    <div className="absolute -inset-4 bg-blue-500/10 rounded-[3rem] blur-xl group-hover:opacity-100 transition duration-1000"></div>
-                    <div className="relative w-48 h-48 bg-gray-50 rounded-[3rem] border-4 border-white shadow-2xl flex items-center justify-center text-[#1E5AA5]">
-                      <Globe2
-                        size={80}
-                        strokeWidth={1}
-                        className="animate-float"
-                      />
-                    </div>
+              <div className="flex items-center gap-8">
+                {/* ✅ Logo Provinsi — emoji besar, compact */}
+                <div className="relative shrink-0">
+                  <div className="w-24 h-24 bg-blue-50 rounded-3xl border-2 border-blue-100 shadow-lg flex items-center justify-center text-5xl select-none">
+                    {provinceEmoji}
                   </div>
-                </div>
-                <div className="lg:col-span-8 space-y-6">
+                  {/* Badge status */}
                   <div
-                    className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${data?.status ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
+                    className={`absolute -bottom-2 -right-2 w-5 h-5 rounded-full border-2 border-white shadow ${data?.status ? "bg-emerald-500" : "bg-rose-500"}`}
+                  />
+                </div>
+
+                {/* Info Utama */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  {/* Status badge */}
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${data?.status ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
                   >
                     <div
-                      className={`w-2 h-2 rounded-full ${data?.status ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
+                      className={`w-1.5 h-1.5 rounded-full ${data?.status ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}
                     />
-                    Status:{" "}
                     {data?.status ? "Operational Active" : "Disabled Area"}
                   </div>
-                  <h2 className="text-5xl font-[1000] text-gray-900 uppercase tracking-tighter leading-none">
+
+                  <h2 className="text-3xl font-[1000] text-gray-900 uppercase tracking-tighter leading-none truncate">
                     {mainTitle}
                   </h2>
-                  <p className="text-gray-400 font-bold text-[11px] uppercase tracking-[0.4em] leading-relaxed max-w-xl italic">
+
+                  {province && (
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {province} · Indonesia
+                    </p>
+                  )}
+
+                  <p className="text-[10px] font-bold text-gray-400 italic leading-relaxed max-w-xl">
                     {data?.deskripsi ||
                       "Basis data deskripsi geografis belum tersedia."}
                   </p>
                 </div>
+
+                {/* Jenis Wilayah Badge */}
+                <div className="shrink-0">
+                  <div
+                    className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${data?.jenis_wilayah === "Absolute" ? "bg-blue-50 text-[#1E5AA5] border-blue-100" : "bg-purple-50 text-purple-600 border-purple-100"}`}
+                  >
+                    <Layers size={12} className="inline mr-1.5 mb-0.5" />
+                    {data?.jenis_wilayah || "Absolute"}
+                  </div>
+                </div>
               </div>
 
-              {/* GRID INFO */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl space-y-4">
+              {/* GRID INFO — 3 kolom compact */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-2">
                   <Label
                     text="Hierarki Registrasi"
                     className="!text-[9px] text-[#1E5AA5] font-black uppercase tracking-widest"
                   />
-                  <span className="block font-bold text-gray-700 text-[12px] uppercase break-words">
+                  <span className="block font-bold text-gray-700 text-[11px] uppercase break-words leading-relaxed">
                     {data?.nama_wilayah}
                   </span>
                 </div>
-                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl space-y-4">
+                <div className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-2">
                   <Label
                     text="Koordinat Navigasi"
                     className="!text-[9px] text-[#1E5AA5] font-black uppercase tracking-widest"
                   />
-                  <span className="block font-mono font-bold text-gray-700 text-[12px]">
-                    {lat || 0}, {lng || 0}
+                  <span className="block font-mono font-bold text-gray-700 text-[11px]">
+                    {isValidCoords ? `${lat}, ${lng}` : "Belum tersedia"}
                   </span>
                 </div>
-                <div className="p-6 bg-gray-50/50 border border-gray-100 rounded-3xl space-y-4">
+                <div className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl space-y-2">
                   <Label
-                    text="Otoritas Klasifikasi"
+                    text="Tahun Awal Binaan"
                     className="!text-[9px] text-[#1E5AA5] font-black uppercase tracking-widest"
                   />
-                  <span className="block font-black text-[#1E5AA5] text-[12px] uppercase tracking-widest">
-                    {data?.keterangan || "ABSOLUTE"}
+                  <span className="block font-black text-gray-700 text-[11px]">
+                    {data?.tahun_awal_binaan || "-"}
                   </span>
                 </div>
               </div>
 
-              {/* MAP & INVENTORY SECTION */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pt-6">
-                {/* Visual Map */}
-                <div className="lg:col-span-7 space-y-5">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">
+              {/* MAP & INVENTORY */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Map */}
+                <div className="lg:col-span-7 space-y-3">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Live Geo-Reference
                   </h3>
-                  <div className="h-[350px] rounded-[2.5rem] overflow-hidden border border-gray-100 shadow-2xl relative z-0 bg-gray-200">
-                    {/* Menggunakan key agar map re-render saat data ID masuk */}
-                    <MapContainer
-                      key={isValidCoords ? `${lat}-${lng}` : "initial-map"}
-                      center={isValidCoords ? [lat, lng] : [-2.5, 118]}
-                      zoom={isValidCoords ? 13 : 5}
-                      scrollWheelZoom={false}
-                      style={{ height: "100%", width: "100%" }}
-                    >
-                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-
-                      {/* Marker dengan custom icon CDN dan pengecekan koordinat yang benar */}
-                      {isValidCoords && (
+                  <div className="h-[300px] rounded-[2rem] overflow-hidden border border-gray-100 shadow-xl relative z-0 bg-gray-100">
+                    {isValidCoords ? (
+                      <MapContainer
+                        center={[lat, lng]}
+                        zoom={13}
+                        scrollWheelZoom={false}
+                        style={{ height: "100%", width: "100%" }}
+                      >
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                         <Marker position={[lat, lng]} icon={pinIcon}>
                           <Popup>
                             <div className="font-black text-[10px] uppercase text-[#1E5AA5]">
@@ -220,25 +275,43 @@ const DetailWilayah = () => {
                             </div>
                           </Popup>
                         </Marker>
-                      )}
-                    </MapContainer>
+                      </MapContainer>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-400">
+                        <MapPin size={32} strokeWidth={1.5} />
+                        <div className="text-center space-y-1">
+                          <p className="text-[10px] font-black uppercase tracking-widest">
+                            Koordinat Belum Tersedia
+                          </p>
+                          <p className="text-[9px] font-bold italic">
+                            Edit wilayah untuk menambahkan lokasi di peta
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => navigate(`/admin/wilayah/edit/${id}`)}
+                          className="px-5 py-2 bg-[#1E5AA5] text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-blue-700 transition-all"
+                        >
+                          Set Koordinat
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Statistics Center (Inventory Summary) */}
-                <div className="lg:col-span-5 space-y-5">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-400">
+                {/* Inventory */}
+                <div className="lg:col-span-5 space-y-3">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                     Inventory Summary
                   </h3>
-                  <div className="p-8 bg-[#1E5AA5] rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden h-[350px] flex flex-col justify-between group">
+                  <div className="p-6 bg-[#1E5AA5] rounded-[2rem] text-white shadow-xl relative overflow-hidden h-[300px] flex flex-col justify-between group">
                     <School
-                      size={160}
-                      className="absolute -bottom-10 -right-10 opacity-10 group-hover:scale-110 transition-transform duration-700"
+                      size={120}
+                      className="absolute -bottom-6 -right-6 opacity-10 group-hover:scale-110 transition-transform duration-700"
                     />
-                    <div className="relative z-10 flex flex-col gap-8">
-                      <div className="grid grid-cols-3 gap-4 border-b border-white/10 pb-8 text-center">
+                    <div className="relative z-10 flex flex-col gap-6">
+                      <div className="grid grid-cols-3 gap-3 border-b border-white/10 pb-6 text-center">
                         <div>
-                          <p className="text-3xl font-black">
+                          <p className="text-2xl font-black">
                             {data?.jumlah_sd || 0}
                           </p>
                           <p className="text-[8px] font-bold opacity-60 uppercase">
@@ -246,7 +319,7 @@ const DetailWilayah = () => {
                           </p>
                         </div>
                         <div className="border-x border-white/10">
-                          <p className="text-3xl font-black">
+                          <p className="text-2xl font-black">
                             {data?.jumlah_smp || 0}
                           </p>
                           <p className="text-[8px] font-bold opacity-60 uppercase">
@@ -254,7 +327,7 @@ const DetailWilayah = () => {
                           </p>
                         </div>
                         <div>
-                          <p className="text-3xl font-black">
+                          <p className="text-2xl font-black">
                             {data?.jumlah_smk || 0}
                           </p>
                           <p className="text-[8px] font-bold opacity-60 uppercase">
@@ -262,14 +335,14 @@ const DetailWilayah = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between px-4 py-3 bg-white/5 rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-widest">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between px-3 py-2.5 bg-white/5 rounded-xl border border-white/10 text-[9px] font-black uppercase tracking-widest">
                           <span>Total Tenaga Pendidik</span>
                           <span className="text-sm">
                             {data?.jumlah_guru || 0}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between px-4 py-3 bg-white/5 rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-widest">
+                        <div className="flex items-center justify-between px-3 py-2.5 bg-white/5 rounded-xl border border-white/10 text-[9px] font-black uppercase tracking-widest">
                           <span>Total Siswa Binaan</span>
                           <span className="text-sm">
                             {data?.jumlah_siswa || 0}
@@ -281,10 +354,11 @@ const DetailWilayah = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-10 pb-16">
+              {/* FOOTER */}
+              <div className="flex justify-end pb-8">
                 <button
                   onClick={() => navigate("/admin/wilayah")}
-                  className="px-10 py-3 bg-white text-gray-400 font-black text-[10px] uppercase tracking-[0.3em] border border-gray-100 rounded-full hover:bg-gray-50 transition-all shadow-sm"
+                  className="px-8 py-2.5 bg-white text-gray-400 font-black text-[9px] uppercase tracking-[0.3em] border border-gray-100 rounded-full hover:bg-gray-50 transition-all shadow-sm"
                 >
                   Back to Hub
                 </button>
@@ -299,7 +373,7 @@ const DetailWilayah = () => {
         @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-        .leaflet-container { z-index: 1 !important; border-radius: 2.5rem; }
+        .leaflet-container { z-index: 1 !important; border-radius: 2rem; }
       `}</style>
     </PageWrapper>
   );
