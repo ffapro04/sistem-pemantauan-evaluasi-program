@@ -57,11 +57,7 @@ import CreatePengurus from "./page/admin/kelolamaster/masterpengurus/CreatePengu
 import EditPengurus from "./page/admin/kelolamaster/masterpengurus/EditPengurus";
 import DetailPengurus from "./page/admin/kelolamaster/masterpengurus/DetailPengurus";
 
-// MASTER FINANCE
-import ReadFinance from "./page/admin/kelolamaster/masterfinance/ReadFinance";
-import CreateFinance from "./page/admin/kelolamaster/masterfinance/CreateFinance";
-import EditFinance from "./page/admin/kelolamaster/masterfinance/EditFinance";
-import DetailFinance from "./page/admin/kelolamaster/masterfinance/DetailFinance";
+
 
 // =========================================================================
 // SEKOLAH OPS
@@ -158,11 +154,7 @@ function App() {
         <Route path="/admin/pengurus/detail/:id" element={<DetailPengurus />} />
         <Route path="/admin/pengurus/edit/:id" element={<EditPengurus />} />
 
-        {/* --- MASTER FINANCE --- */}
-        <Route path="/admin/finance" element={<ReadFinance />} />
-        <Route path="/admin/finance/create" element={<CreateFinance />} />
-        <Route path="/admin/finance/detail/:id" element={<DetailFinance />} />
-        <Route path="/admin/finance/edit/:id" element={<EditFinance />} />
+
 
         {/* --- MODUL SEKOLAH --- */}
         <Route path="/sekolah/dashboard" element={<DashboardSekolah />} />

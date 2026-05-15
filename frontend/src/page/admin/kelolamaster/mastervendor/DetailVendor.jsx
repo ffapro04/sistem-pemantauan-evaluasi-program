@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Building2,
@@ -13,15 +14,18 @@ import {
   User,
   Tags,
   FileText,
-  RefreshCw,
+  RefreshCcw,
   Lock,
   Eye,
   EyeOff,
+  Fingerprint,
+  ShieldAlert,
+  ChevronRight,
+  ExternalLink
 } from "lucide-react";
 import Swal from "sweetalert2";
 
 import Sidebar from "../../../../components/Sidebar";
-import Button from "../../../../components/Button";
 import PageWrapper from "../../../../components/PageWrapper";
 import Label from "../../../../components/Label";
 
@@ -41,10 +45,8 @@ const DetailVendor = () => {
         const res = await axios.get(`http://localhost:3000/vendor/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        console.log("VENDOR DATA:", JSON.stringify(res.data));
         setData(res.data);
       } catch (err) {
-        Swal.fire("Error", "Gagal memuat data vendor", "error");
         navigate("/admin/vendor");
       } finally {
         setLoading(false);
@@ -58,267 +60,232 @@ const DetailVendor = () => {
       setShowPassword(false);
       return;
     }
+
     const { value: inputKey } = await Swal.fire({
-      title: `<span class="text-lg font-black uppercase tracking-tighter">Security Verification</span>`,
-      html: `<p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Masukkan Master Otoritas Key untuk dekripsi password akses vendor.</p>`,
+      title: `<span class="text-xl font-black uppercase tracking-tighter text-[#083344]">Otoritas Keamanan</span>`,
+      html: `<p class="text-[10px] font-bold text-[#0AC4E0] uppercase tracking-[0.2em] mb-4">Input Master Key Protokol Cyan</p>`,
       input: "password",
       inputPlaceholder: "••••••••••••",
       showCancelButton: true,
       confirmButtonText: "AUTHORIZE",
-      cancelButtonText: "CANCEL",
-      confirmButtonColor: "#1E5AA5",
-      cancelButtonColor: "#EF4444",
+      confirmButtonColor: "#0AC4E0",
+      cancelButtonColor: "#CFFAFE",
       customClass: {
-        popup: "rounded-[3rem] p-10 shadow-2xl",
-        input:
-          "rounded-2xl border-2 border-gray-100 text-center tracking-[0.5em] font-black",
-        confirmButton:
-          "rounded-full px-8 py-3 text-[10px] font-black tracking-widest uppercase",
-        cancelButton:
-          "rounded-full px-8 py-3 text-[10px] font-black tracking-widest uppercase",
+        popup: "rounded-[3rem] p-10 shadow-2xl border-2 border-[#0AC4E0] bg-white",
+        input: "rounded-2xl border-2 border-[#CFFAFE] text-center tracking-[0.5em] font-black focus:border-[#0AC4E0] focus:ring-0 text-[#083344]",
+        confirmButton: "rounded-full px-10 py-4 text-[10px] font-black tracking-widest uppercase shadow-xl shadow-cyan-200",
+        cancelButton: "rounded-full px-10 py-4 text-[10px] font-black tracking-widest uppercase text-[#0AC4E0]",
       },
     });
+
     if (inputKey === MASTER_AUTH_KEY) {
       setShowPassword(true);
-      Swal.fire({
-        icon: "success",
-        title: "ACCESS GRANTED",
-        timer: 1500,
-        showConfirmButton: false,
-        toast: true,
-        position: "top-end",
-      });
     } else if (inputKey) {
       Swal.fire({
         icon: "error",
-        title: "ACCESS DENIED",
-        text: "Kunci Otoritas Tidak Valid!",
-        confirmButtonColor: "#EF4444",
+        title: "DITOLAK",
+        text: "Kunci Otoritas Salah",
+        confirmButtonColor: "#0AC4E0",
       });
     }
   };
 
   if (loading)
     return (
-      <div className="h-screen flex items-center justify-center bg-[#EEF5FF]">
-        <RefreshCw className="animate-spin text-[#1E5AA5]" size={40} />
+      <div className="h-screen flex items-center justify-center bg-white">
+        <RefreshCcw className="animate-spin text-[#0AC4E0]" size={40} />
       </div>
     );
 
   const isBermitra = data?.status === "Bermitra";
 
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
+    <PageWrapper className="h-screen bg-[#F0FDFA] flex overflow-hidden !p-0 font-sans text-[#083344]">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-10 pb-0">
-        <div className="flex-1 !m-0 !p-0 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden relative">
-          {/* HEADER BANNER */}
-          <div className="px-8 md:px-16 pt-10 pb-8 bg-[#1E5AA5] shrink-0 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-black/10 to-transparent pointer-events-none"></div>
-            <div className="flex items-center gap-6 relative z-10">
+
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative items-center justify-end">
+        {/* Dekorasi Background - Hanya Cyan/Putih */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/10 rounded-full blur-[100px] -z-0" />
+        <div className="absolute bottom-40 left-20 w-[300px] h-[300px] bg-[#0AC4E0]/5 rounded-full blur-[80px] -z-0" />
+
+        {/* HEADER SECTION */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-6xl px-12 mb-8 flex items-end justify-between relative z-10"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => navigate("/admin/vendor")}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all border border-white/20"
+                className="p-2 bg-white rounded-xl shadow-sm border border-[#CFFAFE] text-[#0AC4E0] hover:bg-[#E0F2FE]"
               >
-                <ArrowLeft size={16} strokeWidth={3} />
+                <ArrowLeft size={18} />
               </button>
-              <div>
-                <h1 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
-                  PROFIL <span className="text-blue-200">VENDOR</span>
-                </h1>
-                <p className="text-[8px] font-bold text-blue-100/70 tracking-widest uppercase italic mt-1.5">
-                  Authorized Partnership Data
-                </p>
-              </div>
+              <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0AC4E0]">Cyan Protocol v2.0</span>
             </div>
+            <h1 className="text-5xl font-black tracking-tighter text-[#083344] uppercase">
+              Vendor <span className="text-[#0AC4E0]">Profile</span>
+            </h1>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-10 bg-white custom-scrollbar">
-            <div className="max-w-6xl w-full mx-auto space-y-12">
-              {/* Profile Card */}
-              <div className="flex flex-col md:flex-row items-center gap-8 pb-10 border-b border-gray-100">
-                <div className="w-32 h-32 bg-blue-50 rounded-[2.5rem] border-4 border-white shadow-2xl flex items-center justify-center text-[#1E5AA5] text-4xl font-black uppercase shrink-0">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => navigate(`/admin/vendor/edit/${id}`)}
+            className="flex items-center gap-3 px-8 py-4 bg-[#083344] text-white rounded-[2rem] shadow-2xl shadow-cyan-900/20"
+          >
+            <Edit3 size={16} className="text-[#0AC4E0]" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Edit Protokol</span>
+          </motion.button>
+        </motion.div>
+
+        {/* MAIN CONTENT CARD */}
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 60, delay: 0.1 }}
+          className="w-full max-w-6xl bg-white rounded-t-[5rem] shadow-[0_-20px_100px_rgba(10,196,224,0.05)] border-t border-x border-[#CFFAFE] p-16 pb-32 relative z-10 overflow-y-auto no-scrollbar"
+        >
+          <div className="grid grid-cols-12 gap-16">
+
+            {/* LEFT: PRIMARY INFO */}
+            <div className="col-span-12 lg:col-span-4 space-y-10">
+              <div className="relative inline-block">
+                <div className="w-48 h-48 bg-[#F0FDFA] rounded-[4rem] border-2 border-[#CFFAFE] flex items-center justify-center text-6xl font-black text-[#0AC4E0]">
                   {data?.nama_vendor?.charAt(0)}
                 </div>
-                <div className="text-center md:text-left space-y-4 flex-1">
-                  <div
-                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${isBermitra ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}
-                  >
-                    <ShieldCheck size={12} />{" "}
-                    {isBermitra ? "Bermitra Aktif" : "Tidak Bermitra"}
-                  </div>
-                  <h2 className="text-4xl font-[900] text-gray-800 uppercase tracking-tighter leading-none">
-                    {data?.nama_vendor}
-                  </h2>
-                  <div className="flex items-center justify-center md:justify-start gap-4 text-gray-400 font-bold text-[10px] uppercase tracking-widest italic">
-                    <div className="flex items-center gap-1.5">
-                      <Tags size={12} className="text-[#1E5AA5]" />{" "}
-                      {data?.pilar}
-                    </div>
-                    <div className="flex items-center gap-1.5 border-l border-gray-200 pl-4">
-                      <MapPin size={12} className="text-rose-400" />{" "}
-                      {data?.alamat?.substring(0, 40)}
-                    </div>
-                  </div>
+                <div className={`absolute -bottom-2 -right-2 p-4 rounded-3xl shadow-xl bg-[#0AC4E0] text-white border-4 border-white`}>
+                  <ShieldCheck size={24} />
                 </div>
-                <Button
-                  text="MODIFIKASI"
-                  icon={<Edit3 size={12} />}
-                  onClick={() => navigate(`/admin/vendor/edit/${id}`)}
-                  className="!bg-[#2E5AA7] !text-white !px-10 !py-2.5 !rounded-full !text-[9px] font-black shadow-lg shrink-0"
-                />
               </div>
 
-              {/* Info Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10">
-                {/* 1. Identitas Lembaga */}
-                <div className="space-y-3">
-                  <Label
-                    text="Identitas Lembaga"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100 hover:bg-white hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm shrink-0">
-                      <Building2 size={18} />
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-gray-700 text-sm uppercase tracking-tight leading-none truncate">
-                        {data?.nama_vendor}
-                      </span>
-                      <span className="text-[10px] font-mono font-black text-[#1E5AA5] mt-1 tracking-widest">
-                        REG: {data?.no_register}
-                      </span>
-                    </div>
-                  </div>
+              <div className="space-y-4">
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.2em] border-2 ${isBermitra ? 'bg-[#0AC4E0] text-white border-[#0AC4E0]' : 'bg-white text-[#0AC4E0] border-[#0AC4E0]'}`}>
+                  ● {isBermitra ? "Mitra Terverifikasi" : "Status Non-Aktif"}
                 </div>
-
-                {/* 2. Email Login */}
-                <div className="space-y-3">
-                  <Label
-                    text="Email Login Sistem"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100 hover:bg-white hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm shrink-0">
-                      <Mail size={18} />
-                    </div>
-                    <span className="font-bold text-gray-700 text-sm lowercase truncate">
-                      {data?.user?.email || "-"}
-                    </span>
-                  </div>
+                <h2 className="text-4xl font-black tracking-tighter uppercase leading-[0.9] text-[#083344]">
+                  {data?.nama_vendor}
+                </h2>
+                <div className="flex items-center gap-2 text-[#0AC4E0]">
+                  <Fingerprint size={16} />
+                  <span className="text-xs font-mono font-bold tracking-widest uppercase">ID: {data?.no_register}</span>
                 </div>
+              </div>
 
-                {/* 3. Password Reveal */}
+              <div className="pt-8 space-y-4 border-t border-[#CFFAFE]">
+                <Label text="Kredensial Akses" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest" />
                 <div className="space-y-3">
-                  <Label
-                    text="Kata Sandi Login"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50/50 border border-gray-100 transition-all">
+                  <div className="flex items-center gap-4 p-5 bg-[#F0FDFA] rounded-[2rem] border border-[#CFFAFE]">
+                    <Mail size={18} className="text-[#0AC4E0]" />
+                    <span className="text-sm font-bold text-[#083344]">{data?.user?.email || "-"}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-5 bg-[#083344] rounded-[2rem] border border-[#083344] shadow-xl">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm shrink-0">
-                        <Lock size={18} />
-                      </div>
-                      <span
-                        className={`font-mono font-black text-sm tracking-widest ${showPassword ? "text-blue-600" : "text-gray-300"}`}
-                      >
-                        {showPassword
-                          ? data?.user?.password || "HIDDEN_BY_SERVER"
-                          : "••••••••"}
+                      <Lock size={18} className="text-[#0AC4E0]" />
+                      <span className={`font-mono text-sm tracking-[0.3em] font-black ${showPassword ? 'text-white' : 'text-[#164e63]'}`}>
+                        {showPassword ? data?.user?.password : "••••••••"}
                       </span>
                     </div>
-                    <button
-                      onClick={handleRevealRequest}
-                      className="p-2 rounded-lg hover:bg-white text-gray-400 hover:text-[#1E5AA5] transition-all shrink-0"
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    <button onClick={handleRevealRequest} className="p-2 bg-[#164e63] rounded-xl text-[#0AC4E0] hover:bg-[#24717d]">
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
-
-                {/* 4. PJ Utama */}
-                <div className="space-y-3">
-                  <Label
-                    text="Penanggung Jawab Utama"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100 hover:bg-white hover:shadow-md transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm shrink-0">
-                      <User size={18} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-black text-gray-700 text-sm uppercase tracking-tight">
-                        {data?.pj_1 || "-"}
-                      </span>
-                      <span className="font-bold text-[#1E5AA5] text-[11px] lowercase italic">
-                        {data?.telp_pj_1 || "Email kontak belum diatur"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 5. Dokumen Legalitas */}
-                <div className="space-y-3">
-                  <Label
-                    text="Dokumen Legalitas"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
-                      <FileText size={18} className="text-rose-400 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[8px] font-black text-gray-400 uppercase">
-                          NPWP
-                        </span>
-                        <span className="text-[9px] font-bold text-gray-600 truncate">
-                          {data?.npwp_file || "-"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
-                      <FileText size={18} className="text-blue-400 shrink-0" />
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[8px] font-black text-gray-400 uppercase">
-                          KTP PJ
-                        </span>
-                        <span className="text-[9px] font-bold text-gray-600 truncate">
-                          {data?.ktp_pj_file || "-"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 6. Status Kemitraan */}
-                <div className="space-y-3">
-                  <Label
-                    text="Status Kemitraan"
-                    className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                  />
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100">
-                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-gray-400 shadow-sm shrink-0">
-                      <ShieldCheck size={18} />
-                    </div>
-                    <span
-                      className={`font-black text-sm uppercase ${isBermitra ? "text-emerald-600" : "text-rose-600"}`}
-                    >
-                      {data?.status || "-"}
-                    </span>
-                  </div>
-                </div>
               </div>
+            </div>
 
-              <div className="flex justify-end pt-6 pb-16">
-                <Button
-                  text="KEMBALI KE LIST"
-                  onClick={() => navigate("/admin/vendor")}
-                  className="!px-10 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 hover:!bg-gray-50 transition-all uppercase tracking-[0.2em] shadow-sm"
-                />
+            {/* RIGHT: SECONDARY INFO GRID */}
+            <div className="col-span-12 lg:col-span-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                {/* Pilar & Alamat */}
+                <div className="col-span-2 grid grid-cols-2 gap-8">
+                  <div className="p-8 rounded-[3rem] bg-[#0AC4E0]/10 border-2 border-[#0AC4E0]/20 flex flex-col justify-between h-40">
+                    <Tags className="text-[#0AC4E0]" size={28} />
+                    <div>
+                      <p className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest mb-1">Pilar Program</p>
+                      <h4 className="text-xl font-black text-[#083344] uppercase tracking-tighter">{data?.pilar}</h4>
+                    </div>
+                  </div>
+                  <div className="p-8 rounded-[3rem] bg-white border-2 border-[#CFFAFE] flex flex-col justify-between h-40 shadow-sm">
+                    <MapPin className="text-[#0AC4E0]" size={28} />
+                    <div>
+                      <p className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest mb-1">Domisili Operasional</p>
+                      <h4 className="text-xs font-bold text-[#164e63] leading-relaxed uppercase">{data?.alamat}</h4>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Penanggung Jawab */}
+                <div className="space-y-4">
+                  <Label text="Otoritas Representatif" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-4" />
+                  <div className="p-8 rounded-[3rem] bg-white border-2 border-[#CFFAFE] shadow-sm">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-12 h-12 rounded-2xl bg-[#CFFAFE] flex items-center justify-center text-[#0AC4E0]">
+                        <User size={20} />
+                      </div>
+                      <div>
+                        <h5 className="font-black text-[#083344] uppercase tracking-tight leading-none">{data?.pj_1 || "-"}</h5>
+                        <p className="text-[10px] font-bold text-[#0AC4E0] uppercase mt-1 italic">PJ Utama</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-black text-[#083344] bg-[#CFFAFE] p-4 rounded-2xl border border-[#0AC4E0]/20">
+                      <ShieldAlert size={14} className="text-[#0AC4E0]" />
+                      {data?.telp_pj_1 || "DATA_NULL"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dokumen */}
+                <div className="space-y-4">
+                  <Label text="Arsip Dokumen Cyan" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-4" />
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex items-center justify-between p-6 bg-[#F0FDFA] border border-[#CFFAFE] rounded-[2.5rem] group hover:bg-white hover:border-[#0AC4E0] transition-all">
+                      <div className="flex items-center gap-4">
+                        <FileText className="text-[#0AC4E0]" size={20} />
+                        <div>
+                          <p className="text-[10px] font-black text-[#0AC4E0] uppercase leading-none">Dokumen NPWP</p>
+                          <p className="text-[11px] font-bold text-[#083344] mt-1 uppercase">{data?.npwp_file || "NPWP_MISSING"}</p>
+                        </div>
+                      </div>
+                      <ExternalLink size={16} className="text-[#0AC4E0]" />
+                    </div>
+                    <div className="flex items-center justify-between p-6 bg-[#F0FDFA] border border-[#CFFAFE] rounded-[2.5rem] group hover:bg-white hover:border-[#0AC4E0] transition-all">
+                      <div className="flex items-center gap-4">
+                        <Database className="text-[#0AC4E0]" size={20} />
+                        <div>
+                          <p className="text-[10px] font-black text-[#0AC4E0] uppercase leading-none">Scan KTP PJ</p>
+                          <p className="text-[11px] font-bold text-[#083344] mt-1 uppercase">{data?.ktp_pj_file || "KTP_MISSING"}</p>
+                        </div>
+                      </div>
+                      <ExternalLink size={16} className="text-[#0AC4E0]" />
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
+        </motion.div>
+
+        {/* BOTTOM DOCK */}
+        <div className="absolute bottom-[-10px] w-[450px] h-[100px] bg-white border-t-2 border-x-2 border-[#CFFAFE] rounded-t-[150px] z-20 flex items-center justify-center px-10 pb-4 shadow-2xl shadow-cyan-100">
+          <button
+            onClick={() => navigate("/admin/vendor")}
+            className="group flex items-center gap-3 px-12 py-4 bg-[#F0FDFA] border-2 border-[#CFFAFE] rounded-full text-[#0AC4E0] hover:bg-[#0AC4E0] hover:text-white transition-all shadow-sm"
+          >
+            <span className="text-[10px] font-black uppercase tracking-[0.3em]">Kembali</span>
+            <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </PageWrapper>
   );
 };

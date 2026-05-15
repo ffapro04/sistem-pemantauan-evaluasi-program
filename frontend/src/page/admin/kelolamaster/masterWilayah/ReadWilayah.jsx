@@ -1,31 +1,32 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-// Import Lucide Icons Lengkap
 import {
   Plus,
   Search as SearchIcon,
-  MapPin,
   Globe,
-  Database,
-  Filter,
+  MapPin,
   Layers,
+  Database,
+  Eye,
+  Edit3,
+  Filter,
   CheckCircle,
-  Edit3, // Pastikan ini ada
+  RotateCcw,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
-// IMPORT KOMPONEN UI PREMIUM
+// Komponen Custom
 import Sidebar from "../../../../components/Sidebar";
 import Card from "../../../../components/Card";
 import Button from "../../../../components/Button";
-import PageWrapper from "../../../../components/PageWrapper";
+import Input from "../../../../components/Input";
 import Table from "../../../../components/Table";
+import PageWrapper from "../../../../components/PageWrapper";
+import Label from "../../../../components/Label";
 import Pagination from "../../../../components/Pagination";
 import Dropdown from "../../../../components/Dropdown";
-import Input from "../../../../components/Input";
-import Label from "../../../../components/Label";
 
 const Toast = Swal.mixin({
   toast: true,
@@ -37,29 +38,44 @@ const Toast = Swal.mixin({
 
 const ReadWilayah = () => {
   const navigate = useNavigate();
+
+  // --- STATE DENGAN PERSISTENSI LOCAL STORAGE ---
   const [searchTerm, setSearchTerm] = useState(
-    localStorage.getItem("wil_search") || "",
+    localStorage.getItem("wil_filter_search") || ""
   );
-  const [filterStatus, setFilterStatus] = useState(
-    localStorage.getItem("wil_status") || "all",
+  const [statusFilter, setStatusFilter] = useState(
+    localStorage.getItem("wil_filter_status") || "all"
   );
-  const [filterKeterangan, setFilterKeterangan] = useState(
-    localStorage.getItem("wil_ket") || "all",
+  const [ketFilter, setKetFilter] = useState(
+    localStorage.getItem("wil_filter_ket") || "all"
   );
   const [currentPage, setCurrentPage] = useState(
-    Number(localStorage.getItem("wil_page")) || 1,
+    Number(localStorage.getItem("wil_filter_page")) || 1
   );
 
-  const [loading, setLoading] = useState(true);
   const [wilayahList, setWilayahList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const itemsPerPage = 5;
 
+  const filterStatusOptions = [
+    { value: "all", label: "SEMUA STATUS" },
+    { value: "active", label: "STATUS: AKTIF" },
+    { value: "inactive", label: "STATUS: NONAKTIF" },
+  ];
+
+  const filterKetOptions = [
+    { value: "all", label: "SEMUA KLASIFIKASI" },
+    { value: "Absolute", label: "ABSOLUTE" },
+    { value: "Independent", label: "INDEPENDENT" },
+  ];
+
+  // --- SIMPAN SETIAP PERUBAHAN KE LOCAL STORAGE ---
   useEffect(() => {
-    localStorage.setItem("wil_search", searchTerm);
-    localStorage.setItem("wil_status", filterStatus);
-    localStorage.setItem("wil_ket", filterKeterangan);
-    localStorage.setItem("wil_page", currentPage);
-  }, [searchTerm, filterStatus, filterKeterangan, currentPage]);
+    localStorage.setItem("wil_filter_search", searchTerm);
+    localStorage.setItem("wil_filter_status", statusFilter);
+    localStorage.setItem("wil_filter_ket", ketFilter);
+    localStorage.setItem("wil_filter_page", currentPage);
+  }, [searchTerm, statusFilter, ketFilter, currentPage]);
 
   const fetchWilayah = async () => {
     try {
@@ -70,7 +86,7 @@ const ReadWilayah = () => {
       });
       setWilayahList(response.data);
     } catch (error) {
-      Toast.fire({ icon: "error", title: "Gagal sinkronisasi data wilayah" });
+      Toast.fire({ icon: "error", title: "Gagal memuat data wilayah" });
     } finally {
       setLoading(false);
     }
@@ -82,70 +98,73 @@ const ReadWilayah = () => {
 
   const handleToggleStatus = async (id, name, currentStatus) => {
     const nextStatus = !currentStatus;
+    const regionName = name.split("/").filter(Boolean).pop();
     try {
       const token = localStorage.getItem("token");
       await axios.patch(
         `http://localhost:3000/wilayah/${id}`,
         { status: nextStatus },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       await fetchWilayah();
       Toast.fire({
         icon: "success",
-        title: `${name.split("/").filter(Boolean).pop()} Berhasil ${nextStatus ? "Diaktifkan" : "Dinonaktifkan"}`,
+        title: `${regionName} sekarang ${nextStatus ? "Aktif" : "Nonaktif"}`,
       });
-    } catch (error) {
-      Toast.fire({ icon: "error", title: "Gagal memperbarui status wilayah" });
+    } catch (e) {
+      Toast.fire({ icon: "error", title: "Gagal update status" });
     }
   };
 
-  const filteredWilayah = wilayahList
+  // --- LOGIKA FILTER & SORTING ---
+  const filteredData = wilayahList
     .filter((w) => {
-      const matchesSearch = w.nama_wilayah
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      const matchesSearch = w.nama_wilayah?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus =
-        filterStatus === "all"
+        statusFilter === "all"
           ? true
-          : filterStatus === "active"
+          : statusFilter === "active"
             ? w.status === true
             : w.status === false;
-      const matchesKeterangan =
-        filterKeterangan === "all" ? true : w.keterangan === filterKeterangan;
-      return matchesSearch && matchesStatus && matchesKeterangan;
+      const matchesKet = ketFilter === "all" ? true : w.keterangan === ketFilter;
+
+      return matchesSearch && matchesStatus && matchesKet;
     })
     .sort((a, b) => b.id_wilayah - a.id_wilayah);
 
-  const totalItems = filteredWilayah.length;
+  const totalItems = filteredData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-  const currentData = filteredWilayah.slice(
+  const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
-  const columns = [
+  const tableColumns = [
     {
       header: "NO",
-      align: "text-left pl-8 w-[70px]",
-      render: (_, idx) => (
-        <span className="text-[10px] font-mono font-bold text-gray-400">
-          {String((currentPage - 1) * itemsPerPage + idx + 1).padStart(2, "0")}
-        </span>
+      align: "text-center w-[80px]",
+      render: (_, i) => (
+        <div className="flex justify-center">
+          <span className="text-left font-mono text-[10px] font-bold text-gray-400 min-w-[20px]">
+            {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
+          </span>
+        </div>
       ),
     },
     {
       header: "WILAYAH BINAAN",
-      align: "text-left w-[35%]",
+      align: "text-left w-[35%]",  // ← ganti text-center ke text-left
       render: (row) => {
         const nameParts = row.nama_wilayah?.split("/").filter(Boolean) || [];
         const mainName = nameParts.pop() || "Unknown Area";
         const hierarchy = nameParts.join(" • ");
         return (
-          <div className="flex flex-col py-3.5">
-            <span className="font-black text-gray-800 uppercase text-[11px] tracking-tight">
+          // ← hapus justify-center, langsung flex-col
+          <div className="flex flex-col gap-0.5 py-2">
+            <span className="font-black text-gray-800 uppercase text-[11px] leading-tight tracking-tight">
               {mainName}
             </span>
-            <span className="text-[9px] text-gray-400 font-bold lowercase truncate">
+            <span className="text-[9px] text-gray-400 font-bold lowercase truncate max-w-[280px]">
               {hierarchy || row.deskripsi}
             </span>
           </div>
@@ -154,61 +173,69 @@ const ReadWilayah = () => {
     },
     {
       header: "KLASIFIKASI",
-      align: "text-left w-[20%]",
-      render: (row) => {
-        const isIndependent = row.keterangan === "Independent";
-        return (
-          <span
-            className={`text-[10px] font-black uppercase tracking-tight ${
-              isIndependent ? "text-blue-600" : "text-indigo-600"
-            }`}
-          >
-            {row.keterangan?.toUpperCase() || "ABSOLUTE"}
-          </span>
-        );
-      },
+      align: "text-center w-[20%]",
+      render: (row) => (
+        <div className="flex justify-center">
+          <div className="text-left min-w-[120px]">
+            <span
+              className={`text-[10px] font-black uppercase tracking-widest ${row.keterangan === "Independent" ? "text-purple-600" : "text-[#0AC4E0]"
+                }`}
+            >
+              {row.keterangan || "ABSOLUTE"}
+            </span>
+          </div>
+        </div>
+      ),
     },
     {
-      header: "KONTROL STATUS",
-      align: "text-left w-[240px]",
+      header: "KONTROL OTORITAS",
+      align: "text-center w-[280px]",
       render: (row) => {
-        const isActive = row.status === true || row.status === "true";
+        const isActive = row.status === true;
         return (
-          <div className="flex gap-3 items-center py-3.5">
-            <div className="flex">
-              <Button
-                icon={<SearchIcon size={16} />}
-                onClick={() =>
-                  navigate(`/admin/wilayah/detail/${row.id_wilayah}`)
-                }
-                className="!p-2 !bg-transparent !text-gray-400 hover:!text-blue-600 !shadow-none"
-              />
-              <Button
-                icon={<Edit3 size={15} />}
-                onClick={() =>
-                  navigate(`/admin/wilayah/edit/${row.id_wilayah}`)
-                }
-                className="!p-2 !bg-transparent !text-gray-400 hover:!text-amber-500 !shadow-none"
-              />
-            </div>
-            <div
-              onClick={() =>
-                handleToggleStatus(row.id_wilayah, row.nama_wilayah, row.status)
-              }
-              className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
-            >
+          <div className="flex justify-center py-2">
+            <div className="flex items-center gap-4 text-left min-w-[180px]">
+              {/* Action Group */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => navigate(`/admin/wilayah/detail/${row.id_wilayah}`)}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-[#0AC4E0] hover:bg-white rounded-lg transition-all active:scale-90"
+                  title="View"
+                >
+                  <Eye size={15} />
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/wilayah/edit/${row.id_wilayah}`)}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-amber-500 hover:bg-white rounded-lg transition-all active:scale-90"
+                  title="Edit"
+                >
+                  <Edit3 size={14} />
+                </button>
+              </div>
+
+              <div className="h-6 w-px bg-slate-100" />
+
+              {/* Toggle Status */}
               <div
-                className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isActive ? "bg-emerald-500" : "bg-gray-300"} p-1`}
+                onClick={() => handleToggleStatus(row.id_wilayah, row.nama_wilayah, row.status)}
+                className="flex items-center gap-2 cursor-pointer group active:scale-95 transition-all"
               >
                 <div
-                  className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-4" : "translate-x-0"}`}
-                />
+                  className={`relative w-8 h-4.5 rounded-full transition-all duration-500 p-0.5 ${isActive ? "bg-emerald-500 shadow-sm shadow-emerald-200" : "bg-gray-200"
+                    }`}
+                >
+                  <div
+                    className={`w-3.5 h-3.5 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-3.5" : "translate-x-0"
+                      }`}
+                  />
+                </div>
+                <span
+                  className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-slate-400"
+                    }`}
+                >
+                  {isActive ? "On" : "Off"}
+                </span>
               </div>
-              <span
-                className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-gray-400"}`}
-              >
-                {isActive ? "Aktif" : "Nonaktif"}
-              </span>
             </div>
           </div>
         );
@@ -220,20 +247,18 @@ const ReadWilayah = () => {
     <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
       <Sidebar />
       <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-10 pt-10 pb-6">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-[2.5rem] shadow-2xl bg-white overflow-hidden">
+        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-[2.5rem] shadow-2xl bg-white overflow-hidden relative">
           <div className="px-10 pt-8 pb-6 shrink-0">
             <header className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-4">
-                <div className="p-3.5 bg-gradient-to-br from-[#1E5AA5] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                  <Globe size={24} />
-                </div>
-                <div className="flex flex-col">
+
+                <div className="flex flex-col gap-1">
                   <Label
                     text="Spatial & Regional Database Center"
-                    className="!text-[8px] !text-[#1E5AA5] !font-black !italic uppercase"
+                    className="!text-[8px] !text-[#0AC4E0] !font-black !italic uppercase"
                   />
-                  <h1 className="text-xl font-black text-gray-800 uppercase leading-none">
-                    Data <span className="text-[#2E5AA7]">Wilayah Binaan</span>
+                  <h1 className="text-xl font-black text-gray-800 uppercase">
+                    Manajemen Data <span className="text-[#0AC4E0]">Wilayah Binaan</span>
                   </h1>
                 </div>
               </div>
@@ -241,37 +266,33 @@ const ReadWilayah = () => {
                 text="SET AREA BARU"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/wilayah/create")}
-                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95 transition-all"
+                className="!bg-[#0AC4E0] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95 transition-all"
               />
             </header>
 
             <div className="flex flex-col md:flex-row gap-3 mb-6">
-              <div className="relative flex-1">
+              <div className="relative flex-1 group">
                 <Input
-                  placeholder="Cari wilayah..."
+                  placeholder="Cari label wilayah atau alamat..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full !pl-11 !py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[11px] font-bold"
+                  className="w-full !pl-11 !py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[11px] font-bold focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/10 transition-all outline-none"
                 />
                 <SearchIcon
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#0AC4E0] transition-colors"
                   size={16}
                 />
               </div>
-              <div className="w-52">
+              <div className="w-56">
                 <Dropdown
-                  icon={CheckCircle}
-                  value={filterStatus}
-                  items={[
-                    { value: "all", label: "SEMUA STATUS" },
-                    { value: "active", label: "WILAYAH AKTIF" },
-                    { value: "inactive", label: "NON-AKTIF" },
-                  ]}
+                  icon={Layers}
+                  value={ketFilter}
+                  items={filterKetOptions}
                   onChange={(v) => {
-                    setFilterStatus(v);
+                    setKetFilter(v);
                     setCurrentPage(1);
                   }}
                   className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
@@ -279,15 +300,11 @@ const ReadWilayah = () => {
               </div>
               <div className="w-52">
                 <Dropdown
-                  icon={Layers}
-                  value={filterKeterangan}
-                  items={[
-                    { value: "all", label: "SEMUA TIPE" },
-                    { value: "Independent", label: "INDEPENDENT" },
-                    { value: "Absolute", label: "ABSOLUTE" },
-                  ]}
+                  icon={CheckCircle}
+                  value={statusFilter}
+                  items={filterStatusOptions}
                   onChange={(v) => {
-                    setFilterKeterangan(v);
+                    setStatusFilter(v);
                     setCurrentPage(1);
                   }}
                   className="!py-2 !bg-gray-50/50 !rounded-xl !text-[9px] font-black uppercase"
@@ -296,29 +313,34 @@ const ReadWilayah = () => {
               <button
                 onClick={() => {
                   setSearchTerm("");
-                  setFilterStatus("all");
-                  setFilterKeterangan("all");
+                  setStatusFilter("all");
+                  setKetFilter("all");
                   setCurrentPage(1);
                 }}
-                className="text-[8px] font-black text-gray-400 hover:text-rose-500 uppercase tracking-widest transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all active:rotate-180 duration-500"
               >
-                Reset Filter
+                <RotateCcw size={16} />
               </button>
             </div>
 
-            <div className="px-4 py-2 bg-blue-50/50 text-[#1E5AA5] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
-              <Filter size={12} className="inline mr-2" /> Hasil: {totalItems}{" "}
-              Geo-Locations
+            <div className="px-4 py-2 bg-[#0AC4E0]/5 text-[#0AC4E0] rounded-lg border border-[#0AC4E0]/10 font-black text-[8px] uppercase tracking-widest w-fit">
+              <Filter size={12} className="inline mr-2" /> Terdata: {totalItems} Geo-Locations
             </div>
           </div>
 
           <div className="flex-none px-10 pb-4 overflow-hidden">
             <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
               <Table
-                columns={columns}
+                columns={tableColumns}
                 data={currentData}
                 className="min-w-full border-collapse"
               />
+              {!loading && currentData.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 opacity-20 text-gray-900">
+                  <Database size={40} className="mb-2" />
+                  <p className="text-xs font-black uppercase tracking-widest">Data Kosong</p>
+                </div>
+              )}
             </div>
           </div>
 

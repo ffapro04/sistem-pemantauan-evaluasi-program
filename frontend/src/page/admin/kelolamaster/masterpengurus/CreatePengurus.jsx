@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
   User,
   Mail,
   Briefcase,
@@ -11,14 +11,17 @@ import {
   Lock,
   ShieldAlert,
   KeyRound,
+  Sparkles,
+  Save,
+  ChevronLeft,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
-import Swal from "sweetalert2";
 
 // Komponen Custom
 import Sidebar from "../../../../components/Sidebar";
 import Input from "../../../../components/Input";
 import Label from "../../../../components/Label";
-import Button from "../../../../components/Button";
 import PageWrapper from "../../../../components/PageWrapper";
 import Dropdown from "../../../../components/Dropdown";
 
@@ -32,8 +35,14 @@ const CreatePengurus = () => {
     nama: "",
     email: "",
     password: "",
-    id_role: 1,
+    id_role: 2,
     jabatan: "Ketua Pengurus",
+  });
+
+  const [statusNote, setStatusNote] = useState({
+    show: false,
+    type: null,
+    message: ""
   });
 
   const jabatanOptions = [
@@ -45,217 +54,169 @@ const CreatePengurus = () => {
   ];
 
   useEffect(() => {
-    // Sinkronisasi id_role: 0 untuk Admin, 1 untuk lainnya
-    setFormData((prev) => ({
-      ...prev,
-      id_role: formData.jabatan === "Admin" ? 0 : 1,
-    }));
     if (formData.jabatan !== "Admin") setAdminKey("");
   }, [formData.jabatan]);
 
-  // Di dalam CreatePengurus.jsx (Bagian handleSubmit)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validasi Master Key (tetap ada)
-    if (formData.jabatan === "Admin" && adminKey !== MASTER_AUTH_KEY) {
-      return Swal.fire({
-        icon: "error",
-        title: "Akses Ditolak",
-        text: "Master Key Salah!",
+  const validateForm = () => {
+    if (!formData.nama || !formData.email || !formData.password) {
+      setStatusNote({
+        show: true,
+        type: 'error',
+        message: "Otentikasi Gagal: Field identitas tidak boleh kosong."
       });
+      return false;
     }
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
 
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-
-      // --- LOGIKA MAPPING ID ROLE ---
-      const finalData = {
-        ...formData,
-        // Jika jabatan "Admin", kirim id_role 1. Jika selain itu, kirim id_role 2.
-        id_role: formData.jabatan === "Admin" ? 1 : 2,
-      };
-
+      const finalData = { ...formData, id_role: formData.jabatan === "Admin" ? 1 : 2 };
       await axios.post("http://localhost:3000/users/register", finalData, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      Swal.fire({
-        icon: "success",
-        title: "Berhasil",
-        text: "Data personil telah diaktifkan.",
-      });
-      navigate("/admin/pengurus");
+      setStatusNote({ show: true, type: 'success', message: "Data Sinkron: Personil berhasil diaktifkan." });
+      setTimeout(() => navigate("/admin/pengurus"), 2500);
     } catch (err) {
-      Swal.fire("Gagal", "Gagal menyimpan data", "error");
+      setStatusNote({ show: true, type: 'error', message: "System Error: Gagal memproses pendaftaran." });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
+    <PageWrapper className="h-screen bg-[#FBFBFD] flex overflow-hidden !p-0 font-sans text-slate-800 leading-none">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-10 pb-0">
-        <div className="flex-1 !rounded-t-[2.5rem] border-none shadow-2xl bg-white flex flex-col overflow-hidden">
-          <div className="px-8 md:px-16 pt-12 pb-10 flex flex-col md:flex-row items-center justify-between bg-[#1E5AA5] shrink-0">
-            <div className="flex items-center gap-6">
-              <button
-                onClick={() => navigate("/admin/pengurus")}
-                className="w-11 h-11 flex items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white hover:text-[#1E5AA5] transition-all"
-              >
-                <ArrowLeft size={18} strokeWidth={3} />
-              </button>
-              <div>
-                <h1 className="text-2xl font-black text-white uppercase leading-none">
-                  REGISTRASI <span className="text-blue-200">PENGURUS</span>
-                </h1>
-                <p className="text-[9px] font-bold text-blue-100/70 uppercase italic mt-2">
-                  Identity & Access Management
-                </p>
-              </div>
-            </div>
-            <div className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-white/10 rounded-2xl border border-white/20 text-white font-black text-[9px] uppercase tracking-widest">
-              <Database size={14} className="text-blue-200" /> SYSTEM CORE V.2
-            </div>
-          </div>
 
-          <div className="flex-1 overflow-y-auto px-8 md:px-16 py-10">
-            <form
-              onSubmit={handleSubmit}
-              className="max-w-6xl mx-auto h-full flex flex-col"
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative items-center justify-end">
+        {/* Background Mesh */}
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-0" />
+
+        {/* --- ERROR NOTE (KIRI) --- */}
+        <AnimatePresence>
+          {statusNote.show && statusNote.type === 'error' && (
+            <motion.div
+              initial={{ x: -100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -100, opacity: 0 }}
+              className="fixed left-[320px] top-[45%] w-72 z-[100]"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 flex-1">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label
-                      text="Nama Lengkap"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                    />
-                    <div className="relative">
-                      <Input
-                        onChange={(e) =>
-                          setFormData({ ...formData, nama: e.target.value })
-                        }
-                        placeholder="Ketik nama lengkap..."
-                        className="!py-4 !pl-12 !bg-gray-50/50 !rounded-2xl font-bold"
-                        required
-                      />
-                      <User
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={18}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label
-                      text="Email Institusi"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                    />
-                    <div className="relative">
-                      <Input
-                        type="email"
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        placeholder="nama@ypamdr.or.id"
-                        className="!py-4 !pl-12 !bg-gray-50/50 !rounded-2xl font-bold"
-                        required
-                      />
-                      <Mail
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={18}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label
-                      text="Password"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                    />
-                    <div className="relative">
-                      <Input
-                        type="password"
-                        onChange={(e) =>
-                          setFormData({ ...formData, password: e.target.value })
-                        }
-                        placeholder="Buat password manual..."
-                        className="!py-4 !pl-12 !bg-gray-50/50 !rounded-2xl font-bold"
-                        required
-                      />
-                      <Lock
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
-                        size={18}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label
-                      text="Jabatan"
-                      required
-                      className="!text-[9px] text-[#1E5AA5] uppercase font-black"
-                    />
-                    <Dropdown
-                      icon={Briefcase}
-                      value={formData.jabatan}
-                      onChange={(val) =>
-                        setFormData({ ...formData, jabatan: val })
-                      }
-                      items={jabatanOptions}
-                      className="!py-4 !bg-gray-50/50 !rounded-2xl font-extrabold"
-                    />
-                  </div>
-                  {formData.jabatan === "Admin" && (
-                    <div className="p-6 rounded-[2rem] bg-rose-50 border border-rose-100 space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                      <div className="flex items-center gap-3 text-rose-600 font-black text-[10px] uppercase">
-                        <ShieldAlert size={18} /> CRITICAL SECURITY ZONE
-                      </div>
-                      <div className="relative">
-                        <Input
-                          type="password"
-                          value={adminKey}
-                          onChange={(e) => setAdminKey(e.target.value)}
-                          placeholder="Master Authorization Key..."
-                          className="!py-4 !pl-12 !bg-white !border-rose-200 !rounded-2xl font-black text-rose-600"
-                          required
-                        />
-                        <KeyRound
-                          className="absolute left-4 top-1/2 -translate-y-1/2 text-rose-300"
-                          size={18}
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div className="p-6 rounded-[2rem] bg-blue-50/30 border border-blue-100 border-dashed italic text-[10px] text-blue-400 font-medium leading-relaxed">
-                    * Pastikan data sesuai dengan SK Pengangkatan Pengurus.
-                  </div>
-                </div>
+              <div className="bg-white/80 backdrop-blur-xl border border-rose-100 p-8 rounded-[3rem] shadow-2xl text-center">
+                <div className="w-14 h-14 bg-rose-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-5 shadow-lg shadow-rose-200"><XCircle size={28} /></div>
+                <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3">Validation Alert</h4>
+                <p className="text-xs font-bold text-slate-600 leading-relaxed mb-8">{statusNote.message}</p>
+                <button onClick={() => setStatusNote({ ...statusNote, show: false })} className="w-full py-4 bg-rose-50 text-rose-600 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95">Dismiss</button>
               </div>
-              <div className="flex justify-end gap-3 pt-12 pb-16">
-                <Button
-                  text="KEMBALI"
-                  onClick={() => navigate("/admin/pengurus")}
-                  className="!px-8 !py-2.5 !bg-white !text-gray-400 !rounded-full !text-[9px] font-black border border-gray-200 shadow-sm"
-                />
-                <Button
-                  text={loading ? "MENGIRIM..." : "SIMPAN DATA"}
-                  type="submit"
-                  disabled={loading}
-                  className={`!px-10 !py-2.5 !rounded-full !text-[9px] font-black shadow-lg ${formData.jabatan === "Admin" ? "!bg-rose-600 shadow-rose-900/10" : "!bg-[#2E5AA7] shadow-blue-900/10"} !text-white border-none`}
-                />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* --- SUCCESS NOTE (KANAN) --- */}
+        <AnimatePresence>
+          {statusNote.show && statusNote.type === 'success' && (
+            <motion.div
+              initial={{ x: 100, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 100, opacity: 0 }}
+              className="fixed right-12 top-[45%] w-72 z-[100]"
+            >
+              <div className="bg-white/80 backdrop-blur-xl border border-emerald-100 p-8 rounded-[3rem] shadow-2xl text-center">
+                <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-5 shadow-lg shadow-emerald-200"><CheckCircle2 size={28} /></div>
+                <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3">Success Sync</h4>
+                <p className="text-xs font-bold text-slate-600 leading-relaxed mb-8">{statusNote.message}</p>
+                <button onClick={() => setStatusNote({ ...statusNote, show: false })} className="w-full py-4 bg-emerald-50 text-emerald-600 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95">Continue</button>
               </div>
-            </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 1. JUDUL FORM */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 text-center z-10">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#1C0770]/50">Sistem Pemantauan dan Evaluasi Program</span>
           </div>
-        </div>
+          <h1 className="text-5xl font-black tracking-tighter text-[#0AC4E0] uppercase">Registrasi Pengurus</h1>
+        </motion.div>
+
+        {/* 2. FORM BOX (GROUNDED / NEMPEL DASAR) */}
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "circOut" }}
+          className="w-full max-w-3xl bg-white rounded-t-[5rem] rounded-b-none shadow-[0_-20px_100px_rgba(10,196,224,0.1)] p-16 pb-40 border-t border-x border-[#0AC4E0]/10 relative z-10 overflow-hidden"
+        >
+          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0AC4E0]/5 to-transparent pointer-events-none" />
+
+          <form onSubmit={handleSubmit} className="relative z-10 space-y-10">
+            <div className="space-y-3">
+              <Label text="Nama Lengkap Database" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
+              <div className="relative group">
+                <Input onChange={(e) => setFormData({ ...formData, nama: e.target.value })} placeholder="Input Full Name..." className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] transition-all shadow-sm" />
+                <User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label text="Email Institusi Otoritas" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
+              <div className="relative group">
+                <Input type="email" onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="user@ypamdr.astra.co.id" className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] transition-all shadow-sm" />
+                <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label text="Security Code (Password)" required className="!text-[10px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-2" />
+              <div className="relative group">
+                <Input type="password" onChange={(e) => setFormData({ ...formData, password: e.target.value })} placeholder="••••••••" className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] transition-all shadow-sm" />
+                <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Label text="Posisi Jabatan" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
+              <Dropdown icon={Briefcase} value={formData.jabatan} onChange={(val) => setFormData({ ...formData, jabatan: val })} items={jabatanOptions} className="!py-5 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-base !font-black text-slate-700" />
+            </div>
+
+            <AnimatePresence>
+              {formData.jabatan === "Admin" && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="p-8 bg-rose-50/50 border border-rose-100 rounded-[2.5rem] flex items-center gap-8 shadow-sm">
+                  <div className="w-14 h-14 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-200 shrink-0"><Database size={24} /></div>
+                  <div className="flex-1 space-y-3">
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest leading-none">Security Key Required</p>
+                    <Input type="password" value={adminKey} onChange={(e) => setAdminKey(e.target.value)} placeholder="Enter Auth Key..." className="!py-3 !bg-white !border-rose-200 !rounded-xl font-black text-rose-600 text-center tracking-[0.3em]" />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </form>
+        </motion.div>
+
+        {/* 3. DOCK ACTION (OVERLAP DI FRONT) */}
+        <motion.div
+          initial={{ y: 100 }} animate={{ y: 0 }} transition={{ delay: 0.3, type: "spring", stiffness: 80 }}
+          className="absolute bottom-[-15px] w-[550px] h-[120px] bg-white/80 backdrop-blur-3xl border-t-2 border-x-2 border-white rounded-t-[250px] z-30 shadow-[0_-20px_80px_rgba(10,196,224,0.2)] flex items-center justify-center px-16 pt-6"
+        >
+          <div className="flex items-center justify-between w-full mb-2">
+            <button onClick={() => navigate("/admin/pengurus")} className="flex items-center gap-2 px-8 py-4 bg-white border border-slate-100 text-slate-400 hover:text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-90 shadow-sm">
+              <ChevronLeft size={16} /> Kembali
+            </button>
+            <button onClick={handleSubmit} disabled={loading} className={`flex items-center gap-3 px-10 py-4 rounded-full text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white ${formData.jabatan === "Admin" ? "bg-rose-600 shadow-rose-200" : "bg-[#0AC4E0] shadow-[#0AC4E0]/30 hover:bg-[#09b3cc]"}`}>
+              <Save size={18} /> {loading ? "..." : "Simpan"}
+            </button>
+          </div>
+        </motion.div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
     </PageWrapper>
   );
-};;
+};
 
 export default CreatePengurus;

@@ -1,62 +1,60 @@
+/* eslint-disable react/prop-types */
+/* eslint-disable no-unused-vars */
 import Sidebar from "../../components/Sidebar";
-import Card from "../../components/Card";
 import PageWrapper from "../../components/PageWrapper";
-import Label from "../../components/Label";
-import { jwtDecode } from "jwt-decode";
 import { useEffect, useState } from "react";
-import { 
-  ClipboardCheck, 
-  School, 
-  MapPin, 
-  Activity,
-  FileText,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  User
+import {
+  ClipboardCheck, School, MapPin, CheckCircle2, AlertCircle,
+  Clock, User, TrendingUp, Activity
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { jwtDecode } from "jwt-decode";
 
-// Recharts & Leaflet
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip,
+  ResponsiveContainer, Cell, PieChart, Pie
 } from "recharts";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Fix Leaflet Default Icon
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+// ── Custom SVG Pin ────────────────────────────────────────────────────────────
+const makePinSVG = (mainColor, shadowColor) => {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120">
+      <ellipse cx="50" cy="112" rx="18" ry="7" fill="${shadowColor}" opacity="0.85"/>
+      <path d="M50 8 C28 8 12 26 12 48 C12 72 50 108 50 108 C50 108 88 72 88 48 C88 26 72 8 50 8 Z" fill="${mainColor}"/>
+      <circle cx="50" cy="46" r="18" fill="white"/>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+const schoolIcon = L.icon({
+  iconUrl: makePinSVG("#0AC4E0", "#0077aa"),
+  iconSize: [36, 44],
+  iconAnchor: [18, 44],
+  popupAnchor: [0, -40],
 });
 
-// Custom Icon untuk Sekolah (Warna Non-Akademik / Sedikit berbeda hue-nya jika ada, tapi pakai blue standar aman)
-const schoolIcon = new L.Icon({
-  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+const schoolIconSelected = L.icon({
+  iconUrl: makePinSVG("#F97316", "#c2410c"),
+  iconSize: [42, 52],
+  iconAnchor: [21, 52],
+  popupAnchor: [0, -48],
 });
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Fungsi untuk men-generate dummy coordinates di area Pulau Jawa berdasarkan index
+const COLORS = ["#0AC4E0", "#0891b2", "#0e7490", "#F97316"];
+
 const getDummyCoords = (index) => {
-  const baseLat = -7.0; // Jawa Tengah / DIY
+  const baseLat = -7.0;
   const baseLng = 110.0;
-  // Menambahkan variasi random kecil tapi deterministik berdasarkan index
-  const latOffset = (Math.sin(index * 1.5) * 1.5);
-  const lngOffset = (Math.cos(index * 1.5) * 3.5);
-  
-  return [baseLat + latOffset, baseLng + lngOffset];
+  return [baseLat + Math.sin(index * 1.5) * 1.5, baseLng + Math.cos(index * 1.5) * 3.5];
 };
 
 export default function DashboardnonAkademik() {
-  const [user, setUser] = useState({ nama: "", role: "", jenis: null });
   const [sekolahs, setSekolahs] = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [selectedSchool, setSelectedSchool] = useState(null);
@@ -64,49 +62,28 @@ export default function DashboardnonAkademik() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        const d = jwtDecode(token);
-        setUser({
-          nama: d.nama ?? d.email ?? "User",
-          role: d.nama_role ?? d.role ?? "-",
-          jenis: d.jenis ?? null,
-        });
-      } catch {
-        localStorage.clear();
-        navigate("/login");
-      }
-    } else {
-      navigate("/login");
-    }
-  }, [navigate]);
-
-  useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem("token");
         const [resSekolah, resAss] = await Promise.all([
           fetch("http://localhost:3000/sekolah", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("http://localhost:3000/assessment?kategori=NON_AKADEMIK", { headers: { Authorization: `Bearer ${token}` } })
+          fetch("http://localhost:3000/assessment?kategori=NON_AKADEMIK", { headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
         if (resSekolah.ok && resAss.ok) {
           const dataSekolah = await resSekolah.json();
           const dataAss = await resAss.json();
-          
           setAssessments(Array.isArray(dataAss) ? dataAss : []);
-          
-          // Gabungkan koordinat ke data sekolah
           const mappedSekolah = (Array.isArray(dataSekolah) ? dataSekolah : []).map((s, idx) => ({
             ...s,
-            coords: s.latitude && s.longitude ? [parseFloat(s.latitude), parseFloat(s.longitude)] : getDummyCoords(idx)
+            coords: s.latitude && s.longitude
+              ? [parseFloat(s.latitude), parseFloat(s.longitude)]
+              : getDummyCoords(idx),
           }));
           setSekolahs(mappedSekolah);
         }
-      } catch (error) {
-        console.error(error);
-        toast.error("Gagal mengambil data dashboard");
+      } catch {
+        toast.error("Gagal sinkronisasi data non-akademik");
       } finally {
         setLoading(false);
       }
@@ -114,288 +91,257 @@ export default function DashboardnonAkademik() {
     fetchData();
   }, []);
 
-  // --- LOGIC STATISTIK ---
-  const totalSekolah = sekolahs.length;
-  const totalAssessment = assessments.length;
-  
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const totalSekolah = sekolahs.length || 0;
+  const totalAssessment = assessments.length || 0;
   const statsAss = assessments.reduce((acc, curr) => {
     const status = curr.status_assessment || "Draft";
     acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {});
 
-  const pieData = Object.keys(statsAss).map((key) => ({
-    name: key,
-    value: statsAss[key]
-  }));
-  const COLORS = ['#2E5AA7', '#10B981', '#F59E0B', '#EF4444'];
+  const pieData = Object.keys(statsAss).map((key) => ({ name: key, value: statsAss[key] }));
 
-  // Data Assessment per Sekolah untuk Bar Chart (Top 5)
-  const assPerSchool = sekolahs.map(s => {
-    const assCount = assessments.filter(a => a.sekolah === s.nama_sekolah).length;
-    return { name: s.nama_sekolah?.substring(0,10) + "..", total: assCount, full_name: s.nama_sekolah };
-  }).sort((a,b) => b.total - a.total).slice(0, 5);
+  const assPerSchool = sekolahs
+    .map((s) => ({
+      name: s.nama_sekolah?.substring(0, 8) + "..",
+      total: assessments.filter((a) => a.sekolah === s.nama_sekolah).length,
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
 
-  // Detail Assessment untuk Sekolah yang dipilih di Peta
-  const selectedSchoolAssessments = selectedSchool 
-    ? assessments.filter(a => a.sekolah === selectedSchool.nama_sekolah)
+  const selectedSchoolAssessments = selectedSchool
+    ? assessments.filter((a) => a.sekolah === selectedSchool.nama_sekolah)
     : [];
 
+  if (loading) return (
+    <div className="h-screen bg-white flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-[#0AC4E0] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
+    <PageWrapper className="h-screen bg-white flex overflow-hidden !p-0 font-sans selection:bg-[#0AC4E0]/20 text-slate-800 leading-none">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-hidden relative">
-          
-          {/* HEADER PREMIUM */}
-          <div className="px-10 pt-8 pb-6 bg-gradient-to-r from-[#2E5AA7] to-[#164a8a] shrink-0 text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-            <div className="relative z-10 flex justify-between items-center">
-              <div>
-                <Label text="Center of Excellence" className="!text-[10px] !text-blue-200 !font-black tracking-[0.3em] !mb-2 uppercase" />
-                <h1 className="text-3xl font-black tracking-tight leading-none mb-1">
-                  Dashboard <span className="text-blue-300">Non-Akademik</span>
-                </h1>
-                <p className="text-sm font-medium text-blue-100 mt-2 flex items-center gap-2">
-                  <Activity size={14} className="text-blue-300" /> Real-time Monitoring & Evaluation
-                </p>
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#0AC4E0]/5 rounded-full blur-[100px] -z-10" />
+
+        <div className="flex-1 flex flex-col px-8 pt-8 pb-6 overflow-hidden gap-5">
+
+          {/* HEADER */}
+          <header className="flex flex-row items-center justify-between animate-in fade-in duration-1000 leading-none">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-[#0AC4E0] rounded-full" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                  Sistem Pemantauan dan Evaluasi Program
+                </span>
               </div>
-              <div className="text-right hidden md:block">
-                <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-1">Active User</p>
-                <div className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 font-black text-sm">
-                  {user.nama}
+              <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
+                Dashboard Head Office <span className="text-[#0AC4E0]">Non-Akademik</span>
+              </h1>
+            </div>
+
+            <div className="hidden md:flex items-center gap-6 border-l border-slate-100 pl-8">
+              <div className="text-right">
+                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1.5">System Status</p>
+                <div className="flex items-center gap-2 justify-end">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#0AC4E0] animate-pulse" />
+                  <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Operational</span>
                 </div>
               </div>
             </div>
+          </header>
+
+          {/* STATS ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-2 duration-700">
+            <StatCard icon={<School size={18} />} label="Institusi" value={totalSekolah} color="#0AC4E0" />
+            <StatCard icon={<ClipboardCheck size={18} />} label="Assessment" value={totalAssessment} color="#0AC4E0" />
+            <StatCard icon={<CheckCircle2 size={18} />} label="Verified" value={statsAss["Selesai"] || 0} color="#0891b2" />
+            <StatCard icon={<AlertCircle size={18} />} label="Pending" value={statsAss["Draft"] || 0} color="#F97316" />
           </div>
 
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-slate-50">
-            
-            {/* STATS ROW */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-blue-50 text-[#2E5AA7] flex items-center justify-center shrink-0">
-                  <School size={24} strokeWidth={2.5} />
+          {/* MAIN GRID */}
+          <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+            {/* LEFT: MAP + CHARTS */}
+            <div className="lg:col-span-8 flex flex-col gap-5 h-full overflow-hidden">
+
+              {/* MAP */}
+              <div className="flex-1 bg-white rounded-[2rem] border-2 border-[#0AC4E0]/20 shadow-sm overflow-hidden flex flex-col min-h-0">
+                <div className="px-6 py-3.5 border-b border-gray-50 flex justify-between items-center bg-white/50 backdrop-blur-md shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <MapPin size={16} className="text-[#0AC4E0]" />
+                    <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Network Coverage</h3>
+                  </div>
+                  <span className="text-[9px] font-bold bg-[#0AC4E0] text-white px-2.5 py-1 rounded-full uppercase">
+                    {totalSekolah} Points
+                  </span>
                 </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Sekolah</p>
-                  <h3 className="text-3xl font-black text-gray-800 leading-none">{totalSekolah}</h3>
+                <div className="flex-1 z-0">
+                  <MapContainer
+                    center={[-6.200, 106.816]} zoom={5}
+                    style={{ height: "100%", width: "100%" }}
+                    zoomControl={true} scrollWheelZoom={true}
+                  >
+                    {/* Tema OpenStreetMap — konsisten dengan Onboarding & DashboardAkademik */}
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+                    {sekolahs.map((s, i) => (
+                      <Marker
+                        key={i}
+                        position={s.coords}
+                        icon={selectedSchool?.nama_sekolah === s.nama_sekolah ? schoolIconSelected : schoolIcon}
+                        eventHandlers={{ click: () => setSelectedSchool(s) }}
+                      >
+                        <Popup>
+                          <div className="p-0.5 text-center leading-normal">
+                            <p className="font-bold text-slate-800 text-xs">{s.nama_sekolah}</p>
+                            <button
+                              onClick={() => setSelectedSchool(s)}
+                              className="mt-2 w-full py-1.5 bg-[#0AC4E0] text-white rounded text-[9px] font-bold uppercase tracking-widest"
+                            >
+                              Select
+                            </button>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </MapContainer>
                 </div>
               </div>
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0">
-                  <ClipboardCheck size={24} strokeWidth={2.5} />
+
+              {/* CHARTS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 shrink-0">
+                <div className="bg-white p-5 rounded-[2rem] border-2 border-[#0AC4E0]/20 shadow-sm">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Status Composition</h3>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData} cx="50%" cy="50%"
+                          innerRadius={35} outerRadius={50}
+                          paddingAngle={5} dataKey="value" stroke="none"
+                        >
+                          {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                        </Pie>
+                        <RechartsTooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Assessment</p>
-                  <h3 className="text-3xl font-black text-gray-800 leading-none">{totalAssessment}</h3>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={24} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">Assessment Selesai</p>
-                  <h3 className="text-3xl font-black text-gray-800 leading-none">{statsAss['Selesai'] || 0}</h3>
-                </div>
-              </div>
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-lg transition-all flex items-center gap-5">
-                <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                  <AlertCircle size={24} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-1">Draft / Pending</p>
-                  <h3 className="text-3xl font-black text-gray-800 leading-none">{statsAss['Draft'] || 0}</h3>
+
+                <div className="bg-white p-5 rounded-[2rem] border-2 border-[#0AC4E0]/20 shadow-sm">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Workload Ranking</h3>
+                  <div className="h-32">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={assPerSchool} layout="vertical">
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name" type="category"
+                          axisLine={false} tickLine={false}
+                          tick={{ fontSize: 9, fontWeight: "bold", fill: "#94A3B8" }}
+                          width={60}
+                        />
+                        <RechartsTooltip cursor={{ fill: "#F8FAFC" }} />
+                        <Bar dataKey="total" fill="#0AC4E0" radius={[0, 6, 6, 0]} barSize={8} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* MAIN DASHBOARD CONTENT */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* LEFT COL: MAP & CHARTS */}
-              <div className="lg:col-span-2 space-y-6">
-                
-                {/* MAP CONTAINER */}
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[400px]">
-                  <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-white z-10 relative">
-                    <div>
-                      <h3 className="font-black text-gray-800 text-lg">Peta Persebaran Sekolah</h3>
-                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Klik pin untuk melihat detail assessment</p>
-                    </div>
-                    <div className="px-3 py-1 bg-blue-50 text-[#2E5AA7] rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                      <MapPin size={12} /> {totalSekolah} Titik
-                    </div>
-                  </div>
-                  <div className="flex-1 relative z-0">
-                    <MapContainer center={[-6.200000, 106.816666]} zoom={5} style={{ height: '100%', width: '100%', zIndex: 0 }}>
-                      <TileLayer
-                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                        attribution='&copy; <a href="https://carto.com/">Carto</a>'
-                      />
-                      {sekolahs.map((sekolah, index) => (
-                        <Marker 
-                          key={index} 
-                          position={sekolah.coords} 
-                          icon={schoolIcon}
-                          eventHandlers={{
-                            click: () => {
-                              setSelectedSchool(sekolah);
-                            },
-                          }}
-                        >
-                          <Popup className="font-sans">
-                            <div className="font-bold text-gray-800 text-sm mb-1">{sekolah.nama_sekolah}</div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">{sekolah.npsn || 'NPSN TIDAK TERSEDIA'}</div>
-                            <button 
-                              onClick={() => setSelectedSchool(sekolah)}
-                              className="text-[10px] font-bold bg-[#2E5AA7] text-white px-3 py-1.5 rounded-lg w-full mt-1"
-                            >
-                              Lihat Assessment
-                            </button>
-                          </Popup>
-                        </Marker>
-                      ))}
-                    </MapContainer>
-                  </div>
+            {/* RIGHT: DETAIL */}
+            <div className="lg:col-span-4 flex flex-col h-full overflow-hidden leading-none animate-in fade-in duration-1000">
+              <div className="bg-white rounded-[2rem] border-2 border-[#0AC4E0]/20 shadow-sm flex flex-col h-full overflow-hidden">
+                <div className="p-6 border-b border-gray-50 flex items-center gap-2.5 shrink-0">
+                  <TrendingUp size={18} className="text-[#0AC4E0]" />
+                  <h3 className="text-[12px] font-black text-slate-800 uppercase tracking-widest">Inspection Context</h3>
                 </div>
 
-                {/* CHARTS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                    <h3 className="font-black text-gray-800 mb-6">Status Assessment</h3>
-                    <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={pieData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {pieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <RechartsTooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                    <h3 className="font-black text-gray-800 mb-6">Top 5 Sekolah (Volume)</h3>
-                    <div className="h-48">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={assPerSchool} layout="vertical" margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
-                          <XAxis type="number" hide />
-                          <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} width={80} />
-                          <RechartsTooltip cursor={{fill: '#f1f5f9'}} />
-                          <Bar dataKey="total" fill="#2E5AA7" radius={[0, 4, 4, 0]} barSize={16}>
-                            {assPerSchool.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={index === 0 ? '#2E5AA7' : '#94a3b8'} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* RIGHT COL: SCHOOL DETAILS & ASSESSMENT LIST */}
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-250px)] lg:h-auto">
-                <div className="p-6 bg-gradient-to-br from-slate-50 to-white border-b border-gray-100 shrink-0">
-                  <h3 className="font-black text-gray-800 text-lg mb-1">Detail Sekolah</h3>
-                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Assessment yang ditugaskan</p>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto no-scrollbar p-5 bg-gray-50/30">
                   {!selectedSchool ? (
-                    <div className="h-full flex flex-col items-center justify-center opacity-40 text-center">
-                      <MapPin size={48} className="text-[#2E5AA7] mb-4" />
-                      <p className="text-sm font-black uppercase tracking-widest text-gray-500">
-                        Pilih Sekolah di Peta
-                      </p>
-                      <p className="text-[10px] font-bold text-gray-400 mt-2 max-w-[200px]">
-                        Klik salah satu pin biru di peta untuk melihat daftar assessment sekolah tersebut.
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                      <MapPin size={28} className="text-[#0AC4E0] mb-3" />
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight">
+                        Click marker for details
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                      
-                      {/* SCHOOL INFO CARD */}
-                      <div className="bg-white p-4 rounded-2xl border border-blue-100 shadow-sm">
-                        <div className="flex items-start gap-4">
-                          <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#2E5AA7] flex items-center justify-center shrink-0">
-                            <School size={20} />
-                          </div>
-                          <div>
-                            <div className="inline-block px-2 py-0.5 bg-slate-100 rounded text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1">
-                              NPSN: {selectedSchool.npsn || '-'}
-                            </div>
-                            <h4 className="font-black text-gray-800 leading-tight">{selectedSchool.nama_sekolah}</h4>
-                            <p className="text-[11px] font-bold text-gray-500 mt-1 flex items-center gap-1.5">
-                              <MapPin size={12}/> {selectedSchool.wilayah?.nama_wilayah?.split("/").pop() || "Tanpa Wilayah"}
-                            </p>
-                          </div>
+                      <div className="space-y-6 animate-in fade-in duration-500">
+                        <div className="bg-white p-5 rounded-[1.5rem] border border-[#0AC4E0]/10 shadow-sm">
+                          <p className="text-[8px] font-black text-[#0AC4E0] uppercase tracking-widest mb-1">
+                            NPSN: {selectedSchool.npsn}
+                          </p>
+                          <h4 className="text-sm font-bold text-slate-800 leading-tight">{selectedSchool.nama_sekolah}</h4>
+                          <div className="mt-3 flex items-center gap-1.5 text-[9px] font-bold text-slate-400 uppercase">
+                            <MapPin size={10} className="text-[#0AC4E0]" />
+                            {selectedSchool.wilayah?.nama_wilayah?.split("/").pop() || "ID"}
                         </div>
                       </div>
 
-                      {/* ASSESSMENT LIST */}
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h5 className="font-black text-gray-700 text-sm">Daftar Assessment</h5>
-                          <span className="px-2 py-1 bg-blue-100 text-[#2E5AA7] rounded-md text-[10px] font-black">
-                            {selectedSchoolAssessments.length} Total
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between px-1">
+                            <h5 className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Activity History</h5>
+                            <span className="text-[8px] font-black bg-[#0AC4E0]/10 text-[#0AC4E0] px-2 py-0.5 rounded-full uppercase">
+                              {selectedSchoolAssessments.length} Units
                           </span>
                         </div>
 
-                        {selectedSchoolAssessments.length === 0 ? (
-                          <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-gray-200">
-                            <FileText size={24} className="mx-auto text-gray-300 mb-2" />
-                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Belum ada assessment</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {selectedSchoolAssessments.map(ass => (
-                              <div key={ass.id_assessment} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-[#2E5AA7]/30 transition-colors group">
-                                <div className="flex justify-between items-start mb-2">
-                                  <span className="px-2 py-1 bg-slate-50 text-slate-600 rounded text-[9px] font-black uppercase tracking-widest border border-slate-100">
-                                    {ass.kode_assessment || 'NO KODE'}
-                                  </span>
-                                  <span className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest ${
-                                    ass.status_assessment === 'Selesai' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                                  }`}>
-                                    {ass.status_assessment || 'Draft'}
-                                  </span>
-                                </div>
-                                <h6 className="font-bold text-gray-800 text-sm leading-snug mb-3 group-hover:text-[#2E5AA7] transition-colors">
-                                  {ass.nama_assessment}
-                                </h6>
-                                <div className="flex items-center gap-3 text-[10px] font-bold text-gray-400 border-t border-gray-50 pt-3">
-                                  <span className="flex items-center gap-1"><Clock size={12}/> {ass.tahun || '-'}</span>
-                                  <span className="flex items-center gap-1"><User size={12}/> {ass.pembuat || 'Sistem'}</span>
-                                </div>
+                          {selectedSchoolAssessments.map((ass) => (
+                            <div key={ass.id_assessment} className="group bg-white p-4 rounded-[1.2rem] border border-gray-100 hover:border-[#0AC4E0]/40 transition-all shadow-sm">
+                              <div className="flex justify-between items-center mb-2.5 leading-none">
+                                <div className={`w-1.5 h-1.5 rounded-full ${ass.status_assessment === "Selesai" ? "bg-[#0AC4E0]" : "bg-[#F97316]"}`} />
+                                <span className="text-[8px] font-black text-slate-300 uppercase">{ass.kode_assessment || "ASS-NA"}</span>
                               </div>
-                            ))}
+                            <h6 className="text-[11px] font-bold text-slate-700 group-hover:text-[#0AC4E0] transition-colors leading-snug mb-3">
+                              {ass.nama_assessment}
+                            </h6>
+                            <div className="flex items-center gap-3 text-[8px] font-black text-slate-300 uppercase leading-none">
+                              <span className="flex items-center gap-1"><Clock size={10} /> {ass.tahun || "2024"}</span>
+                              <span className="flex items-center gap-1 shrink-0"><User size={10} /> {ass.pembuat || "User"}</span>
+                            </div>
                           </div>
-                        )}
+                        ))}
+                        </div>
                       </div>
-
-                    </div>
                   )}
                 </div>
               </div>
-
             </div>
+
           </div>
-        </Card>
+        </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .leaflet-container { font-family: inherit; }
+        .leaflet-popup-content-wrapper { border-radius: 16px !important; padding: 8px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
+        .leaflet-popup-content { margin: 0 !important; }
+        .leaflet-control-zoom a { border-radius: 10px !important; color: #0AC4E0 !important; }
+      `}} />
     </PageWrapper>
   );
 }
+
+// ── Stat Card ─────────────────────────────────────────────────────────────────
+const StatCard = ({ icon, label, value, color }) => (
+  <div className="group bg-white p-4 rounded-[1.5rem] border-2 border-[#0AC4E0]/20 shadow-sm hover:shadow-md transition-all duration-300 flex items-center gap-4">
+    <div
+      className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+      style={{ backgroundColor: `${color}15`, color }}
+    >
+      {icon}
+    </div>
+    <div>
+      <p className="text-[9px] font-black uppercase tracking-widest text-slate-300 leading-none mb-1">{label}</p>
+      <h3 className="text-xl font-black text-slate-800 leading-none tracking-tight">{value}</h3>
+    </div>
+  </div>
+);

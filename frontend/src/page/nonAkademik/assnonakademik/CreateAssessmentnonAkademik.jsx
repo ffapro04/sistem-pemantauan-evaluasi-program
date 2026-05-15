@@ -1,15 +1,24 @@
 /* eslint-disable no-undef */
 import Sidebar from "../../../components/Sidebar";
-import Card from "../../../components/Card";
-import Button from "../../../components/Button";
 import Label from "../../../components/Label";
 import Input from "../../../components/Input";
-import IconButton from "../../../components/IconButton";
 import PageWrapper from "../../../components/PageWrapper";
 import { toast } from "react-toastify";
+import { motion, AnimatePresence } from "framer-motion";
 
 import { useNavigate } from "react-router-dom";
-import { Trash2, ArrowLeft, Save, Plus, FileText } from "lucide-react";
+import {
+  Trash2,
+  ArrowLeft,
+  Save,
+  Plus,
+  Sparkles,
+  ChevronDown,
+  Clock,
+  School,
+  User,
+  LayoutGrid
+} from "lucide-react";
 import { useState, useEffect } from "react";
 
 function CreateAssessmentNonAkademik() {
@@ -25,7 +34,6 @@ function CreateAssessmentNonAkademik() {
   ]);
   const [tenggat, setTenggat] = useState(7);
 
-  // FETCH HO LIST
   useEffect(() => {
     const fetchHo = async () => {
       try {
@@ -34,30 +42,13 @@ function CreateAssessmentNonAkademik() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        console.log("[DEBUG 1] Data Asli dari Backend:", data);
-
-        // --- PERUBAHAN DI SINI: Filter khusus non-akademik ---
         if (Array.isArray(data)) {
-          if (data.length > 0) {
-            console.log("[DEBUG 2] Contoh satu data user:", data[0]);
-            console.log(
-              "[DEBUG 3] Apakah ada properti 'jenis'?:",
-              data[0].jenis !== undefined ? "ADA" : "TIDAK ADA",
-            );
-          }
+          // Filter khusus non-akademik
           const filteredHo = data.filter((ho) => ho.jenis === "non-akademik");
-
-          console.log("[DEBUG 4] Hasil Setelah Difilter:", filteredHo);
           setHoList(filteredHo);
-        } else {
-          setHoList([]);
         }
-        // -----------------------------------------------------
-
-        console.log("HO DATA:", data);
       } catch (err) {
         console.error(err);
-        setHoList([]);
       }
     };
     fetchHo();
@@ -72,31 +63,26 @@ function CreateAssessmentNonAkademik() {
         setSekolahList(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
-        setSekolahList([]);
       }
     };
     fetchSekolah();
   }, []);
 
-  // TAMBAH PERTANYAAN
   const addQuestion = () => {
     setQuestions([...questions, { question: "", options: ["", "", "", ""] }]);
   };
 
-  // HAPUS PERTANYAAN
   const removeQuestion = (index) => {
     if (questions.length === 1) return;
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
-  // EDIT PERTANYAAN
   const handleQuestionChange = (index, value) => {
     const updated = [...questions];
     updated[index].question = value;
     setQuestions(updated);
   };
 
-  // EDIT PILIHAN
   const handleOptionChange = (qIndex, optIndex, value) => {
     const updated = [...questions];
     updated[qIndex].options[optIndex] = value;
@@ -105,16 +91,12 @@ function CreateAssessmentNonAkademik() {
 
   const saveAssessment = async () => {
     if (!selectedHo) return toast.error("Silakan pilih HO terlebih dahulu");
-    if (!selectedSekolah)
-      return toast.error("Silakan pilih sekolah terlebih dahulu");
-    if (!namaAssessment.trim())
-      return toast.error("Nama assessment harus diisi");
+    if (!selectedSekolah) return toast.error("Silakan pilih sekolah terlebih dahulu");
+    if (!namaAssessment.trim()) return toast.error("Nama assessment harus diisi");
 
     for (let q of questions) {
-      if (!q.question.trim())
-        return toast.error("Pertanyaan tidak boleh kosong");
-      if (q.options.some((opt) => !opt.trim()))
-        return toast.error("Semua pilihan harus diisi");
+      if (!q.question.trim()) return toast.error("Pertanyaan tidak boleh kosong");
+      if (q.options.some((opt) => !opt.trim())) return toast.error("Semua pilihan harus diisi");
     }
 
     const payload = {
@@ -122,6 +104,7 @@ function CreateAssessmentNonAkademik() {
       nama: namaAssessment.trim(),
       target_sekolah_ids: [Number(selectedSekolah)],
       tenggat: tenggat,
+      jenis: "non-akademik", // Explicitly set jenis
       questions: questions.map((q) => ({
         question: q.question.trim(),
         options: q.options.map((opt) => opt.trim()),
@@ -136,268 +119,240 @@ function CreateAssessmentNonAkademik() {
         body: JSON.stringify(payload),
       });
 
-      const resBody = await res.json(); // HARUS di atas
-
-      console.log("RESPONSE BODY:", JSON.stringify(resBody, null, 2));
-
-      if (!res.ok) {
-        console.error("BACKEND ERROR:", JSON.stringify(resBody, null, 2));
-        toast.error(resBody.message || "Gagal membuat assessment");
-        return;
-      }
-
-      toast.success("Assessment berhasil dibuat!");
+      if (!res.ok) throw new Error("Gagal");
+      toast.success("Assessment Non-Akademik berhasil dibuat!");
       navigate("/ho/assessment/non-akademik");
     } catch (err) {
-      console.error(err);
-      toast.error("Gagal membuat assessment. Cek console untuk detail.");
+      toast.error("Gagal membuat assessment");
     } finally {
       setLoading(false);
     }
   };
 
-  // === HoPicker Component ===
-  function HoPicker() {
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-
-    const handleSelect = (hoId) => {
-      setSelectedHo(hoId);
-      setDropdownOpen(false);
-    };
-
-    const selectedHoName =
-      hoList.find((h) => h.id_user === selectedHo)?.nama || "Pilih HO";
+  function CustomDropdown({ label, items, value, onSelect, placeholder, icon: Icon }) {
+    const [open, setOpen] = useState(false);
+    const selectedItem = items.find(i => (i.id_user || i.id_sekolah) === value);
 
     return (
-      <div className="relative w-full max-w-xs">
+      <div className="relative w-full group">
+        <Label text={label} required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-1 !mb-2" />
         <button
           type="button"
-          onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="w-full border px-4 py-2 text-left bg-white rounded shadow"
+          onClick={() => setOpen(!open)}
+          className={`w-full flex items-center justify-between px-5 py-3.5 bg-white border-2 transition-all duration-300 rounded-2xl ${open ? 'border-[#0AC4E0] ring-4 ring-[#0AC4E0]/10 shadow-lg' : 'border-slate-100 hover:border-[#0AC4E0]/40 shadow-sm'}`}
         >
-          {selectedHoName}
-        </button>
-
-        {dropdownOpen && (
-          <ul className="absolute z-10 w-full bg-white border mt-1 rounded shadow max-h-60 overflow-y-auto">
-            {hoList.map((ho) => (
-              <li
-                key={ho.id_user}
-                onClick={() => handleSelect(ho.id_user)}
-                className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
-              >
-                {ho.nama}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
-
-  function SekolahPicker() {
-    const [dropdownOpen, setDropdownOpen] = useState(false);
-
-    const selectedSekolahName =
-      sekolahList.find((s) => s.id_sekolah === selectedSekolah)?.nama_sekolah ||
-      "Pilih Sekolah";
-
-    return (
-      <div className="relative w-full max-w-xs">
-        <button
-          type="button"
-          onClick={() => setDropdownOpen(!dropdownOpen)}
-          className="w-full border px-4 py-2 text-left bg-white rounded shadow"
-        >
-          {selectedSekolahName}
-        </button>
-
-        {dropdownOpen && (
-          <ul className="absolute z-10 w-full bg-white border mt-1 rounded shadow max-h-60 overflow-y-auto">
-            {sekolahList.map((s) => (
-              <li
-                key={s.id_sekolah}
-                onClick={() => {
-                  setSelectedSekolah(s.id_sekolah);
-                  setDropdownOpen(false);
-                }}
-                className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
-              >
-                {s.nama_sekolah}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
-
-  // === JSX HALAMAN UTAMA ===
-  return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
-      <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-hidden relative">
-          <div className="px-8 pt-6 pb-6 shrink-0">
-            <header className="flex flex-row items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition animate-pulse"></div>
-                  <div className="relative p-3.5 bg-gradient-to-br from-[#2E5AA7] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                    <FileText size={22} strokeWidth={2} />
-                  </div>
-                </div>
-                <div className="flex flex-col -space-y-1">
-                  <Label
-                    text="Sistem Monitoring dan Evaluasi Program"
-                    className="!text-[8px] !text-[#2E5AA7] !font-black tracking-[0.3em] !mb-1 uppercase"
-                  />
-                  <h1 className="text-xl font-black text-gray-800 tracking-tight uppercase leading-none">
-                    Buat <span className="text-[#2E5AA7]">Assessment Non-Akademik</span>
-                  </h1>
-                </div>
-              </div>
-
-              <Button
-                text="Kembali"
-                icon={<ArrowLeft size={14} />}
-                onClick={() => navigate("/ho/assessment/non-akademik")}
-                className="group !bg-[#2E5AA7] hover:!bg-[#1C5496] !rounded-xl !px-5 !py-2.5 !text-[10px] font-black text-white shadow-lg active:scale-95 transition-all flex items-center gap-2"
-              />
-            </header>
+          <div className="flex items-center gap-3">
+            <Icon size={18} className={open ? "text-[#0AC4E0]" : "text-slate-300"} />
+            <span className={`text-sm font-semibold ${selectedItem ? "text-slate-800" : "text-slate-300"}`}>
+              {selectedItem ? (selectedItem.nama || selectedItem.nama_sekolah) : placeholder}
+            </span>
           </div>
+          <ChevronDown size={16} className={`transition-transform duration-300 ${open ? 'rotate-180 text-[#0AC4E0]' : 'text-slate-300'}`} />
+        </button>
+        <AnimatePresence>
+          {open && (
+            <motion.ul
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute z-50 w-full bg-white/90 backdrop-blur-xl border border-slate-100 mt-2 rounded-2xl shadow-2xl max-h-60 overflow-y-auto no-scrollbar p-2"
+            >
+              {items.map((item) => (
+                <li
+                  key={item.id_user || item.id_sekolah}
+                  onClick={() => { onSelect(item.id_user || item.id_sekolah); setOpen(false); }}
+                  className="px-4 py-3 hover:bg-[#0AC4E0] hover:text-white rounded-xl cursor-pointer text-sm font-bold text-slate-600 transition-all mb-1 last:mb-0"
+                >
+                  {item.nama || item.nama_sekolah}
+                </li>
+              ))}
+            </motion.ul>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
 
-          <div className="flex-1 overflow-hidden px-8 pb-6">
-            <div className="h-full overflow-y-auto pr-2 custom-scrollbar space-y-6">
-              {/* INPUT TARGET & JUDUL */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label text="Nama HO" required />
-                  <HoPicker />
+  return (
+    <PageWrapper className="h-screen bg-white flex overflow-hidden !p-0 font-sans selection:bg-[#0AC4E0]/20">
+      <Sidebar />
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Background Decor */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-10" />
+
+        <div className="flex-1 flex flex-col px-8 pt-8 pb-4 overflow-hidden leading-none">
+          {/* COMPACT HEADER */}
+          <header className="flex flex-row items-end justify-between mb-8 animate-in fade-in duration-700">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-[#0AC4E0] rounded-lg text-white shadow-lg shadow-[#0AC4E0]/20">
+                  <LayoutGrid size={14} />
                 </div>
-                <div className="space-y-2">
-                  <Label text="Sekolah Tujuan" required />
-                  <SekolahPicker />
-                </div>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#0AC4E0]">Non-Academic Module</span>
               </div>
+              <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight leading-none">
+                New <span className="text-[#0AC4E0]">Assessment</span>
+              </h1>
+            </div>
 
-              <div className="space-y-2">
-                <Label text="Nama Assessment" required />
-                <Input
-                  placeholder="Masukkan nama assessment..."
-                  value={namaAssessment}
-                  onChange={(e) => setNamaAssessment(e.target.value)}
-                  className="!pl-4 !pr-4 !py-2.5 !bg-gray-50/80 !border-gray-200/50 !rounded-xl !text-sm !font-medium outline-none focus:!bg-white focus:!ring-4 focus:!ring-blue-100/50 transition-all shadow-sm"
+            <button
+              onClick={() => navigate("/ho/assessment/non-akademik")}
+              className="flex items-center gap-2 px-6 py-3.5 bg-white hover:bg-slate-50 text-slate-500 rounded-2xl text-sm font-bold shadow-sm border border-slate-100 transition-all active:scale-95 leading-none"
+            >
+              <ArrowLeft size={18} /> Kembali
+            </button>
+          </header>
+
+          <div className="flex-1 overflow-y-auto no-scrollbar pr-2 space-y-8 pb-10">
+            {/* SECTION 1: CORE INFO (BENTO CARD) */}
+            <div className="bg-white rounded-[2.5rem] border-2 border-[#0AC4E0]/20 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] space-y-8 animate-in fade-in slide-in-from-left-6 duration-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <CustomDropdown
+                  label="Penanggung Jawab (HO Non-Akademik)"
+                  items={hoList}
+                  value={selectedHo}
+                  onSelect={setSelectedHo}
+                  placeholder="Pilih Personil Non-Akademik..."
+                  icon={User}
+                />
+                <CustomDropdown
+                  label="Institusi Sekolah"
+                  items={sekolahList}
+                  value={selectedSekolah}
+                  onSelect={setSelectedSekolah}
+                  placeholder="Pilih Sekolah Tujuan..."
+                  icon={School}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label text="Tenggat Pengisian (hari)" required />
-                <Input
-                  type="number"
-                  placeholder="Contoh: 7"
-                  value={tenggat}
-                  onChange={(e) => setTenggat(Number(e.target.value))}
-                  min={1}
-                  className="!pl-4 !pr-4 !py-2.5 !bg-gray-50/80 !border-gray-200/50 !rounded-xl !text-sm !font-medium outline-none focus:!bg-white focus:!ring-4 focus:!ring-blue-100/50 transition-all shadow-sm"
-                />
-              </div>
-
-              <hr className="border-gray-100" />
-
-              {/* LIST PERTANYAAN */}
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-bold text-gray-800">
-                    Daftar Pertanyaan
-                  </h3>
-                  <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50 text-[#2E5AA7] rounded-xl border border-blue-100 font-black text-[9px] uppercase tracking-[0.2em] shrink-0">
-                    <Plus size={14} /> Total: {questions.length} Pertanyaan
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-3">
+                  <Label text="Nama Assessment Non-Akademik" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-1" />
+                  <Input
+                    placeholder="Contoh: Evaluasi Sarana Prasarana / Ekstrakurikuler..."
+                    value={namaAssessment}
+                    onChange={(e) => setNamaAssessment(e.target.value)}
+                    className="!bg-slate-50/50 !border-slate-100 !rounded-2xl !py-4 !px-6 !text-sm !font-bold !text-slate-800 focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <Label text="Tenggat (Hari)" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-1" />
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      value={tenggat}
+                      onChange={(e) => setTenggat(Number(e.target.value))}
+                      className="!bg-slate-50/50 !border-slate-100 !rounded-2xl !py-4 !px-12 !text-center !font-black !text-lg !text-[#0AC4E0] focus:!border-[#0AC4E0] transition-all shadow-sm"
+                    />
+                    <Clock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                   </div>
                 </div>
+              </div>
+            </div>
 
-                {questions.map((q, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-200 p-5 rounded-xl bg-[#FAFCFF] shadow-sm relative transition-all duration-300 hover:shadow-md hover:border-[#2E5AA7]/30"
-                  >
-                    <div className="flex justify-between items-center mb-4">
-                      <Label
-                        text={`Pertanyaan ${index + 1}`}
-                        required
-                        className="text-[#2E5AA7] font-bold"
-                      />
-                      <IconButton
-                        icon={<Trash2 size={16} />}
-                        onClick={() => removeQuestion(index)}
-                        variant="danger"
-                        title="Hapus Pertanyaan"
+            {/* SECTION 2: QUESTIONS LIST */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between px-2">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-3">
+                  <div className="w-1.5 h-6 bg-[#0AC4E0] rounded-full" />
+                  Konstruksi Instrumen
+                </h3>
+                <span className="text-[10px] font-black bg-[#0AC4E0]/10 text-[#0AC4E0] px-3 py-1 rounded-full">
+                  {questions.length} ITEM PERTANYAAN
+                </span>
+              </div>
+
+              {questions.map((q, index) => (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  key={index}
+                  className="bg-white rounded-[2.5rem] border-2 border-[#0AC4E0]/20 p-8 shadow-sm relative overflow-hidden group"
+                >
+                  <div className="flex justify-between items-center mb-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-2xl bg-[#0AC4E0] text-white flex items-center justify-center font-black text-sm shadow-lg shadow-[#0AC4E0]/30">
+                        {index + 1}
+                      </div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Draft Butir Instrumen</p>
+                    </div>
+                    <button
+                      onClick={() => removeQuestion(index)}
+                      className="w-10 h-10 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all active:scale-90"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="space-y-3">
+                      <Label text="Pertanyaan / Indikator" required className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest !ml-1" />
+                      <Input
+                        placeholder="Tuliskan indikator penilaian non-akademik di sini..."
+                        value={q.question}
+                        onChange={(e) => handleQuestionChange(index, e.target.value)}
+                        className="!bg-white !border-slate-200 !rounded-2xl !py-4 !px-6 !text-[15px] !font-bold !text-slate-800 focus:!border-[#0AC4E0] focus:!ring-0 transition-all shadow-sm"
                       />
                     </div>
 
-                    <Input
-                      placeholder="Tulis pertanyaan di sini..."
-                      value={q.question}
-                      onChange={(e) =>
-                        handleQuestionChange(index, e.target.value)
-                      }
-                      className="mb-4 !pl-4 !pr-4 !py-2.5 !bg-white !border-gray-200/50 !rounded-xl !text-sm !font-medium outline-none focus:!bg-white focus:!ring-4 focus:!ring-blue-100/50 transition-all shadow-sm"
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-lg border border-gray-100">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
                       {q.options.map((opt, optIndex) => (
-                        <div key={optIndex} className="space-y-1.5">
-                          <Label
-                            text={`Pilihan ${String.fromCharCode(65 + optIndex)}`}
-                            className="text-xs text-gray-500 font-semibold"
-                          />
+                        <div key={optIndex} className="space-y-2">
+                          <div className="flex items-center gap-2 ml-1">
+                            <span className="text-[10px] font-black text-[#0AC4E0] bg-white w-5 h-5 rounded-md flex items-center justify-center border border-slate-200">
+                              {String.fromCharCode(65 + optIndex)}
+                            </span>
+                            <Label text={`Skala / Pilihan`} className="!mb-0 !text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                          </div>
                           <Input
                             value={opt}
-                            placeholder={`Jawaban ${String.fromCharCode(65 + optIndex)}`}
-                            onChange={(e) =>
-                              handleOptionChange(index, optIndex, e.target.value)
-                            }
-                            className="!pl-4 !pr-4 !py-2.5 !bg-gray-50/80 !border-gray-200/50 !rounded-xl !text-sm !font-medium outline-none focus:!bg-white focus:!ring-4 focus:!ring-blue-100/50 transition-all shadow-sm"
+                            placeholder={`Ketik deskripsi pilihan...`}
+                            onChange={(e) => handleOptionChange(index, optIndex, e.target.value)}
+                            className="!bg-white !border-transparent !rounded-xl !py-3 !px-5 !text-sm !font-semibold focus:!border-[#0AC4E0]/30 transition-all shadow-sm"
                           />
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
+                </motion.div>
+              ))}
 
-              <div className="flex justify-center">
-                <Button
-                  text="+ Tambah Pertanyaan"
-                  icon={<Plus size={16} />}
-                  onClick={addQuestion}
-                  variant="ghost"
-                  className="w-full max-w-md border-dashed border-2 border-blue-200 text-[#2E5AA7] hover:bg-blue-50 py-3 !rounded-xl"
-                />
-              </div>
-
-              {/* TOMBOL ACTION */}
-              <div className="flex justify-between items-center pt-6 border-t border-gray-100">
-                <Button
-                  text="Batal"
-                  icon={<ArrowLeft size={14} />}
-                  variant="ghost"
-                  className="text-gray-500 hover:text-gray-700 hover:bg-gray-100 !rounded-xl !px-5 !py-2.5"
-                  onClick={() => navigate("/ho/assessment/non-akademik")}
-                />
-                <Button
-                  text="Simpan Assessment"
-                  icon={<Save size={14} />}
-                  onClick={saveAssessment}
-                  loading={loading}
-                  className="group !bg-[#2E5AA7] hover:!bg-[#1c5496] !rounded-xl !px-5 !py-2.5 !text-[10px] font-black text-white shadow-lg active:scale-95 transition-all flex items-center gap-2"
-                />
-              </div>
+              <button
+                onClick={addQuestion}
+                className="w-full py-6 bg-white border-2 border-dashed border-[#0AC4E0]/30 rounded-[2.5rem] text-[#0AC4E0] font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 hover:bg-[#0AC4E0]/5 hover:border-[#0AC4E0] transition-all active:scale-[0.99]"
+              >
+                <Plus size={20} strokeWidth={3} /> Tambah Butir Instrumen
+              </button>
             </div>
           </div>
-        </Card>
+
+          {/* STICKY ACTION FOOTER */}
+          <footer className="mt-6 py-6 bg-white/60 backdrop-blur-xl border border-slate-100 rounded-[2.5rem] flex items-center justify-between px-10 shadow-sm leading-none shrink-0">
+            <button
+              onClick={() => navigate("/ho/assessment/non-akademik")}
+              className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest"
+            >
+              Batalkan
+            </button>
+            <button
+              disabled={loading}
+              onClick={saveAssessment}
+              className="flex items-center gap-3 px-10 py-4 bg-[#0AC4E0] hover:bg-[#09b3cc] text-white rounded-2xl text-[13px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#0AC4E0]/30 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Save size={20} />
+              {loading ? "SINKRONISASI..." : "PUBLIKASI NON-AKADEMIK"}
+            </button>
+          </footer>
+        </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </PageWrapper>
   );
 }
+
 export default CreateAssessmentNonAkademik;

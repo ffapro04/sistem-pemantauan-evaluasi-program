@@ -1,874 +1,597 @@
-/* eslint-disable no-undef */
-import Sidebar from "../../../components/Sidebar";
-import Card from "../../../components/Card";
-import Button from "../../../components/Button";
-import PageWrapper from "../../../components/PageWrapper";
-import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+/* eslint-disable react/prop-types */
+/* eslint-disable no-unused-vars */
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft,
-  FileText,
-  Download,
-  UserCheck,
-  CheckCircle2,
-  MessageCircle,
-  ShieldCheck,
-  BarChart3,
-  Zap,
-  Activity,
-  Building2,
-  Clock,
-  ChevronRight,
-  Layers,
-  Target,
-  TrendingUp,
-  Calendar,
-  Users,
-  Check,
-  CreditCard,
-  FileCheck,
-  FolderOpen,
+  ShieldCheck, Eye, MessageSquare, X, FileText, ChevronRight,
+  CheckCircle2, Clock, Send, Lock, UserCheck, MousePointer2,
+  Printer, DownloadCloud, ArrowLeft, Building2, User, MapPin,
+  Target, Calendar
 } from "lucide-react";
-import { toast } from "react-toastify";
 
-function DetailProgramAkademik() {
+// MENGGUNAKAN KOMPONEN MILIK ANDA
+import Sidebar from "../../../components/Sidebar";
+import PageWrapper from "../../../components/PageWrapper";
+import Button from "../../../components/Button";
+import InformationCard from "../../../components/InformationCard";
+import Table from "../../../components/Table";
+import Input from "../../../components/Input";
+import IconButton from "../../../components/IconButton";
+import Divider from "../../../components/Divider";
+import Label from "../../../components/Label";
+
+// ─── DATA STATIC PROGRAM ──────────────────────────────────────────────────
+const PROGRAM_INFO = {
+  no_mou: "088/MOU/ASTRA-YPA/V/2026",
+  nama_program: "DIGITALISASI KURIKULUM 2026",
+  nama_sekolah: "SMK NEGERI 1 KARAWANG",
+  head_office: "Bpk. Yusuf Tajiri",
+  area_officer: "Bpk. Andri",
+  wilayah: "Karawang, Jawa Barat",
+  npsn: "20109321",
+  tanggal_update: "08 May 2026",
+};
+
+const FASES = [
+  { id: 0, nama: "Inisiasi" },
+  { id: 1, nama: "Perencanaan" },
+  { id: 2, nama: "Pelaksanaan" },
+  { id: 3, nama: "Monitoring" },
+  { id: 4, nama: "Evaluasi" },
+  { id: 5, nama: "Pelaporan" },
+];
+
+export default function DetailProgramAkademik() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedPhaseIndex, setSelectedPhaseIndex] = useState(2); // default ke Pelaksanaan
-  const [selectedKegiatan, setSelectedKegiatan] = useState(null);
 
-  // Data Dummy
-  const dummyFases = [
-    {
-      id: 0,
-      nama_fase: "Inisiasi",
-      status: "completed",
-      progress: 100,
-      tanggal: "Jan 2024",
-      kegiatan: [
+  const generateInitialData = () => {
+    let data = {};
+    FASES.forEach((f) => {
+      data[f.id] = [
         {
-          id: 1,
-          nama_kegiatan: "Kick-off Meeting & Pembentukan Tim",
-          status: "completed",
-          tanggal: "5 Jan 2024",
-          pic: "Project Manager",
-          deskripsi: "Pertemuan awal untuk membahas scope program.",
-          termin: [
-            {
-              id: 1,
-              nama: "Notulensi Meeting",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "5 Jan 2024",
-              file: true,
-            },
-            {
-              id: 2,
-              nama: "Daftar Hadir Tim",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "5 Jan 2024",
-              file: true,
-            },
-            {
-              id: 3,
-              nama: "Pembayaran Termin I",
-              jenis: "pembayaran",
-              status: "completed",
-              tanggal: "10 Jan 2024",
-              jumlah: "Rp 75.000.000",
-            },
-          ],
+          id: `G${f.id}`,
+          isPhaseGate: true,
+          kegiatan: `AKTIVASI FASE ${f.nama.toUpperCase()}`,
+          persyaratan: [{ name: "Dokumen Otorisasi", aoAcc: true, file: "auth.pdf" }],
+          aoStatus: "ACC",
+          hoStatus: "PENDING",
         },
         {
-          id: 2,
-          nama_kegiatan: "Studi Kelayakan",
-          status: "completed",
-          tanggal: "12 Jan 2024",
-          pic: "Tim Analis",
-          deskripsi: "Analisis kelayakan program.",
-          termin: [
-            {
-              id: 1,
-              nama: "Laporan Studi Kelayakan",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "15 Jan 2024",
-              file: true,
-            },
-            {
-              id: 2,
-              nama: "Pembayaran Termin II",
-              jenis: "pembayaran",
-              status: "completed",
-              tanggal: "20 Jan 2024",
-              jumlah: "Rp 40.000.000",
-            },
+          id: `A${f.id}1`,
+          isPhaseGate: false,
+          kegiatan: `Kegiatan Lapangan 01 - ${f.nama}`,
+          persyaratan: [
+            { name: "Laporan Teknis", aoAcc: true, file: "report1.pdf" },
+            { name: "Absensi", aoAcc: true, file: "abs.pdf" },
           ],
-        },
-      ],
-    },
-    {
-      id: 1,
-      nama_fase: "Perencanaan",
-      status: "completed",
-      progress: 100,
-      tanggal: "Feb 2024",
-      kegiatan: [
-        {
-          id: 1,
-          nama_kegiatan: "Perencanaan Kurikulum",
-          status: "completed",
-          tanggal: "5 Feb 2024",
-          pic: "Tim Akademik",
-          deskripsi: "Penyusunan kurikulum dan modul pembelajaran.",
-          termin: [
-            {
-              id: 1,
-              nama: "Dokumen Kurikulum",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "8 Feb 2024",
-              file: true,
-            },
-            {
-              id: 2,
-              nama: "Modul Ajar",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "12 Feb 2024",
-              file: true,
-            },
-            {
-              id: 3,
-              nama: "Pembayaran",
-              jenis: "pembayaran",
-              status: "completed",
-              tanggal: "15 Feb 2024",
-              jumlah: "Rp 50.000.000",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 2,
-      nama_fase: "Pelaksanaan",
-      status: "active",
-      progress: 65,
-      tanggal: "Mar-Mei 2024",
-      kegiatan: [
-        {
-          id: 1,
-          nama_kegiatan: "Pelaksanaan Program Inti",
-          status: "in-progress",
-          tanggal: "1 Mar 2024",
-          pic: "Tim Lapangan",
-          deskripsi: "Pelaksanaan program sesuai kurikulum.",
-          termin: [
-            {
-              id: 1,
-              nama: "Laporan Mingguan",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "7 Mar 2024",
-              file: true,
-            },
-            {
-              id: 2,
-              nama: "Dokumentasi Kegiatan",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "15 Mar 2024",
-              file: true,
-            },
-            {
-              id: 3,
-              nama: "Pembayaran Termin I",
-              jenis: "pembayaran",
-              status: "completed",
-              tanggal: "15 Mar 2024",
-              jumlah: "Rp 100.000.000",
-            },
-            {
-              id: 4,
-              nama: "Laporan Bulanan",
-              jenis: "dokumentasi",
-              status: "pending",
-              tanggal: "31 Mar 2024",
-              file: false,
-            },
-            {
-              id: 5,
-              nama: "Pembayaran Termin II",
-              jenis: "pembayaran",
-              status: "pending",
-              tanggal: "30 Apr 2024",
-              jumlah: "Rp 100.000.000",
-            },
-          ],
+          aoStatus: "ACC",
+          hoStatus: "PENDING",
         },
         {
-          id: 2,
-          nama_kegiatan: "Monitoring & Evaluasi",
-          status: "in-progress",
-          tanggal: "Ongoing",
-          pic: "Supervisor",
-          deskripsi: "Monitoring harian dan evaluasi mingguan.",
-          termin: [
-            {
-              id: 1,
-              nama: "Form Monitoring",
-              jenis: "dokumentasi",
-              status: "completed",
-              tanggal: "Daily",
-              file: true,
-            },
-            {
-              id: 2,
-              nama: "Laporan Evaluasi",
-              jenis: "dokumentasi",
-              status: "in-progress",
-              tanggal: "Setiap Jumat",
-              file: false,
-            },
-            {
-              id: 3,
-              nama: "Pembayaran",
-              jenis: "pembayaran",
-              status: "pending",
-              tanggal: "Akhir Bulan",
-              jumlah: "Rp 50.000.000",
-            },
+          id: `A${f.id}2`,
+          isPhaseGate: false,
+          kegiatan: `Kegiatan Akhir 02 - ${f.nama}`,
+          persyaratan: [
+            { name: "BAST Pekerjaan", aoAcc: true, file: "bast.pdf" },
+            { name: "Dokumentasi", aoAcc: true, file: "foto.jpg" },
           ],
+          aoStatus: "ACC",
+          hoStatus: "PENDING",
         },
-      ],
-    },
-    {
-      id: 3,
-      nama_fase: "Monitoring",
-      status: "pending",
-      progress: 0,
-      tanggal: "Jun 2024",
-      kegiatan: [
-        {
-          id: 1,
-          nama_kegiatan: "Pengawasan & Pengendalian Mutu",
-          status: "pending",
-          tanggal: "TBD",
-          pic: "Tim QA",
-          deskripsi: "Pengawasan kualitas pelaksanaan program.",
-          termin: [
-            {
-              id: 1,
-              nama: "Checklist Kualitas",
-              jenis: "dokumentasi",
-              status: "pending",
-              tanggal: "TBD",
-              file: false,
-            },
-            {
-              id: 2,
-              nama: "Laporan Audit",
-              jenis: "dokumentasi",
-              status: "pending",
-              tanggal: "TBD",
-              file: false,
-            },
-            {
-              id: 3,
-              nama: "Pembayaran",
-              jenis: "pembayaran",
-              status: "pending",
-              tanggal: "TBD",
-              jumlah: "Rp 75.000.000",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 4,
-      nama_fase: "Evaluasi",
-      status: "pending",
-      progress: 0,
-      tanggal: "Jul 2024",
-      kegiatan: [
-        {
-          id: 1,
-          nama_kegiatan: "Evaluasi Capaian Program",
-          status: "pending",
-          tanggal: "TBD",
-          pic: "Tim Evaluator",
-          deskripsi: "Evaluasi capaian program.",
-          termin: [
-            {
-              id: 1,
-              nama: "Laporan Evaluasi",
-              jenis: "dokumentasi",
-              status: "pending",
-              tanggal: "TBD",
-              file: false,
-            },
-            {
-              id: 2,
-              nama: "Pembayaran",
-              jenis: "pembayaran",
-              status: "pending",
-              tanggal: "TBD",
-              jumlah: "Rp 60.000.000",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 5,
-      nama_fase: "Pelaporan",
-      status: "pending",
-      progress: 0,
-      tanggal: "Aug 2024",
-      kegiatan: [
-        {
-          id: 1,
-          nama_kegiatan: "Penyusunan Laporan Akhir",
-          status: "pending",
-          tanggal: "TBD",
-          pic: "Tim Admin",
-          deskripsi: "Penyusunan laporan akhir.",
-          termin: [
-            {
-              id: 1,
-              nama: "Draft Laporan",
-              jenis: "dokumentasi",
-              status: "pending",
-              tanggal: "TBD",
-              file: false,
-            },
-            {
-              id: 2,
-              nama: "Pembayaran Akhir",
-              jenis: "pembayaran",
-              status: "pending",
-              tanggal: "TBD",
-              jumlah: "Rp 40.000.000",
-            },
-          ],
-        },
-      ],
-    },
-  ];
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
-        const resDetail = await fetch(`http://localhost:3000/program/${id}`, {
-          headers,
-        });
-        const detailJson = await resDetail.json();
-        const apiData = detailJson.data || detailJson;
-
-        setData({
-          ...apiData,
-          fases: dummyFases,
-          nama_sekolah: "SMK Negeri 1 Jakarta",
-          wilayah: "DKI Jakarta",
-          npsn: "20109321",
-          nama_ho: "Dr. Ahmad Budiman, M.Pd",
-          nama_ao: "Drs. Slamet Riyadi, M.Si",
-          daftar_vendor: "PT Edukasi Nusantara, CV Sarana Prima",
-        });
-      } catch (err) {
-        toast.error("Gagal mengambil data");
-        setData({
-          id_program: id,
-          nama_program: "Program Akademik",
-          fases: dummyFases,
-          nama_sekolah: "SMK Negeri 1 Jakarta",
-          wilayah: "DKI Jakarta",
-          npsn: "20109321",
-          nama_ho: "Dr. Ahmad Budiman, M.Pd",
-          nama_ao: "Drs. Slamet Riyadi, M.Si",
-          daftar_vendor: "PT Edukasi Nusantara, CV Sarana Prima",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id]);
-
-  const getDokumentasiCount = (termin) =>
-    termin.filter((t) => t.jenis === "dokumentasi").length;
-  const getDokumentasiCompleted = (termin) =>
-    termin.filter((t) => t.jenis === "dokumentasi" && t.status === "completed")
-      .length;
-  const getPaymentStatus = (termin) => {
-    const payments = termin.filter((t) => t.jenis === "pembayaran");
-    const completed = payments.filter((p) => p.status === "completed").length;
-    if (payments.length === 0)
-      return { text: "No Payment", color: "text-slate-400" };
-    if (completed === payments.length)
-      return { text: "Lunas", color: "text-emerald-600" };
-    if (completed > 0) return { text: "Sebagian", color: "text-amber-600" };
-    return { text: "Belum Dibayar", color: "text-red-500" };
+      ];
+    });
+    return data;
   };
 
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  const [activeFase, setActiveFase] = useState(0);
+  const [activities, setActivities] = useState(generateInitialData());
+  const [chats, setChats] = useState([
+    { sender: "System", text: "Gunakan 'ACC' atau 'REJECT' di kolom chat.", time: "08:00", isSystem: true },
+  ]);
 
-  if (!data) return null;
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [selectedAoVerif, setSelectedAoVerif] = useState(null);
+  const [viewingFile, setViewingFile] = useState(null);
+  const [showChat, setShowChat] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [isRejectMode, setIsRejectMode] = useState(false);
+  const [isAccTriggered, setIsAccTriggered] = useState(false);
+  const [handPointerId, setHandPointerId] = useState(null);
+  const [accNotif, setAccNotif] = useState({ show: false, title: "", msg: "" });
+  const chatEndRef = useRef(null);
 
-  const currentFase = data.fases[selectedPhaseIndex];
-  const kegiatanList = currentFase?.kegiatan || [];
-  const selectedKegiatanData = kegiatanList.find(
-    (k) => k.id === selectedKegiatan?.id,
-  );
+  const currentList = activities[activeFase] || [];
+  const checkPhaseUnlocked = (faseId) => {
+    if (faseId === 0) return true;
+    const prevFase = activities[faseId - 1];
+    return prevFase[prevFase.length - 1].hoStatus === "COMPLETED";
+  };
+  const currentPhaseAccessible = checkPhaseUnlocked(activeFase);
+  const gateACC = currentList[0]?.hoStatus === "COMPLETED";
+
+  useEffect(() => {
+    if (showChat) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chats, showChat, isRejectMode, isAccTriggered]);
+
+  const handleSendChat = () => {
+    if (!msg.trim()) return;
+    if (msg === "REJECT") { setIsRejectMode(true); return; }
+    if (msg === "ACC") { setIsAccTriggered(true); return; }
+    setChats([...chats, { sender: "Anda (HO)", text: msg, time: "Now", self: true }]);
+    setMsg("");
+  };
+
+  const confirmReject = () => {
+    const updatedFase = currentList.map((item) => {
+      if (!item.isPhaseGate && item.hoStatus !== "COMPLETED") {
+        return { ...item, hoStatus: "PENDING", aoStatus: "PENDING", persyaratan: item.persyaratan.map(p => ({ ...p, aoAcc: false, file: null })) };
+      }
+      return item;
+    });
+    setActivities({ ...activities, [activeFase]: updatedFase });
+    setChats([...chats, { text: "SYSTEM: REJECT BERHASIL. DATA RESET.", isSystem: true }]);
+    setIsRejectMode(false);
+    setMsg("");
+  };
+
+  const triggerAccHand = () => {
+    setShowChat(false);
+    setIsAccTriggered(false);
+    setMsg("");
+    const target = currentList.find((a) => a.hoStatus === "PENDING" && a.aoStatus === "ACC");
+    if (target) setHandPointerId(target.id);
+  };
+
+  const handleHoAction = (item, idx) => {
+    const updatedFase = currentList.map((act) => act.id === item.id ? { ...act, hoStatus: "COMPLETED" } : act);
+    setActivities({ ...activities, [activeFase]: updatedFase });
+    setHandPointerId(null);
+    const isLast = idx === currentList.length - 1;
+    setAccNotif({
+      show: true,
+      title: isLast ? "Fase Selesai" : "Verified",
+      msg: isLast ? `Fase ${FASES[activeFase].nama} ditutup.` : `Unit ${item.kegiatan} berhasil di-ACC.`,
+    });
+    setTimeout(() => setAccNotif({ show: false, title: "", msg: "" }), 4000);
+  };
+
+  // Table columns definition
+  const tableColumns = [
+    {
+      header: "No",
+      accessor: "no",
+      align: "text-center",
+      render: (_, idx) => <span className="text-[12px] font-black text-slate-300">{idx + 1}</span>
+    },
+    {
+      header: "Status & Deskripsi Unit",
+      accessor: "kegiatan",
+      render: (item, idx) => {
+        const isRowLocked = !currentPhaseAccessible || (!item.isPhaseGate && !gateACC) || (idx > 0 && currentList[idx - 1].hoStatus !== "COMPLETED");
+        const isCompleted = item.hoStatus === "COMPLETED";
+        return (
+          <div className="flex items-center gap-4 text-left">
+            {isCompleted ? <CheckCircle2 size={18} className="text-emerald-500" /> : isRowLocked ? <Lock size={18} className="text-slate-300" /> : <Clock size={18} className="text-[#0AC4E0]" />}
+            <p className={`text-[13px] ${item.isPhaseGate ? "font-black text-[#0AC4E0] uppercase tracking-tighter" : "font-bold text-slate-700"}`}>
+              {item.kegiatan}
+            </p>
+          </div>
+        );
+      }
+    },
+    {
+      header: "Output Persyaratan",
+      accessor: "persyaratan",
+      render: (item) => (
+        <div className="flex flex-col gap-2">
+          {item.persyaratan.map((p, i) => (
+            <div key={i} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tight text-slate-400">
+              {p.file ? <CheckCircle2 size={12} className="text-emerald-500" /> : <Clock size={12} className="text-gray-200" />}
+              <span className={p.file ? "text-emerald-600" : "text-slate-300"}>{p.name}</span>
+            </div>
+          ))}
+        </div>
+      )
+    },
+    {
+      header: "Berkas",
+      accessor: "id",
+      align: "text-center",
+      render: (item) => (
+        <IconButton icon={<Eye size={18} />} onClick={() => setSelectedActivity(item)} variant="light" className="!bg-transparent hover:!bg-gray-100" />
+      )
+    },
+    {
+      header: "Verifikasi AO",
+      accessor: "aoStatus",
+      align: "text-center",
+      render: (item) => (
+        <div className="flex justify-center">
+          <IconButton
+            icon={<UserCheck size={16} />}
+            onClick={() => setSelectedAoVerif(item)}
+            variant="light"
+            className={`!rounded-2xl !px-5 !py-2.5 !text-[10px] !font-black ${item.aoStatus === "ACC"
+              ? "!bg-emerald-50 !text-emerald-600"
+              : "!bg-gray-50 !text-slate-300"
+              }`}
+            label={item.aoStatus === "ACC" ? "Verified" : "Wait AO"}
+          />
+        </div>
+      )
+    },
+    {
+      header: "Aksi HO",
+      accessor: "hoStatus",
+      align: "text-right",
+      render: (item, idx) => {
+        const isRowLocked = !currentPhaseAccessible || (!item.isPhaseGate && !gateACC) || (idx > 0 && currentList[idx - 1].hoStatus !== "COMPLETED");
+        const isCompleted = item.hoStatus === "COMPLETED";
+
+        if (isRowLocked) return null;
+
+        return (
+          <div className="flex justify-end gap-3">
+            <IconButton
+              icon={<X size={14} />}
+              label="Hold"
+              variant="light"
+              className="!bg-red-50 !text-red-400 !border-red-100 !rounded-[1.2rem] !text-[10px] !px-4 !py-2.5"
+            />
+            <div className="relative">
+              {handPointerId === item.id && (
+                <motion.div animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 0.6 }} className="absolute -top-14 left-1/2 -translate-x-1/2 text-orange-500 drop-shadow-xl z-50">
+                  <MousePointer2 size={36} fill="currentColor" className="rotate-180" />
+                </motion.div>
+              )}
+              <Button
+                label={isCompleted ? "Selesai" : "Verify Step"}
+                disabled={item.aoStatus !== "ACC" || isCompleted}
+                onClick={() => handleHoAction(item, idx)}
+                className={`!px-7 !py-2.5 !rounded-[1.2rem] !text-[10px] !font-black !uppercase ${isCompleted
+                  ? "!bg-emerald-500 !text-white"
+                  : "!bg-slate-800 !text-white hover:!bg-[#0AC4E0]"
+                  }`}
+              />
+            </div>
+          </div>
+        );
+      }
+    }
+  ];
+
+  // Filter data berdasarkan row lock
+  const getFilteredData = () => {
+    return currentList.map((item, idx) => {
+      const isRowLocked = !currentPhaseAccessible || (!item.isPhaseGate && !gateACC) || (idx > 0 && currentList[idx - 1].hoStatus !== "COMPLETED");
+      return { ...item, isRowLocked, originalIndex: idx };
+    });
+  };
 
   return (
-    <PageWrapper className="h-screen overflow-hidden flex bg-white !p-0 font-sans">
+    <PageWrapper className="h-screen overflow-hidden flex bg-white !p-0 font-sans selection:bg-[#0AC4E0]/20">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* HEADER */}
-        <header className="shrink-0 bg-white border-b border-slate-100 px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
-                <BarChart3 size={18} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-slate-800">
-                  {data.nama_program}
-                </h1>
-                <p className="text-[10px] text-slate-400">
-                  ID: {data.id_program} • NPSN: {data.npsn}
-                </p>
+
+      <NotificationBadge accNotif={accNotif} />
+
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-10" />
+
+        {/* HEADER SECTION - FIXED NO SCROLL */}
+        <header className="shrink-0 bg-white/70 backdrop-blur-xl border-b border-gray-100 px-8 py-4 flex items-center justify-between z-40">
+          <div className="flex items-center gap-6">
+            <IconButton icon={<ArrowLeft size={18} />} onClick={() => navigate(-1)} variant="light" />
+            <div className="space-y-0.5">
+              <h1 className="text-sm font-black text-slate-800 uppercase tracking-tight">Progress Monitoring</h1>
+              <div className="flex items-center gap-2 text-[10px] font-bold text-[#0AC4E0] uppercase tracking-[0.2em]">
+                <span>Head Office</span> <ChevronRight size={10} /> <span className="text-slate-400">Control Center</span>
               </div>
             </div>
-            <Button
-              text="Back"
-              icon={<ArrowLeft size={14} />}
-              onClick={() => navigate(-1)}
-              className="!bg-white !text-slate-600 !border !border-slate-200 !rounded-lg !px-3 !py-1.5 !text-[11px]"
-            />
           </div>
 
-          <div className="grid grid-cols-4 gap-4 text-left">
-            <div>
-              <p className="text-[9px] font-medium text-slate-400 uppercase">
-                Sekolah
-              </p>
-              <p className="text-xs font-semibold text-slate-800">
-                {data.nama_sekolah}
-              </p>
-              <p className="text-[10px] text-slate-400">{data.wilayah}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-medium text-slate-400 uppercase">
-                Penanggung Jawab
-              </p>
-              <p className="text-xs font-semibold text-slate-800">
-                {data.nama_ho}
-              </p>
-              <p className="text-[10px] text-slate-400">AO: {data.nama_ao}</p>
-            </div>
-            <div>
-              <p className="text-[9px] font-medium text-slate-400 uppercase">
-                Mitra
-              </p>
-              <p className="text-xs font-semibold text-slate-800">
-                {data.daftar_vendor}
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-slate-400" />
-                <span className="text-xs text-slate-600">
-                  {data.file_mou || "MOU_2024.pdf"}
-                </span>
+          <div className="flex items-center gap-5">
+            <Button
+              label="Diskusi"
+              icon={<MessageSquare size={14} />}
+              onClick={() => setShowChat(true)}
+              className="!rounded-full !px-6 !bg-[#0AC4E0] !text-white"
+            />
+            <Divider orientation="vertical" className="h-8" />
+            <div className="flex items-center gap-3">
+              <div className="text-right leading-tight">
+                <p className="text-[11px] font-black text-slate-800 uppercase tracking-tighter">Astra HO Admin</p>
+                <p className="text-[9px] font-bold text-[#0AC4E0] uppercase tracking-tighter">Verified Access</p>
               </div>
-              <button className="text-slate-400 hover:text-slate-600">
-                <Download size={14} />
-              </button>
+              <div className="w-10 h-10 rounded-full border-2 border-[#0AC4E0]/20 overflow-hidden">
+                <img src="https://ui-avatars.com/api/?name=Admin+Astra&background=0AC4E0&color=fff" alt="Avatar" />
+              </div>
             </div>
           </div>
         </header>
 
-        {/* MAIN CONTENT */}
-        <div className="flex-1 flex overflow-hidden p-6 gap-6">
-          {/* LEFT SIDEBAR - LIST KEGIATAN (bukan fase) */}
-          <div className="w-80 bg-white border border-slate-100 rounded-xl overflow-hidden flex flex-col shrink-0">
-            <div className="p-3 border-b border-slate-100 bg-slate-50/30">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FolderOpen size={12} className="text-blue-500" />
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase">
-                    Kegiatan
-                  </span>
+        {/* SCROLLABLE CONTENT - ONLY THIS PART SCROLLS */}
+        <div className="flex-1 overflow-y-auto no-scrollbar p-8 space-y-8">
+          {/* BENTO INFO CARD */}
+          <InformationCard className="border-2 border-[#0AC4E0]/40 !rounded-[3rem] overflow-hidden">
+            <div className="p-10 bg-white">
+              <div className="flex flex-col lg:flex-row gap-10 items-start">
+                <div className="w-24 h-24 bg-[#0AC4E0] rounded-[2.2rem] flex items-center justify-center shrink-0 shadow-2xl text-white font-black text-3xl italic border-4 border-white">
+                  HO
                 </div>
-                <span className="text-[9px] text-slate-400">
-                  {currentFase.nama_fase} • {kegiatanList.length} item
-                </span>
+                <div className="flex-1">
+                  <h2 className="text-[32px] font-black text-slate-800 leading-none uppercase tracking-tighter mb-2">
+                    {PROGRAM_INFO.nama_program}
+                  </h2>
+                  <p className="text-[11px] font-bold text-[#0AC4E0] uppercase tracking-[0.3em] mb-8 leading-none">
+                    MOU: {PROGRAM_INFO.no_mou}
+                  </p>
+                  <Divider className="mb-8 opacity-20" />
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
+                    <InfoItem icon={<Building2 size={14} />} label="Institusi" value={PROGRAM_INFO.nama_sekolah} />
+                    <InfoItem icon={<User size={14} />} label="Head Office" value={PROGRAM_INFO.head_office} isHO />
+                    <InfoItem icon={<UserCheck size={14} />} label="Area Officer" value={PROGRAM_INFO.area_officer} />
+                    <InfoItem icon={<MapPin size={14} />} label="Wilayah" value={PROGRAM_INFO.wilayah} />
+                    <InfoItem icon={<Target size={14} />} label="NPSN" value={PROGRAM_INFO.npsn} />
+                    <InfoItem icon={<Calendar size={14} />} label="Last Updated" value={PROGRAM_INFO.tanggal_update} />
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-50">
-              {kegiatanList.map((keg, idx) => {
-                const docComplete = getDokumentasiCompleted(keg.termin);
-                const docTotal = getDokumentasiCount(keg.termin);
-                const payment = getPaymentStatus(keg.termin);
+          </InformationCard>
 
-                return (
-                  <button
-                    key={keg.id}
-                    onClick={() => setSelectedKegiatan(keg)}
-                    className={`w-full p-3 text-left transition-all ${
-                      selectedKegiatan?.id === keg.id
-                        ? "bg-blue-50/50 border-l-2 border-l-blue-500"
-                        : "hover:bg-slate-50"
+          {/* FASE NAVIGATION */}
+          <div className="bg-gray-50 p-1.5 rounded-[2.2rem] flex gap-1 border border-gray-100">
+            {FASES.map((f, idx) => {
+              const isLocked = !checkPhaseUnlocked(idx);
+              const isActive = activeFase === f.id;
+              return (
+                <button
+                  key={f.id}
+                  disabled={isLocked}
+                  onClick={() => { setActiveFase(f.id); setHandPointerId(null); }}
+                  className={`flex-1 py-4 rounded-[1.8rem] text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${isActive
+                    ? "bg-white text-[#0AC4E0] shadow-lg shadow-[#0AC4E0]/10"
+                    : isLocked
+                      ? "text-slate-300 cursor-not-allowed bg-gray-50"
+                      : "text-slate-500 hover:text-slate-700 bg-transparent"
                     }`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <div
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold mt-0.5 ${
-                          keg.status === "completed"
-                            ? "bg-emerald-100 text-emerald-600"
-                            : keg.status === "in-progress"
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-slate-100 text-slate-400"
-                        }`}
-                      >
-                        {idx + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-medium text-slate-700 truncate">
-                          {keg.nama_kegiatan}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[8px] text-slate-400">
-                            {keg.tanggal}
-                          </span>
-                          <span className="text-[8px] text-slate-400">•</span>
-                          <span className="text-[8px] text-slate-400">
-                            {keg.pic}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[7px] font-medium text-blue-600 bg-blue-50 px-1 py-0.5 rounded">
-                            📄 {docComplete}/{docTotal}
-                          </span>
-                          <span
-                            className={`text-[7px] font-medium px-1 py-0.5 rounded ${payment.color} bg-slate-50`}
-                          >
-                            💰 {payment.text}
-                          </span>
-                        </div>
-                      </div>
-                      <ChevronRight
-                        size={12}
-                        className={`text-slate-300 mt-2 ${selectedKegiatan?.id === keg.id ? "text-blue-500" : ""}`}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-              {kegiatanList.length === 0 && (
-                <div className="p-6 text-center">
-                  <p className="text-[10px] text-slate-400">
-                    Belum ada kegiatan
-                  </p>
-                </div>
-              )}
-            </div>
+                >
+                  {isLocked && <Lock size={12} className="text-slate-300" />}
+                  {f.nama}
+                </button>
+              );
+            })}
           </div>
 
-          {/* RIGHT - DETAIL TERMIN */}
-          <div className="flex-1 flex flex-col gap-5 overflow-hidden">
-            {/* INFO FASE SAAT INI */}
-            <div className="bg-white border border-slate-100 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] font-medium text-slate-400 uppercase">
-                      Fase Saat Ini
-                    </span>
-                    <span
-                      className={`text-[8px] font-medium px-1.5 py-0.5 rounded ${
-                        currentFase.status === "completed"
-                          ? "bg-emerald-50 text-emerald-600"
-                          : currentFase.status === "active"
-                            ? "bg-blue-50 text-blue-600"
-                            : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {currentFase.status === "completed"
-                        ? "Selesai"
-                        : currentFase.status === "active"
-                          ? "Berjalan"
-                          : "Belum Mulai"}
-                    </span>
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-800">
-                    {currentFase.nama_fase}
-                  </h2>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {currentFase.tanggal} • Progress {currentFase.progress}%
-                  </p>
-                </div>
-                <div className="w-32">
-                  <div className="w-full h-1.5 bg-slate-100 rounded-full">
-                    <div
-                      className="h-full bg-blue-500 rounded-full"
-                      style={{ width: `${currentFase.progress}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* DETAIL TERMIN DARI KEGIATAN YANG DIPILIH */}
-            {selectedKegiatanData ? (
-              <div className="flex-1 bg-white border border-slate-100 rounded-xl overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-slate-100 bg-slate-50/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className={`text-[8px] font-medium px-1.5 py-0.5 rounded ${
-                            selectedKegiatanData.status === "completed"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : selectedKegiatanData.status === "in-progress"
-                                ? "bg-blue-50 text-blue-600"
-                                : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {selectedKegiatanData.status === "completed"
-                            ? "Selesai"
-                            : selectedKegiatanData.status === "in-progress"
-                              ? "Berjalan"
-                              : "Menunggu"}
-                        </span>
-                        <span className="text-[9px] text-slate-400">
-                          Target: {selectedKegiatanData.tanggal}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-bold text-slate-800">
-                        {selectedKegiatanData.nama_kegiatan}
-                      </h3>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        PIC: {selectedKegiatanData.pic}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {/* Deskripsi */}
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-[11px] text-slate-600">
-                      {selectedKegiatanData.deskripsi}
-                    </p>
-                  </div>
-
-                  {/* DAFTAR TERMIN (Checkpoint) */}
-                  <div>
-                    <p className="text-[9px] font-medium text-slate-400 uppercase mb-2">
-                      Termin & Checkpoint
-                    </p>
-                    <div className="space-y-2">
-                      {selectedKegiatanData.termin.map((term, idx) => (
-                        <div
-                          key={idx}
-                          className={`flex items-center justify-between p-2.5 rounded-lg border ${
-                            term.status === "completed"
-                              ? "border-emerald-100 bg-emerald-50/20"
-                              : term.status === "in-progress"
-                                ? "border-blue-100 bg-blue-50/20"
-                                : "border-slate-100"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                                term.jenis === "dokumentasi"
-                                  ? "bg-blue-100"
-                                  : "bg-amber-100"
-                              }`}
-                            >
-                              {term.jenis === "dokumentasi" ? (
-                                term.status === "completed" ? (
-                                  <FileCheck
-                                    size={12}
-                                    className="text-blue-600"
-                                  />
-                                ) : (
-                                  <FileText
-                                    size={12}
-                                    className="text-blue-400"
-                                  />
-                                )
-                              ) : term.status === "completed" ? (
-                                <CheckCircle2
-                                  size={12}
-                                  className="text-emerald-600"
-                                />
-                              ) : (
-                                <CreditCard
-                                  size={12}
-                                  className="text-amber-500"
-                                />
-                              )}
-                            </div>
-                            <div>
-                              <p className="text-[11px] font-medium text-slate-700">
-                                {term.nama}
-                              </p>
-                              <p className="text-[8px] text-slate-400">
-                                {term.tanggal}
-                                {term.jumlah && ` • ${term.jumlah}`}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {term.status === "completed" && (
-                              <span className="text-[7px] font-medium text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
-                                Selesai
-                              </span>
-                            )}
-                            {term.status === "in-progress" && (
-                              <span className="text-[7px] font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
-                                Proses
-                              </span>
-                            )}
-                            {term.status === "pending" && (
-                              <span className="text-[7px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                Menunggu
-                              </span>
-                            )}
-                            {term.file && (
-                              <button className="p-1 text-slate-400 hover:text-slate-600">
-                                <Download size={10} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div className="p-3 bg-slate-50 rounded-lg text-center">
-                      <p className="text-[8px] font-medium text-slate-400 uppercase">
-                        Dokumen
-                      </p>
-                      <p className="text-xl font-bold text-blue-600">
-                        {getDokumentasiCompleted(selectedKegiatanData.termin)}/
-                        {getDokumentasiCount(selectedKegiatanData.termin)}
-                      </p>
-                    </div>
-                    <div className="p-3 bg-slate-50 rounded-lg text-center">
-                      <p className="text-[8px] font-medium text-slate-400 uppercase">
-                        Pembayaran
-                      </p>
-                      <p
-                        className={`text-sm font-bold ${getPaymentStatus(selectedKegiatanData.termin).color}`}
-                      >
-                        {getPaymentStatus(selectedKegiatanData.termin).text}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 bg-white border border-slate-100 rounded-xl flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <FolderOpen size={20} className="text-slate-300" />
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Pilih kegiatan untuk melihat termin
-                  </p>
+          {/* MONITORING TABLE - MENGGUNAKAN COMPONENT TABLE */}
+          <div className="relative">
+            {!currentPhaseAccessible && (
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 rounded-[3rem] flex items-center justify-center">
+                <div className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                  <Lock size={14} /> Selesaikan Fase Sebelumnya Terlebih Dahulu
                 </div>
               </div>
             )}
-
-            {/* ========== CHEVRON PROGRESS INDICATOR (6 STEP) ========== */}
-            <div className="bg-white border border-slate-100 rounded-xl p-4 overflow-x-auto">
-              <div className="flex items-center justify-between min-w-[600px]">
-                {data.fases.map((fase, index) => {
-                  const isCompleted = fase.status === "completed";
-                  const isActive = fase.status === "active";
-
-                  return (
-                    <div key={index} className="flex items-center">
-                      {index !== 0 && (
-                        <div
-                          className="w-10 h-[2px] bg-slate-200 mr-[-6px] z-0"
-                          style={{
-                            clipPath:
-                              "polygon(0% 0%, 92% 0%, 100% 50%, 92% 100%, 0% 100%)",
-                          }}
-                        ></div>
-                      )}
-                      <div
-                        className={`relative flex flex-col items-center cursor-pointer transition-all duration-300 z-10 ${
-                          selectedPhaseIndex === index ? "scale-110" : ""
-                        }`}
-                        onClick={() => {
-                          setSelectedPhaseIndex(index);
-                          setSelectedKegiatan(null);
-                        }}
-                      >
-                        <div
-                          className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                            isCompleted
-                              ? "bg-emerald-500 text-white shadow-md"
-                              : isActive
-                                ? "bg-blue-600 text-white shadow-md ring-4 ring-blue-100"
-                                : "bg-white text-slate-400 border-2 border-slate-200"
-                          }`}
-                        >
-                          {isCompleted ? (
-                            <Check size={18} />
-                          ) : isActive ? (
-                            <Activity size={16} className="animate-pulse" />
-                          ) : (
-                            String(index + 1).padStart(2, "0")
-                          )}
-                        </div>
-                        <p
-                          className={`text-[9px] font-semibold mt-1.5 ${
-                            selectedPhaseIndex === index
-                              ? "text-blue-600"
-                              : "text-slate-400"
-                          }`}
-                        >
-                          {fase.nama_fase.substring(0, 5)}
-                        </p>
-                        <p className="text-[7px] text-slate-300">
-                          {fase.progress}%
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <Table
+              columns={tableColumns}
+              data={getFilteredData()}
+            />
           </div>
         </div>
+
+        {/* MODAL BERKAS */}
+        <FileRepositoryModal selectedActivity={selectedActivity} onClose={() => setSelectedActivity(null)} onViewFile={setViewingFile} />
+
+        {/* MODAL VERIFIKASI AO */}
+        <AoVerificationModal selectedAoVerif={selectedAoVerif} onClose={() => setSelectedAoVerif(null)} onOpenChat={() => setShowChat(true)} />
+
+        {/* QUICK LOOK PREVIEW */}
+        <FilePreviewModal viewingFile={viewingFile} onClose={() => setViewingFile(null)} />
+
+        {/* CHAT SYSTEM */}
+        <AnimatePresence>
+          {showChat && (
+            <motion.div initial={{ x: 400 }} animate={{ x: 0 }} exit={{ x: 400 }} className="fixed top-0 right-0 w-[420px] h-full bg-white z-[500] shadow-2xl flex flex-col border-l border-gray-100 text-left">
+              <div className="px-10 py-8 bg-[#0AC4E0] text-white flex justify-between items-center shrink-0 shadow-lg leading-none">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center font-black text-xs uppercase">HO</div>
+                  <div>
+                    <h4 className="text-[12px] font-black uppercase tracking-widest">Command Center</h4>
+                    <p className="text-[10px] text-white/80 font-bold mt-1.5 uppercase tracking-widest flex items-center gap-1.5 animate-pulse">Online</p>
+                  </div>
+                </div>
+                <IconButton icon={<X size={24} />} onClick={() => setShowChat(false)} variant="light" className="!text-white hover:!bg-white/20" />
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-gray-50/50 no-scrollbar">
+                {chats.map((c, i) => (
+                  <div key={i} className={`flex flex-col ${c.self ? "items-end" : "items-start"} ${c.isSystem ? "items-center" : ""}`}>
+                    {!c.isSystem && <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-2 px-4">{c.sender}</span>}
+                    <div className={`max-w-[85%] px-6 py-4 rounded-[2rem] text-[13px] font-semibold shadow-sm transition-all
+                      ${c.isSystem ? "bg-amber-50 text-amber-700 text-[10px] text-center border border-amber-200" : c.self ? "bg-[#0AC4E0] text-white rounded-tr-none shadow-lg shadow-[#0AC4E0]/20" : "bg-white text-slate-700 rounded-tl-none border border-gray-100"}`}>
+                      {c.text}
+                    </div>
+                  </div>
+                ))}
+
+                {isRejectMode && (
+                  <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-[3rem] p-10 shadow-2xl border border-red-100 text-center space-y-6">
+                    <p className="text-[13px] font-black text-red-600 uppercase tracking-tighter leading-tight">Reject & reset data fase ini?</p>
+                    <div className="flex flex-col gap-3">
+                      <Button label="YA, REJECT DATA" onClick={confirmReject} className="!bg-red-600 !text-white !rounded-[1.5rem] !py-4" />
+                      <Button label="BATAL" onClick={() => { setIsRejectMode(false); setMsg(""); }} className="!bg-gray-50 !text-slate-400 !rounded-[1.5rem] !py-4" />
+                    </div>
+                  </motion.div>
+                )}
+
+                {isAccTriggered && (
+                  <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white rounded-[3rem] p-10 shadow-2xl border border-emerald-100 text-center space-y-6">
+                    <div className="w-20 h-20 bg-emerald-500 text-white rounded-[2rem] flex items-center justify-center mx-auto shadow-xl"><ShieldCheck size={40} /></div>
+                    <p className="text-[11px] font-black text-emerald-800 uppercase tracking-widest leading-relaxed">Keputusan HO:<br /><span className="text-xl">ACC APPROVED</span></p>
+                    <Button label="AKTIVASI POINTER TABEL" onClick={triggerAccHand} className="!bg-emerald-600 !text-white !rounded-[2rem] !py-5" />
+                  </motion.div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <div className="p-8 bg-white border-t border-gray-100 flex items-center gap-4 shrink-0">
+                <Input
+                  value={msg}
+                  onChange={(e) => setMsg(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && handleSendChat()}
+                  placeholder="Ketik ACC / REJECT..."
+                  className="flex-1 !rounded-full !py-5"
+                />
+                <IconButton
+                  icon={<Send size={24} />}
+                  onClick={handleSendChat}
+                  variant="primary"
+                  className="!w-14 !h-14 !rounded-full !bg-[#0AC4E0] !text-white"
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
+
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
     </PageWrapper>
   );
 }
 
-export default DetailProgramAkademik;
+// ─── SUB-COMPONENTS ────────────────────────────────────────────────────────
+
+const NotificationBadge = ({ accNotif }) => (
+  <AnimatePresence>
+    {accNotif.show && (
+      <motion.div initial={{ y: -100, x: "-50%", opacity: 0 }} animate={{ y: 20, x: "-50%", opacity: 1 }} exit={{ y: -100, x: "-50%", opacity: 0 }} className="fixed top-0 left-1/2 z-[600] w-[420px]">
+        <div className="bg-white/95 backdrop-blur-2xl border border-[#0AC4E0]/30 shadow-2xl rounded-[2.5rem] p-5 flex gap-4">
+          <div className="w-12 h-12 bg-[#0AC4E0] rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-[#0AC4E0]/30"><ShieldCheck size={24} /></div>
+          <div className="text-left">
+            <h4 className="text-[13px] font-bold text-slate-800 leading-none mb-1">{accNotif.title}</h4>
+            <p className="text-[11px] font-medium text-slate-500 leading-tight">{accNotif.msg}</p>
+          </div>
+        </div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+
+const InfoItem = ({ icon, label, value, isHO }) => (
+  <div className="text-left space-y-2">
+    <div className="flex items-center gap-2 text-slate-400 leading-none">
+      <span className={isHO ? "text-slate-400" : "text-[#0AC4E0]"}>{icon}</span>
+      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
+    </div>
+    <p className={`text-[12px] font-black leading-tight truncate ${isHO ? "text-slate-600" : "text-slate-800"}`}>
+      {value || "-"}
+    </p>
+  </div>
+);
+
+const FileRepositoryModal = ({ selectedActivity, onClose, onViewFile }) => (
+  <AnimatePresence>
+    {selectedActivity && (
+      <>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[100] bg-slate-900/20 backdrop-blur-sm" />
+        <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} className="fixed top-0 right-0 w-[420px] h-full bg-white z-[101] shadow-2xl flex flex-col border-l border-gray-100 text-left">
+          <div className="p-8 bg-[#0AC4E0] text-white flex justify-between items-center shadow-lg shrink-0">
+            <div className="text-left leading-none">
+              <h4 className="text-[12px] font-black uppercase tracking-widest">Repository Dokumen</h4>
+              <p className="text-[10px] text-white/80 font-bold uppercase mt-1 truncate max-w-[280px]">{selectedActivity.kegiatan}</p>
+            </div>
+            <IconButton icon={<X size={24} />} onClick={onClose} variant="light" className="!text-white hover:!bg-white/20" />
+          </div>
+          <div className="p-8 space-y-4 overflow-y-auto no-scrollbar bg-gray-50 flex-1">
+            {selectedActivity.persyaratan.map((f, i) => (
+              <div key={i} className="bg-white p-5 rounded-[2rem] border border-gray-100 flex items-center justify-between group hover:border-[#0AC4E0] transition-all shadow-sm">
+                <div className="flex items-center gap-4 text-left">
+                  <div className="w-12 h-12 bg-[#0AC4E0]/10 text-[#0AC4E0] rounded-2xl flex items-center justify-center group-hover:bg-[#0AC4E0] group-hover:text-white transition-all"><FileText size={20} /></div>
+                  <div>
+                    <p className="text-[12px] font-black text-slate-800 uppercase leading-none mb-1">{f.name}</p>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Verified AO</p>
+                  </div>
+                </div>
+                {f.file ? (
+                  <Button label="Buka" onClick={() => onViewFile({ activity: selectedActivity.kegiatan, docName: f.name })} className="!px-5 !py-2 !bg-slate-800 !text-white !rounded-full !text-[9px]" />
+                ) : (
+                  <span className="text-[9px] font-black text-slate-300 uppercase italic">No File</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </>
+    )}
+  </AnimatePresence>
+);
+
+const AoVerificationModal = ({ selectedAoVerif, onClose, onOpenChat }) => (
+  <AnimatePresence>
+    {selectedAoVerif && (
+      <>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[100] bg-slate-900/20 backdrop-blur-sm" />
+        <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 30 }} className="fixed top-0 right-0 w-[450px] h-full bg-white z-[101] shadow-2xl flex flex-col border-l border-gray-100 text-left">
+          <div className="p-10 bg-emerald-600 text-white flex justify-between font-black text-[12px] uppercase items-center shrink-0">
+            <span>Field Verification Report</span>
+            <IconButton icon={<X size={24} />} onClick={onClose} variant="light" className="!text-white hover:!bg-white/20" />
+          </div>
+          <div className="p-10 space-y-8 text-center flex-1 bg-gray-50 overflow-y-auto no-scrollbar">
+            <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto shadow-xl shadow-emerald-100 mb-4"><UserCheck size={40} /></div>
+            <div className="p-8 bg-white border border-gray-100 rounded-[3rem] shadow-sm text-left">
+              <p className="text-[10px] font-black uppercase text-slate-300 mb-1">Field Investigator</p>
+              <p className="text-xl font-black text-slate-800 uppercase leading-none">{PROGRAM_INFO.area_officer}</p>
+              <div className="mt-6 px-5 py-2 bg-emerald-50 text-emerald-600 rounded-full inline-block text-[11px] font-black uppercase">Status: {selectedAoVerif.aoStatus}</div>
+            </div>
+            <Button label="Diskusikan di Chat" icon={<MessageSquare size={20} />} onClick={onOpenChat} className="!w-full !py-5 !bg-white !text-[#0AC4E0] !border-2 !border-[#0AC4E0] !rounded-[2.2rem] !font-black !text-[11px] shadow-xl" />
+          </div>
+        </motion.div>
+      </>
+    )}
+  </AnimatePresence>
+);
+
+const FilePreviewModal = ({ viewingFile, onClose }) => (
+  <AnimatePresence>
+    {viewingFile && (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[500] bg-slate-900/40 backdrop-blur-xl flex items-center justify-center p-10">
+        <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }} className="bg-white w-full max-w-5xl h-full rounded-[4rem] shadow-2xl flex flex-col overflow-hidden border border-white">
+          <div className="px-12 py-8 flex justify-between items-center border-b border-gray-100 bg-white shrink-0 text-left">
+            <div className="flex items-center gap-5 leading-none">
+              <div className="w-14 h-14 bg-[#0AC4E0] text-white rounded-2xl flex items-center justify-center shadow-lg"><FileText size={28} /></div>
+              <div>
+                <h4 className="text-lg font-black text-slate-800 uppercase tracking-widest">{viewingFile.docName}</h4>
+                <p className="text-[11px] text-[#0AC4E0] font-bold uppercase mt-1">{viewingFile.activity}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <IconButton icon={<Printer size={18} />} variant="light" />
+              <Button label="Download" icon={<DownloadCloud size={18} />} className="!bg-[#0AC4E0] !text-white !rounded-full" />
+              <IconButton icon={<X size={24} />} onClick={onClose} variant="light" />
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-16 bg-gray-100 flex justify-center no-scrollbar">
+            <div className="bg-white w-[850px] min-h-[1100px] shadow-2xl p-24 text-left font-serif text-slate-800 border border-gray-50 relative">
+              <div className="border-b-2 border-slate-800 pb-10 mb-12 text-center leading-tight">
+                <h2 className="text-3xl font-bold uppercase tracking-tight">Yayasan Pendidikan Astra - Michael D. Ruslim</h2>
+                <p className="text-[10px] font-sans font-black text-slate-400 uppercase mt-4">Gedung Astra International • Jakarta, Indonesia</p>
+              </div>
+              <div className="space-y-12 text-[14px] leading-loose">
+                <div className="flex justify-between font-sans font-bold text-[12px] text-slate-400 uppercase">
+                  <span>Ref: {PROGRAM_INFO.no_mou}/BAV/2026</span>
+                  <span>Jakarta, {PROGRAM_INFO.tanggal_update}</span>
+                </div>
+                <h3 className="text-center font-bold text-2xl uppercase underline underline-offset-[12px] font-sans text-slate-900 leading-none">Berita Acara Verifikasi Digital</h3>
+                <p className="text-justify indent-12">Menyatakan bahwa unit kegiatan <b>{viewingFile.activity}</b> telah divalidasi oleh tim Area Officer (AO). Dokumen pendukung <b>{viewingFile.docName}</b> telah memenuhi seluruh kriteria mutu operasional.</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    )}
+  </AnimatePresence>
+);

@@ -4,7 +4,6 @@ import Button from "../../../components/Button";
 import Label from "../../../components/Label";
 import Input from "../../../components/Input";
 import PageWrapper from "../../../components/PageWrapper";
-import Card from "../../../components/Card";
 import { toast } from "react-toastify";
 
 import { useNavigate, useParams } from "react-router-dom";
@@ -19,6 +18,12 @@ import {
   Info,
   FileText,
   Edit3,
+  Building2,
+  Calendar,
+  Sparkles,
+  MapPin,
+  Briefcase,
+  Loader2
 } from "lucide-react";
 
 function EditProgramnonAkademik() {
@@ -63,7 +68,7 @@ function EditProgramnonAkademik() {
         const [resSekolah, resAo, resVendor, resDetail] = await Promise.all([
           fetch("http://localhost:3000/sekolah", { headers }),
           fetch("http://localhost:3000/users/ao", { headers }),
-          fetch("http://localhost:3000/vendor", { headers }),
+          fetch("http://localhost:3000/vendor?kategori=NON_AKADEMIK", { headers }),
           fetch(`http://localhost:3000/program/${id}`, { headers }),
         ]);
 
@@ -72,9 +77,7 @@ function EditProgramnonAkademik() {
 
         setSekolahList(Array.isArray(dataSekolah) ? dataSekolah : []);
         setAoList(Array.isArray(await resAo.json()) ? await resAo.json() : []);
-        setVendorList(
-          Array.isArray(await resVendor.json()) ? await resVendor.json() : [],
-        );
+        setVendorList(Array.isArray(await resVendor.json()) ? await resVendor.json() : []);
 
         if (detail) {
           setNamaProgram(detail.nama_program || "");
@@ -83,14 +86,11 @@ function EditProgramnonAkademik() {
           setSelectedAO(detail.id_pengawas || "");
           setSelectedVendor(detail.id_vendor || "");
           setTahun(detail.tahun || "");
-          if (detail.tanggal_mulai)
-            setTanggalMulai(detail.tanggal_mulai.split("T")[0]);
+          if (detail.tanggal_mulai) setTanggalMulai(detail.tanggal_mulai.split("T")[0]);
           setStatusProgram(detail.status_program || "Draft");
           setExistingFileName(detail.file_mou_nama || "");
 
-          const sklh = dataSekolah.find(
-            (s) => s.id_sekolah === detail.id_sekolah,
-          );
+          const sklh = dataSekolah.find((s) => s.id_sekolah === detail.id_sekolah);
           if (sklh)
             setWilayahInfo({
               kota: sklh.wilayah?.nama_wilayah,
@@ -140,7 +140,7 @@ function EditProgramnonAkademik() {
         body: formData,
       });
       if (res.ok) {
-        toast.success("Update Berhasil!");
+        toast.success("Update Non-Akademik Berhasil!");
         navigate(`/ho/program/non-akademik/detail/${id}`);
       } else {
         const b = await res.json();
@@ -153,356 +153,336 @@ function EditProgramnonAkademik() {
     }
   };
 
-  const DropdownTrigger = ({ type, placeholder, value }) => (
+  const DropdownTrigger = ({ type, placeholder, value, icon }) => (
     <button
       type="button"
       onClick={() => setOpenDrop(openDrop === type ? null : type)}
-      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm transition-all ${openDrop === type ? "border-blue-500 ring-2 ring-blue-500/10" : "border-gray-200 bg-gray-50/50 hover:border-gray-300"}`}
+      className={`w-full flex items-center justify-between px-5 py-3.5 rounded-2xl border transition-all duration-300 ${openDrop === type
+        ? "bg-white border-[#0AC4E0] shadow-lg shadow-[#0AC4E0]/10 ring-4 ring-[#0AC4E0]/5"
+        : "bg-white border-slate-200 hover:border-slate-300"
+        }`}
     >
-      <span
-        className={`truncate ${value ? "text-gray-800 font-bold" : "text-gray-400"}`}
-      >
-        {value || placeholder}
-      </span>
-      <ChevronDown
-        size={14}
-        className={`transition-transform ${openDrop === type ? "rotate-180 text-blue-500" : ""}`}
-      />
+      <div className="flex items-center gap-3 overflow-hidden text-left">
+        {icon && <div className={`${openDrop === type ? "text-[#0AC4E0]" : "text-slate-400"}`}>{icon}</div>}
+        <span className={`truncate text-sm font-semibold ${value ? "text-slate-800" : "text-slate-300"}`}>
+          {value || placeholder}
+        </span>
+      </div>
+      <ChevronDown size={16} className={`transition-transform duration-300 ${openDrop === type ? "rotate-180 text-[#0AC4E0]" : "text-slate-300"}`} />
     </button>
   );
 
   if (loading)
     return (
-      <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
-        <Sidebar />
-        <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-          <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-hidden relative">
-            <div className="flex-1 flex flex-col items-center justify-center px-8 py-20">
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition animate-pulse"></div>
-                <div className="relative p-4 bg-gradient-to-br from-[#2E5AA7] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                  <Edit3 size={24} strokeWidth={2} />
-                </div>
-              </div>
-              <div className="mt-6 text-center">
-                <p className="text-sm font-black text-gray-600 uppercase tracking-widest animate-pulse">
-                  Memuat Data Program...
-                </p>
-              </div>
-            </div>
-          </Card>
-        </main>
-      </PageWrapper>
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-12 h-12 border-4 border-[#0AC4E0] border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-bold text-slate-300 uppercase tracking-[0.2em]">Syncing Non-Academic Data...</p>
+        </div>
+      </div>
     );
 
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
+    <PageWrapper className="h-screen bg-[#FBFBFD] flex overflow-hidden !p-0 font-sans selection:bg-[#0AC4E0]/20 text-slate-800">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-hidden relative">
-          <div className="px-8 pt-6 pb-6 shrink-0">
-            <header className="flex flex-row items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition animate-pulse"></div>
-                  <div className="relative p-3.5 bg-gradient-to-br from-[#2E5AA7] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                    <Edit3 size={22} strokeWidth={2} />
-                  </div>
-                </div>
-                <div className="flex flex-col -space-y-1">
-                  <Label
-                    text="Sistem Monitoring dan Evaluasi Program"
-                    className="!text-[8px] !text-[#1E5AA5] !font-black tracking-[0.3em] !mb-1 uppercase"
-                  />
-                  <h1 className="text-xl font-black text-gray-800 tracking-tight uppercase leading-none">
-                    Edit Program{" "}
-                    <span className="text-[#2E5AA7]">Non Akademik</span>
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <select
-                  value={statusProgram}
-                  onChange={(e) => setStatusProgram(e.target.value)}
-                  className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border border-blue-200 bg-blue-50 text-blue-600 outline-none cursor-pointer"
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Aktif">Aktif</option>
-                  <option value="Selesai">Selesai</option>
-                  <option value="Nonaktif">Nonaktif</option>
-                </select>
-                <Button
-                  text="← Kembali"
-                  icon={<ArrowLeft size={14} />}
-                  onClick={() =>
-                    navigate(`/ho/program/non-akademik/detail/${id}`)
-                  }
-                  className="group !bg-gray-600 hover:!bg-gray-700 !rounded-xl !px-5 !py-2.5 !text-[10px] font-black text-white shadow-lg active:scale-95 transition-all flex items-center gap-2"
+
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-10" />
+
+        <div className="flex-1 flex flex-col px-10 pt-10 pb-6 overflow-hidden leading-none">
+
+          {/* PROFESSIONAL HEADER SECTION */}
+          <header className="flex flex-row items-center justify-between mb-10 animate-in fade-in duration-1000 leading-none">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-[#0AC4E0] rounded-full" />
+                <Label
+                  text="Sistem Pemantauan dan Evaluasi Program"
+                  className="!text-[10px] !font-black !uppercase !tracking-[0.3em] !text-slate-400 !mb-0"
                 />
               </div>
-            </header>
-
-            <div className="flex flex-row items-center gap-3 mb-6">
-              <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 font-black text-[9px] uppercase tracking-[0.2em] shrink-0">
-                <Target size={14} /> Program: {namaProgram || "Loading..."}
-              </div>
-              <div className="flex items-center gap-3 px-5 py-2.5 bg-gray-50 text-gray-600 rounded-xl border border-gray-100 font-black text-[9px] uppercase tracking-[0.2em] shrink-0">
-                <Info size={14} /> Kode: {id}
-              </div>
+              <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
+                Edit Program <span className="text-[#0AC4E0]">Non-Akademik</span>
+              </h1>
             </div>
-          </div>
 
-          <div className="flex-1 overflow-hidden flex flex-col px-10 pb-4">
-            <div className="flex-1 bg-white border border-gray-100 rounded-3xl overflow-hidden flex flex-col shadow-sm">
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  {/* Penempatan */}
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 pb-3 border-b-2 border-blue-100">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <Target size={20} className="text-blue-600" />
-                      </div>
-                      <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">
-                        Penempatan
-                      </h3>
-                    </div>
+            <div className="flex items-center gap-4">
+              {/* Status Switcher Pill */}
+              <div className="bg-slate-100/50 backdrop-blur-md p-1 rounded-2xl border border-slate-200 flex shadow-sm">
+                {["Draft", "Aktif", "Selesai"].map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusProgram(status)}
+                    className={`px-6 py-2 rounded-[0.9rem] text-[11px] font-bold uppercase tracking-wider transition-all duration-300 ${statusProgram === status
+                      ? "bg-white text-slate-800 shadow-sm border border-slate-200"
+                      : "text-slate-400 hover:text-slate-600"
+                      }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
 
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label text="Sekolah" required />
-                        <div className="relative">
-                          <DropdownTrigger
-                            type="sekolah"
-                            placeholder="Pilih Sekolah"
-                            value={
-                              sekolahList.find(
-                                (s) => s.id_sekolah === selectedSekolah,
-                              )?.nama_sekolah
-                            }
-                          />
-                          {openDrop === "sekolah" && (
-                            <ul className="absolute z-40 w-full bg-white border border-gray-100 mt-2 rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1">
-                              {sekolahList.map((s) => (
-                                <li
-                                  key={s.id_sekolah}
-                                  onClick={() =>
-                                    handleSekolahSelect(s.id_sekolah)
-                                  }
-                                  className="px-4 py-2 hover:bg-blue-50 rounded-lg cursor-pointer text-sm font-bold text-gray-600 transition-colors"
-                                >
-                                  {s.nama_sekolah}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
+              {/* Menggunakan Component Button.jsx */}
+              <Button
+                text="Kembali"
+                icon={<ArrowLeft size={18} />}
+                variant="outline"
+                onClick={() => navigate(`/ho/program/non-akademik/detail/${id}`)}
+                className="!rounded-2xl !px-6 !py-3.5 !text-sm !font-bold shadow-sm border-slate-100 !text-slate-500 hover:!bg-slate-50 transition-all active:scale-95"
+              />
+            </div>
+          </header>
 
-                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
-                        <div>
-                          <Label text="Provinsi" />
-                          <p className="text-sm font-black text-blue-600">
-                            {wilayahInfo.provinsi || "-"}
-                          </p>
-                        </div>
-                        <div>
-                          <Label text="Kabupaten / Kota" />
-                          <p className="text-sm font-black text-blue-600">
-                            {wilayahInfo.kota || "-"}
-                          </p>
-                        </div>
-                      </div>
+          <div className="flex-1 overflow-y-auto no-scrollbar space-y-8 pb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                      <div className="space-y-2">
-                        <Label text="Pengawas (AO)" required />
-                        <div className="relative">
-                          <DropdownTrigger
-                            type="ao"
-                            placeholder="Pilih Pengawas"
-                            value={
-                              aoList.find((a) => a.id_user === selectedAO)?.nama
-                            }
-                          />
-                          {openDrop === "ao" && (
-                            <ul className="absolute z-40 w-full bg-white border border-gray-100 mt-2 rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1">
-                              {aoList.map((a) => (
-                                <li
-                                  key={a.id_user}
-                                  onClick={() => {
-                                    setSelectedAO(a.id_user);
-                                    setOpenDrop(null);
-                                  }}
-                                  className="px-4 py-2 hover:bg-blue-50 rounded-lg cursor-pointer text-sm font-bold text-gray-600 transition-colors"
-                                >
-                                  {a.nama}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              {/* SECTION: PENEMPATAN */}
+              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-8 animate-in fade-in slide-in-from-left-6 duration-700">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-50 text-[#0AC4E0] rounded-2xl flex items-center justify-center">
+                    <Building2 size={22} />
                   </div>
-
-                  {/* Identitas Program */}
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3 pb-3 border-b-2 border-blue-100">
-                      <div className="p-2 bg-green-50 rounded-lg">
-                        <Info size={20} className="text-green-600" />
-                      </div>
-                      <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">
-                        Identitas Program
-                      </h3>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label text="Penanggung Jawab HO" />
-                        <Input
-                          value={namaHO}
-                          disabled
-                          className="bg-gray-50 border-transparent text-gray-400 font-bold"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label text="Nama Program" required />
-                        <Input
-                          placeholder="cth: Bank Sampah"
-                          value={namaProgram}
-                          onChange={(e) => setNamaProgram(e.target.value)}
-                          className="bg-gray-50 border-transparent focus:bg-white font-bold"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label text="Deskripsi" />
-                        <textarea
-                          className="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-medium focus:ring-2 focus:ring-blue-500/20 h-32 resize-none"
-                          placeholder="Detail kegiatan..."
-                          value={deskripsi}
-                          onChange={(e) => setDeskripsi(e.target.value)}
-                        />
-                      </div>
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 leading-none uppercase">Penempatan</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Institusi pelaksana program</p>
                   </div>
                 </div>
 
-                {/* Logistik & Berkas */}
-                <div className="mt-8 space-y-6">
-                  <div className="flex items-center gap-3 pb-3 border-b-2 border-blue-100">
-                    <div className="p-2 bg-purple-50 rounded-lg">
-                      <FileText size={20} className="text-purple-600" />
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label text="Sekolah Sasaran" required className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <div className="relative">
+                      <DropdownTrigger
+                        type="sekolah"
+                        placeholder="Pilih Sekolah"
+                        icon={<Building2 size={16} />}
+                        value={sekolahList.find((s) => s.id_sekolah === selectedSekolah)?.nama_sekolah}
+                      />
+                      {openDrop === "sekolah" && (
+                        <div className="absolute z-50 w-full bg-white border border-slate-100 mt-3 rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in-95">
+                          <div className="max-h-56 overflow-y-auto no-scrollbar">
+                            {sekolahList.map((s) => (
+                              <button
+                                key={s.id_sekolah}
+                                onClick={() => handleSekolahSelect(s.id_sekolah)}
+                                className="w-full text-left px-5 py-3 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 hover:text-[#0AC4E0] transition-colors"
+                              >
+                                {s.nama_sekolah}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <h3 className="text-lg font-black text-gray-800 uppercase tracking-wide">
-                      Logistik & Berkas
-                    </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="space-y-2">
-                      <Label text="Tahun" required />
-                      <Input
-                        type="number"
-                        value={tahun}
-                        onChange={(e) => setTahun(e.target.value)}
-                        className="bg-gray-50 border-transparent text-center font-black"
-                      />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                      <div className="flex items-center gap-2 text-slate-300 mb-1 leading-none">
+                        <MapPin size={12} />
+                        <Label text="Provinsi" className="!mb-0 !text-[8px] !font-black !uppercase !tracking-widest" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 ml-5">{wilayahInfo.provinsi || "—"}</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label text="Tgl Mulai" />
-                      <Input
-                        type="date"
-                        value={tanggalMulai}
-                        onChange={(e) => setTanggalMulai(e.target.value)}
-                        className="bg-gray-50 border-transparent text-sm"
-                      />
+                    <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                      <div className="flex items-center gap-2 text-slate-300 mb-1 leading-none">
+                        <MapPin size={12} />
+                        <Label text="Kab / Kota" className="!mb-0 !text-[8px] !font-black !uppercase !tracking-widest" />
+                      </div>
+                      <p className="text-sm font-bold text-slate-700 ml-5">{wilayahInfo.kota || "—"}</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label text="Vendor" />
-                      <div className="relative">
-                        <DropdownTrigger
-                          type="vendor"
-                          placeholder="Pilih Vendor"
-                          value={
-                            vendorList.find(
-                              (v) => v.id_vendor === selectedVendor,
-                            )?.nama_vendor
-                          }
-                        />
-                        {openDrop === "vendor" && (
-                          <ul className="absolute z-40 w-full bg-white border border-gray-100 mt-2 rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1">
-                            <li
-                              onClick={() => {
-                                setSelectedVendor("");
-                                setOpenDrop(null);
-                              }}
-                              className="px-4 py-2 hover:bg-gray-100 rounded-lg italic text-gray-400 text-sm"
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label text="Area Officer (Pengawas)" required className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <div className="relative">
+                      <DropdownTrigger
+                        type="ao"
+                        placeholder="Pilih AO Pengawas"
+                        icon={<Sparkles size={16} />}
+                        value={aoList.find((a) => a.id_user === selectedAO)?.nama}
+                      />
+                      {openDrop === "ao" && (
+                        <div className="absolute z-50 w-full bg-white border border-slate-100 mt-3 rounded-2xl shadow-2xl p-2 animate-in fade-in zoom-in-95">
+                          <div className="max-h-56 overflow-y-auto no-scrollbar">
+                            {aoList.map((a) => (
+                              <button
+                                key={a.id_user}
+                                onClick={() => { setSelectedAO(a.id_user); setOpenDrop(null); }}
+                                className="w-full text-left px-5 py-3 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 hover:text-[#0AC4E0] transition-colors"
+                              >
+                                {a.nama}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: IDENTITAS PROGRAM */}
+              <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-8 animate-in fade-in slide-in-from-right-6 duration-700">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-50 text-[#0AC4E0] rounded-2xl flex items-center justify-center">
+                    <Info size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-800 leading-none uppercase">Detail Program</h3>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Narasi dan penanggung jawab pusat</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-3">
+                    <Label text="Head Office Responsible" className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <div className="px-5 py-3.5 bg-slate-50/50 rounded-2xl text-sm font-bold text-slate-300 border border-slate-100 cursor-not-allowed">
+                      {namaHO}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label text="Nama Program" required className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <Input
+                      placeholder="Masukkan nama program non-akademik..."
+                      value={namaProgram}
+                      onChange={(e) => setNamaProgram(e.target.value)}
+                      className="!bg-white !border-slate-200 !rounded-2xl !py-4 !px-6 !text-sm !font-bold !text-slate-800 focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label text="Deskripsi" className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <textarea
+                      className="w-full bg-white border border-slate-200 rounded-[2rem] p-6 text-sm font-semibold text-slate-800 focus:border-[#0AC4E0] focus:ring-4 focus:ring-[#0AC4E0]/5 outline-none transition-all h-[142px] resize-none shadow-sm placeholder:text-slate-200"
+                      placeholder="Tuliskan tujuan atau detail kegiatan..."
+                      value={deskripsi}
+                      onChange={(e) => setDeskripsi(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION: LOGISTIK & DOKUMEN */}
+              <div className="lg:col-span-2 bg-white rounded-[3rem] border border-slate-100 p-10 shadow-sm animate-in fade-in slide-in-from-bottom-8 duration-1000">
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="w-14 h-14 bg-slate-800 rounded-[1.8rem] flex items-center justify-center text-white shadow-xl">
+                    <FileText size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-800 tracking-tight leading-none uppercase">Logistik & Berkas</h3>
+                    <p className="text-sm text-slate-400 font-medium mt-2">Arsip administrasi dan periode pelaksanaan</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 text-left">
+                  <div className="space-y-3">
+                    <Label text="Tahun Anggaran" required icon={<Calendar size={12} />} className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <Input
+                      type="number"
+                      value={tahun}
+                      onChange={(e) => setTahun(e.target.value)}
+                      className="!bg-white !border-slate-200 !rounded-2xl !py-4 !px-6 !text-center !font-black !text-lg !text-[#0AC4E0] focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label text="Mulai Pelaksanaan" icon={<Calendar size={12} />} className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <Input
+                      type="date"
+                      value={tanggalMulai}
+                      onChange={(e) => setTanggalMulai(e.target.value)}
+                      className="!bg-white !border-slate-200 !rounded-2xl !py-4 !px-6 !text-sm !font-bold !text-slate-800 focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label text="Pelaksana (Vendor)" icon={<Briefcase size={12} />} className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                    <div className="relative">
+                      <DropdownTrigger
+                        type="vendor"
+                        placeholder="Pilih Vendor"
+                        icon={<Briefcase size={16} />}
+                        value={vendorList.find((v) => v.id_vendor === selectedVendor)?.nama_vendor}
+                      />
+                      {openDrop === "vendor" && (
+                        <div className="absolute z-50 w-full bg-white border border-slate-100 mt-3 rounded-2xl shadow-2xl p-2">
+                          <div className="max-h-56 overflow-y-auto no-scrollbar">
+                            <button
+                              onClick={() => { setSelectedVendor(""); setOpenDrop(null); }}
+                              className="w-full text-left px-5 py-3 hover:bg-slate-50 rounded-xl text-sm font-bold text-slate-300 italic"
                             >
                               Tanpa Vendor
-                            </li>
+                            </button>
                             {vendorList.map((v) => (
-                              <li
+                              <button
                                 key={v.id_vendor}
-                                onClick={() => {
-                                  setSelectedVendor(v.id_vendor);
-                                  setOpenDrop(null);
-                                }}
-                                className="px-4 py-2 hover:bg-blue-50 rounded-lg cursor-pointer text-sm font-bold text-gray-600 transition-colors"
+                                onClick={() => { setSelectedVendor(v.id_vendor); setOpenDrop(null); }}
+                                className="w-full text-left px-5 py-3 hover:bg-slate-50 rounded-xl text-sm font-semibold text-slate-600 hover:text-[#0AC4E0] transition-colors"
                               >
                                 {v.nama_vendor}
-                              </li>
+                              </button>
                             ))}
-                          </ul>
-                        )}
-                      </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label text="Berkas MOU" />
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 hover:bg-blue-50/30 hover:border-blue-500 transition-all cursor-pointer group">
-                      <Upload
-                        size={24}
-                        className="text-gray-300 group-hover:text-blue-500 mb-2 transition-colors"
-                      />
-                      <div className="text-center px-4">
-                        <p className="text-[10px] font-black text-gray-400 group-hover:text-blue-600 truncate w-full">
-                          {fileMou
-                            ? fileMou.name
-                            : existingFileName || "GANTI FILE MOU"}
-                        </p>
-                        {existingFileName && !fileMou && (
-                          <p className="text-[8px] text-blue-400 font-bold mt-1 uppercase tracking-tighter">
-                            File lama tersimpan
-                          </p>
-                        )}
-                      </div>
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => setFileMou(e.target.files[0])}
-                        accept=".pdf,.jpg,.png,.jpeg"
-                      />
-                    </label>
                   </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-gray-100">
-                  <Button
-                    text={saving ? "Menyimpan..." : "Simpan Perubahan"}
-                    icon={<Save size={14} />}
-                    disabled={saving}
-                    onClick={saveProgram}
-                    className="!bg-blue-50 !text-blue-600 hover:!bg-blue-600 hover:!text-white !rounded-xl !px-6 !py-3 !text-sm font-black transition-all shadow-sm"
-                  />
+                <div className="space-y-4">
+                  <Label text="Pembaruan Berkas MOU" className="!text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                  <label className="group relative flex flex-col items-center justify-center w-full h-48 bg-slate-50/50 border-2 border-dashed border-slate-200 rounded-[2.5rem] hover:bg-[#0AC4E0]/5 hover:border-[#0AC4E0] transition-all duration-500 cursor-pointer overflow-hidden">
+                    <div className="flex flex-col items-center justify-center p-6 transition-transform duration-500 group-hover:scale-110">
+                      <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mb-4 group-hover:text-[#0AC4E0] transition-colors">
+                        <Upload size={24} />
+                      </div>
+                      <p className="text-xs font-black text-slate-400 uppercase tracking-widest group-hover:text-[#0AC4E0] transition-colors">
+                        {fileMou ? fileMou.name : existingFileName || "Klik untuk ganti file MOU"}
+                      </p>
+                      {existingFileName && !fileMou && (
+                        <p className="mt-2 text-[10px] font-bold text-[#0AC4E0] uppercase tracking-tighter bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                          Arsip Saat Ini: {existingFileName}
+                        </p>
+                      )}
+                    </div>
+                    <input type="file" className="hidden" onChange={(e) => setFileMou(e.target.files[0])} accept=".pdf,.jpg,.png,.jpeg" />
+                  </label>
                 </div>
               </div>
             </div>
+
+            {/* STICKY ACTION FOOTER */}
+            <footer className="mt-10 py-8 bg-white border border-slate-100 rounded-[2.5rem] flex justify-end gap-4 px-10 shadow-sm leading-none shrink-0">
+              {/* Menggunakan Component Button.jsx untuk Simpan */}
+              <Button
+                disabled={saving}
+                onClick={saveProgram}
+                text={saving ? "Memproses..." : "Simpan Perubahan"}
+                icon={saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                className="!bg-slate-900 hover:!bg-[#09b3cc] !text-white !rounded-2xl !px-12 !py-4 !text-sm !font-bold shadow-xl shadow-[#0AC4E0]/20 transition-all active:scale-95 disabled:!opacity-50"
+              />
+            </footer>
+
           </div>
-        </Card>
+        </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+          animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
     </PageWrapper>
   );
 }

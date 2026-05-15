@@ -163,99 +163,116 @@ const ReadPengurus = () => {
   const tableColumns = [
     {
       header: "NO",
-      align: "text-left pl-8 w-[70px]",
+      align: "text-center w-[80px]", // Header tengah
       render: (_, i) => (
-        <span className="text-[10px] font-mono font-bold text-gray-400">
-          {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
-        </span>
+        <div className="flex justify-center"> {/* Container ke tengah */}
+          <span className="text-left font-mono text-[10px] font-bold text-gray-400 min-w-[20px]">
+            {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
+          </span>
+        </div>
       ),
     },
     {
       header: "IDENTITAS PENGURUS",
-      align: "text-left w-[30%]",
+      align: "text-center w-[30%]", // Header tengah
       render: (row) => {
-        const isSuper = Number(row.id_role) === 1; // FIX: Admin adalah ID 1
+        const isSuper = Number(row.id_role) === 1;
         return (
-          <div className="flex flex-col py-3">
-            <div className="flex items-center gap-2">
-              <span className="font-black text-gray-800 uppercase text-[11px]">
-                {row.nama}
+          <div className="flex justify-center py-2"> {/* Container ke tengah */}
+            <div className="text-left flex flex-col gap-0.5 min-w-[160px]"> {/* Teks rata kiri di dalam */}
+              <div className="flex items-center gap-2">
+                <span className="font-black text-gray-800 uppercase text-[11px] leading-tight">
+                  {row.nama}
+                </span>
+                {isSuper && <ShieldCheck size={12} className="text-amber-500 shrink-0" />}
+              </div>
+              <span className="text-[9px] text-gray-400 font-bold lowercase truncate">
+                {row.email}
               </span>
-              {isSuper && <ShieldCheck size={12} className="text-amber-500" />}
             </div>
-            <span className="text-[9px] text-gray-400 font-bold lowercase">
-              {row.email}
-            </span>
           </div>
         );
       },
     },
     {
       header: "JABATAN STRUKTURAL",
-      align: "text-left w-[25%]",
+      align: "text-center w-[25%]", // Header tengah
       render: (row) => {
         const isSuper = Number(row.id_role) === 1;
         return (
-          <span
-            className={`text-[10px] font-black uppercase tracking-tight ${
-              isSuper ? "text-gray-800" : "text-[#1E5AA5]"
-            }`}
-          >
-            {isSuper ? "SUPER ADMINISTRATOR" : row.jabatan || "PENGURUS"}
-          </span>
+          <div className="flex justify-center"> {/* Container ke tengah */}
+            <div className="text-left min-w-[140px]"> {/* Teks rata kiri di dalam */}
+              <span
+                className={`text-[10px] font-black uppercase tracking-tight ${isSuper ? "text-gray-800" : "text-[#0AC4E0]"
+                  }`}
+              >
+                {isSuper ? "SUPER ADMINISTRATOR" : row.jabatan || "PENGURUS"}
+              </span>
+            </div>
+          </div>
         );
       },
     },
     {
       header: "KONTROL OTORITAS",
-      align: "text-left w-[240px]",
+      align: "text-center w-[280px]", // Header tengah
       render: (row) => {
-        const isSuper = Number(row.id_role) === 1; // FIX: Admin adalah ID 1
+        const isSuper = Number(row.id_role) === 1;
         const isActive =
           row.status === true ||
           row.status === "true" ||
           Number(row.status) === 1;
         return (
-          <div className="flex gap-3 items-center py-3">
-            <div className="flex">
-              <Button
-                icon={<Eye size={16} />}
-                onClick={() =>
-                  navigate(`/admin/pengurus/detail/${row.id_user}`)
-                }
-                className="!p-2 !bg-transparent !text-gray-400 hover:!text-blue-600 !shadow-none"
-              />
-              <Button
-                icon={<Edit3 size={15} />}
-                onClick={() => navigate(`/admin/pengurus/edit/${row.id_user}`)}
-                className="!p-2 !bg-transparent !text-gray-400 hover:!text-amber-500 !shadow-none"
-              />
-            </div>
-            {isSuper ? (
-              <span className="text-[8px] font-black text-gray-300 uppercase pl-2 italic tracking-widest">
-                Locked Access
-              </span>
-            ) : (
-              <div
-                onClick={() =>
-                  handleToggleStatus(row.id_user, row.nama, row.status)
-                }
-                className="flex items-center gap-3 cursor-pointer group active:scale-95 transition-all"
-              >
-                <div
-                  className={`relative w-9 h-5 rounded-full transition-all duration-500 ${isActive ? "bg-emerald-500" : "bg-gray-300"} p-1`}
+          <div className="flex justify-center py-2"> {/* Container ke tengah */}
+            <div className="flex items-center gap-4 text-left min-w-[180px]"> {/* Konten rata kiri */}
+              {/* Action Group */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => navigate(`/admin/pengurus/detail/${row.id_user}`)}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-[#0AC4E0] hover:bg-white rounded-lg transition-all active:scale-90"
+                  title="View"
                 >
-                  <div
-                    className={`w-3 h-3 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-4" : "translate-x-0"}`}
-                  />
-                </div>
-                <span
-                  className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-gray-400"}`}
+                  <Eye size={15} />
+                </button>
+                <button
+                  onClick={() => navigate(`/admin/pengurus/edit/${row.id_user}`)}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-amber-500 hover:bg-white rounded-lg transition-all active:scale-90"
+                  title="Edit"
                 >
-                  {isActive ? "Aktif" : "Nonaktif"}
-                </span>
+                  <Edit3 size={14} />
+                </button>
               </div>
-            )}
+
+              <div className="h-6 w-px bg-slate-100" />
+
+              {/* Status Group */}
+              {isSuper ? (
+                <span className="text-[8px] font-black text-gray-300 uppercase italic tracking-widest">
+                  Locked
+                </span>
+              ) : (
+                <div
+                    onClick={() => handleToggleStatus(row.id_user, row.nama, row.status)}
+                    className="flex items-center gap-2 cursor-pointer group active:scale-95 transition-all"
+                  >
+                    <div
+                      className={`relative w-8 h-4.5 rounded-full transition-all duration-500 p-0.5 ${isActive ? "bg-emerald-500 shadow-sm shadow-emerald-200" : "bg-gray-200"
+                        }`}
+                    >
+                      <div
+                        className={`w-3.5 h-3.5 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-3.5" : "translate-x-0"
+                          }`}
+                      />
+                    </div>
+                    <span
+                      className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-slate-400"
+                        }`}
+                    >
+                    {isActive ? "On" : "Off"}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         );
       },
@@ -270,17 +287,15 @@ const ReadPengurus = () => {
           <div className="px-10 pt-8 pb-6 shrink-0">
             <header className="flex justify-between items-center mb-8">
               <div className="flex items-center gap-4">
-                <div className="p-3.5 bg-gradient-to-br from-[#1E5AA5] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                  <UserRoundCheck size={24} />
-                </div>
+
                 <div className="flex flex-col">
                   <Label
                     text="Sistem Pemantauan Program"
-                    className="!text-[8px] !text-[#1E5AA5] !font-black !italic uppercase"
+                    className="!text-[8px] !text-[##0AC4E0] !font-black !italic uppercase"
                   />
                   <h1 className="text-xl font-black text-gray-800 uppercase">
                     Manajemen Data{" "}
-                    <span className="text-[#2E5AA7]">Pengurus</span>
+                    <span className="text-[#0AC4E0]">Pengurus</span>
                   </h1>
                 </div>
               </div>
@@ -288,7 +303,7 @@ const ReadPengurus = () => {
                 text="TAMBAH PENGURUS"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/pengurus/create")}
-                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
+                className="!bg-[#0AC4E0] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
               />
             </header>
 
@@ -344,7 +359,7 @@ const ReadPengurus = () => {
                 Reset Filter
               </button>
             </div>
-            <div className="px-4 py-2 bg-blue-50/50 text-[#1E5AA5] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
+            <div className="px-4 py-2 bg-blue-50/50 text-[##0AC4E0] rounded-lg border border-blue-100/50 font-black text-[8px] uppercase tracking-widest w-fit">
               <Filter size={12} className="inline mr-2" /> Hasil: {totalItems}{" "}
               Personnel
             </div>

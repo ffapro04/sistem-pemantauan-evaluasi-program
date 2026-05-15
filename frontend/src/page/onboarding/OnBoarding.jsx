@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
@@ -15,110 +16,63 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import {
-  School,
-  RefreshCcw,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Rocket,
-  Mountain,
-  Target,
-  MoveRight,
-  Filter,
-  Globe2,
-  X,
-  Navigation,
+  School, RefreshCcw, ChevronLeft, ChevronRight, Eye, Rocket,
+  Mountain, Target, MoveRight, Filter, Globe2, X, Navigation, Sparkles,
 } from "lucide-react";
 
 import Navbar from "../../components/Navbar";
 import Dropdown from "../../components/Dropdown";
 import Footer from "../../components/Footer";
-import Table from "../../components/Table";
-import Button from "../../components/Button";
-import Label from "../../components/Label";
 
 import picturependidikan from "../../assets/img/pichture_pendidikan 1.png";
 
-// --- Leaflet Icon Setup ---
-const selectedIcon = new L.Icon({
-  iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+// ==================== MARKER CUSTOM SVG ====================
+const makePinSVG = (mainColor, shadowColor) => {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" width="100" height="120">
+      <ellipse cx="50" cy="112" rx="18" ry="7" fill="${shadowColor}" opacity="0.85"/>
+      <path d="M50 8 C28 8 12 26 12 48 C12 72 50 108 50 108 C50 108 88 72 88 48 C88 26 72 8 50 8 Z" fill="${mainColor}"/>
+      <circle cx="50" cy="46" r="18" fill="white"/>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+// Pin Cyan — default
+const cyanPinIcon = L.icon({
+  iconUrl: makePinSVG("#0AC4E0", "#0077aa"),
+  iconSize: [36, 44],
+  iconAnchor: [18, 44],
+  popupAnchor: [0, -40],
 });
 
-const defaultIcon = new L.Icon({
-  iconUrl:
-    "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+// Pin Orange — selected
+const orangePinIcon = L.icon({
+  iconUrl: makePinSVG("#F97316", "#c2410c"),
+  iconSize: [42, 52],
+  iconAnchor: [21, 52],
+  popupAnchor: [0, -48],
 });
 
-// --- Sub-Component: Map Controller (Menggerakkan kamera peta) ---
+// ==================== MAP CONTROLLER ====================
 function MapController({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
-    if (center && !isNaN(center[0])) {
-      map.flyTo(center, zoom, { duration: 1.5 });
+    if (center && !isNaN(center[0]) && center[0] !== 0 && map) {
+      map.flyTo(center, zoom, { duration: 1.2 });
     }
   }, [center, zoom, map]);
   return null;
 }
 
-// --- Variabel Animasi Page Flip (Efek Buka Buku) ---
-const pageVariants = {
-  initial: (direction) => ({
-    rotateY: direction > 0 ? 90 : -90,
-    opacity: 0,
-    transformOrigin: direction > 0 ? "left" : "right",
-  }),
-  animate: {
-    rotateY: 0,
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      ease: [0.645, 0.045, 0.355, 1.0],
-    },
-  },
-  exit: (direction) => ({
-    rotateY: direction > 0 ? -90 : 90,
-    opacity: 0,
-    transformOrigin: direction > 0 ? "right" : "left",
-    transition: {
-      duration: 0.6,
-    },
-  }),
-};
-
-// --- Sub-Component: Modal Detail Sekolah dengan Page Flip ---
-const SchoolDetailModal = ({
-  isOpen,
-  onClose,
-  initialSchool,
-  allSchools,
-  wilayahList,
-}) => {
+// ==================== MODAL DETAIL SEKOLAH ====================
+const SchoolDetailModal = ({ isOpen, onClose, initialSchool, allSchools, wilayahList }) => {
+  const schoolsInArea = allSchools.filter((s) => s.id_wilayah === initialSchool?.id_wilayah);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
-
-  // Filter sekolah yang ada dalam satu hub wilayah yang sama
-  const schoolsInArea = allSchools.filter(
-    (s) => s.id_wilayah === initialSchool?.id_wilayah,
-  );
 
   useEffect(() => {
     if (initialSchool) {
-      const idx = schoolsInArea.findIndex(
-        (s) => s.id_sekolah === initialSchool.id_sekolah,
-      );
+      const idx = schoolsInArea.findIndex((s) => s.id_sekolah === initialSchool.id_sekolah);
       setCurrentIndex(idx !== -1 ? idx : 0);
     }
   }, [initialSchool, isOpen]);
@@ -127,175 +81,102 @@ const SchoolDetailModal = ({
 
   const school = schoolsInArea[currentIndex];
   const wilayah = wilayahList.find((w) => w.id_wilayah === school.id_wilayah);
-  const province = wilayah?.nama_wilayah?.split("/")[1] || "Indonesia";
-
-  const paginate = (newDirection) => {
-    const newIndex = currentIndex + newDirection;
-    if (newIndex >= 0 && newIndex < schoolsInArea.length) {
-      setDirection(newDirection);
-      setCurrentIndex(newIndex);
-    }
-  };
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 perspective-1000">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="absolute inset-0 bg-[#1E5AA5]/40 backdrop-blur-sm"
-        />
-
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.9 }}
-          className="relative w-full max-w-4xl bg-white rounded-[2.5rem] shadow-3xl flex flex-col overflow-hidden shadow-blue-900/20"
-          style={{ transformStyle: "preserve-3d" }}
+          className="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col border border-white"
         >
-          {/* Header Banner (Statik) */}
-          <div className="px-8 py-8 bg-[#1E5AA5] relative shrink-0 z-20">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-900/40 to-transparent" />
-            <div className="flex justify-between items-center relative z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-white border border-white/20 shadow-lg">
-                  <School size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-black text-white uppercase tracking-tighter">
-                    Profil Sekolah Binaan
-                  </h2>
-                  <p className="text-[8px] font-bold text-blue-100/70 tracking-widest uppercase italic">
-                    Hub Wilayah:{" "}
-                    {wilayah?.nama_wilayah?.split("/").pop() || "N/A"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-rose-500 transition-all border border-white/10 active:scale-90"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          </div>
-
-          {/* Animating Pages Container (Diberikan Min-Height Agar Konten Muncul) */}
-          <div className="relative bg-white min-h-[500px] md:min-h-[450px] overflow-hidden">
-            <AnimatePresence initial={false} custom={direction} mode="wait">
-              <motion.div
-                key={school?.id_sekolah || currentIndex}
-                custom={direction}
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                className="absolute inset-0 p-8 md:p-12 overflow-y-auto custom-scrollbar"
-              >
-                <div className="space-y-8">
-                  {/* Judul & Badge */}
-                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-gray-100 pb-6">
-                    <div>
-                      <h3 className="text-4xl font-[1000] text-gray-900 uppercase tracking-tighter leading-none">
-                        {school?.nama_sekolah}
-                      </h3>
-                      <p className="text-[10px] font-bold text-gray-400 mt-3 uppercase tracking-[0.2em] italic flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-blue-500" />
-                        NPSN: {school?.npsn} • Jenjang {school?.jenjang}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="px-5 py-2 rounded-xl bg-blue-50 text-[#1E5AA5] border border-blue-100 text-[10px] font-black uppercase tracking-widest shadow-sm">
-                        Akreditasi {school?.akreditasi || "N/A"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Konten Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    <div className="space-y-6">
-                      <div className="p-6 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
-                        <Label
-                          text="Identitas Lokasi"
-                          className="text-[#1E5AA5] font-black text-[9px] uppercase mb-3 block tracking-widest"
-                        />
-                        <p className="text-xs font-bold text-gray-600 uppercase leading-relaxed">
-                          {school?.alamat ||
-                            "Data alamat lengkap belum diperbarui dalam sistem."}
-                        </p>
-                      </div>
-                      <div className="p-6 bg-gray-50/50 rounded-2xl border border-gray-100 shadow-sm">
-                        <Label
-                          text="Visi & Ringkasan Binaan"
-                          className="text-[#1E5AA5] font-black text-[9px] uppercase mb-3 block tracking-widest"
-                        />
-                        <p className="text-xs font-medium text-gray-400 italic leading-relaxed">
-                          {school?.deskripsi ||
-                            "Sekolah ini merupakan binaan aktif YPA-MDR yang menerapkan standar kualitas pendidikan nasional melalui program pilar transformasi."}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-8 bg-[#1E5AA5] rounded-[2.5rem] text-white relative overflow-hidden group shadow-2xl shadow-blue-900/20">
-                      <Globe2
-                        size={150}
-                        className="absolute -bottom-10 -right-10 opacity-10 group-hover:scale-110 transition-all duration-1000 group-hover:rotate-12"
-                      />
-                      <div className="relative z-10 space-y-8">
-                        <div className="grid grid-cols-2 gap-6 border-b border-white/10 pb-8">
-                          <div>
-                            <p className="text-5xl font-black tracking-tighter">
-                              {school?.jumlah_guru || 0}
-                            </p>
-                            <p className="text-[9px] font-black uppercase opacity-60 tracking-widest mt-1">
-                              Tenaga Pengajar
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-5xl font-black tracking-tighter">
-                              {school?.jumlah_siswa || 0}
-                            </p>
-                            <p className="text-[9px] font-black uppercase opacity-60 tracking-widest mt-1">
-                              Siswa Terdaftar
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-widest">
-                          <span className="text-blue-200">Provinsi Area</span>
-                          <span className="text-base">{province}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Footer Navigasi (Book Flip Controls) */}
-          <div className="px-10 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between shrink-0 z-20">
+          <div className="bg-[#0AC4E0] p-8 text-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-4">
-              <div className="px-4 py-1.5 bg-white border border-gray-200 rounded-full text-[9px] font-black text-gray-400 uppercase tracking-widest shadow-sm">
-                Urutan {currentIndex + 1} Dari {schoolsInArea.length} Sekolah
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center border border-white/30">
+                <School size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black uppercase">Detail Profil Sekolah</h2>
+                <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">
+                  Hub Wilayah: {wilayah?.nama_wilayah?.split("/").pop()}
+                </p>
               </div>
             </div>
+            <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-red-500 transition-all">
+              <X size={20} />
+            </button>
+          </div>
 
-            <div className="flex gap-4">
+          <div className="flex-1 p-10 md:p-14 overflow-y-auto no-scrollbar bg-white">
+            <div className="space-y-8">
+              <div className="border-b border-gray-100 pb-6">
+                <h3 className="text-4xl font-black text-slate-800 uppercase tracking-tighter mb-4">
+                  {school?.nama_sekolah}
+                </h3>
+                <div className="flex gap-3">
+                  <span className="px-4 py-1.5 bg-[#0AC4E0]/10 text-[#0AC4E0] rounded-xl text-[10px] font-black uppercase">
+                    NPSN: {school?.npsn}
+                  </span>
+                  <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase border border-emerald-100">
+                    Akreditasi {school?.akreditasi || "N/A"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-12">
+                <div className="space-y-8">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-300 uppercase mb-3 tracking-widest">Alamat Lengkap</p>
+                    <p className="text-sm font-semibold text-slate-600 leading-relaxed italic">
+                      "{school?.alamat || "Informasi alamat lengkap belum diperbarui."}"
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-gray-100">
+                    <p className="text-[10px] font-black text-[#0AC4E0] uppercase mb-2 tracking-widest">Visi Transformasi</p>
+                    <p className="text-xs font-medium text-slate-400 leading-relaxed">
+                      {school?.deskripsi || "Sekolah binaan aktif Astra YPA-MDR dengan fokus pada keunggulan akademik."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex flex-col justify-center gap-8 relative overflow-hidden shadow-2xl">
+                  <Globe2 size={150} className="absolute -bottom-10 -right-10 opacity-5" />
+                  <div className="grid grid-cols-2 gap-4 text-center relative z-10">
+                    <div className="space-y-1">
+                      <p className="text-4xl font-black text-[#0AC4E0]">{school?.jumlah_guru || 0}</p>
+                      <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Guru</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-4xl font-black text-white">{school?.jumlah_siswa || 0}</p>
+                      <p className="text-[9px] font-bold text-white/30 uppercase tracking-widest">Siswa</p>
+                    </div>
+                  </div>
+                  <div className="pt-6 border-t border-white/5">
+                    <p className="text-[9px] font-bold text-[#0AC4E0] uppercase tracking-widest mb-1">Status Program</p>
+                    <p className="text-sm font-black uppercase">Mandiri & Unggul</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-10 py-6 bg-gray-50 border-t border-gray-100 flex justify-between items-center shrink-0">
+            <span className="text-[10px] font-black text-slate-300 uppercase">
+              Sekolah {currentIndex + 1} dari {schoolsInArea.length}
+            </span>
+            <div className="flex gap-3">
               <button
-                onClick={() => paginate(-1)}
-                disabled={currentIndex === 0}
-                className="w-14 h-12 flex items-center justify-center rounded-2xl bg-white border border-gray-200 text-gray-400 hover:text-[#1E5AA5] hover:border-[#1E5AA5] transition-all disabled:opacity-20 active:scale-90 shadow-sm"
+                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+                className="w-12 h-12 rounded-2xl bg-white border border-gray-200 flex items-center justify-center active:scale-90 transition-all"
               >
-                <ChevronLeft size={24} />
+                <ChevronLeft size={20} />
               </button>
               <button
-                onClick={() => paginate(1)}
-                disabled={currentIndex === schoolsInArea.length - 1}
-                className="w-14 h-12 flex items-center justify-center rounded-2xl bg-[#1E5AA5] text-white shadow-xl shadow-blue-900/20 hover:bg-blue-700 transition-all disabled:opacity-20 active:scale-90"
+                onClick={() => setCurrentIndex((prev) => Math.min(schoolsInArea.length - 1, prev + 1))}
+                className="w-12 h-12 rounded-2xl bg-[#0AC4E0] text-white flex items-center justify-center shadow-lg active:scale-90 transition-all"
               >
-                <ChevronRight size={24} />
+                <ChevronRight size={20} />
               </button>
             </div>
           </div>
@@ -305,24 +186,19 @@ const SchoolDetailModal = ({
   );
 };
 
-// --- Main Component: Onboarding ---
+// ==================== MAIN COMPONENT ====================
 const Onboarding = () => {
   const [wilayahList, setWilayahList] = useState([]);
   const [sekolahList, setSekolahList] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Filter States
   const [selectedWilayah, setSelectedWilayah] = useState(null);
   const [selectedJenis, setSelectedJenis] = useState("all");
-
-  // Modal States
-  const [selectedSchoolForModal, setSelectedSchoolForModal] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
+  const [selectedSchoolModal, setSelectedSchoolModal] = useState(null);
   const [mapCenter, setMapCenter] = useState([-2.5, 118]);
   const [zoom, setZoom] = useState(5);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 5;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -331,12 +207,10 @@ const Onboarding = () => {
           axios.get("http://localhost:3000/wilayah"),
           axios.get("http://localhost:3000/sekolah"),
         ]);
-        setWilayahList(
-          resW.data.filter((w) => w.status === true || w.status === 1),
-        );
+        setWilayahList(resW.data.filter((w) => w.status === true || w.status === 1));
         setSekolahList(resS.data);
       } catch (err) {
-        console.error("Data Fetch Error:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
@@ -346,127 +220,68 @@ const Onboarding = () => {
 
   const filteredSekolah = sekolahList.filter((s) => {
     const wilayahInfo = wilayahList.find((w) => w.id_wilayah === s.id_wilayah);
-    const matchWilayah = selectedWilayah
-      ? s.id_wilayah === selectedWilayah.id_wilayah
-      : true;
-    const matchJenis =
-      selectedJenis === "all"
-        ? true
-        : wilayahInfo?.jenis_wilayah === selectedJenis;
+    const matchWilayah = selectedWilayah ? s.id_wilayah === selectedWilayah.id_wilayah : true;
+    const matchJenis = selectedJenis === "all" ? true : wilayahInfo?.jenis_wilayah === selectedJenis;
     return matchWilayah && matchJenis;
   });
 
-  const currentItems = filteredSekolah.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
-  );
   const totalPages = Math.ceil(filteredSekolah.length / itemsPerPage);
+  const currentItems = filteredSekolah.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const schoolColumns = [
-    {
-      header: "INSTITUSI",
-      render: (row) => (
-        <div className="flex flex-col py-1">
-          <span className="font-black text-[#1E5AA5] text-[10px] uppercase truncate w-36 leading-none mb-1">
-            {row.nama_sekolah}
-          </span>
-          <span className="text-[8px] text-gray-400 font-bold uppercase italic tracking-wider">
-            {row.jenjang} • NPSN {row.npsn}
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: "AKREDITASI",
-      align: "text-center",
-      render: (row) => (
-        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-[9px] font-black border border-blue-100 shadow-sm">
-          {row.akreditasi || "N/A"}
-        </span>
-      ),
-    },
-    {
-      header: "DETAIL",
-      align: "text-center",
-      render: (row) => (
-        <button
-          onClick={() => {
-            setSelectedSchoolForModal(row);
-            setIsModalOpen(true);
-          }}
-          className="p-2.5 bg-gray-50 text-[#1E5AA5] hover:bg-[#1E5AA5] hover:text-white rounded-xl transition-all border border-gray-100 shadow-sm group active:scale-90"
-        >
-          <Eye
-            size={14}
-            className="group-hover:scale-110 transition-transform"
-          />
-        </button>
-      ),
-    },
-  ];
+  if (loading) return (
+    <div className="h-screen bg-white flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-[#0AC4E0] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
-    <div className="w-full min-h-screen bg-[#FDFDFD] font-sans overflow-x-hidden selection:bg-[#1E5AA5] selection:text-white">
+    <div className="w-full min-h-screen bg-[#FBFBFD] font-sans selection:bg-[#0AC4E0]/20">
       <Navbar isDashboard />
 
-      {/* HERO SECTION */}
-      <section className="bg-[#F7F8F0] pt-32 pb-20 px-6 min-h-[80vh] flex items-center relative">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 items-center gap-12 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
-          >
-            <span className="inline-block px-4 py-1 bg-white rounded-full border border-blue-100 text-[9px] font-black text-[#1E5AA5] uppercase tracking-[0.3em]">
-              Corporate Social Impact
-            </span>
-            <h1 className="text-7xl font-[1000] text-gray-900 leading-none tracking-tighter uppercase">
-              SATU <br /> <span className="text-[#1E5AA5]">INDONESIA</span>{" "}
-              <br /> CERDAS
+      {/* HERO */}
+      <section className="pt-40 pb-24 px-10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-10" />
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 items-center gap-20">
+          <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.8 }} className="space-y-10 text-left">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-full shadow-sm">
+              <Sparkles size={14} className="text-[#0AC4E0]" />
+              <span className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest">Social Impact Intelligence</span>
+            </div>
+            <h1 className="text-7xl xl:text-8xl font-black text-slate-800 tracking-tighter leading-[0.9] uppercase">
+              SATU <br /> <span className="text-[#0AC4E0]">INDONESIA</span> <br /> CERDAS
             </h1>
-            <p className="text-gray-500 text-lg border-l-4 border-[#1E5AA5] pl-6 font-medium max-w-md italic">
-              Transformasi pendidikan berkelanjutan untuk mewujudkan generasi
-              emas Indonesia yang mandiri dan berprestasi.
+            <p className="text-xl text-slate-400 font-medium leading-relaxed max-w-lg border-l-4 border-[#0AC4E0] pl-8 italic">
+              "Mentransformasi sekolah binaan untuk masa depan bangsa yang mandiri dan kompeten."
             </p>
-            <Button
-              text="Selengkapnya Tentang YPA-MDR"
-              icon={<MoveRight size={18} />}
-              onClick={() =>
-                window.open("https://yayasanastra-ypamdr.or.id/", "_blank")
-              }
-              className="bg-[#1E5AA5] text-white px-8 py-4 rounded-full font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 border-none"
-            />
+            <button
+              onClick={() => window.open("https://yayasanastra-ypamdr.or.id/", "_blank")}
+              className="px-10 py-5 bg-slate-800 hover:bg-[#0AC4E0] text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all shadow-xl flex items-center gap-4 active:scale-95"
+            >
+              Explore Our Vision <MoveRight size={18} />
+            </button>
           </motion.div>
-          <div className="hidden lg:block text-right">
-            <img
-              src={picturependidikan}
-              alt="Hero"
-              className="w-[500px] inline-block drop-shadow-2xl animate-float"
-            />
+          <div className="hidden lg:block relative text-right">
+            <img src={picturependidikan} alt="Hero" className="w-[550px] inline-block relative z-10 drop-shadow-2xl animate-float" />
           </div>
         </div>
       </section>
 
-      {/* MAP & REGISTRY SECTION */}
-      <section className="py-24 px-6 bg-[#EEF5FF]">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <span className="text-[#1E5AA5] font-black text-[10px] uppercase tracking-[0.5em]">
-              Global Sebaran Data Binaan
-            </span>
-            <h2 className="text-5xl font-[1000] text-gray-900 tracking-tighter uppercase leading-none">
-              Mapping <span className="text-[#1E5AA5]">Sekolah Binaan</span>
-            </h2>
+      {/* MAP & REGISTRY */}
+      <section className="py-20 px-10 bg-gray-50/30">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="text-center space-y-4">
+            <p className="text-[11px] font-black text-[#0AC4E0] uppercase tracking-[0.4em]">Spatial View</p>
+            <h2 className="text-5xl font-black text-slate-800 tracking-tighter uppercase">Mapping Institusi</h2>
           </div>
 
-          <div className="bg-white rounded-[3rem] shadow-3xl border border-gray-100 overflow-hidden grid lg:grid-cols-12 min-h-[650px]">
-            {/* Sisi Kiri: Peta */}
+          <div className="bg-white rounded-[3.5rem] border-2 border-[#0AC4E0]/20 shadow-2xl shadow-slate-200/40 overflow-hidden grid lg:grid-cols-12 min-h-[700px]">
+
+            {/* PETA */}
             <div className="lg:col-span-7 relative h-[500px] lg:h-auto border-r border-gray-100">
               <MapContainer
-                center={mapCenter}
-                zoom={zoom}
-                style={{ height: "100%", width: "100%" }}
-                zoomControl={false}
+                center={mapCenter} zoom={zoom}
+                style={{ height: "100%", width: "100%", background: "#aad3df" }}
+                zoomControl={false} scrollWheelZoom={true}
               >
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <ZoomControl position="bottomright" />
@@ -475,38 +290,43 @@ const Onboarding = () => {
                 {wilayahList.map((w) => {
                   const lat = parseFloat(w.latitude);
                   const lng = parseFloat(w.longitude);
-                  if (isNaN(lat) || isNaN(lng)) return null;
+                  if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
+                  if (selectedJenis !== "all" && w.jenis_wilayah !== selectedJenis) return null;
+                  const isSelected = selectedWilayah?.id_wilayah === w.id_wilayah;
 
-                  if (
-                    selectedJenis !== "all" &&
-                    w.jenis_wilayah !== selectedJenis
-                  )
-                    return null;
-
-                  const isSelected =
-                    selectedWilayah?.id_wilayah === w.id_wilayah;
                   return (
                     <Marker
-                      key={`wilayah-${w.id_wilayah}`}
+                      key={w.id_wilayah}
                       position={[lat, lng]}
-                      icon={isSelected ? selectedIcon : defaultIcon}
+                      icon={isSelected ? orangePinIcon : cyanPinIcon}
+                      eventHandlers={{
+                        click: () => {
+                          setSelectedWilayah(w);
+                          setMapCenter([lat, lng]);
+                          setZoom(11);
+                          setCurrentPage(1);
+                        },
+                      }}
                     >
                       <Popup>
-                        <div className="p-2 min-w-[160px] font-sans">
-                          <p className="font-black text-[#1E5AA5] uppercase text-[10px] border-b pb-1 mb-2">
-                            {w.nama_wilayah.split("/").pop()}
+                        <div className="p-3 font-sans text-center min-w-[170px]">
+                          <p className="font-black text-[#0AC4E0] text-sm uppercase mb-2">
+                            {w.nama_wilayah?.split("/").pop() || w.nama_wilayah}
                           </p>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase">
-                            Jenis: {w.jenis_wilayah || "-"}
+                          <p className="text-[10px] text-slate-500 mb-3 font-semibold">
+                            {w.jenis_wilayah || "Area Binaan"}
                           </p>
-                          <p className="text-[9px] font-bold text-gray-500 uppercase italic">
-                            Unit Sekolah:{" "}
-                            {
-                              sekolahList.filter(
-                                (s) => s.id_wilayah === w.id_wilayah,
-                              ).length
-                            }
-                          </p>
+                          <button
+                            onClick={() => {
+                              setSelectedWilayah(w);
+                              setMapCenter([lat, lng]);
+                              setZoom(13);
+                              setCurrentPage(1);
+                            }}
+                            className="w-full py-2 bg-[#0AC4E0] text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+                          >
+                            Lihat Sekolah
+                          </button>
                         </div>
                       </Popup>
                     </Marker>
@@ -514,35 +334,37 @@ const Onboarding = () => {
                 })}
               </MapContainer>
 
-              <div className="absolute top-6 left-6 z-[1000] bg-white/90 backdrop-blur-md border border-white p-4 rounded-3xl shadow-xl flex items-center gap-4">
-                <div className="w-12 h-12 bg-[#1E5AA5] rounded-2xl flex items-center justify-center text-white shadow-lg">
+              {/* Legend */}
+              <div className="absolute bottom-8 left-8 z-[1000] bg-white/90 backdrop-blur-md rounded-2xl p-3 shadow-lg flex gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-6 bg-[#0AC4E0] rounded-full shadow-sm" />
+                  <span className="text-[9px] font-bold text-slate-600 uppercase">Area Binaan</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-7 bg-[#F97316] rounded-full shadow-sm" />
+                  <span className="text-[9px] font-bold text-slate-600 uppercase">Area Terpilih</span>
+                </div>
+              </div>
+
+              {/* Info bubble */}
+              <div className="absolute top-8 left-8 z-[1000] bg-white/90 backdrop-blur-xl border border-white/50 p-5 rounded-[2rem] shadow-xl flex items-center gap-4">
+                <div className="w-12 h-12 bg-[#0AC4E0] rounded-2xl flex items-center justify-center text-white shadow-lg">
                   <Navigation size={22} />
                 </div>
                 <div>
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 italic">
-                    Spatial View
-                  </p>
-                  <p className="text-sm font-black text-[#1E5AA5] uppercase tracking-tighter leading-none">
-                    {selectedWilayah
-                      ? selectedWilayah.nama_wilayah.split("/").pop()
-                      : "SELURUH INDONESIA"}
+                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Hub Status</p>
+                  <p className="text-sm font-black text-slate-800 uppercase tracking-tighter">
+                    {selectedWilayah ? selectedWilayah.nama_wilayah?.split("/").pop() : "SELURUH INDONESIA"}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Sisi Kanan: Panel Data */}
+            {/* REGISTRY */}
             <div className="lg:col-span-5 flex flex-col bg-white overflow-hidden">
-              <div className="p-10 bg-gray-50/50 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 italic">
-                      Regional Hubs
-                    </span>
-                    <h3 className="text-3xl font-[1000] text-gray-800 uppercase tracking-tighter leading-none">
-                      REGISTRY
-                    </h3>
-                  </div>
+              <div className="p-10 bg-slate-50/50 border-b border-gray-100 space-y-6 shrink-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-3xl font-black text-slate-800 tracking-tighter uppercase">Registry</h3>
                   <button
                     onClick={() => {
                       setSelectedWilayah(null);
@@ -551,19 +373,19 @@ const Onboarding = () => {
                       setZoom(5);
                       setCurrentPage(1);
                     }}
-                    className="w-12 h-12 flex items-center justify-center bg-white rounded-2xl shadow-sm border border-gray-100 text-rose-500 hover:bg-rose-50 transition-all active:scale-95"
+                    className="w-12 h-12 bg-white rounded-2xl border border-gray-100 text-red-400 flex items-center justify-center shadow-sm hover:bg-red-50 transition-all active:scale-90"
                   >
                     <RefreshCcw size={20} />
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <Dropdown
                     items={[
-                      { value: "all", label: "TAMPILKAN SEMUA WILAYAH" },
+                      { value: "all", label: "PILIH SEMUA WILAYAH" },
                       ...wilayahList.map((w) => ({
                         value: w.id_wilayah,
-                        label: w.nama_wilayah.split("/").pop().toUpperCase(),
+                        label: w.nama_wilayah?.split("/").pop()?.toUpperCase() || w.nama_wilayah,
                       })),
                     ]}
                     value={selectedWilayah?.id_wilayah || "all"}
@@ -573,23 +395,17 @@ const Onboarding = () => {
                         setMapCenter([-2.5, 118]);
                         setZoom(5);
                       } else {
-                        const found = wilayahList.find(
-                          (w) => w.id_wilayah === val,
-                        );
+                        const found = wilayahList.find((w) => w.id_wilayah === val);
                         if (found) {
                           setSelectedWilayah(found);
-                          setMapCenter([
-                            parseFloat(found.latitude),
-                            parseFloat(found.longitude),
-                          ]);
+                          setMapCenter([parseFloat(found.latitude), parseFloat(found.longitude)]);
                           setZoom(11);
                         }
                       }
                       setCurrentPage(1);
                     }}
-                    className="!rounded-2xl !border-gray-200 !py-4 !text-[11px] font-black uppercase shadow-sm"
+                    className="!rounded-2xl !py-4 !text-[11px] !font-black !border-gray-100 shadow-sm"
                   />
-
                   <Dropdown
                     icon={Filter}
                     items={[
@@ -598,143 +414,121 @@ const Onboarding = () => {
                       { value: "Independent", label: "INDEPENDENT" },
                     ]}
                     value={selectedJenis}
-                    onChange={(val) => {
-                      setSelectedJenis(val);
-                      setCurrentPage(1);
-                    }}
-                    className="!rounded-2xl !border-gray-200 !py-4 !text-[11px] font-black uppercase shadow-sm"
+                    onChange={(val) => { setSelectedJenis(val); setCurrentPage(1); }}
+                    className="!rounded-2xl !py-4 !text-[11px] !font-black !border-gray-100 shadow-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col p-10 overflow-hidden">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-3">
-                    <School size={20} className="text-[#1E5AA5]" />
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] italic">
-                      Inventory Records
-                    </span>
-                  </div>
-                  <span className="px-4 py-1.5 bg-blue-600 text-white rounded-full text-[10px] font-black shadow-xl tracking-widest">
-                    {filteredSekolah.length} SEKOLAH
-                  </span>
-                </div>
+              <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                <div className="flex-1 overflow-y-auto no-scrollbar">
+                  <table className="min-w-full border-separate border-spacing-0">
+                    <thead>
+                      <tr>
+                        <th className="px-10 py-5 bg-[#0AC4E0] text-white text-[10px] font-black uppercase tracking-widest text-left">Institusi Binaan</th>
+                        <th className="px-10 py-5 bg-[#0AC4E0] text-white text-[10px] font-black uppercase tracking-widest text-left">Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentItems.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-[#0AC4E0]/5 transition-colors">
+                          <td className="px-10 py-7 border-b border-slate-50">
+                            <div className="flex flex-col gap-1.5">
+                              <span className="font-bold text-slate-800 text-[13px] uppercase">{row.nama_sekolah}</span>
+                              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                                {row.jenjang} • NPSN {row.npsn}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-10 py-7 border-b border-slate-50">
+                            <button
+                              onClick={() => { setSelectedSchoolModal(row); setIsModalOpen(true); }}
+                              className="w-10 h-10 bg-slate-50 text-[#0AC4E0] border border-slate-100 rounded-2xl flex items-center justify-center hover:bg-[#0AC4E0] hover:text-white transition-all active:scale-90 shadow-sm"
+                            >
+                              <Eye size={18} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-                  {currentItems.length > 0 ? (
-                    <Table
-                      columns={schoolColumns}
-                      data={currentItems}
-                      className="min-w-full"
-                    />
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-300 py-10">
-                      <School size={50} strokeWidth={1} />
-                      <p className="text-[11px] font-black uppercase tracking-widest text-center italic leading-relaxed">
-                        No records found matching <br /> current spatial hub
-                        filters
-                      </p>
+                  {currentItems.length === 0 && (
+                    <div className="py-24 text-center opacity-30">
+                      <School size={48} className="mx-auto mb-4 text-slate-300" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">Data Sekolah Tidak Ditemukan</p>
                     </div>
                   )}
                 </div>
 
-                {totalPages > 1 && (
-                  <div className="pt-8 mt-6 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Page {currentPage} / {totalPages}
-                    </span>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() =>
-                          setCurrentPage((p) => Math.max(1, p - 1))
-                        }
-                        disabled={currentPage === 1}
-                        className="p-3 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors shadow-sm active:scale-90"
-                      >
-                        <ChevronLeft size={18} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          setCurrentPage((p) => Math.min(totalPages, p + 1))
-                        }
-                        disabled={currentPage === totalPages}
-                        className="p-3 border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 transition-colors shadow-sm active:scale-90"
-                      >
-                        <ChevronRight size={18} />
-                      </button>
-                    </div>
+                <div className="p-8 border-t border-gray-100 flex items-center justify-between bg-white shrink-0">
+                  <span className="text-[10px] font-black text-slate-300 uppercase">
+                    Record {currentPage} dari {totalPages || 1}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 disabled:opacity-20 active:scale-90 transition-all shadow-sm"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 disabled:opacity-20 active:scale-90 transition-all shadow-sm"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* MISSION FOOTER SECTION */}
-      <section className="py-24 px-6 bg-white">
-        <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-10">
-          {[
-            {
-              t: "Vision",
-              i: <Eye />,
-              d: "Lembaga sosial kredibel untuk mutu pendidikan daerah binaan.",
-            },
-            {
-              t: "Mission",
-              i: <Rocket />,
-              d: "Mendorong pembinaan sekolah melalui 4 Pilar Pendidikan Utama.",
-            },
-            {
-              t: "Goal",
-              i: <Mountain />,
-              d: "Mewujudkan sekolah binaan mandiri, unggul, dan berprestasi.",
-            },
-            {
-              t: "Aim",
-              i: <Target />,
-              d: "Melahirkan generasi muda kompeten demi Indonesia sejahtera.",
-            },
-          ].map((m, i) => (
-            <div
-              key={i}
-              className="p-12 border border-gray-50 rounded-[3rem] hover:bg-white hover:shadow-3xl transition-all group border-none bg-gray-50/30"
-            >
-              <div className="text-[#1E5AA5] mb-8 group-hover:scale-110 transition-transform duration-500">
-                {m.i}
-              </div>
-              <h4 className="text-2xl font-[1000] uppercase tracking-tighter mb-4 text-gray-900">
-                {m.t}
-              </h4>
-              <p className="text-gray-400 text-xs font-bold leading-relaxed italic uppercase tracking-widest">
-                {m.d}
-              </p>
-            </div>
-          ))}
+      {/* CORE VALUES */}
+      <section className="py-32 px-10 bg-white">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <ValueCard icon={<Eye />} title="Vision" desc="Lembaga sosial kredibel untuk mutu pendidikan daerah binaan." />
+          <ValueCard icon={<Rocket />} title="Mission" desc="Mendorong pembinaan sekolah melalui 4 Pilar Utama." />
+          <ValueCard icon={<Mountain />} title="Goal" desc="Mewujudkan sekolah binaan mandiri, unggul, dan berprestasi." />
+          <ValueCard icon={<Target />} title="Aim" desc="Melahirkan generasi muda kompeten demi Indonesia sejahtera." />
         </div>
       </section>
 
       <Footer />
 
-      {/* Modal Detail Sekolah (Buku Flip) */}
       <SchoolDetailModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        initialSchool={selectedSchoolForModal}
+        initialSchool={selectedSchoolModal}
         allSchools={sekolahList}
         wilayahList={wilayahList}
       />
 
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 10px; }
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-25px)} }
         .animate-float { animation: float 6s ease-in-out infinite; }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-25px); } }
-        .leaflet-container { border-radius: 0; font-family: inherit; z-index: 1; }
-        .perspective-1000 { perspective: 1000px; }
-      `}</style>
+        .leaflet-container { font-family: inherit; z-index: 1; border: none !important; width: 100%; height: 100%; background: #aad3df !important; }
+        .leaflet-control-zoom a { background: white !important; color: #0AC4E0 !important; border-radius: 12px !important; margin: 4px !important; width: 36px !important; height: 36px !important; line-height: 36px !important; }
+        .leaflet-popup-content-wrapper { border-radius: 20px !important; padding: 0 !important; }
+        .leaflet-popup-content { margin: 0 !important; }
+      `}} />
     </div>
   );
 };
+
+const ValueCard = ({ icon, title, desc }) => (
+  <div className="p-10 bg-white border-2 border-[#0AC4E0]/10 rounded-[3rem] hover:border-[#0AC4E0] hover:shadow-2xl transition-all duration-500 group text-left">
+    <div className="text-[#0AC4E0] mb-8 group-hover:scale-110 transition-transform">{icon}</div>
+    <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tighter mb-4">{title}</h4>
+    <p className="text-sm font-medium text-slate-400 leading-relaxed italic">{desc}</p>
+  </div>
+);
 
 export default Onboarding;

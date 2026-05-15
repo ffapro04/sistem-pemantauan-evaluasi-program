@@ -1,30 +1,36 @@
 /* eslint-disable no-unused-vars */
 import Sidebar from "../../../components/Sidebar";
-import Card from "../../../components/Card";
 import Button from "../../../components/Button";
 import Label from "../../../components/Label";
 import Input from "../../../components/Input";
 import IconButton from "../../../components/IconButton";
 import PageWrapper from "../../../components/PageWrapper";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "react-toastify";
 
-import { Trash2, ArrowLeft, Save, Plus, FileText } from "lucide-react";
+import { Trash2, ArrowLeft, Save, Plus, FileText, Sparkles, LayoutGrid, ClipboardList } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 function EditAssessmentAkademik() {
   const navigate = useNavigate();
   const { id } = useParams();
-
   const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const fetchAssessment = async () => {
+      setLoading(true);
       try {
         const res = await fetch(`http://localhost:3000/assessment/${id}`);
         const data = await res.json();
         setQuestions(data.questions || []);
       } catch (err) {
         console.error("Gagal mengambil assessment", err);
+        toast.error("Gagal memuat data assessment");
+      } finally {
+        setLoading(false);
       }
     };
     fetchAssessment();
@@ -43,6 +49,10 @@ function EditAssessmentAkademik() {
   };
 
   const removeQuestion = (index) => {
+    if (questions.length === 1) {
+      toast.warn("Minimal harus terdapat satu pertanyaan");
+      return;
+    }
     setQuestions(questions.filter((_, i) => i !== index));
   };
 
@@ -51,6 +61,7 @@ function EditAssessmentAkademik() {
   };
 
   const handleSave = async () => {
+    setSaving(true);
     try {
       const res = await fetch(`http://localhost:3000/assessment/${id}`, {
         method: "PATCH",
@@ -58,144 +69,167 @@ function EditAssessmentAkademik() {
         body: JSON.stringify({ questions }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error("Gagal update assessment:", errorData);
-        return;
-      }
+      if (!res.ok) throw new Error("Gagal update");
 
+      toast.success("Perubahan berhasil disimpan");
       navigate("/ho/assessment/akademik");
     } catch (err) {
-      console.error("Gagal update assessment", err);
+      toast.error("Gagal memperbarui assessment");
+    } finally {
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-screen bg-white flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[#0AC4E0] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0">
+    <PageWrapper className="h-screen bg-white flex overflow-hidden !p-0 font-sans selection:bg-[#0AC4E0]/20 text-slate-800">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-hidden relative">
-          <div className="px-8 pt-6 pb-6 shrink-0">
-            <header className="flex flex-row items-center justify-between mb-8">
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-blue-400 rounded-2xl blur opacity-20 group-hover:opacity-40 transition animate-pulse"></div>
-                  <div className="relative p-3.5 bg-gradient-to-br from-[#2E5AA7] to-[#164a8a] rounded-2xl text-white shadow-xl">
-                    <FileText size={22} strokeWidth={2} />
-                  </div>
-                </div>
-                <div className="flex flex-col -space-y-1">
-                  <Label
-                    text="Sistem Monitoring dan Evaluasi Program"
-                    className="!text-[8px] !text-[#1E5AA5] !font-black tracking-[0.3em] !mb-1 uppercase"
-                  />
-                  <h1 className="text-xl font-black text-gray-800 tracking-tight uppercase leading-none">
-                    Edit <span className="text-[#2E5AA7]">Assessment Akademik</span>
-                  </h1>
-                </div>
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Subtle Background Decor */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-10" />
+
+        <div className="flex-1 flex flex-col px-8 pt-10 pb-4 overflow-hidden leading-none gap-8">
+
+          {/* HEADER SECTION - PROFESSIONAL STYLE */}
+          <header className="flex flex-row items-center justify-between mb-10 animate-in fade-in duration-1000 leading-none">
+            <div className="space-y-3">
+              {/* Sub-label dengan penanda aksen bar vertikal profesional */}
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-[#0AC4E0] rounded-full" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                  Sistem Pemantauan dan Evaluasi Program
+                </span>
               </div>
 
-              <Button
-                text="Kembali"
-                icon={<ArrowLeft size={14} />}
-                onClick={() => navigate("/ho/assessment/akademik")}
-                className="group !bg-gray-100 hover:!bg-gray-200 !rounded-xl !px-5 !py-2.5 !text-[10px] font-black text-gray-600 shadow-lg active:scale-95 transition-all flex items-center gap-2"
-              />
-            </header>
-
-            <div className="flex flex-row items-center gap-3 mb-6">
-              <div className="flex items-center gap-3 px-5 py-2.5 bg-blue-50 text-[#1E5AA5] rounded-xl border border-blue-100 font-black text-[9px] uppercase tracking-[0.2em] shrink-0">
-                Total: {questions.length} Pertanyaan
-              </div>
+              {/* Judul Utama */}
+              <h1 className="text-3xl font-black text-slate-800 tracking-tighter">
+                Edit Data Soal <span className="text-[#0AC4E0]">Assessment</span>
+              </h1>
             </div>
+
+            {/* Menggunakan Component Button.jsx */}
+            <Button
+              text="Kembali"
+              icon={<ArrowLeft size={18} />}
+              variant="outline"
+              onClick={() => navigate("/ho/assessment/akademik")}
+              className="!rounded-2xl !px-6 !py-3.5 !text-sm !font-bold shadow-sm border-slate-100 !text-slate-500 hover:!bg-slate-50 transition-all active:scale-95 leading-none"
+            />
+          </header>
+
+          {/* QUICK STATS PILL */}
+          <div className="flex items-center gap-3 px-6 py-4 bg-slate-50 border border-slate-100 rounded-full w-fit animate-in fade-in zoom-in-95 duration-700">
+            <ClipboardList size={16} className="text-[#0AC4E0]" />
+            <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest leading-none">
+              Total: {questions.length} Butir Pertanyaan
+            </span>
           </div>
 
-          <div className="flex-1 overflow-hidden px-8 pb-6">
-            {/* LIST PERTANYAAN */}
+          {/* EDITING AREA */}
+          <div className="flex-1 overflow-y-auto no-scrollbar pr-2 space-y-8 pb-20">
             <div className="space-y-6">
               {questions.map((q, index) => (
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   key={index}
-                  className="border border-gray-200 p-5 md:p-6 rounded-2xl bg-[#FAFCFF] shadow-sm relative transition-all duration-300 hover:shadow-md hover:border-[#1E5AA5]/30 group"
+                  className="bg-white rounded-[2.5rem] border-2 border-[#0AC4E0]/20 p-8 shadow-sm relative overflow-hidden group"
                 >
-                  {/* Nomor Soal & Tombol Hapus */}
-                  <div className="flex justify-between items-center mb-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E5AA5] flex items-center justify-center font-black text-sm border border-blue-100 group-hover:bg-[#1E5AA5] group-hover:text-white transition-colors">
+                  {/* Card Header: Nomor & Delete */}
+                  <div className="flex justify-between items-center mb-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-2xl bg-[#0AC4E0] text-white flex items-center justify-center font-black text-sm shadow-lg shadow-[#0AC4E0]/30 leading-none">
                         {index + 1}
                       </div>
-                      <Label
-                        text="Pertanyaan"
-                        required
-                        className="!mb-0 text-gray-700 font-bold"
-                      />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Konfigurasi Pertanyaan</p>
                     </div>
-                    <IconButton
-                      icon={<Trash2 size={16} />}
-                      variant="danger"
+                    <button
                       onClick={() => removeQuestion(index)}
-                      title="Hapus Pertanyaan"
-                    />
+                      className="w-10 h-10 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all active:scale-90"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
 
                   {/* Input Pertanyaan */}
-                  <Input
-                    value={q.question}
-                    onChange={(e) =>
-                      handleQuestionChange(index, e.target.value)
-                    }
-                    placeholder="Masukkan pertanyaan di sini..."
-                    className="mb-5 bg-white font-medium"
-                  />
+                  <div className="space-y-8">
+                    <div className="space-y-3">
+                      <Label text="Pertanyaan Utama" required className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest !ml-1" />
+                      <Input
+                        value={q.question}
+                        onChange={(e) => handleQuestionChange(index, e.target.value)}
+                        placeholder="Tuliskan pertanyaan di sini..."
+                        className="!bg-white !border-slate-200 !rounded-2xl !py-4 !px-6 !text-[15px] !font-bold !text-slate-800 focus:!border-[#0AC4E0] focus:!ring-0 transition-all shadow-sm leading-snug"
+                      />
+                    </div>
 
-                  {/* Grid Pilihan Jawaban */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-inner">
-                    {q.options.map((opt, i) => (
-                      <div key={i} className="space-y-1.5">
-                        <Label
-                          text={`Pilihan ${String.fromCharCode(65 + i)}`}
-                          className="text-xs text-gray-500 font-semibold"
-                        />
-                        <Input
-                          value={opt}
-                          placeholder={`Jawaban ${String.fromCharCode(65 + i)}`}
-                          onChange={(e) =>
-                            handleOptionChange(index, i, e.target.value)
-                          }
-                          className="bg-gray-50/50"
-                        />
-                      </div>
-                    ))}
+                    {/* Grid Jawaban */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
+                      {q.options.map((opt, i) => (
+                        <div key={i} className="space-y-2 leading-none">
+                          <div className="flex items-center gap-2 ml-1">
+                            <span className="text-[10px] font-black text-[#0AC4E0] bg-white w-5 h-5 rounded-md flex items-center justify-center border border-slate-200">
+                              {String.fromCharCode(65 + i)}
+                            </span>
+                            <Label text={`Pilihan Jawaban`} className="!mb-0 !text-[9px] !font-black !text-slate-400 !uppercase !tracking-widest" />
+                          </div>
+                          <Input
+                            value={opt}
+                            placeholder={`Jawaban ${String.fromCharCode(65 + i)}`}
+                            onChange={(e) => handleOptionChange(index, i, e.target.value)}
+                            className="!bg-white !border-transparent !rounded-xl !py-3.5 !px-5 !text-[13px] !font-semibold text-slate-700 focus:!border-[#0AC4E0]/30 transition-all shadow-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
 
-            {/* TOMBOL TAMBAH PERTANYAAN */}
-            <div className="flex mt-6">
-              <Button
-                text="Tambah Pertanyaan Baru"
-                icon={<Plus size={18} />}
-                onClick={addQuestion}
-                variant="outline"
-                className="w-full border-dashed border-2 border-blue-200 text-[#1E5AA5] hover:bg-blue-50 py-3.5 rounded-2xl font-bold transition-colors"
-              />
-            </div>
+            {/* BUTTON ADD QUESTION */}
+            <button
+              onClick={addQuestion}
+              className="w-full py-6 bg-white border-2 border-dashed border-[#0AC4E0]/30 rounded-[2.5rem] text-[#0AC4E0] font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 hover:bg-[#0AC4E0]/5 hover:border-[#0AC4E0] transition-all active:scale-[0.99] leading-none mb-10"
+            >
+              <Plus size={20} strokeWidth={3} /> Sisipkan Pertanyaan Baru
+            </button>
           </div>
 
-          <div className="px-8 pb-6 shrink-0">
-            {/* FOOTER ACTION (SIMPAN) */}
-            <div className="flex justify-end pt-6 border-t border-gray-100">
-              <Button
-                text="Simpan Perubahan"
-                icon={<Save size={18} />}
-                onClick={handleSave}
-                className="bg-[#1E5AA5] hover:bg-[#15437a] shadow-lg shadow-blue-900/20 px-8 py-3 rounded-xl font-bold"
-              />
-            </div>
-          </div>
-        </Card>
+          {/* STICKY FOOTER ACTION */}
+          <footer className="mt-auto py-6 bg-white/60 backdrop-blur-xl border border-slate-100 rounded-[2.5rem] flex items-center justify-end px-10 shadow-sm leading-none shrink-0">
+            <button
+              disabled={saving}
+              onClick={handleSave}
+              className="flex items-center gap-3 px-12 py-4 bg-[#0AC4E0] hover:bg-[#09b3cc] text-white rounded-2xl text-[13px] font-black uppercase tracking-[0.2em] shadow-xl shadow-[#0AC4E0]/30 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <Save size={20} />
+              {saving ? "MENYIMPAN..." : "SIMPAN PERUBAHAN"}
+            </button>
+          </footer>
+        </div>
       </main>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+          animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
     </PageWrapper>
   );
 }
