@@ -23,7 +23,8 @@ export class Program {
   @Column()
   id_sekolah: number;
 
-   @ManyToOne(() => Sekolah)
+  @ManyToOne(() => Sekolah)
+  @JoinColumn({ name: 'id_sekolah' })
   sekolah : Sekolah;
 
   @Column('int', { name: 'id_vendor', array: true, nullable: true })

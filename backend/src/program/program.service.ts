@@ -135,6 +135,8 @@ export class ProgramService {
       return await this.programRepo.find({
         where: kategori ? { kategori } : {},
         order: { created_at: 'DESC' },
+
+        relations: ['sekolah'],
       });
     } catch (error) {
       console.error('--- [ERROR] DATABASE FINDALL ---', error.message);
@@ -198,6 +200,7 @@ async findOne(id: number) {
         finalVendorIds = !isNaN(singleId) ? [singleId] : existing.id_vendor;
       }
     }
+    
 
     const finalData = {
       ...dataToUpdate,

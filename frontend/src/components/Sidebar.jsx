@@ -1,5 +1,4 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
+
 import {
   ArrowLeft,
   LogOut,
@@ -26,6 +25,7 @@ import { jwtDecode } from "jwt-decode";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import logo_ypamdr from "../assets/img/logo_ypamdr.png";
+import { Map } from "lucide-react";
 
 // --- SPRING CONFIG (Samsung OneUI Inspired) ---
 const samsungSpring = {
@@ -167,7 +167,7 @@ export default function Sidebar() {
       4: "AREA OFFICER",
       5: "SEKOLAH",
       6: "VENDOR",
-      8: "KEPALA DINAS",
+      7: "KEPALA DINAS",
     };
     return labels[user.id_role] || "GUEST";
   };
@@ -176,8 +176,10 @@ export default function Sidebar() {
     (user.jenis?.trim() || "").toLowerCase().includes("akademik") &&
     !(user.jenis?.trim() || "").toLowerCase().includes("non");
 
+  // --- PEMETAAN NAV ITEMS SINKRON (MUTLAK TERISOLASI PER ROLE) 🚀 ---
   const navItems = [
-    ...(user.id_role === 1 || user.id_role === 2
+    // Role 1: Super Admin
+    ...(user.id_role === 1
       ? [
           {
             icon: <LayoutDashboard size={20} />,
@@ -187,41 +189,75 @@ export default function Sidebar() {
           },
         ]
       : []),
+    // Role 2: Pengurus
+    ...(user.id_role === 2
+      ? [
+          {
+            icon: <LayoutDashboard size={20} />,
+            label: "Dashboard Pengurus",
+            path: "/pengurus/dashboard",
+          },
+          {
+            icon: <ClipboardCheck size={20} />,
+            label: "Dashboard Sekolah",
+            path: "/pengurus/dashboardsekolahpengurus",
+          },
+          {
+            icon: <FolderKanban size={20} />,
+            label: "Dashboard Kegiatan",
+            path: "/pengurus/dashboardkegiatanpengurus",
+          },
+        ]
+      : []),
+    // Role 3: HO Personnel
     ...(user.id_role === 3
       ? [
           {
             icon: <LayoutDashboard size={20} />,
             label: "Dashboard",
-            path: isAkademik
-              ? "/ho/dashboard/akademik"
-              : "/ho/dashboard/non-akademik",
+            path: isAkademik ? "/ho/dashboard/akademik" : "/ho/dashboard/non-akademik",
             exact: true,
           },
           {
-            icon: <ClipboardCheck size={20} />,
+            icon: <LayoutDashboard size={20} />,
             label: "Assessment",
-            path: isAkademik
-              ? "/ho/assessment/akademik"
-              : "/ho/assessment/non-akademik",
+            path: isAkademik ? "/ho/assessment/akademik" : "/ho/assessment/non-akademik",
           },
           {
             icon: <FolderKanban size={20} />,
             label: "Program Kegiatan",
-            path: isAkademik
-              ? "/ho/program/akademik"
-              : "/ho/program/non-akademik",
+            path: isAkademik ? "/ho/program/akademik" : "/ho/program/non-akademik",
           },
           {
             icon: <CalendarDays size={20} />,
             label: "List Schedule",
-            path: isAkademik
-              ? "/ho/penjadwalan/akademik"
-              : "/ho/penjadwalan/non-akademik",
+            path: isAkademik ? "/ho/penjadwalan/akademik" : "/ho/penjadwalan/non-akademik",
           },
         ]
       : []),
-    ...(user.id_role >= 4
+    // Role 4: Area Officer (AO) -> Khusus Monitoring Wilayah Binaan Astra
+    ...(user.id_role === 4
       ? [
+          {
+            icon: <LayoutDashboard size={20} />,
+            label: "Dashboard AO",
+            path: "/ao/dashboard",
+          },
+          {
+            icon: <School size={20} />,
+            label: "Monitoring Wilayah",
+            path: "/ao/monitoring-wilayah",
+          },
+        ]
+      : []),
+    // Role 5: Internal Sekolah Binaaan Astra
+    ...(user.id_role === 5
+      ? [
+          {
+            icon: <FolderKanban size={20} />,
+            label: "Profil Sekolah",
+            path: "/sekolah/ProfilSekolah",
+          },
           {
             icon: <ClipboardCheck size={20} />,
             label: "Assessment",
@@ -230,8 +266,32 @@ export default function Sidebar() {
           {
             icon: <FolderKanban size={20} />,
             label: "Program Kegiatan",
-            path: "/sekolah/program",
+            path: "/sekolah/ProgramKegiatan",
           },
+        ]
+      : []),
+    ...(user.id_role === 6
+      ? [
+          {
+            icon: <LayoutDashboard size={20} />,
+            label: "Dashboard Vendor",
+            path: "/vendor/dashboard",
+          },
+          {
+            icon: <Truck size={20} />,
+            label: "Project Pengadaan",
+            path: "/vendor/project",
+          },
+        ]
+      : []),
+    ...(user.id_role === 7
+      ? [
+          {
+            icon: <Map size={20} />,
+            label: "Wilayah Sekolah",
+            path: "/kadin/wilayahsekolah",
+          },
+          
         ]
       : []),
   ];
@@ -255,7 +315,9 @@ export default function Sidebar() {
       path: "/admin/sekolah",
       icon: <School size={16} />,
     },
-    { label: "Data Vendor", path: "/admin/vendor", icon: <Truck size={16} /> },
+    { label: "Data Vendor", 
+      path: "/admin/vendor", 
+      icon: <Truck size={16} /> },
     {
       label: "Data Kepala Dinas",
       path: "/admin/kadin",
@@ -312,7 +374,7 @@ export default function Sidebar() {
       </div>
 
       {/* 3. ADMINISTRASI (Scrollable) */}
-      {(user.id_role === 1 || user.id_role === 2) && (
+      {(user.id_role === 1 ) && (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 mt-8">
           <div className="flex-shrink-0 px-10">
             <div className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase mb-4">
@@ -363,6 +425,24 @@ export default function Sidebar() {
           </div>
         </div>
       )}
+
+    {user.id_role === 2 && (
+    <div className="mt-8 px-6">
+      <div className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase ml-4 mb-4">
+        {/* Laporan Yayasan */}
+      </div>
+      {/* Tambahkan button menu di sini */}
+    </div>
+    )}
+
+   {user.id_role === 7 && (
+        <div className="mt-8 px-6">
+          <div className="text-[10px] font-black tracking-[0.2em] text-white/30 uppercase ml-4 mb-4">
+            {/* Monitoring Dinas */}
+          </div>
+        </div>
+      )}
+
 
       {/* 4. FOOTER CLOCK (Static) */}
       <div className="flex-shrink-0 p-6 bg-black/10 mt-auto">

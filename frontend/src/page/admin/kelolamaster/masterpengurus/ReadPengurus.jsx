@@ -287,7 +287,7 @@ const ReadPengurus = () => {
               <Button
                 text="TAMBAH PENGURUS"
                 icon={<Plus size={14} />}
-                onClick={() => navigate("/admin/pengurus/create")}
+                onClick={() => navigate("/admin/kadin/create")}
                 className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
               />
             </header>

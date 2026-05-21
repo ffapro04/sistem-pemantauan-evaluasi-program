@@ -34,7 +34,8 @@ function ReadProgramnonAkademik() {
   const [filterWilayah, setFilterWilayah] = useState("Semua");
   const [programs, setPrograms] = useState([]);
   const [sekolahs, setSekolahs] = useState([]);
-
+const [selectedSchool, setSelectedSchool] = useState(null); 
+const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const limit = 12;
   const start = (page - 1) * limit;
@@ -63,6 +64,11 @@ function ReadProgramnonAkademik() {
       toast.error("Gagal mengubah status program");
     }
   };
+
+  const openDrawer = (school) => {
+  setSelectedSchool(school);
+  setIsDrawerOpen(true);
+};
 
   const fetchData = async () => {
     try {

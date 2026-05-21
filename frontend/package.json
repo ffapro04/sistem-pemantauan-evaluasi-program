@@ -17,7 +17,7 @@
     "@fullcalendar/timegrid": "^6.1.20",
     "@react-leaflet/core": "^2.1.0",
     "axios": "^1.13.6",
-    "framer-motion": "^12.31.0",
+    "framer-motion": "^12.38.0",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",

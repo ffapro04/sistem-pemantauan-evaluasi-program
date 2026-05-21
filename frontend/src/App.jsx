@@ -57,6 +57,16 @@ import CreatePengurus from "./page/admin/kelolamaster/masterpengurus/CreatePengu
 import EditPengurus from "./page/admin/kelolamaster/masterpengurus/EditPengurus";
 import DetailPengurus from "./page/admin/kelolamaster/masterpengurus/DetailPengurus";
 
+
+// MASTER KADIN
+import CreateKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/CreateKepalaDinas";
+import ReadKepalaPengurus from "./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas";
+import DetailKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/DetailKelapaDinas";
+import EditKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/EditKepalaDinas";
+
+
+
+
 // MASTER FINANCE
 import ReadFinance from "./page/admin/kelolamaster/masterfinance/ReadFinance";
 import CreateFinance from "./page/admin/kelolamaster/masterfinance/CreateFinance";
@@ -68,6 +78,24 @@ import DetailFinance from "./page/admin/kelolamaster/masterfinance/DetailFinance
 // =========================================================================
 import DashboardSekolah from "./page/sekolah/DashboardSekolah";
 import IsiAssessmentSekolah from "./page/sekolah/IsiAssessmentSekolah";
+import ProfilSekolah from "./page/sekolah/ProfilSekolah";
+import ProgramKegiatan from "./page/sekolah/ProgramKegiatan";
+
+
+
+// =========================================================================
+// PENGURUS OPS
+// =========================================================================
+import DashboardPengurus from "./page/pengurus/DashboardPengurus";
+import DashboardSekolahPengurus from "./page/pengurus/DashboardSekolahPengurus";
+import DashboardKegiatanPengurus from "./page/pengurus/DashboardKegiatanPengurus";
+
+// =========================================================================
+// KADIN OPS
+// =========================================================================
+import DashboardKadin from "./page/kepaladinas/DashboardKadin";
+import DetailSekolahKadin from "./page/kepaladinas/DetailSekolahKadin";
+
 
 // =========================================================================
 // HO - DASHBOARD (dipisah per jenis)
@@ -104,6 +132,9 @@ import CreateProgramNonAkademik from "./page/nonAkademik/proNonAkademik/CreatePr
 import DetailProgramNonAkademik from "./page/nonAkademik/proNonAkademik/DetailProgramnonAkademik";
 import EditProgramNonAkademik from "./page/nonAkademik/proNonAkademik/EditProgramnonAkademik";
 import CalendarOfEventnonAkademik from "./page/nonAkademik/proNonAkademik/CalendarOfEventnonAkademik";
+import ReadKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas";
+
+
 
 function App() {
   return (
@@ -158,6 +189,14 @@ function App() {
         <Route path="/admin/pengurus/detail/:id" element={<DetailPengurus />} />
         <Route path="/admin/pengurus/edit/:id" element={<EditPengurus />} />
 
+
+        {/* --- MASTER KEPALA DINAS --- */}
+      <Route path="/admin/kadin/create" element={<CreateKepalaDinas />} />
+      <Route path="/admin/kadin" element={<ReadKepalaDinas />} /> 
+      <Route path="/admin/kadin/detail/:id" element={ <DetailKepalaDinas/>} />
+      <Route path="/admin/kadin/edit/:id" element={<EditKepalaDinas />} />
+
+
         {/* --- MASTER FINANCE --- */}
         <Route path="/admin/finance" element={<ReadFinance />} />
         <Route path="/admin/finance/create" element={<CreateFinance />} />
@@ -170,6 +209,31 @@ function App() {
           path="/sekolah/assessment/isi/:id"
           element={<IsiAssessmentSekolah />}
         />
+         {/* --- MODUL SEKOLAH --- */}
+        <Route path="/sekolah/dashboard" element={<DashboardSekolah />} />
+        <Route
+          path="/sekolah/assessment/isi/:id"
+          element={<IsiAssessmentSekolah />}
+        />
+        <Route path="/sekolah/ProfilSekolah/:id" element={<ProfilSekolah />} />
+        <Route path="/sekolah/ProfilSekolah" element={<ProfilSekolah />} />
+        <Route path="/sekolah/ProgramKegiatan" element={<ProgramKegiatan />} />
+
+
+
+
+         {/* --- MODUL pengurus --- */}        
+        <Route path="/pengurus/dashboard" element={<DashboardPengurus />} />
+        <Route path="/pengurus/dashboardsekolahpengurus" element={<DashboardSekolahPengurus />} />
+        <Route path="/pengurus/dashboardkegiatanpengurus" element={<DashboardKegiatanPengurus/>} />
+
+
+
+         {/* --- MODUL kadin --- */}        
+        <Route path="/kadin/wilayahsekolah" element={<DashboardKadin/>} />
+        <Route path="/kadin/dashboard" element={<DashboardKadin/>} />
+        <Route path="/kadin/detailsekolahkadin/detail/:id" element={<DetailSekolahKadin/>} />
+
 
         {/* --- HO DASHBOARD (dipisah per jenis) --- */}
         <Route path="/ho/dashboard/akademik" element={<DashboardAkademik />} />

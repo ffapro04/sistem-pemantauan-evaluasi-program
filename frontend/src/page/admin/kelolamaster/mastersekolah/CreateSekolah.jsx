@@ -15,6 +15,8 @@ import {
   User,
   LockKeyhole,
   ShieldCheck,
+  Users,         // Digunakan untuk Jumlah Siswa
+  GraduationCap, // Digunakan untuk Jumlah Guru
 } from "lucide-react";
 import Swal from "sweetalert2";
 
@@ -29,6 +31,7 @@ import Textarea from "../../../../components/Textarea";
 
 const CreateSekolah = () => {
   const navigate = useNavigate();
+  const [wilayahRaw, setWilayahRaw] = useState([]); 
   const [wilayahList, setWilayahList] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,10 +41,12 @@ const CreateSekolah = () => {
     jenjang: "SD",
     akreditasi: "A",
     id_wilayah: "",
+    jumlah_guru: 0, 
+    jumlah_siswa: 0, 
     alamat: "",
     email_login: "",
     password_login: "",
-    id_role: 5, // Sesuai mapping: Role Sekolah adalah ID 5
+    id_role: 5, 
   });
 
   useEffect(() => {
@@ -52,17 +57,17 @@ const CreateSekolah = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        // FIX: Parsing nama wilayah agar tidak kosong (Lampung, bukan Indonesia/Lampung/)
-        const formatted = res.data
-          .filter((w) => w.status === true)
-          .map((w) => ({
-            value: w.id_wilayah,
-            label: w.nama_wilayah
-              .split("/")
-              .filter(Boolean)
-              .pop()
-              .toUpperCase(),
-          }));
+        const activeWilayah = res.data.filter((w) => w.status === true);
+        setWilayahRaw(activeWilayah); 
+
+        const formatted = activeWilayah.map((w) => ({
+          value: w.id_wilayah,
+          label: w.nama_wilayah
+            .split("/")
+            .filter(Boolean)
+            .pop()
+            .toUpperCase(),
+        }));
         setWilayahList(formatted);
       } catch (err) {
         console.error("Gagal ambil wilayah", err);
@@ -90,12 +95,28 @@ const CreateSekolah = () => {
       );
     }
 
+  const targetWilayah = wilayahRaw.find(w => Number(w.id_wilayah) === Number(formData.id_wilayah));
+    
+    // Trik offset koordinat agar antar pin sekolah tidak menumpuk presisi di satu titik tengah wilayah
+    const randomOffsetLat = (Math.random() - 0.5) * 0.02; 
+    const randomOffsetLng = (Math.random() - 0.5) * 0.02;
+
+    const schoolLatitude = targetWilayah?.latitude ? parseFloat(targetWilayah.latitude) + randomOffsetLat : -6.2349;
+    const schoolLongitude = targetWilayah?.longitude ? parseFloat(targetWilayah.longitude) + randomOffsetLng : 107.0014;
+
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
+
       const payload = {
         ...formData,
         id_wilayah: Number(formData.id_wilayah),
+        jumlah_guru: Number(formData.jumlah_guru),   
+        jumlah_siswa: Number(formData.jumlah_siswa), 
+        // ⚠️ CATATAN: Pastikan backend kamu tidak crash menerima properti koordinat ini 
+        // jika kolom latitude/longitude belum dibuat di tabel m_sekolah.
+        latitude: schoolLatitude,
+        longitude: schoolLongitude
       };
 
       await axios.post("http://localhost:3000/sekolah", payload, {
@@ -263,15 +284,57 @@ const CreateSekolah = () => {
                     </div>
                   </div>
 
-                  <div className="p-6 bg-blue-50/50 rounded-[2rem] border border-blue-100 border-dashed flex gap-4">
-                    <ShieldCheck
-                      size={20}
-                      className="text-[#1E5AA5] shrink-0 mt-1"
-                    />
-                    <p className="text-[10px] text-blue-400 font-medium leading-relaxed italic">
-                      Data identitas unit sekolah akan disinkronkan dengan
-                      pangkalan data pendidikan pusat YPA-MDR.
-                    </p>
+                  {/* FIX ICON: JUMLAH GURU & SISWA */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label
+                        text="Jumlah Guru Binaan"
+                        required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={formData.jumlah_guru}
+                          onChange={(e) =>
+                            setFormData({ ...formData, jumlah_guru: e.target.value })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <GraduationCap // FIX: Guru pakai icon Toga / Topi Kelulusan (atau bisa ditukar Staf jika ada)
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        text="Jumlah Siswa Aktif"
+                        required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={formData.jumlah_siswa}
+                          onChange={(e) =>
+                            setFormData({ ...formData, jumlah_siswa: e.target.value })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <Users // FIX: Siswa pakai icon Users (banyak orang)
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 

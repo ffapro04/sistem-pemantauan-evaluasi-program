@@ -109,35 +109,36 @@ const Login = () => {
   const getTargetPath = (decoded) => {
     console.log("Isi decoded token:", decoded);
 
-    const role = String(decoded.role || "")
-      .trim()
-      .toLowerCase();
-    const jenis = String(decoded.jenis || "")
-      .trim()
-      .toLowerCase();
+    // Ambil ID Role dan pastikan jadi angka
+    const id_role = Number(decoded.id_role);
+    const jenis = String(decoded.jenis || "").trim().toLowerCase();
 
-    console.log("Role yang didapat:", role);
-    console.log("Jenis:", jenis);
+    console.log("Role ID:", id_role);
 
-    if (role === "admin") {
+    if (id_role === 1) {
       return "/admin/dashboard";
-    }
-
-    if (role === "ho") {
+    } 
+    if (id_role === 2) {
+      return "/pengurus/dashboard"; 
+    } 
+    if (id_role === 3) {
       return jenis === "akademik"
         ? "/ho/dashboard/akademik"
         : "/ho/dashboard/non-akademik";
     }
 
+    if (id_role === 7) {
+      return "/kadin/dashboard";
+
+    }
     return "/sekolah/dashboard";
   };
-
+  
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      localStorage.clear();
       const res = await axios.post("http://localhost:3000/auth/login", {
         email: formData.email,
         password: formData.password,
@@ -151,7 +152,6 @@ const Login = () => {
       }
       const decoded = jwtDecode(token);
 
-      // Tunggu progress bar selesai
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       Swal.fire({
@@ -216,7 +216,6 @@ const Login = () => {
       setLoadingProgress(0);
     }
   };
-
   // Komponen Loading Zig Zag Bar
   const LoadingZigZagBar = () => (
     <div className="w-full space-y-2">

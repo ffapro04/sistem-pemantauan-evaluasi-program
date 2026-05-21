@@ -10,16 +10,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { User } from './user.entity';
-import { Wilayah } from '../wilayah/entities/wilayah.entity';
+import { Wilayah } from '../wilayah/entities/wilayah.entity'; // Pastikan un-comment jika Wilayah digunakan
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private userRepo: Repository<User>,
+    private readonly userRepo: Repository<User>,
 
     @InjectRepository(Wilayah)
-    private wilayahRepo: Repository<Wilayah>,
+    private readonly wilayahRepo: Repository<Wilayah>,
   ) {}
 
   // --- 1. AMBIL SEMUA USER ---
@@ -34,20 +34,18 @@ export class UsersService {
   async findOne(id: number) {
     if (!id) throw new BadRequestException('ID User wajib disertakan');
 
-    // Menggunakan QueryBuilder untuk memaksa kolom password yang di-hide (select: false) agar muncul
     const user = await this.userRepo
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.wilayah', 'wilayah')
       .leftJoinAndSelect('user.sekolah', 'sekolah')
-      .addSelect('user.password') // <--- Paksa password keluar untuk detail
+      .addSelect('user.password')
       .where('user.id_user = :id', { id })
       .getOne();
 
     if (!user)
       throw new NotFoundException(`User dengan ID #${id} tidak ditemukan`);
 
-    // Return sebagai plain object agar tidak terkena Interceptor Serialization NestJS
     return { ...user };
   }
 
@@ -65,13 +63,10 @@ export class UsersService {
   }
 
   // --- 4. CARI BERDASARKAN EMAIL (LOGIN VALIDASI) ---
-  // ✅ SESUDAH
   async findByEmail(email: string) {
-    return this.userRepo
+    // FIX: Diubah menggunakan query builder agar aman memaksa kolom password ditarik
+    return await this.userRepo
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.role', 'role')
-      .leftJoinAndSelect('user.wilayah', 'wilayah')
-      .leftJoinAndSelect('user.sekolah', 'sekolah')
       .addSelect('user.password')
       .where('user.email = :email', { email })
       .getOne();
@@ -91,7 +86,6 @@ export class UsersService {
         no_telp: data.no_telp,
         jenis: data.jenis || null,
         sub_jenis: data.sub_jenis || null,
-        // Konversi ke Number untuk memastikan integritas ID Role
         role: data.id_role ? ({ id_role: Number(data.id_role) } as any) : null,
       });
 
@@ -114,7 +108,6 @@ export class UsersService {
 
   // --- 6. UPDATE USER ---
   async update(id: number, data: any) {
-    // Gunakan findOne yang sudah kita perbaiki agar data lengkap terambil
     const user = await this.userRepo.findOne({ where: { id_user: id } });
     if (!user) throw new NotFoundException('User tidak ditemukan');
 
@@ -174,7 +167,6 @@ export class UsersService {
       no_telp: data.no_telp,
       jenis: data.jenis,
       sub_jenis: data.sub_jenis,
-      // Default untuk pendaftaran mandiri biasanya SEKOLAH (ID 5 sesuai mapping baru kamu)
       role: data.id_role
         ? ({ id_role: Number(data.id_role) } as any)
         : { id_role: 5 },

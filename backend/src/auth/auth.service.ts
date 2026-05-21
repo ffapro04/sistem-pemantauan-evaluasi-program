@@ -14,6 +14,12 @@ export class AuthService {
     // findByEmail sudah kita pastikan men-select password & id_role
     const user = await this.usersService.findByEmail(email);
 
+    console.log('====== DATA USER DARI DATABASE ======\n', user);
+
+  if (!user) {
+    throw new UnauthorizedException('User tidak ditemukan');
+  }
+
     if (!user) {
       throw new UnauthorizedException('User tidak ditemukan');
     }
@@ -31,7 +37,7 @@ export class AuthService {
       // SANGAT PENTING: Masukkan id_role (angka) agar Sidebar tidak "NO ROLE"
       id_role: user.id_role || (user.role ? user.role.id_role : null),
       role: user?.role?.nama_role || 'No Role',
-      id_sekolah: user.id_sekolah,
+      id_sekolah: user.id_sekolah || (user.sekolah ? user.sekolah.id_sekolah : null),
       jenis: user.jenis,
     };
 

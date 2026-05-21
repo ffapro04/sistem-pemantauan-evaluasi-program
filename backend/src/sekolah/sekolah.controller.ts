@@ -7,6 +7,7 @@ import {
   Patch,
   Param,
   Delete,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { SekolahService } from './sekolah.service';
 import { CreateSekolahDto } from './dto/create-sekolah.dto';
@@ -26,19 +27,33 @@ export class SekolahController {
     return this.sekolahService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.sekolahService.findOne(+id);
+  // --- POSISI PENTING: Jalur 'user/:userId' harus di atas ':id' jika id-nya string, 
+  // tapi karena kita pakai ParseIntPipe, urutan ini sudah aman. ---
+  // @Get('user/:userId')
+  // findByUserId(@Param('userId', ParseIntPipe) userId: number) {
+  //   return this.sekolahService.findByUserId(userId);
+  // }
+@Get('user/:userId')
+  async findByUserId(@Param('userId') userId: string) {
+    
+    return await this.sekolahService.findByUserId(+userId);
   }
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return await this.sekolahService.findOne(+id);
+  }
+@Get('programs/user/:userId')
+async findPrograms(@Param('userId', ParseIntPipe) userId: number) {
+  return this.sekolahService.findProgramsByUserId(userId);
+}
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSekolahDto: UpdateSekolahDto) {
-    return this.sekolahService.update(+id, updateSekolahDto);
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateSekolahDto: UpdateSekolahDto) {
+    return this.sekolahService.update(id, updateSekolahDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.sekolahService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.sekolahService.remove(id);
   }
-  
 }
