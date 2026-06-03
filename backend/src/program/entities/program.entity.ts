@@ -19,7 +19,7 @@ export class Program {
   @Column()
   id_sekolah: number;
 
-  @Column('int', { name: 'id_vendor', array: true, nullable: true }) // <--- Tambahkan 'int' dan array: true
+  @Column('int', { name: 'id_vendor', array: true, nullable: true })
   id_vendor: number[];
 
   @Column({ nullable: true })
@@ -51,6 +51,30 @@ export class Program {
 
   @Column({ name: 'file_mou', nullable: true })
   file_mou: string;
+
+  @Column({ nullable: true })
+  nomor_mou: string;
+
+  @Column({ type: 'decimal', precision: 15, scale: 2, default: 0 })
+  harga_vendor: number;
+
+  @Column({ nullable: true })
+  kpi_nama: string;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  kpi_target: number;
+
+  @Column({ nullable: true })
+  kpi_satuan: string;
+
+  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  sekolah_ids: number[];
+
+  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  ao_ids: number[];
+
+  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  vendor_ids: number[];
 
   @OneToMany(() => Fase, (fase) => fase.program)
   fases: Fase[];

@@ -28,6 +28,27 @@ export class AssessmentController {
     return this.assessmentService.findBySekolah(+id_sekolah, +id_user);
   }
 
+  @Get()
+  findAll(@Query('jenis') jenis?: string, @Query('id_ho') id_ho?: string) {
+    return this.assessmentService.findAll(jenis, id_ho ? +id_ho : undefined);
+  }
+
+  @Get('best-renggo')
+  getBestRenggo(
+    @Query('jenis') jenis?: string,
+    @Query('id_assessment') id_assessment?: string,
+  ) {
+    return this.assessmentService.getBestRenggo(
+      jenis,
+      id_assessment ? +id_assessment : undefined,
+    );
+  }
+
+  @Get(':id/hasil')
+  getHasilAssessment(@Param('id') id: string) {
+    return this.assessmentService.getHasilAssessment(+id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.assessmentService.findOne(+id);
@@ -51,10 +72,5 @@ export class AssessmentController {
   @Patch(':id/send')
   send(@Param('id') id: string) {
     return this.assessmentService.send(+id);
-  }
-
-  @Get()
-  findAll(@Query('jenis') jenis?: string, @Query('id_ho') id_ho?: string) {
-    return this.assessmentService.findAll(jenis, id_ho ? +id_ho : undefined);
   }
 }

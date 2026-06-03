@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,9 +11,8 @@ import {
   EyeOff,
   Loader2,
   Activity,
-  Sparkles,
+  LogIn,
   ArrowLeft,
-  LogIn
 } from "lucide-react";
 
 // ASSETS
@@ -30,6 +29,107 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Label from "../../components/Label";
 
+const getRedirectPath = (decoded) => {
+  const role = String(decoded.role || decoded.nama_role || "")
+    .trim()
+    .toLowerCase();
+
+  const jenis = String(decoded.jenis || "")
+    .trim()
+    .toLowerCase();
+
+  const jabatan = String(decoded.jabatan || "")
+    .trim()
+    .toLowerCase();
+
+  const idRole = Number(decoded.id_role || decoded.role_id || 0);
+
+  console.log("ROLE CHECK:", {
+    role,
+    jenis,
+    jabatan,
+    idRole,
+  });
+
+  // ADMIN + PENGURUS
+  if (
+    idRole === 1 ||
+    idRole === 2 ||
+    role === "admin" ||
+    role === "pengurus" ||
+    jabatan.includes("admin") ||
+    jabatan.includes("pengurus")
+  ) {
+    return "/admin/dashboard";
+  }
+
+  // HEAD OFFICE
+  if (
+    idRole === 3 ||
+    role === "ho" ||
+    role.includes("head office") ||
+    jabatan.includes("head office") ||
+    jabatan.includes("ho")
+  ) {
+    if (jenis.includes("non")) return "/ho/dashboard/non-akademik";
+    return "/ho/dashboard/akademik";
+  }
+
+  // AREA OFFICER
+  if (
+    idRole === 4 ||
+    role === "ao" ||
+    role.includes("area officer") ||
+    jabatan.includes("area officer")
+  ) {
+    return "/ao/dashboard";
+  }
+
+  // SEKOLAH
+  if (
+    idRole === 5 ||
+    role === "sekolah" ||
+    role === "institusi" ||
+    jenis === "sekolah" ||
+    jabatan.includes("sekolah") ||
+    jabatan.includes("institusi")
+  ) {
+    return "/sekolah/dashboard";
+  }
+
+  // VENDOR
+  if (
+    idRole === 6 ||
+    role === "vendor" ||
+    jabatan.includes("vendor")
+  ) {
+    return "/vendor/dashboard";
+  }
+
+  // KEPALA DINAS
+  if (
+    idRole === 7 ||
+    role.includes("kepala dinas") ||
+    role.includes("dinas") ||
+    jabatan.includes("kepala dinas") ||
+    jabatan.includes("dinas")
+  ) {
+    return "/kepaladinas/dashboard";
+  }
+
+  // GURU ASSESSMENT
+  // Guru tetap masuk lewat akun sekolah + mini login guru.
+  // Kalau role ini tidak sengaja login lewat halaman utama, arahkan ke dashboard sekolah.
+  if (
+    idRole === 8 ||
+    role.includes("guru") ||
+    jabatan.includes("guru")
+  ) {
+    return "/sekolah/dashboard";
+  }
+
+  return "/login";
+};
 const Login = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
@@ -38,10 +138,11 @@ const Login = () => {
   const [focused, setFocused] = useState(null);
 
   const navigate = useNavigate();
-  const backgrounds = [library_YPAMDR];
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
+
     setLoading(true);
 
     try {
@@ -50,151 +151,92 @@ const Login = () => {
         password: formData.password,
       });
 
-      const token = res.data.access_token;
+      const token = res.data.access_token || res.data.token;
+
+      if (!token) {
+        throw new Error("Token tidak ditemukan dari server");
+      }
+
       localStorage.setItem("token", token);
+
       const decoded = jwtDecode(token);
+      localStorage.setItem("user", JSON.stringify(decoded));
+
+      const redirectPath = getRedirectPath(decoded);
+
+      console.log("LOGIN DECODED:", decoded);
+      console.log("REDIRECT TARGET:", redirectPath);
 
       setIsSuccess(true);
-      // Jeda sedikit lebih lama agar animasi loading terlihat premium
+
       setTimeout(() => {
-        const role = String(decoded.role || "").toLowerCase();
-        const jenis = String(decoded.jenis || "").toLowerCase();
-        let target = (role === "admin") ? "/admin/dashboard" : (role === "ho") ? (jenis === "akademik" ? "/ho/dashboard/akademik" : "/ho/dashboard/non-akademik") : "/sekolah/dashboard";
-        navigate(target);
-      }, 2500);
+        navigate(redirectPath, { replace: true });
+      }, 900);
     } catch (err) {
+      console.error("LOGIN ERROR:", err);
       setLoading(false);
-      alert("Gagal Masuk: Kredensial tidak valid.");
+      setIsSuccess(false);
+      alert(err.response?.data?.message || "Gagal Masuk: Kredensial tidak valid.");
     }
   };
 
   return (
-    <PageWrapper className="!p-0 h-screen w-full flex bg-[#F8FAFC] overflow-hidden font-sans">
+    <PageWrapper className="!p-0 flex h-screen w-full overflow-hidden bg-[#F6F8FB] font-sans">
       <AnimatePresence mode="wait">
         {!isSuccess ? (
           <motion.div
             key="login-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ scale: 5, opacity: 0, filter: "blur(20px)", transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }}
-            className="relative w-full h-full flex"
+            exit={{
+              opacity: 0,
+              filter: "blur(10px)",
+              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+            }}
+            className="relative h-full w-full overflow-hidden"
           >
-            {/* ─── BACKGROUND & WAVY DIVIDER ─── */}
-            <div className="absolute inset-0 z-0 flex">
-              <div className="w-[45%] bg-white h-full" />
-              <div className="w-[55%] relative h-full overflow-hidden">
-                <img src={library_YPAMDR} className="w-full h-full object-cover" alt="Library" />
-                <div className="absolute inset-0 bg-[#0AC4E0]/10 mix-blend-multiply" />
-              </div>
-              <svg
-                className="absolute inset-y-0 left-[45%] h-full w-[120px] text-white fill-current translate-x-[-100%]"
-                preserveAspectRatio="none" viewBox="0 0 100 100"
-              >
-                <path d="M100,0 C50,0 50,50 0,50 C50,50 50,100 100,100 Z" />
-              </svg>
-            </div>
+            <div className="absolute inset-0 flex">
+              <div className="h-full w-[48%] bg-[#F6F8FB]" />
 
-            {/* ─── CONTENT LAYER ─── */}
-            <div className="relative z-10 w-full h-full flex flex-col lg:flex-row">
+              <div className="relative hidden h-full flex-1 overflow-hidden lg:block">
+                <img
+                  src={library_YPAMDR}
+                  className="h-full w-full object-cover"
+                  alt="Library YPA-MDR"
+                />
 
-              {/* SISI KIRI: FORM LOGIN */}
-              <div className="w-full lg:w-[45%] h-full flex flex-col justify-between p-12 lg:p-20 bg-transparent">
-                <div className="flex items-center gap-4">
-                  <img src={logo_ypamdr_blue} className="h-10 object-contain" alt="Logo" />
-                  <div className="w-px h-6 bg-slate-200" />
-                  <a
-                    href="https://yayasanastra-ypamdr.or.id/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.3em] hover:text-[#0AC4E0] transition-colors"
-                  >
-                    Official YPAMDR
-                  </a>
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-[#0AC4E0]/10 to-slate-950/65" />
+                <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.18)_0%,transparent_36%,rgba(15,23,42,0.25)_100%)]" />
+
+                <div className="absolute right-10 top-10 grid grid-cols-6 gap-2 opacity-45">
+                  {Array.from({ length: 36 }).map((_, index) => (
+                    <span
+                      key={index}
+                      className="h-1.5 w-1.5 rounded-full bg-[#0AC4E0]"
+                    />
+                  ))}
                 </div>
 
-                <div className="max-w-[420px] w-full text-left">
-                  <header className="mb-10">
-                    <h1 className="text-6xl font-black text-slate-800 tracking-tighter leading-none">
-                      Masuk<br />
-                    </h1>
-                  </header>
+                <div className="absolute bottom-10 right-12 max-w-[510px] text-right text-white">
+                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">
+                    Yayasan Pendidikan Astra Michael D. Ruslim
+                  </p>
 
-                  <form onSubmit={handleLogin} className="space-y-8">
-                    {/* INPUT EMAIL */}
-                    <div className="space-y-2">
-                      <Label text="Email Akun" className="!text-[11px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                      <div className={`relative transition-all duration-300 ${focused === 'email' ? 'scale-[1.02]' : ''}`}>
-                        <Input
-                          type="email"
-                          placeholder="nama@ypamdr.or.id"
-                          value={formData.email}
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                          onFocus={() => setFocused('email')}
-                          onBlur={() => setFocused(null)}
-                          className={`!h-16 !pl-14 !rounded-2xl !border-2 !text-base !font-bold ${focused === 'email' ? '!border-[#0AC4E0] !bg-white shadow-2xl shadow-cyan-100/50' : '!border-slate-100 !bg-slate-50/50'}`}
-                        />
-                        <Mail size={20} className={`absolute left-5 top-1/2 -translate-y-1/2 transition-colors ${focused === 'email' ? 'text-[#0AC4E0]' : 'text-slate-300'}`} />
-                      </div>
-                    </div>
+                  <h2 className="mt-4 text-[35px] font-black leading-tight tracking-[-0.055em]">
+                    Monitoring program yang lebih terarah dan terukur.
+                  </h2>
 
-                    {/* INPUT PASSWORD */}
-                    <div className="space-y-2">
-                      <Label text="Kata Sandi" className="!text-[11px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                      <div className={`relative transition-all duration-300 ${focused === 'password' ? 'scale-[1.02]' : ''}`}>
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          onFocus={() => setFocused('password')}
-                          onBlur={() => setFocused(null)}
-                          className={`!h-16 !pl-14 !pr-14 !rounded-2xl !border-2 !text-base !font-bold ${focused === 'password' ? '!border-[#0AC4E0] !bg-white shadow-2xl shadow-cyan-100/50' : '!border-slate-100 !bg-slate-50/50'}`}
-                        />
-                        <Lock size={20} className={`absolute left-5 top-1/2 -translate-y-1/2 transition-colors ${focused === 'password' ? 'text-[#0AC4E0]' : 'text-slate-300'}`} />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#0AC4E0]"
-                        >
-                          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                        </button>
-                      </div>
-                    </div>
+                  <p className="ml-auto mt-4 max-w-[420px] text-[13px] font-semibold leading-6 text-white/70">
+                    Progres program, dokumen, validasi, dan evaluasi dapat
+                    dipantau dalam satu alur kerja.
+                  </p>
 
-                    {/* BUTTONS */}
-                    <div className="pt-4 flex items-center gap-4">
-                      <Button
-                        text="Kembali"
-                        variant="outline"
-                        onClick={() => navigate("/")}
-                        className="!flex-1 !h-16 !rounded-2xl !text-[11px] !font-black !uppercase !tracking-[0.2em] !border-slate-200 !text-slate-400 hover:!bg-slate-50"
-                      />
-                      <Button
-                        text={loading ? "Proses..." : "Masuk"}
-                        icon={!loading && <LogIn size={18} />}
-                        onClick={handleLogin}
-                        disabled={loading}
-                        className="!flex-1 !h-16 !bg-[#0AC4E0] hover:!bg-[#00889A] !text-white !rounded-2xl !text-[12px] !font-black !uppercase !tracking-[0.2em] shadow-xl shadow-cyan-200 active:scale-95 transition-all"
-                      />
-                    </div>
-                  </form>
-                </div>
-
-                <div className="flex items-center gap-3 opacity-40">
-                  <Activity size={14} className="text-slate-400" />
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Sistem Pemantauan dan Evaluasi Program</span>
-                </div>
-              </div>
-
-              {/* SISI KANAN BAWAH: PILAR CATUR DHARMA */}
-              <div className="hidden lg:flex flex-1 items-end justify-end p-12 lg:p-16">
-                <div className="flex flex-col items-end gap-5">
-                  <p className="text-[9px] font-black text-white/60 uppercase tracking-[0.3em]">Yayasan Pendidikan Astra Michael D.Ruslim</p>
-                  <div className="flex gap-6">
+                  <div className="mt-7 flex justify-end gap-5">
                     {[pilar1, pilar2, pilar3, pilar4].map((src, i) => (
                       <img
-                        key={i} src={src}
-                        className="h-9 w-9 object-contain brightness-0 invert opacity-40 hover:opacity-100 transition-all duration-500"
+                        key={i}
+                        src={src}
+                        className="h-9 w-9 object-contain brightness-0 invert opacity-55 transition hover:opacity-100"
                         alt="pilar"
                       />
                     ))}
@@ -202,35 +244,289 @@ const Login = () => {
                 </div>
               </div>
             </div>
+
+            <div className="relative z-10 flex h-full w-full">
+              <section className="flex h-full w-full items-center justify-center px-7 py-7 lg:w-[48%]">
+                <div className="paper-sheet relative w-full max-w-[500px] px-9 py-9 lg:px-11 lg:py-10">
+                  <div className="absolute left-1/2 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0AC4E0] shadow-[0_12px_22px_rgba(10,196,224,0.32)] ring-4 ring-white/80" />
+
+                  <div className="mb-10 flex items-center gap-5">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] bg-white/40">
+                      <img
+                        src={logo_ypamdr_blue}
+                        className="h-14 object-contain"
+                        alt="Logo YPA-MDR"
+                      />
+                    </div>
+
+                    <div className="h-20 w-px bg-slate-300/70" />
+
+                    <div className="min-w-0">
+                      <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-slate-800">
+                        Sistem
+                      </p>
+
+                      <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-slate-800">
+                        Pemantauan dan
+                      </p>
+
+                      <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-[#0AC4E0]">
+                        Evaluasi Program
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mb-7">
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
+                      Login Sistem
+                    </p>
+
+                    <h1 className="mt-2 text-[42px] font-black leading-none tracking-[-0.06em] text-slate-900">
+                      Masuk
+                    </h1>
+
+                    <p className="mt-3 max-w-sm text-[12px] font-semibold leading-6 text-slate-500">
+                      Gunakan akun yang telah terdaftar sesuai peran pengguna.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleLogin} className="space-y-8">
+                    <div>
+                      <div className="mb-2 flex items-center gap-3">
+                        <Mail
+                          size={18}
+                          className={
+                            focused === "email"
+                              ? "text-[#0AC4E0]"
+                              : "text-slate-500"
+                          }
+                        />
+
+                        <Label
+                          text="Email"
+                          className="!mb-0 !text-[13px] !font-black !text-slate-700"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Input
+                          type="email"
+                          placeholder="nama@ypamdr.or.id"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              email: e.target.value,
+                            })
+                          }
+                          onFocus={() => setFocused("email")}
+                          onBlur={() => setFocused(null)}
+                          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+                        />
+
+                        <span
+                          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "email" ? "w-full" : "w-0"
+                            }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex items-center gap-3">
+                        <Lock
+                          size={18}
+                          className={
+                            focused === "password"
+                              ? "text-[#0AC4E0]"
+                              : "text-slate-500"
+                          }
+                        />
+
+                        <Label
+                          text="Password"
+                          className="!mb-0 !text-[13px] !font-black !text-slate-700"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Masukkan password Anda"
+                          value={formData.password}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              password: e.target.value,
+                            })
+                          }
+                          onFocus={() => setFocused("password")}
+                          onBlur={() => setFocused(null)}
+                          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !pr-10 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+
+                        <span
+                          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "password" ? "w-full" : "w-0"
+                            }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-1">
+                      <Button
+                        text={loading ? "Proses..." : "Masuk"}
+                        icon={
+                          loading ? (
+                            <Loader2 size={18} className="animate-spin" />
+                          ) : (
+                            <LogIn size={18} />
+                          )
+                        }
+                        type="submit"
+                        disabled={loading}
+                        className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-70"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => navigate("/")}
+                        className="mx-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[12px] font-black text-slate-500 transition hover:bg-white/60 hover:text-[#0AC4E0]"
+                      >
+                        <ArrowLeft size={16} />
+                        Kembali
+                      </button>
+                    </div>
+                  </form>
+
+                  <div className="mt-8 flex items-center justify-center gap-3 text-center opacity-55">
+                    <Activity size={14} className="text-[#0AC4E0]" />
+
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                      Yayasan Pendidikan Astra
+                    </span>
+                  </div>
+                </div>
+              </section>
+            </div>
           </motion.div>
         ) : (
-          /* ─── ANIMASI TRANSISI SUKSES (VERSI TERBARU) ─── */
           <motion.div
               key="success"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center w-full h-full bg-white"
+              className="flex h-full w-full flex-col items-center justify-center bg-white"
           >
               <motion.h2
-                initial={{ y: 20, opacity: 0 }}
+                initial={{ y: 18, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.8 }}
-                className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight text-center px-6"
+                transition={{ delay: 0.12, duration: 0.5 }}
+                className="px-6 text-center text-3xl font-black tracking-tight text-slate-900 md:text-4xl"
               >
                 Sistem Pemantauan dan Evaluasi Program
               </motion.h2>
 
-              <motion.div
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
-                className="mt-12"
+              <motion.p
+                initial={{ y: 14, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.22, duration: 0.5 }}
+                className="mt-3 text-center text-sm font-semibold text-slate-400"
               >
-                <Loader2 className="w-14 h-14 text-[#0AC4E0] animate-spin" strokeWidth={3} />
+                Login berhasil, mengarahkan ke dashboard...
+              </motion.p>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.7 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.42, duration: 0.35 }}
+                className="mt-10"
+              >
+                <Loader2
+                  className="h-12 w-12 animate-spin text-[#0AC4E0]"
+                  strokeWidth={3}
+                />
               </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .paper-sheet {
+              background:
+                radial-gradient(circle at 18% 16%, rgba(255,255,255,0.72), transparent 20%),
+                radial-gradient(circle at 82% 22%, rgba(15,23,42,0.035), transparent 18%),
+                radial-gradient(circle at 22% 78%, rgba(15,23,42,0.045), transparent 20%),
+                linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9));
+              box-shadow:
+                0 28px 60px rgba(15, 23, 42, 0.16),
+                0 8px 18px rgba(15, 23, 42, 0.08);
+              filter: drop-shadow(0 16px 18px rgba(15,23,42,0.10));
+              border: 1px solid rgba(226, 232, 240, 0.85);
+              border-radius: 18px;
+            }
+
+            .paper-sheet::before {
+              content: "";
+              position: absolute;
+              inset: 0;
+              pointer-events: none;
+              border-radius: inherit;
+              opacity: 0.45;
+              background-image:
+                linear-gradient(115deg, transparent 0%, rgba(15,23,42,0.04) 18%, transparent 32%),
+                linear-gradient(72deg, transparent 0%, rgba(255,255,255,0.55) 36%, transparent 51%),
+                repeating-linear-gradient(
+                  0deg,
+                  rgba(15,23,42,0.035) 0px,
+                  rgba(15,23,42,0.035) 1px,
+                  transparent 1px,
+                  transparent 7px
+                );
+              mix-blend-mode: multiply;
+            }
+
+            .paper-sheet::after {
+              content: "";
+              position: absolute;
+              inset: -1px;
+              pointer-events: none;
+              border-radius: inherit;
+              background:
+                linear-gradient(90deg, rgba(255,255,255,0.92), transparent 12%, transparent 88%, rgba(15,23,42,0.04)),
+                linear-gradient(0deg, rgba(15,23,42,0.06), transparent 10%, transparent 90%, rgba(255,255,255,0.72));
+              opacity: 0.45;
+            }
+
+            .paper-line-input {
+              border-bottom-color: rgba(51, 65, 85, 0.55) !important;
+            }
+
+            .paper-line-input::placeholder {
+              color: rgba(100, 116, 139, 0.52) !important;
+              font-weight: 600 !important;
+            }
+
+            .paper-line-input:focus {
+              box-shadow: none !important;
+              border-bottom-color: rgba(51, 65, 85, 0.55) !important;
+            }
+
+            @media (max-height: 760px) {
+              .paper-sheet {
+                transform: scale(0.94);
+              }
+            }
+          `,
+        }}
+      />
     </PageWrapper>
   );
 };

@@ -6,7 +6,8 @@ import {
   IsNotEmpty,
   IsEmail,
   MinLength,
-} from 'class-validator'; // Pastikan IsEmail dan MinLength diimpor di sini
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateSekolahDto {
   @IsString()
@@ -29,27 +30,47 @@ export class CreateSekolahDto {
   @IsString()
   alamat?: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsNotEmpty()
   id_wilayah: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   jumlah_guru?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   jumlah_siswa?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   latitude?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   longitude?: number;
 
-  // --- KREDENSIAL LOGIN ---
+  @IsOptional()
+  @IsString()
+  area?: string;
+
+  @IsOptional()
+  @IsString()
+  kriteria_2022?: string;
+
+  @IsOptional()
+  @IsString()
+  sertifikat_iso?: string;
+
+  @IsOptional()
+  @IsString()
+  adiwiyata?: string;
+
   @IsEmail({}, { message: 'Format email tidak valid' })
   @IsNotEmpty()
   email_login: string;

@@ -9,6 +9,7 @@ import {
   UnauthorizedException,
   UseInterceptors,
   UploadedFile,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -18,6 +19,39 @@ import { TerminService } from './termin.service';
 @Controller('termin')
 export class TerminController {
   constructor(private readonly terminService: TerminService) {}
+
+  private getUserFromAuth(authHeader: string) {
+    if (!authHeader) {
+      throw new UnauthorizedException('Token tidak ada');
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+      const payloadBase64Url = token.split('.')[1];
+      const payloadBase64 = payloadBase64Url
+        .replace(/-/g, '+')
+        .replace(/_/g, '/');
+
+      const payloadJson = Buffer.from(payloadBase64, 'base64').toString(
+        'utf-8',
+      );
+
+      const payload = JSON.parse(payloadJson);
+
+      return {
+        id_user: payload.sub || payload.id_user || payload.id,
+        nama_user: payload.nama || payload.name || payload.email || '',
+        role_user:
+          payload.role ||
+          payload.nama_role ||
+          payload.jabatan ||
+          String(payload.id_role || ''),
+      };
+    } catch (e) {
+      throw new UnauthorizedException('Token tidak valid');
+    }
+  }
 
   @Post()
   @UseInterceptors(
@@ -37,32 +71,15 @@ export class TerminController {
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token tidak ada');
-    }
+    const user = this.getUserFromAuth(authHeader);
 
-    const token = authHeader.split(' ')[1];
-    let id_user = null;
-    let nama_user = '';
-    let role_user = '';
-
-    try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-      const payloadJson = Buffer.from(payloadBase64, 'base64').toString(
-        'utf-8',
-      );
-      const payload = JSON.parse(payloadJson);
-      id_user = payload.sub;
-      nama_user = payload.nama || '';
-      role_user = payload.role || '';
-    } catch (e) {
-      throw new UnauthorizedException('Token tidak valid');
-    }
-
-    return this.terminService.createTermin(createDto, file, id_user, nama_user, role_user);
+    return this.terminService.createTermin(
+      createDto,
+      file,
+      user.id_user,
+      user.nama_user,
+      user.role_user,
+    );
   }
 
   @Get('kegiatans/:id')
@@ -75,32 +92,19 @@ export class TerminController {
     @Body() createDto: any,
     @Headers('authorization') authHeader: string,
   ) {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token tidak ada');
-    }
+    const user = this.getUserFromAuth(authHeader);
 
-    const token = authHeader.split(' ')[1];
-    let id_user = null;
-    let nama_user = '';
-    let role_user = '';
+    return this.terminService.createChat(
+      createDto,
+      user.id_user,
+      user.nama_user,
+      user.role_user,
+    );
+  }
 
-    try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-      const payloadJson = Buffer.from(payloadBase64, 'base64').toString(
-        'utf-8',
-      );
-      const payload = JSON.parse(payloadJson);
-      id_user = payload.sub;
-      nama_user = payload.nama || '';
-      role_user = payload.role || '';
-    } catch (e) {
-      throw new UnauthorizedException('Token tidak valid');
-    }
-
-    return this.terminService.createChat(createDto, id_user, nama_user, role_user);
+  @Get('chat')
+  getChatsByContext(@Query() query: any) {
+    return this.terminService.getChatsByContext(query);
   }
 
   @Get('chat/:id_termin')

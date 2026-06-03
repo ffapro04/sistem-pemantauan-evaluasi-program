@@ -10,6 +10,19 @@ import Login from "./page/otorisasi/Login";
 // ADMIN - DASHBOARD & GLOBAL
 // =========================================================================
 import DashboardAdmin from "./page/admin/dashboardadmin/DashboardAdmin";
+import AgendaAdmin from "./page/admin/dashboardadmin/AgendaAdmin";
+
+// =========================================================================
+// PENGURUS ROLE
+// =========================================================================
+import DashboardPengurus from "./page/pengurus/DashboardPengurus";
+
+// =========================================================================
+// KEPALA DINAS ROLE
+// =========================================================================
+import DashboardKepalaDinas from "./page/kepaladinas/DashboardKepalaDinas";
+import DaftarSekolahKepalaDinas from "./page/kepaladinas/DaftarSekolahKepalaDinas";
+import DetailSekolahKepalaDinas from "./page/kepaladinas/DetailSekolahKepalaDinas";
 
 // =========================================================================
 // ADMIN - KELOLA MASTER DATA
@@ -33,13 +46,13 @@ import CreateVendor from "./page/admin/kelolamaster/mastervendor/CreateVendor";
 import EditVendor from "./page/admin/kelolamaster/mastervendor/EditVendor";
 import DetailVendor from "./page/admin/kelolamaster/mastervendor/DetailVendor";
 
-// MASTER AO (AREA OFFICER)
+// MASTER AO / AREA OFFICER
 import ReadAO from "./page/admin/kelolamaster/masterao/ReadAO";
 import CreateAO from "./page/admin/kelolamaster/masterao/CreateAO";
 import EditAO from "./page/admin/kelolamaster/masterao/EditAO";
 import DetailAO from "./page/admin/kelolamaster/masterao/DetailAO";
 
-// MASTER HO (HEAD OFFICE)
+// MASTER HO / HEAD OFFICE
 import ReadHO from "./page/admin/kelolamaster/masterho/ReadHO";
 import CreateHO from "./page/admin/kelolamaster/masterho/CreateHO";
 import EditHO from "./page/admin/kelolamaster/masterho/EditHO";
@@ -57,28 +70,43 @@ import CreatePengurus from "./page/admin/kelolamaster/masterpengurus/CreatePengu
 import EditPengurus from "./page/admin/kelolamaster/masterpengurus/EditPengurus";
 import DetailPengurus from "./page/admin/kelolamaster/masterpengurus/DetailPengurus";
 
-
+// MASTER KEPALA DINAS
+import ReadKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas";
+import CreateKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/CreateKepalaDinas";
+import EditKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/EditKepalaDinas";
+import DetailKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/DetailKepalaDinas";
 
 // =========================================================================
 // SEKOLAH OPS
 // =========================================================================
 import DashboardSekolah from "./page/sekolah/DashboardSekolah";
+import AssessmentSekolah from "./page/sekolah/AssessmentSekolah";
 import IsiAssessmentSekolah from "./page/sekolah/IsiAssessmentSekolah";
 
 // =========================================================================
-// HO - DASHBOARD (dipisah per jenis)
+// VENDOR ROLE
+// =========================================================================
+import DashboardVendor from "./page/vendor/DashboardVendor";
+import ListProgramVendor from "./page/vendor/ListProgramVendor";
+import DetailProgramVendor from "./page/vendor/DetailProgramVendor";
+
+// =========================================================================
+// HO - DASHBOARD
 // =========================================================================
 import DashboardAkademik from "./page/akademik/DashboardAkademik";
 import DashboardnonAkademik from "./page/nonAkademik/DashboardnonAkademik";
 
 // =========================================================================
-// AKADEMIK (HO ROLE)
+// AKADEMIK - ASSESSMENT
 // =========================================================================
 import ReadAssessmentAkademik from "./page/akademik/assakademik/ReadAssessmentAkademik";
 import CreateAssessmentAkademik from "./page/akademik/assakademik/CreateAssessmentAkademik";
 import DetailAssessmentAkademik from "./page/akademik/assakademik/DetailAssessmentAkademik";
 import EditAssessmentAkademik from "./page/akademik/assakademik/EditAssessmentAkademik";
 
+// =========================================================================
+// AKADEMIK - PROGRAM
+// =========================================================================
 import ReadProgramAkademik from "./page/akademik/proAkademik/ReadProgramAkademik";
 import ListProgramAkademik from "./page/akademik/proAkademik/ListProgramAkademik";
 import CreateProgramAkademik from "./page/akademik/proAkademik/CreateProgramAkademik";
@@ -87,13 +115,16 @@ import EditProgramAkademik from "./page/akademik/proAkademik/EditProgramAkademik
 import CalendarOfEventakademik from "./page/akademik/proAkademik/CalendarOfEventakademik";
 
 // =========================================================================
-// NON-AKADEMIK (HO ROLE)
+// NON-AKADEMIK - ASSESSMENT
 // =========================================================================
 import ReadAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/ReadAssessmentnonAkademik";
 import CreateAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/CreateAssessmentnonAkademik";
 import DetailAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/DetailAssessmentnonAkademik";
 import EditAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/EditAssessmentnonAkademik";
 
+// =========================================================================
+// NON-AKADEMIK - PROGRAM
+// =========================================================================
 import ReadProgramNonAkademik from "./page/nonAkademik/proNonAkademik/ReadProgramnonAkademik";
 import ListProgramNonAkademik from "./page/nonAkademik/proNonAkademik/ListProgramnonAkademik";
 import CreateProgramNonAkademik from "./page/nonAkademik/proNonAkademik/CreateProgramnonAkademik";
@@ -105,72 +136,137 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* --- OTORISASI --- */}
+        {/* =========================================================================
+            OTORISASI
+        ========================================================================= */}
         <Route path="/" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
 
-        {/* --- ADMIN DASHBOARD --- */}
+        {/* =========================================================================
+            ADMIN DASHBOARD
+        ========================================================================= */}
         <Route path="/admin/dashboard" element={<DashboardAdmin />} />
+        <Route path="/admin/agenda" element={<AgendaAdmin />} />
 
-        {/* --- MASTER USER --- */}
+        {/* =========================================================================
+            PENGURUS DASHBOARD
+        ========================================================================= */}
+        <Route path="/pengurus/dashboard" element={<DashboardPengurus />} />
+
+        {/* =========================================================================
+            MASTER USER
+        ========================================================================= */}
         <Route path="/admin/users" element={<ReadUser />} />
         <Route path="/admin/users/create" element={<CreateUser />} />
         <Route path="/admin/users/detail/:id" element={<DetailUser />} />
         <Route path="/admin/users/edit/:id" element={<EditUser />} />
 
-        {/* --- MASTER SEKOLAH --- */}
+        {/* =========================================================================
+            MASTER SEKOLAH
+        ========================================================================= */}
         <Route path="/admin/sekolah" element={<ReadSekolah />} />
         <Route path="/admin/sekolah/create" element={<CreateSekolah />} />
         <Route path="/admin/sekolah/detail/:id" element={<DetailSekolah />} />
         <Route path="/admin/sekolah/edit/:id" element={<EditSekolah />} />
 
-        {/* --- MASTER VENDOR --- */}
+        {/* =========================================================================
+            MASTER VENDOR
+        ========================================================================= */}
         <Route path="/admin/vendor" element={<ReadVendor />} />
         <Route path="/admin/vendor/create" element={<CreateVendor />} />
         <Route path="/admin/vendor/detail/:id" element={<DetailVendor />} />
         <Route path="/admin/vendor/edit/:id" element={<EditVendor />} />
 
-        {/* --- MASTER AO --- */}
+        {/* =========================================================================
+            MASTER AO / AREA OFFICER
+        ========================================================================= */}
         <Route path="/admin/ao" element={<ReadAO />} />
         <Route path="/admin/ao/create" element={<CreateAO />} />
         <Route path="/admin/ao/detail/:id" element={<DetailAO />} />
         <Route path="/admin/ao/edit/:id" element={<EditAO />} />
 
-        {/* --- MASTER HO --- */}
+        {/* =========================================================================
+            MASTER HO / HEAD OFFICE
+        ========================================================================= */}
         <Route path="/admin/ho" element={<ReadHO />} />
         <Route path="/admin/ho/create" element={<CreateHO />} />
         <Route path="/admin/ho/detail/:id" element={<DetailHO />} />
         <Route path="/admin/ho/edit/:id" element={<EditHO />} />
 
-        {/* --- MASTER WILAYAH --- */}
+        {/* =========================================================================
+            MASTER WILAYAH
+        ========================================================================= */}
         <Route path="/admin/wilayah" element={<ReadWilayah />} />
         <Route path="/admin/wilayah/create" element={<CreateWilayah />} />
         <Route path="/admin/wilayah/detail/:id" element={<DetailWilayah />} />
         <Route path="/admin/wilayah/edit/:id" element={<EditWilayah />} />
 
-        {/* --- MASTER PENGURUS --- */}
+        {/* =========================================================================
+            MASTER PENGURUS
+        ========================================================================= */}
         <Route path="/admin/pengurus" element={<ReadPengurus />} />
         <Route path="/admin/pengurus/create" element={<CreatePengurus />} />
         <Route path="/admin/pengurus/detail/:id" element={<DetailPengurus />} />
         <Route path="/admin/pengurus/edit/:id" element={<EditPengurus />} />
 
+        {/* =========================================================================
+            MASTER KEPALA DINAS
+        ========================================================================= */}
+        <Route path="/admin/kadin" element={<ReadKepalaDinas />} />
+        <Route path="/admin/kadin/create" element={<CreateKepalaDinas />} />
+        <Route path="/admin/kadin/detail/:id" element={<DetailKepalaDinas />} />
+        <Route path="/admin/kadin/edit/:id" element={<EditKepalaDinas />} />
 
+        {/* =========================================================================
+            MODUL KEPALA DINAS
+        ========================================================================= */}
+        <Route
+          path="/kepaladinas/dashboard"
+          element={<DashboardKepalaDinas />}
+        />
+        <Route
+          path="/kepaladinas/sekolah"
+          element={<DaftarSekolahKepalaDinas />}
+        />
+        <Route
+          path="/kepaladinas/sekolah/detail/:id"
+          element={<DetailSekolahKepalaDinas />}
+        />
 
-        {/* --- MODUL SEKOLAH --- */}
+        {/* =========================================================================
+            MODUL SEKOLAH
+        ========================================================================= */}
         <Route path="/sekolah/dashboard" element={<DashboardSekolah />} />
+        <Route path="/sekolah/assessment" element={<AssessmentSekolah />} />
         <Route
           path="/sekolah/assessment/isi/:id"
           element={<IsiAssessmentSekolah />}
         />
 
-        {/* --- HO DASHBOARD (dipisah per jenis) --- */}
+        {/* Alias lama agar URL lama tetap aman */}
+        <Route path="/sekolah/program" element={<DashboardSekolah />} />
+
+        {/* =========================================================================
+            MODUL VENDOR
+        ========================================================================= */}
+        <Route path="/vendor/dashboard" element={<DashboardVendor />} />
+        <Route path="/vendor/program" element={<ListProgramVendor />} />
+        <Route
+          path="/vendor/program/detail/:id"
+          element={<DetailProgramVendor />}
+        />
+
+        {/* =========================================================================
+            HO DASHBOARD
+        ========================================================================= */}
         <Route path="/ho/dashboard/akademik" element={<DashboardAkademik />} />
         <Route
           path="/ho/dashboard/non-akademik"
           element={<DashboardnonAkademik />}
         />
-
-        {/* --- HO AKADEMIK --- */}
+        {/* =========================================================================
+            HO AKADEMIK - ASSESSMENT
+        ========================================================================= */}
         <Route
           path="/ho/assessment/akademik"
           element={<ReadAssessmentAkademik />}
@@ -187,6 +283,10 @@ function App() {
           path="/ho/assessment/akademik/edit/:id"
           element={<EditAssessmentAkademik />}
         />
+
+        {/* =========================================================================
+            HO AKADEMIK - PROGRAM
+        ========================================================================= */}
         <Route path="/ho/program/akademik" element={<ReadProgramAkademik />} />
         <Route
           path="/ho/program/akademik/list/:id"
@@ -209,7 +309,9 @@ function App() {
           element={<CalendarOfEventakademik />}
         />
 
-        {/* --- HO NON-AKADEMIK --- */}
+        {/* =========================================================================
+            HO NON-AKADEMIK - ASSESSMENT
+        ========================================================================= */}
         <Route
           path="/ho/assessment/non-akademik"
           element={<ReadAssessmentNonAkademik />}
@@ -226,6 +328,10 @@ function App() {
           path="/ho/assessment/non-akademik/edit/:id"
           element={<EditAssessmentNonAkademik />}
         />
+
+        {/* =========================================================================
+            HO NON-AKADEMIK - PROGRAM
+        ========================================================================= */}
         <Route
           path="/ho/program/non-akademik"
           element={<ReadProgramNonAkademik />}

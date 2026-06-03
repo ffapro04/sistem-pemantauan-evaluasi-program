@@ -1,306 +1,501 @@
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
-  MapPin, Edit3, School, Layers, Globe2,
-  ChevronLeft, CheckCircle2, XCircle,
-  CalendarDays, AlignLeft,
+  MapPin,
+  Edit3,
+  Layers,
+  Globe2,
+  ChevronLeft,
+  CheckCircle2,
+  XCircle,
+  AlignLeft,
+  Navigation,
+  Map,
+  Ruler,
+  Compass,
+  LocateFixed,
+  Database,
 } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import Swal from "sweetalert2";
 import { motion, AnimatePresence } from "framer-motion";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 import Sidebar from "../../../../components/Sidebar";
 import PageWrapper from "../../../../components/PageWrapper";
+import Card from "../../../../components/Card";
+import Button from "../../../../components/Button";
 import Label from "../../../../components/Label";
 
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
 const pinIcon = new L.Icon({
-  iconUrl: markerIcon, shadowUrl: markerShadow,
-  iconSize: [25, 41], iconAnchor: [12, 41],
-  popupAnchor: [1, -34], shadowSize: [41, 41],
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
 });
 
-const PROVINCE_FLAG = {
-  Aceh: "🏴", "Sumatera Utara": "🌋", "Sumatera Barat": "🏔️", Riau: "🌴",
-  "Kepulauan Riau": "🏝️", Jambi: "🌿", Bengkulu: "🌊", "Sumatera Selatan": "🏞️",
-  "Kepulauan Bangka Belitung": "🏖️", Lampung: "🌺", Banten: "🕌", "DKI Jakarta": "🏙️",
-  "Jawa Barat": "🏯", "Jawa Tengah": "🎭", "DI Yogyakarta": "🎨", "Jawa Timur": "⛩️",
-  Bali: "🌺", "Nusa Tenggara Barat": "🏔️", "Nusa Tenggara Timur": "🌊",
-  "Kalimantan Barat": "🌳", "Kalimantan Tengah": "🦧", "Kalimantan Selatan": "💎",
-  "Kalimantan Timur": "🛢️", "Kalimantan Utara": "🌲", "Sulawesi Utara": "🐠",
-  Gorontalo: "🌾", "Sulawesi Tengah": "🏝️", "Sulawesi Barat": "🌴",
-  "Sulawesi Selatan": "⛵", "Sulawesi Tenggara": "🐢", Maluku: "🌺",
-  "Maluku Utara": "🏝️", "Papua Barat": "🦜", Papua: "🌿",
-  "Papua Pegunungan": "⛰️", "Papua Selatan": "🌊", "Papua Tengah": "🌳",
+const normalizeKlasifikasi = (value) => {
+  const raw = String(value || "").toLowerCase();
+
+  if (
+    raw.includes("independent") ||
+    raw.includes("bukan") ||
+    raw.includes("mandiri") ||
+    raw.includes("non")
+  ) {
+    return "Independent";
+  }
+
+  return "Absolute";
 };
 
-const getProvince = (namaWilayah) => {
-  const parts = namaWilayah?.split("/").filter(Boolean) || [];
-  return parts[1] || "";
+const parseBounds = (bounds) => {
+  if (!bounds) return null;
+
+  if (Array.isArray(bounds)) return bounds;
+
+  try {
+    const parsed = JSON.parse(bounds);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (error) {
+    return null;
+  }
 };
-const getProvinceEmoji = (namaWilayah) => PROVINCE_FLAG[getProvince(namaWilayah)] || "🗺️";
+
+const normalizeWilayah = (item) => {
+  const namaWilayah =
+    item?.nama_wilayah ||
+    item?.namaWilayah ||
+    item?.nama_provinsi ||
+    item?.nama ||
+    "Wilayah Tidak Diketahui";
+
+  return {
+    ...item,
+    id_wilayah: item?.id_wilayah ?? item?.idWilayah ?? item?.id,
+    kode_wilayah:
+      item?.kode_wilayah || item?.kodeWilayah || item?.kode_provinsi || "—",
+    nama_wilayah: namaWilayah,
+    tipe_wilayah: normalizeKlasifikasi(
+      item?.tipe_wilayah || item?.keterangan || item?.jenis_wilayah,
+    ),
+    jenis_wilayah: item?.jenis_wilayah || "PROVINSI",
+    deskripsi: item?.deskripsi || "",
+    luas_wilayah: item?.luas_wilayah || item?.luasWilayah || "—",
+    letak_geografis:
+      item?.letak_geografis || item?.letakGeografis || "Belum tersedia.",
+    letak_astronomis:
+      item?.letak_astronomis || item?.letakAstronomis || "Belum tersedia.",
+    latitude: item?.latitude ?? item?.lat ?? null,
+    longitude: item?.longitude ?? item?.lng ?? item?.lon ?? null,
+    bounds: parseBounds(item?.bounds),
+    status: item?.status ?? true,
+  };
+};
+
+function ProvinceMapController({ data }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!data) return;
+
+    if (data.bounds) {
+      map.fitBounds(data.bounds, {
+        padding: [45, 45],
+        animate: true,
+        duration: 1,
+      });
+
+      return;
+    }
+
+    const lat = Number(data.latitude);
+    const lng = Number(data.longitude);
+
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      map.flyTo([lat, lng], 8, {
+        animate: true,
+        duration: 1,
+      });
+    }
+  }, [data, map]);
+
+  return null;
+}
+
+const DetailInfoCard = ({ icon, label, value, accent = "blue" }) => {
+  const accentClass =
+    accent === "purple"
+      ? "text-purple-600 bg-purple-50"
+      : accent === "emerald"
+        ? "text-emerald-600 bg-emerald-50"
+        : "text-[#0AC4E0] bg-[#0AC4E0]/10";
+
+  return (
+    <div className="rounded-3xl border border-gray-100 bg-gray-50/50 p-5">
+      <div className="mb-3 flex items-center gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${accentClass}`}
+        >
+          {icon}
+        </div>
+
+        <Label
+          text={label}
+          className="!m-0 !text-[8px] !font-black !uppercase !tracking-widest !text-gray-400"
+        />
+      </div>
+
+      <p className="text-[12px] font-bold leading-relaxed text-gray-700">
+        {value || "—"}
+      </p>
+    </div>
+  );
+};
 
 const DetailWilayah = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [statusNote, setStatusNote] = useState({ show: false, type: null, message: "" });
+
+  const [statusNote, setStatusNote] = useState({
+    show: false,
+    type: null,
+    message: "",
+  });
 
   useEffect(() => {
     const fetchDetail = async () => {
       try {
         const token = localStorage.getItem("token");
+
         const res = await axios.get(`http://localhost:3000/wilayah/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setData(res.data);
+
+        setData(normalizeWilayah(res.data));
       } catch (err) {
-        Swal.fire("Error", "Gagal menyinkronkan data spasial", "error");
+        Swal.fire("Error", "Gagal mengambil detail wilayah", "error");
         navigate("/admin/wilayah");
       } finally {
         setLoading(false);
       }
     };
+
     fetchDetail();
   }, [id, navigate]);
 
-  if (loading)
+  const klasifikasi = normalizeKlasifikasi(data?.tipe_wilayah);
+  const isIndependent = klasifikasi === "Independent";
+
+  const lat = Number(data?.latitude);
+  const lng = Number(data?.longitude);
+  const isValidCoords = Number.isFinite(lat) && Number.isFinite(lng);
+
+  const mapCenter = useMemo(() => {
+    if (isValidCoords) return [lat, lng];
+    return [-2.548926, 118.0148634];
+  }, [isValidCoords, lat, lng]);
+
+  if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <div className="w-12 h-12 border-4 border-[#0AC4E0] border-t-transparent rounded-full animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0AC4E0] border-t-transparent" />
       </div>
     );
-
-  const locationParts = data?.nama_wilayah?.split("/").filter(Boolean) || [];
-  const mainTitle = locationParts[locationParts.length - 1] || "Unknown Area";
-  const province = getProvince(data?.nama_wilayah);
-  const provinceEmoji = getProvinceEmoji(data?.nama_wilayah);
-  const lat = parseFloat(data?.latitude);
-  const lng = parseFloat(data?.longitude);
-  const isValidCoords = !isNaN(lat) && !isNaN(lng);
+  }
 
   return (
-    <PageWrapper className="h-screen bg-[#FBFBFD] flex overflow-hidden !p-0 font-sans text-slate-800 leading-none">
+    <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0 font-sans text-slate-800">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative items-center justify-end">
-        {/* Background Mesh */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-0 pointer-events-none" />
-        <div className="absolute bottom-0 left-[200px] w-[500px] h-[400px] bg-[#0AC4E0]/3 rounded-full blur-[100px] -z-0 pointer-events-none" />
-
-        {/* VALIDATION NOTE */}
+      <main className="flex h-full flex-1 flex-col overflow-hidden px-4 pb-6 pt-10 md:px-10">
         <AnimatePresence>
           {statusNote.show && (
             <motion.div
-              initial={{ x: statusNote.type === 'error' ? -100 : 100, opacity: 0 }}
+              initial={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: statusNote.type === 'error' ? -100 : 100, opacity: 0 }}
-              className={`fixed ${statusNote.type === 'error' ? 'left-[320px]' : 'right-12'} top-[45%] w-72 z-[100]`}
+              exit={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
+              className={`fixed ${statusNote.type === "error" ? "left-[320px]" : "right-12"
+                } top-[45%] z-[250] w-72`}
             >
-              <div className="bg-white/80 backdrop-blur-xl border border-slate-100 p-8 rounded-[3rem] shadow-2xl text-center">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white mx-auto mb-5 shadow-lg ${statusNote.type === 'error' ? 'bg-rose-500 shadow-rose-200' : 'bg-emerald-500 shadow-emerald-200'}`}>
-                  {statusNote.type === 'error' ? <XCircle size={28} /> : <CheckCircle2 size={28} />}
+              <div className="rounded-[3rem] border border-slate-200 bg-white/90 p-8 text-center shadow-2xl backdrop-blur-xl">
+                <div
+                  className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg ${statusNote.type === "error"
+                    ? "bg-rose-500 shadow-rose-200"
+                    : "bg-emerald-500 shadow-emerald-200"
+                    }`}
+                >
+                  {statusNote.type === "error" ? (
+                    <XCircle size={28} />
+                  ) : (
+                    <CheckCircle2 size={28} />
+                  )}
                 </div>
-                <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${statusNote.type === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {statusNote.type === 'error' ? 'System Alert' : 'System Success'}
+
+                <h4
+                  className={`mb-3 text-[10px] font-black uppercase tracking-widest ${statusNote.type === "error"
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                    }`}
+                >
+                  {statusNote.type === "error" ? "Sistem Alert" : "Berhasil"}
                 </h4>
-                <p className="text-xs font-bold text-slate-600 leading-relaxed mb-8">{statusNote.message}</p>
-                <button onClick={() => setStatusNote({ ...statusNote, show: false })} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95 ${statusNote.type === 'error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                  Got It
+
+                <p className="mb-8 text-xs font-bold leading-relaxed text-slate-700">
+                  {statusNote.message}
+                </p>
+
+                <button
+                  onClick={() => setStatusNote({ ...statusNote, show: false })}
+                  className={`w-full rounded-2xl py-4 text-[10px] font-black uppercase transition-all active:scale-95 ${statusNote.type === "error"
+                    ? "bg-rose-50 text-rose-600"
+                    : "bg-emerald-50 text-emerald-600"
+                    }`}
+                >
+                  Mengerti
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* 1. JUDUL */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-4 text-center z-10 shrink-0">
-          <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#1C0770]/50 block mb-1">
-            Spatial Identification & Core Inventory
-          </span>
-          <h1 className="text-5xl font-black tracking-tighter text-[#0AC4E0] uppercase">Detail Wilayah</h1>
-        </motion.div>
+        <Card className="!m-0 flex flex-1 flex-col overflow-hidden rounded-[2.5rem] bg-white !p-0 shadow-2xl">
+          <div className="shrink-0 px-10 pb-6 pt-8">
+            <header className="flex items-center justify-between">
+              <div>
+                <Label
+                  text="Sistem Pemantauan Program"
+                  className="!text-[8px] !font-black !italic uppercase !text-[#0AC4E0]"
+                />
 
-        {/* 2. MAIN SHEET */}
-        <motion.div
-          initial={{ opacity: 0, y: 100 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: "circOut" }}
-          className="w-full max-w-5xl bg-white rounded-t-[4rem] rounded-b-none shadow-[0_-20px_100px_rgba(10,196,224,0.1)] border-t border-x border-[#0AC4E0]/10 relative z-10 overflow-hidden flex flex-col"
-          style={{ height: "calc(100vh - 155px)" }}
-        >
-          <div className="absolute top-0 left-0 w-full h-20 bg-gradient-to-b from-[#0AC4E0]/5 to-transparent pointer-events-none z-10" />
+                <h1 className="text-xl font-black uppercase text-gray-800">
+                  Detail Data <span className="text-[#0AC4E0]">Wilayah</span>
+                </h1>
+              </div>
 
-          {/* IDENTITY HEADER BAR */}
-          <div className="px-10 pt-8 pb-5 shrink-0 flex items-center gap-5 border-b border-slate-50">
-            <div className="relative shrink-0">
-              <div className="w-14 h-14 bg-slate-50 border border-slate-100 rounded-[1.2rem] flex items-center justify-center text-2xl select-none">
-                {provinceEmoji}
-              </div>
-              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${data?.status ? "bg-emerald-500" : "bg-rose-500"}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border mb-1.5 ${data?.status ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-rose-50 text-rose-600 border-rose-100"}`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${data?.status ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
-                {data?.status ? "Operational Active" : "Disabled Area"}
-              </div>
-              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter leading-none truncate">{mainTitle}</h2>
-              {province && <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{province} · Indonesia</p>}
-            </div>
-            <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border shrink-0 ${data?.keterangan === "Independent" ? "bg-purple-50 text-purple-600 border-purple-100" : "bg-[#0AC4E0]/5 text-[#0AC4E0] border-[#0AC4E0]/10"}`}>
-              <Layers size={10} className="inline mr-1.5 mb-0.5" />
-              {data?.keterangan || "Absolute"}
-            </div>
+              <Button
+                text="Kembali"
+                icon={<ChevronLeft size={14} />}
+                onClick={() => navigate("/admin/wilayah")}
+                className="!rounded-full !border !border-slate-100 !bg-white !px-6 !py-2.5 !text-[9px] font-black !uppercase !text-slate-400 shadow-sm hover:!text-slate-800"
+              />
+            </header>
           </div>
 
-          {/* 2 KOLOM KONTEN */}
-          <div className="flex-1 flex overflow-hidden">
-
-            {/* KOLOM KIRI */}
-            <div className="w-[40%] shrink-0 px-10 py-5 flex flex-col gap-3.5 border-r border-slate-50">
-
-              <div className="space-y-1.5">
-                <Label text="Hierarki Registrasi" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1" />
-                <div className="flex items-start gap-3 px-4 py-3 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                  <Layers size={15} className="text-[#0AC4E0] shrink-0 mt-0.5" />
-                  <span className="text-[10px] font-bold text-slate-700 uppercase tracking-tight break-all leading-relaxed">{data?.nama_wilayah}</span>
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden border-t border-gray-100 lg:grid-cols-[42%_58%]">
+            <div className="no-scrollbar overflow-y-auto px-10 py-7">
+              <div className="mb-7 flex items-start gap-4">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
+                  <MapPin size={28} />
                 </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <Label text="Koordinat Navigasi" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1" />
-                <div className="flex items-center gap-3 px-4 py-3 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                  <MapPin size={15} className="text-[#0AC4E0] shrink-0" />
-                  <span className="text-[10px] font-mono font-bold text-slate-700">
-                    {isValidCoords ? `${lat}, ${lng}` : "Belum tersedia"}
-                  </span>
-                </div>
-              </div>
+                <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                      <Globe2 size={10} />
+                      {data?.jenis_wilayah || "PROVINSI"}
+                    </span>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label text="Tahun Binaan" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1" />
-                  <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                    <CalendarDays size={14} className="text-[#0AC4E0] shrink-0" />
-                    <span className="text-[12px] font-black text-slate-700">{data?.tahun_awal_binaan || "—"}</span>
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label text="Klasifikasi" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1" />
-                  <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                    <Globe2 size={14} className="text-[#0AC4E0] shrink-0" />
-                    <span className={`text-[10px] font-black uppercase ${data?.keterangan === "Independent" ? "text-purple-600" : "text-[#0AC4E0]"}`}>
-                      {data?.keterangan || "Absolute"}
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${isIndependent
+                        ? "border-purple-100 bg-purple-50 text-purple-600"
+                        : "border-[#0AC4E0]/10 bg-[#0AC4E0]/5 text-[#0AC4E0]"
+                        }`}
+                    >
+                      <Layers size={10} />
+                      {klasifikasi}
                     </span>
                   </div>
-                </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <Label text="Deskripsi" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1" />
-                <div className="flex items-start gap-3 px-4 py-3 bg-slate-50/50 border border-slate-100 rounded-2xl">
-                  <AlignLeft size={15} className="text-[#0AC4E0] shrink-0 mt-0.5" />
-                  <p className="text-[10px] font-bold text-slate-500 italic leading-relaxed line-clamp-2">
-                    {data?.deskripsi || "Basis data deskripsi geografis belum tersedia."}
+                  <h2 className="truncate text-3xl font-black uppercase leading-none tracking-tighter text-gray-900">
+                    {data?.nama_wilayah || "—"}
+                  </h2>
+
+                  <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                    Kode Wilayah: {data?.kode_wilayah || "—"}
                   </p>
                 </div>
               </div>
 
-              {/* INVENTORY */}
-              <div className="flex-1 mt-1 p-5 bg-[#0AC4E0]/5 border border-[#0AC4E0]/10 rounded-2xl relative overflow-hidden flex flex-col justify-start">
-                <School size={90} className="absolute -bottom-3 -right-3 opacity-5 pointer-events-none" />
-                <p className="text-[8px] font-black text-[#0AC4E0] uppercase tracking-widest mb-2">Inventory Summary</p>
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#0AC4E0]/10 text-center">
-                  {[{ label: "SD", value: data?.jumlah_sd || 0 }, { label: "SMP", value: data?.jumlah_smp || 0 }, { label: "SMK", value: data?.jumlah_smk || 0 }].map((item) => (
-                    <div key={item.label}>
-                      <p className="text-2xl font-black text-slate-800">{item.value}</p>
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{item.label}</p>
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <DetailInfoCard
+                    icon={<Database size={18} />}
+                    label="Nama Provinsi"
+                    value={data?.nama_wilayah}
+                  />
+
+                  <DetailInfoCard
+                    icon={<Layers size={18} />}
+                    label="Klasifikasi Wilayah"
+                    value={klasifikasi}
+                    accent={isIndependent ? "purple" : "blue"}
+                  />
                 </div>
-                <div className="space-y-1.5 mt-2">
-                  {[{ label: "Tenaga Pendidik", value: data?.jumlah_guru || 0 }, { label: "Siswa Binaan", value: data?.jumlah_siswa || 0 }].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between px-3 py-2 bg-white/60 rounded-xl border border-[#0AC4E0]/10">
-                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{item.label}</span>
-                      <span className="text-[13px] font-black text-slate-800">{item.value}</span>
+
+                <DetailInfoCard
+                  icon={<Compass size={18} />}
+                  label="Letak Geografis"
+                  value={data?.letak_geografis}
+                />
+
+                <DetailInfoCard
+                  icon={<LocateFixed size={18} />}
+                  label="Letak Astronomis"
+                  value={data?.letak_astronomis}
+                />
+
+                <DetailInfoCard
+                  icon={<Ruler size={18} />}
+                  label="Luas Wilayah"
+                  value={data?.luas_wilayah}
+                  accent="emerald"
+                />
+
+                <div className="rounded-3xl border border-gray-100 bg-gray-50/50 p-5">
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
+                      <AlignLeft size={18} />
                     </div>
-                  ))}
+
+                    <Label
+                      text="Deskripsi Opsional"
+                      className="!m-0 !text-[8px] !font-black !uppercase !tracking-widest !text-gray-400"
+                    />
+                  </div>
+
+                  <p className="text-[12px] font-bold leading-relaxed text-gray-600">
+                    {data?.deskripsi ||
+                      "Belum ada deskripsi khusus untuk wilayah ini."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex min-h-0 flex-col gap-5 border-l border-gray-100 p-7">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label
+                    text="Province Map"
+                    className="!text-[8px] !font-black !italic uppercase !text-[#0AC4E0]"
+                  />
+
+                  <h2 className="text-lg font-black uppercase text-gray-800">
+                    Peta Wilayah Provinsi
+                  </h2>
+                </div>
+
+                <div className="rounded-lg border border-blue-100/50 bg-blue-50/50 px-4 py-2 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                  <Navigation size={12} className="mr-2 inline" />
+                  Auto Focus
                 </div>
               </div>
 
-            </div>
-            {/* ← TUTUP KOLOM KIRI */}
-
-            {/* KOLOM KANAN — Map full height */}
-            <div className="flex-1 flex flex-col px-8 py-5 gap-2">
-              <Label text="Live Geo-Reference" className="!text-[8px] !font-black !text-slate-300 !uppercase !tracking-widest !ml-1 shrink-0" />
-              <div className="flex-1 rounded-[2rem] overflow-hidden border border-slate-100 shadow-sm relative z-0 bg-slate-50">
+              <div className="relative flex-1 overflow-hidden rounded-3xl border border-gray-100 bg-slate-50 shadow-sm">
                 {isValidCoords ? (
-                  <MapContainer center={[lat, lng]} zoom={13} scrollWheelZoom={false} style={{ height: "100%", width: "100%" }}>
+                  <MapContainer
+                    center={mapCenter}
+                    zoom={6}
+                    scrollWheelZoom
+                    style={{ height: "100%", width: "100%" }}
+                  >
+                    <ProvinceMapController data={data} />
+
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
                     <Marker position={[lat, lng]} icon={pinIcon}>
                       <Popup>
-                        <div className="font-black text-[10px] uppercase text-[#0AC4E0]">{mainTitle} Hub</div>
+                        <div className="text-[10px] font-black uppercase text-[#0AC4E0]">
+                          {data?.nama_wilayah}
+                        </div>
+
+                        <div className="mt-1 text-[10px] font-bold text-gray-500">
+                          {data?.kode_wilayah || "Kode wilayah belum tersedia"}
+                        </div>
                       </Popup>
                     </Marker>
                   </MapContainer>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-300">
-                    <MapPin size={48} strokeWidth={1} />
-                    <div className="text-center space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest">Koordinat Belum Tersedia</p>
-                      <p className="text-[9px] font-bold italic text-gray-200">Edit wilayah untuk menambahkan lokasi</p>
-                    </div>
-                    <button
-                      onClick={() => navigate(`/admin/wilayah/edit/${id}`)}
-                      className="px-6 py-2.5 bg-[#0AC4E0] text-white text-[9px] font-black uppercase tracking-widest rounded-full hover:bg-[#09b3cc] transition-all active:scale-95"
-                    >
-                      Set Koordinat
-                    </button>
+                    <div className="flex h-full flex-col items-center justify-center text-center text-gray-300">
+                      <MapPin size={46} strokeWidth={1.5} />
+
+                      <p className="mt-4 text-[10px] font-black uppercase tracking-widest">
+                        Koordinat belum tersedia
+                      </p>
+
+                      <p className="mt-2 text-[10px] font-bold text-gray-300">
+                        Edit wilayah untuk menambahkan titik lokasi.
+                      </p>
+                  </div>
+                )}
+
+                {isValidCoords && (
+                  <div className="pointer-events-none absolute bottom-5 left-5 z-[500] max-w-sm rounded-2xl border border-white/70 bg-white/90 p-5 shadow-xl backdrop-blur-xl">
+                    <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                      Selected Province
+                    </p>
+
+                    <p className="text-xl font-black uppercase leading-none tracking-tight text-slate-800">
+                      {data?.nama_wilayah || "—"}
+                    </p>
+
+                    <p className="mt-2 text-[10px] font-bold leading-relaxed text-slate-400">
+                      {data?.luas_wilayah || "Luas wilayah belum tersedia"}
+                    </p>
+
+                    <p className="mt-3 font-mono text-[10px] font-black text-slate-500">
+                      {lat.toFixed(6)}, {lng.toFixed(6)}
+                    </p>
                   </div>
                 )}
               </div>
+
+              <div className="flex shrink-0 items-center justify-between border-t border-gray-100 pt-5">
+                <Button
+                  text="Kembali"
+                  icon={<ChevronLeft size={14} />}
+                  onClick={() => navigate("/admin/wilayah")}
+                  className="!rounded-full !border !border-slate-100 !bg-white !px-7 !py-3 !text-[9px] font-black !uppercase !text-slate-400 shadow-sm hover:!text-slate-800"
+                />
+
+                <Button
+                  text="Edit Data"
+                  icon={<Edit3 size={15} />}
+                  onClick={() => navigate(`/admin/wilayah/edit/${id}`)}
+                  className="!rounded-full !bg-[#0AC4E0] !px-8 !py-3 !text-[9px] font-black !uppercase !text-white shadow-lg shadow-[#0AC4E0]/20 active:scale-95"
+                />
+              </div>
             </div>
-            {/* ← TUTUP KOLOM KANAN */}
-
           </div>
-          {/* ← TUTUP 2 KOLOM KONTEN */}
-
-        </motion.div>
-        {/* ← TUTUP MAIN SHEET */}
-
-        {/* 3. DOCK ACTION */}
-        <motion.div
-          initial={{ y: 100 }} animate={{ y: 0 }} transition={{ delay: 0.3, type: "spring", stiffness: 80 }}
-          className="absolute bottom-[-15px] w-[550px] h-[120px] bg-white/80 backdrop-blur-3xl border-t-2 border-x-2 border-white rounded-t-[250px] z-30 shadow-[0_-20px_80px_rgba(10,196,224,0.2)] flex items-center justify-center px-16 pt-6"
-        >
-          <div className="flex items-center justify-between w-full mb-2">
-            <button
-              onClick={() => navigate("/admin/wilayah")}
-              className="flex items-center gap-2 px-8 py-4 bg-white border border-slate-100 text-slate-400 hover:text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-90 shadow-sm"
-            >
-              <ChevronLeft size={16} /> Kembali
-            </button>
-            <button
-              onClick={() => navigate(`/admin/wilayah/edit/${id}`)}
-              className="flex items-center gap-3 px-10 py-4 rounded-full text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white bg-[#0AC4E0] shadow-[#0AC4E0]/30 hover:bg-[#09b3cc]"
-            >
-              <Edit3 size={18} /> Edit Data
-            </button>
-          </div>
-        </motion.div>
-
+        </Card>
       </main>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `.leaflet-container { z-index: 1 !important; }`
-      }} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .leaflet-container { z-index: 1 !important; }
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          `,
+        }}
+      />
     </PageWrapper>
   );
 };

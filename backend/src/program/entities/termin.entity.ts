@@ -1,7 +1,17 @@
 /* eslint-disable prettier/prettier */
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  CreateDateColumn,
+  JoinColumn,
+} from 'typeorm';
 import { Kegiatans } from './kegiatans.entity';
+import { Fase } from './fase.entity';
 import { TerminChat } from './termin-chat.entity';
+import { PersyaratanTermin } from './persyaratan-termin.entity';
 
 @Entity('t_termin')
 export class Termin {
@@ -23,14 +33,28 @@ export class Termin {
   @Column({ name: 'nama_file_dokumentasi', nullable: true })
   nama_file_dokumentasi: string;
 
-  @Column({ default: 'pending' })
+  @Column({ default: 'WAITING_UPLOAD' })
   status: string;
 
-  @Column()
+  @Column({ nullable: true })
+  id_fase: number;
+
+  @Column({ nullable: true })
   id_kegiatans: number;
 
-  @ManyToOne(() => Kegiatans, (kegiatans) => kegiatans.termin, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Fase, (fase) => fase.termin, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'id_fase' })
+  fase: Fase;
+
+  @ManyToOne(() => Kegiatans, (kegiatans) => kegiatans.termin, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'id_kegiatans' })
   kegiatans: Kegiatans;
+
+  @OneToMany(() => PersyaratanTermin, (persyaratan) => persyaratan.termin)
+  persyaratan: PersyaratanTermin[];
 
   @OneToMany(() => TerminChat, (chat) => chat.termin)
   chats: TerminChat[];

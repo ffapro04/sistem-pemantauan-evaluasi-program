@@ -7,29 +7,28 @@ import {
   User,
   Mail,
   Briefcase,
-  Database,
   Lock,
   Building2,
   Layers,
   ShieldCheck,
-  Sparkles,
   Save,
   ChevronLeft,
   XCircle,
-  CheckCircle2
+  CheckCircle2,
 } from "lucide-react";
-import Swal from "sweetalert2";
 
-// Komponen Custom
 import Sidebar from "../../../../components/Sidebar";
 import Input from "../../../../components/Input";
 import Label from "../../../../components/Label";
 import PageWrapper from "../../../../components/PageWrapper";
 import Dropdown from "../../../../components/Dropdown";
+import Button from "../../../../components/Button";
 
 const CreateHO = () => {
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(false);
+
   const [formData, setFormData] = useState({
     nama: "",
     email: "",
@@ -40,7 +39,11 @@ const CreateHO = () => {
     sub_jenis: "SD & SMP",
   });
 
-  const [statusNote, setStatusNote] = useState({ show: false, type: null, message: "" });
+  const [statusNote, setStatusNote] = useState({
+    show: false,
+    type: null,
+    message: "",
+  });
 
   const deptOptions = [
     { value: "akademik", label: "AKADEMIK" },
@@ -60,217 +63,369 @@ const CreateHO = () => {
     }
   }, [formData.jenis]);
 
-  const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    if (!formData.nama || !formData.email) {
-      setStatusNote({ show: true, type: 'error', message: "Otoritas Ditolak: Mohon lengkapi identitas personil." });
-      return;
+  const validateForm = () => {
+    if (!formData.nama || !formData.email || !formData.password) {
+      setStatusNote({
+        show: true,
+        type: "error",
+        message: "Nama lengkap, email, dan password wajib diisi.",
+      });
+
+      return false;
     }
 
+    if (!formData.jabatan) {
+      setStatusNote({
+        show: true,
+        type: "error",
+        message: "Jabatan Head Office wajib diisi.",
+      });
+
+      return false;
+    }
+
+    if (formData.jenis === "akademik" && !formData.sub_jenis) {
+      setStatusNote({
+        show: true,
+        type: "error",
+        message: "Fokus bidang akademik wajib dipilih.",
+      });
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+
+    if (!validateForm()) return;
+
     setLoading(true);
+
     try {
       const token = localStorage.getItem("token");
-      await axios.post("http://localhost:3000/users/register", formData, {
-        headers: { Authorization: `Bearer ${token}` },
+
+      await axios.post(
+        "http://localhost:3000/users/register",
+        {
+          ...formData,
+          id_role: 3,
+          sub_jenis: formData.jenis === "akademik" ? formData.sub_jenis : null,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      setStatusNote({
+        show: true,
+        type: "success",
+        message: "Data Head Office berhasil disimpan.",
       });
-      setStatusNote({ show: true, type: 'success', message: "Berhasil: Personil HO telah terdaftar." });
-      setTimeout(() => navigate("/admin/ho"), 2500);
+
+      setTimeout(() => navigate("/admin/ho"), 1800);
     } catch (err) {
-      setStatusNote({ show: true, type: 'error', message: "Gagal menyimpan data ke database." });
+      setStatusNote({
+        show: true,
+        type: "error",
+        message:
+          err.response?.data?.message ||
+          "Gagal menyimpan data Head Office ke database.",
+      });
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <PageWrapper className="h-screen bg-[#FBFBFD] flex overflow-hidden !p-0 font-sans text-slate-800 leading-none">
+    <PageWrapper className="flex h-screen overflow-hidden bg-[#FBFBFD] !p-0 font-sans leading-none text-slate-800">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative items-center justify-end">
-        {/* Background Mesh */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#0AC4E0]/5 rounded-full blur-[120px] -z-0" />
+      <main className="relative flex h-full flex-1 flex-col items-center justify-end overflow-hidden">
+        <div className="absolute right-0 top-0 -z-0 h-[600px] w-[600px] rounded-full bg-[#0AC4E0]/5 blur-[120px]" />
 
-        {/* --- VALIDATION SIDE NOTES --- */}
         <AnimatePresence>
           {statusNote.show && (
             <motion.div
-              initial={{ x: statusNote.type === 'error' ? -100 : 100, opacity: 0 }}
+              initial={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
               animate={{ x: 0, opacity: 1 }}
-              exit={{ x: statusNote.type === 'error' ? -100 : 100, opacity: 0 }}
-              className={`fixed ${statusNote.type === 'error' ? 'left-[320px]' : 'right-12'} top-[40%] w-72 z-[100]`}
+              exit={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
+              className={`fixed ${statusNote.type === "error" ? "left-[320px]" : "right-12"
+                } top-[45%] z-[100] w-72`}
             >
-              <div className="bg-white/80 backdrop-blur-xl border border-slate-100 p-8 rounded-[3rem] shadow-2xl text-center">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white mx-auto mb-5 shadow-lg ${statusNote.type === 'error' ? 'bg-rose-500 shadow-rose-200' : 'bg-emerald-500 shadow-emerald-200'}`}>
-                  {statusNote.type === 'error' ? <XCircle size={28} /> : <CheckCircle2 size={28} />}
+              <div className="rounded-[3rem] border border-slate-100 bg-white/80 p-8 text-center shadow-2xl backdrop-blur-xl">
+                <div
+                  className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg ${statusNote.type === "error"
+                    ? "bg-rose-500 shadow-rose-200"
+                    : "bg-emerald-500 shadow-emerald-200"
+                    }`}
+                >
+                  {statusNote.type === "error" ? (
+                    <XCircle size={28} />
+                  ) : (
+                    <CheckCircle2 size={28} />
+                  )}
                 </div>
-                <h4 className={`text-[10px] font-black uppercase tracking-widest mb-3 ${statusNote.type === 'error' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {statusNote.type === 'error' ? 'Validation Alert' : 'System Success'}
+
+                <h4
+                  className={`mb-3 text-[10px] font-black uppercase tracking-widest ${statusNote.type === "error"
+                    ? "text-rose-600"
+                    : "text-emerald-600"
+                    }`}
+                >
+                  {statusNote.type === "error"
+                    ? "Peringatan Validasi"
+                    : "Berhasil"}
                 </h4>
-                <p className="text-xs font-bold text-slate-600 leading-relaxed mb-8">{statusNote.message}</p>
-                <button onClick={() => setStatusNote({ ...statusNote, show: false })} className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase transition-all active:scale-95 ${statusNote.type === 'error' ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                  Dismiss
+
+                <p className="mb-8 text-xs font-bold leading-relaxed text-slate-600">
+                  {statusNote.message}
+                </p>
+
+                <button
+                  onClick={() => setStatusNote({ ...statusNote, show: false })}
+                  className={`w-full rounded-2xl py-4 text-[10px] font-black uppercase transition-all active:scale-95 ${statusNote.type === "error"
+                    ? "bg-rose-50 text-rose-600"
+                    : "bg-emerald-50 text-emerald-600"
+                    }`}
+                >
+                  Mengerti
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* 1. JUDUL FORM (Ditarik kebawah mendekati form) */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 text-center z-10"
+          className="z-10 mb-6 text-center"
         >
-          <div className="flex items-center justify-center gap-3 mb-2 leading-none">
-            <Sparkles size={20} className="text-[#0AC4E0]" />
-            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0AC4E0]/60">Identity & Access Management</span>
+          <div className="mb-1 flex items-center justify-center gap-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#1C0770]/50">
+              Sistem Pemantauan dan Evaluasi Program
+            </span>
           </div>
-          <h1 className="text-5xl font-black tracking-tighter text-[#0AC4E0] uppercase leading-none">
+
+          <h1 className="text-5xl font-black uppercase leading-none tracking-tighter text-[#0AC4E0]">
             Registrasi Head Office
           </h1>
         </motion.div>
 
-        {/* 2. FORM BOX (Nempel Dasar Layar) */}
         <motion.div
           initial={{ opacity: 0, y: 100 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "circOut" }}
-          className="w-full max-w-6xl bg-white rounded-t-[5rem] rounded-b-none shadow-[0_-30px_100px_rgba(10,196,224,0.1)] p-16 pb-44 border-t border-x border-[#0AC4E0]/10 relative z-10 overflow-hidden"
+          className="relative z-10 w-full max-w-6xl overflow-hidden rounded-t-[5rem] rounded-b-none border-x border-t border-[#0AC4E0]/10 bg-white p-16 pb-40 shadow-[0_-30px_100px_rgba(10,196,224,0.1)]"
         >
-          {/* Top Gradient Glass Effect */}
-          <div className="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-[#0AC4E0]/5 to-transparent pointer-events-none" />
+          <div className="pointer-events-none absolute left-0 top-0 h-24 w-full bg-gradient-to-b from-[#0AC4E0]/5 to-transparent" />
 
           <form onSubmit={handleSubmit} className="relative z-10">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-20 gap-y-10">
+            <div className="grid grid-cols-1 gap-x-20 gap-y-7 lg:grid-cols-2">
+              <div className="space-y-7">
+                <div className="space-y-2">
+                  <Label
+                    text="Nama Lengkap Personel"
+                    required
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
 
-              {/* KOLOM KIRI */}
-              <div className="space-y-10">
-                <div className="space-y-3">
-                  <Label text="Nama Lengkap Personil" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                  <div className="relative group">
+                  <div className="group relative">
                     <Input
-                      onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-                      placeholder="Input Full Name..."
-                      className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                      value={formData.nama}
+                      onChange={(e) =>
+                        setFormData({ ...formData, nama: e.target.value })
+                      }
+                      placeholder="Masukkan nama lengkap..."
+                      className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !pl-14 !text-[16px] !font-bold shadow-sm transition-all focus:!border-[#0AC4E0] focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/5"
                     />
-                    <User className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+
+                    <User
+                      className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]"
+                      size={20}
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label text="Email Institusi" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                  <div className="relative group">
+                <div className="space-y-2">
+                  <Label
+                    text="Email Institusi"
+                    required
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+
+                  <div className="group relative">
                     <Input
                       type="email"
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
                       placeholder="ho@ypamdr.astra.co.id"
-                      className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                      className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !pl-14 !text-[16px] !font-bold shadow-sm transition-all focus:!border-[#0AC4E0] focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/5"
                     />
-                    <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+
+                    <Mail
+                      className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]"
+                      size={20}
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label text="Security Password" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                  <div className="relative group">
+                <div className="space-y-2">
+                  <Label
+                    text="Kode Keamanan Password"
+                    required
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+
+                  <div className="group relative">
                     <Input
                       type="password"
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      value={formData.password}
+                      onChange={(e) =>
+                        setFormData({ ...formData, password: e.target.value })
+                      }
                       placeholder="••••••••"
-                      className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/5 transition-all shadow-sm"
+                      className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !pl-14 !text-[16px] !font-bold shadow-sm transition-all focus:!border-[#0AC4E0] focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/5"
                     />
-                    <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+
+                    <Lock
+                      className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]"
+                      size={20}
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* KOLOM KANAN */}
-              <div className="space-y-10">
-                <div className="space-y-3">
-                  <Label text="Jabatan Struktural" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
-                  <div className="relative group">
+              <div className="space-y-7">
+                <div className="space-y-2">
+                  <Label
+                    text="Jabatan Struktural"
+                    required
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+
+                  <div className="group relative">
                     <Input
                       value={formData.jabatan}
-                      onChange={(e) => setFormData({ ...formData, jabatan: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, jabatan: e.target.value })
+                      }
                       placeholder="Staff / Manager Head Office"
-                      className="!py-5 !pl-14 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-[16px] !font-bold focus:!bg-white focus:!border-[#0AC4E0] transition-all shadow-sm"
+                      className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !pl-14 !text-[16px] !font-bold shadow-sm transition-all focus:!border-[#0AC4E0] focus:!bg-white"
                     />
-                    <Briefcase className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]" size={20} />
+
+                    <Briefcase
+                      className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0AC4E0]"
+                      size={20}
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label text="Department (Jenis)" required className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
+                <div className="space-y-2">
+                  <Label
+                    text="Departemen"
+                    required
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+
                   <Dropdown
                     icon={Building2}
                     value={formData.jenis}
-                    onChange={(val) => setFormData({ ...formData, jenis: val })}
+                    onChange={(val) =>
+                      setFormData({ ...formData, jenis: val })
+                    }
                     items={deptOptions}
-                    className="!py-5 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-base !font-black text-slate-700"
+                    className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !text-base !font-black text-slate-700"
                   />
                 </div>
 
-                <div className={`space-y-3 transition-all duration-500 ${formData.jenis !== "akademik" ? "opacity-20 grayscale pointer-events-none" : "opacity-100"}`}>
-                  <Label text="Fokus Bidang (Tingkat)" className="!text-[10px] !font-black !text-slate-400 !uppercase !tracking-widest !ml-2" />
+                <div
+                  className={`space-y-2 transition-all duration-500 ${formData.jenis !== "akademik"
+                    ? "pointer-events-none opacity-20 grayscale"
+                    : "opacity-100"
+                    }`}
+                >
+                  <Label
+                    text="Fokus Bidang"
+                    className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+
                   <Dropdown
                     icon={Layers}
                     value={formData.sub_jenis}
                     disabled={formData.jenis !== "akademik"}
-                    onChange={(val) => setFormData({ ...formData, sub_jenis: val })}
+                    onChange={(val) =>
+                      setFormData({ ...formData, sub_jenis: val })
+                    }
                     items={tingkatOptions}
-                    className="!py-5 !bg-slate-50/50 !border-slate-100 !rounded-[2.2rem] !text-base !font-black text-slate-700"
+                    className="!rounded-[2.2rem] !border-slate-100 !bg-slate-50/50 !py-4 !text-base !font-black text-slate-700"
                   />
                 </div>
               </div>
             </div>
 
-            {/* POLICY NOTE */}
-            <div className="mt-12 p-8 bg-[#0AC4E0]/5 border-2 border-[#0AC4E0]/10 border-dashed rounded-[2.5rem] flex items-center gap-8 shadow-sm">
-              <div className="w-14 h-14 bg-[#0AC4E0] rounded-2xl flex items-center justify-center text-white shadow-xl shadow-[#0AC4E0]/30 shrink-0">
+            <div className="mt-10 flex items-center gap-8 rounded-[2.5rem] border-2 border-dashed border-[#0AC4E0]/10 bg-[#0AC4E0]/5 p-7 shadow-sm">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-xl shadow-[#0AC4E0]/30">
                 <ShieldCheck size={24} />
               </div>
+
               <div className="flex-1 space-y-1">
-                <p className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest leading-none">Security Access Policy</p>
-                <p className="text-sm font-bold text-slate-400 uppercase tracking-tighter">Personil HO akan mendapatkan akses dashboard sesuai dengan Department yang dipilih (Akademik/Non-Akademik).</p>
+                <p className="text-[10px] font-black uppercase leading-none tracking-widest text-[#0AC4E0]">
+                  Kebijakan Akses
+                </p>
+
+                <p className="text-sm font-bold uppercase tracking-tighter text-slate-400">
+                  Personel Head Office akan mendapatkan akses dashboard sesuai
+                  departemen yang dipilih.
+                </p>
               </div>
             </div>
           </form>
         </motion.div>
 
-        {/* 3. DOCK ACTION (OVERLAP DI FRONT) */}
         <motion.div
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           transition={{ delay: 0.3, type: "spring", stiffness: 80 }}
-          className="absolute bottom-[-15px] w-[550px] h-[120px] bg-white/80 backdrop-blur-3xl border-t-2 border-x-2 border-white rounded-t-[250px] z-30 shadow-[0_-20px_80px_rgba(10,196,224,0.15)] flex items-center justify-center px-16 pt-6"
+          className="absolute bottom-[-15px] z-30 flex h-[120px] w-[550px] items-center justify-center rounded-t-[250px] border-x-2 border-t-2 border-white bg-white/80 px-16 pt-6 shadow-[0_-20px_80px_rgba(10,196,224,0.15)] backdrop-blur-3xl"
         >
-          <div className="flex items-center justify-between w-full mb-2">
-            <button
+          <div className="mb-2 flex w-full items-center justify-between">
+            <Button
+              text="Kembali"
+              icon={<ChevronLeft size={16} />}
               onClick={() => navigate("/admin/ho")}
-              className="flex items-center gap-2 px-8 py-4 bg-white border border-slate-100 text-slate-400 hover:text-slate-800 rounded-full text-[10px] font-black uppercase tracking-widest transition-all active:scale-90 shadow-sm leading-none"
-            >
-              <ChevronLeft size={16} /> Kembali
-            </button>
+              className="!rounded-full !border !border-slate-100 !bg-white !px-8 !py-4 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400 shadow-sm hover:!text-slate-800 active:scale-90"
+            />
 
-            <button
+            <Button
+              text={loading ? "Menyimpan..." : "Simpan Data"}
+              icon={<Save size={18} />}
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center gap-3 px-10 py-4 rounded-full text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95 text-white bg-[#0AC4E0] shadow-[#0AC4E0]/30 hover:bg-[#09b3cc] leading-none"
-            >
-              <Save size={18} />
-              {loading ? "..." : "Simpan Data"}
-            </button>
+              className="!rounded-full !bg-[#0AC4E0] !px-10 !py-4 !text-[11px] !font-black !uppercase !tracking-widest !text-white shadow-2xl shadow-[#0AC4E0]/30 hover:!bg-[#09b3cc] active:scale-95"
+            />
           </div>
         </motion.div>
-
       </main>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          `,
+        }}
+      />
     </PageWrapper>
   );
 };

@@ -1,29 +1,22 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Search as SearchIcon,
-  Briefcase,
   MapPin,
-  Database,
   Eye,
   Edit3,
   Filter,
   CheckCircle,
-  Users,
-  Sparkles,
   LayoutGrid,
   Mail,
-  ChevronRight,
-  ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 
-// Komponen Custom
 import Sidebar from "../../../../components/Sidebar";
 import Card from "../../../../components/Card";
 import Button from "../../../../components/Button";
@@ -34,6 +27,9 @@ import Label from "../../../../components/Label";
 import Pagination from "../../../../components/Pagination";
 import Dropdown from "../../../../components/Dropdown";
 
+const API_BASE = "http://localhost:3000";
+const ROLE_AO = 4;
+
 const Toast = Swal.mixin({
   toast: true,
   position: "top-end",
@@ -42,28 +38,67 @@ const Toast = Swal.mixin({
   timerProgressBar: true,
 });
 
+const normalizeArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.result)) return payload.result;
+  if (Array.isArray(payload?.users)) return payload.users;
+  if (Array.isArray(payload?.user)) return payload.user;
+  if (Array.isArray(payload?.wilayah)) return payload.wilayah;
+
+  return [];
+};
+
+const normalizeText = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const getRoleId = (user) =>
+  Number(user?.id_role || user?.role_id || user?.role?.id_role || 0);
+
+const isAreaOfficerUser = (user) => getRoleId(user) === ROLE_AO;
+
+const isActiveValue = (value) =>
+  value === true || value === "true" || Number(value) === 1;
+
+const getWilayahId = (wilayah) => wilayah?.id_wilayah || wilayah?.id;
+
+const getWilayahName = (wilayah) =>
+  wilayah?.nama_wilayah || wilayah?.nama || "Wilayah";
+
+const cleanWilayahName = (value) =>
+  String(value || "Wilayah")
+    .split("/")
+    .filter(Boolean)
+    .pop();
+
 const ReadAO = () => {
-  // --- STATE DENGAN PERSISTENSI LOCAL STORAGE ---
+  const navigate = useNavigate();
+
   const [searchTerm, setSearchTerm] = useState(
-    localStorage.getItem("ao_filter_search") || ""
+    localStorage.getItem("ao_filter_search") || "",
   );
+
   const [filterWilayah, setFilterWilayah] = useState(
-    localStorage.getItem("ao_filter_wilayah") || "all"
+    localStorage.getItem("ao_filter_wilayah") || "all",
   );
+
   const [filterStatus, setFilterStatus] = useState(
-    localStorage.getItem("ao_filter_status") || "all"
+    localStorage.getItem("ao_filter_status") || "all",
   );
+
   const [currentPage, setCurrentPage] = useState(
-    Number(localStorage.getItem("ao_filter_page")) || 1
+    Number(localStorage.getItem("ao_filter_page")) || 1,
   );
 
   const [aos, setAos] = useState([]);
   const [wilayahList, setWilayahList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const itemsPerPage = 5;
-  const navigate = useNavigate();
 
-  // --- SIMPAN SETIAP PERUBAHAN KE LOCAL STORAGE ---
+  const itemsPerPage = 5;
+
   useEffect(() => {
     localStorage.setItem("ao_filter_search", searchTerm);
     localStorage.setItem("ao_filter_wilayah", filterWilayah);
@@ -74,18 +109,59 @@ const ReadAO = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
-      const [resAO, resWilayah] = await Promise.all([
-        axios.get("http://localhost:3000/users/ao", { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get("http://localhost:3000/wilayah", { headers: { Authorization: `Bearer ${token}` } })
-      ]);
 
-      // Filter role AO (ID 4)
-      setAos(resAO.data.filter((u) => Number(u.id_role) === 4));
-      setWilayahList(resWilayah.data);
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        navigate("/login");
+        return;
+      }
+
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      };
+
+      let users = [];
+      let wilayah = [];
+
+      try {
+        const resAO = await axios.get(`${API_BASE}/users/ao`, {
+          headers,
+        });
+
+        users = normalizeArray(resAO.data);
+      } catch (error) {
+        console.warn("Endpoint /users/ao gagal, fallback ke /users:", error);
+      }
+
+      if (users.length === 0) {
+        const resUsers = await axios.get(`${API_BASE}/users`, {
+          headers,
+        });
+
+        users = normalizeArray(resUsers.data);
+      }
+
+      try {
+        const resWilayah = await axios.get(`${API_BASE}/wilayah`, {
+          headers,
+        });
+
+        wilayah = normalizeArray(resWilayah.data);
+      } catch (error) {
+        console.warn("Gagal mengambil data wilayah:", error);
+        wilayah = [];
+      }
+
+      setAos(users.filter(isAreaOfficerUser));
+      setWilayahList(wilayah);
     } catch (error) {
       console.error("Fetch AO Error:", error);
-      Toast.fire({ icon: "error", title: "Gagal memuat data Area Officer" });
+
+      Toast.fire({
+        icon: "error",
+        title: "Gagal memuat data Area Officer",
+      });
     } finally {
       setLoading(false);
     }
@@ -96,47 +172,93 @@ const ReadAO = () => {
   }, []);
 
   const handleToggleStatus = async (id, name, currentStatus) => {
-    const nextStatus = !(currentStatus === true || currentStatus === "true" || Number(currentStatus) === 1);
+    const nextStatus = !isActiveValue(currentStatus);
+
     try {
       const token = localStorage.getItem("token");
+
       await axios.patch(
-        `http://localhost:3000/users/${id}`,
+        `${API_BASE}/users/${id}`,
         { status: nextStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       );
+
       await fetchData();
+
       Toast.fire({
         icon: "success",
         title: `${name} sekarang ${nextStatus ? "Aktif" : "Nonaktif"}`,
       });
-    } catch (e) {
-      Toast.fire({ icon: "error", title: "Gagal update otoritas" });
+    } catch (error) {
+      console.error("Toggle Status AO Error:", error);
+
+      Toast.fire({
+        icon: "error",
+        title: "Gagal memperbarui status Area Officer",
+      });
     }
   };
 
-  // --- LOGIKA FILTER & SORTING ---
+  const resetFilter = () => {
+    setSearchTerm("");
+    setFilterWilayah("all");
+    setFilterStatus("all");
+    setCurrentPage(1);
+
+    localStorage.removeItem("ao_filter_search");
+    localStorage.removeItem("ao_filter_wilayah");
+    localStorage.removeItem("ao_filter_status");
+    localStorage.removeItem("ao_filter_page");
+  };
+
   const filteredData = aos
     .filter((ao) => {
-      const search = searchTerm.toLowerCase();
-      const matchesSearch = ao.nama?.toLowerCase().includes(search) || ao.email?.toLowerCase().includes(search);
+      const search = normalizeText(searchTerm);
 
-      const matchesWilayah = filterWilayah === "all"
-        ? true
-        : ao.wilayah?.some((w) => Number(w.id_wilayah) === Number(filterWilayah));
+      const nama = normalizeText(ao?.nama);
+      const email = normalizeText(ao?.email);
 
-      const isActive = ao.status === true || ao.status === "true" || Number(ao.status) === 1;
-      const matchesStatus = filterStatus === "all" ? true : filterStatus === "active" ? isActive : !isActive;
+      const matchesSearch =
+        !search || nama.includes(search) || email.includes(search);
+
+      const matchesWilayah =
+        filterWilayah === "all"
+          ? true
+          : Array.isArray(ao?.wilayah) &&
+          ao.wilayah.some(
+            (wilayah) => Number(getWilayahId(wilayah)) === Number(filterWilayah),
+          );
+
+      const active = isActiveValue(ao?.status);
+
+      const matchesStatus =
+        filterStatus === "all"
+          ? true
+          : filterStatus === "active"
+            ? active
+            : !active;
 
       return matchesSearch && matchesWilayah && matchesStatus;
     })
-    .sort((a, b) => b.id_user - a.id_user);
+    .sort((a, b) => Number(b.id_user || 0) - Number(a.id_user || 0));
 
   const totalItems = filteredData.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
   const currentData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const tableColumns = [
     {
@@ -144,7 +266,7 @@ const ReadAO = () => {
       align: "text-center w-[80px]",
       render: (_, i) => (
         <div className="flex justify-center">
-          <span className="text-left font-mono text-[10px] font-bold text-gray-400 min-w-[20px]">
+          <span className="min-w-[20px] text-left font-mono text-[10px] font-bold text-gray-400">
             {String((currentPage - 1) * itemsPerPage + i + 1).padStart(2, "0")}
           </span>
         </div>
@@ -155,14 +277,22 @@ const ReadAO = () => {
       align: "text-center w-[30%]",
       render: (row) => (
         <div className="flex justify-center py-2">
-          <div className="text-left flex flex-col gap-0.5 min-w-[160px]">
-            <span className="font-black text-gray-800 uppercase text-[11px] leading-tight">
-              {row.nama}
+          <div className="flex min-w-[160px] flex-col gap-0.5 text-left">
+            <span className="text-[11px] font-black uppercase leading-tight text-gray-800">
+              {row.nama || "-"}
             </span>
-            <div className="flex items-center gap-1.5 text-slate-400 leading-none">
+
+            <div className="flex items-center gap-1.5 leading-none text-slate-400">
               <Mail size={10} />
-              <span className="text-[9px] font-bold lowercase truncate">{row.email}</span>
+
+              <span className="truncate text-[9px] font-bold lowercase">
+                {row.email || "-"}
+              </span>
             </div>
+
+            <span className="mt-1 text-[8px] font-black uppercase tracking-widest text-slate-300">
+              ID: {row.id_user || "-"} · {row.jabatan || "Area Officer"}
+            </span>
           </div>
         </div>
       ),
@@ -172,19 +302,26 @@ const ReadAO = () => {
       align: "text-center w-[35%]",
       render: (row) => (
         <div className="flex justify-center py-2">
-          <div className="text-left min-w-[160px]">
+          <div className="min-w-[160px] text-left">
             <div className="flex flex-wrap items-center gap-1.5">
-              {row.wilayah?.length > 0 ? (
-                row.wilayah.map((w, idx) => (
-                  <span
-                    key={idx}
-                    className="px-2.5 py-1 bg-[#0AC4E0]/5 text-[#0AC4E0] rounded-lg text-[9px] font-black uppercase tracking-tight border border-[#0AC4E0]/10"
-                  >
-                    {w.nama_wilayah?.split("/").filter(Boolean).pop()}
-                  </span>
-                ))
+              {Array.isArray(row?.wilayah) && row.wilayah.length > 0 ? (
+                row.wilayah.map((wilayah) => {
+                  const idWilayah = getWilayahId(wilayah);
+                  const namaWilayah = cleanWilayahName(getWilayahName(wilayah));
+
+                  return (
+                    <span
+                      key={idWilayah}
+                      className="rounded-lg border border-[#0AC4E0]/10 bg-[#0AC4E0]/5 px-2.5 py-1 text-[9px] font-black uppercase tracking-tight text-[#0AC4E0]"
+                    >
+                      {namaWilayah}
+                    </span>
+                  );
+                })
               ) : (
-                <span className="text-[10px] text-slate-300 italic font-bold">BELUM DITUGASKAN</span>
+                  <span className="text-[10px] font-bold italic text-slate-300">
+                    BELUM DITUGASKAN
+                  </span>
               )}
             </div>
           </div>
@@ -192,26 +329,29 @@ const ReadAO = () => {
       ),
     },
     {
-      header: "AKSI KONTROL",
+      header: "KONTROL OTORITAS",
       align: "text-center w-[280px]",
       render: (row) => {
-        const isActive = row.status === true || row.status === "true" || Number(row.status) === 1;
+        const active = isActiveValue(row.status);
+
         return (
           <div className="flex justify-center py-2">
-            <div className="flex items-center gap-4 text-left min-w-[180px]">
-              {/* Action Group */}
-              <div className="flex items-center gap-1 shrink-0">
+            <div className="flex min-w-[180px] items-center gap-4 text-left">
+              <div className="flex shrink-0 items-center gap-1">
                 <button
+                  type="button"
                   onClick={() => navigate(`/admin/ao/detail/${row.id_user}`)}
-                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-[#0AC4E0] hover:bg-white rounded-lg transition-all active:scale-90"
-                  title="View"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-white hover:text-[#0AC4E0] active:scale-90"
+                  title="Lihat Detail"
                 >
                   <Eye size={15} />
                 </button>
+
                 <button
+                  type="button"
                   onClick={() => navigate(`/admin/ao/edit/${row.id_user}`)}
-                  className="w-8 h-8 flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 hover:text-amber-500 hover:bg-white rounded-lg transition-all active:scale-90"
-                  title="Edit"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-white hover:text-amber-500 active:scale-90"
+                  title="Edit Data"
                 >
                   <Edit3 size={14} />
                 </button>
@@ -219,27 +359,33 @@ const ReadAO = () => {
 
               <div className="h-6 w-px bg-slate-100" />
 
-              {/* Toggle Status */}
-              <div
-                onClick={() => handleToggleStatus(row.id_user, row.nama, row.status)}
-                className="flex items-center gap-2 cursor-pointer group active:scale-95 transition-all"
+              <button
+                type="button"
+                onClick={() =>
+                  handleToggleStatus(row.id_user, row.nama, row.status)
+                }
+                className="group flex cursor-pointer items-center gap-2 transition-all active:scale-95"
+                title="Ubah Status"
               >
                 <div
-                  className={`relative w-8 h-4.5 rounded-full transition-all duration-500 p-0.5 ${isActive ? "bg-emerald-500 shadow-sm shadow-emerald-200" : "bg-gray-200"
+                  className={`relative h-[18px] w-8 rounded-full p-0.5 transition-all duration-500 ${active
+                    ? "bg-emerald-500 shadow-sm shadow-emerald-200"
+                    : "bg-gray-200"
                     }`}
                 >
                   <div
-                    className={`w-3.5 h-3.5 bg-white rounded-full transition-all duration-300 shadow-sm ${isActive ? "translate-x-3.5" : "translate-x-0"
+                    className={`h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-all duration-300 ${active ? "translate-x-3.5" : "translate-x-0"
                       }`}
                   />
                 </div>
+
                 <span
-                  className={`text-[9px] font-black uppercase tracking-widest ${isActive ? "text-emerald-600" : "text-slate-400"
+                  className={`text-[9px] font-black uppercase tracking-widest ${active ? "text-emerald-600" : "text-slate-400"
                     }`}
                 >
-                  {isActive ? "On" : "Off"}
+                  {active ? "Aktif" : "Nonaktif"}
                 </span>
-              </div>
+              </button>
             </div>
           </div>
         );
@@ -248,48 +394,51 @@ const ReadAO = () => {
   ];
 
   return (
-    <PageWrapper className="h-screen bg-[#EEF5FF] flex overflow-hidden !p-0 font-sans selection:bg-[#0AC4E0]/20 text-slate-800">
+    <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0 font-sans text-slate-800 selection:bg-[#0AC4E0]/20">
       <Sidebar />
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-10 pt-10 pb-6">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-[2.5rem] shadow-2xl bg-white overflow-hidden relative leading-none">
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/5 rounded-full blur-[100px] -z-10" />
 
-          <div className="px-10 pt-8 pb-6 shrink-0">
-            <header className="flex justify-between items-center mb-8">
+      <main className="flex h-full flex-1 flex-col overflow-hidden px-4 pb-6 pt-10 md:px-10">
+        <Card className="relative !m-0 flex flex-1 flex-col overflow-hidden rounded-[2.5rem] bg-white !p-0 leading-none shadow-2xl">
+          <div className="absolute right-0 top-0 -z-10 h-[500px] w-[500px] rounded-full bg-[#0AC4E0]/5 blur-[100px]" />
+
+          <div className="shrink-0 px-10 pb-6 pt-8">
+            <header className="mb-8 flex items-center justify-between">
               <div className="flex items-center gap-4">
-
                 <div className="flex flex-col gap-1 leading-none">
                   <Label
-                    text="Sistem Monitoring Area Strategis"
-                    className="!text-[8px] !text-[#0AC4E0] !font-black !italic uppercase tracking-widest"
+                    text="Sistem Pemantauan Area Strategis"
+                    className="!text-[8px] !font-black !italic uppercase tracking-widest !text-[#0AC4E0]"
                   />
-                  <h1 className="text-xl font-black text-gray-800 uppercase">
-                    Manajemen Data <span className="text-[#0AC4E0]">Area Officer</span>
+
+                  <h1 className="text-xl font-black uppercase text-gray-800">
+                    Manajemen Data{" "}
+                    <span className="text-[#0AC4E0]">Area Officer</span>
                   </h1>
                 </div>
               </div>
+
               <Button
-                text="REGISTRASI AO"
+                text="Tambah Area Officer"
                 icon={<Plus size={14} />}
                 onClick={() => navigate("/admin/ao/create")}
-                className="!bg-[#0AC4E0] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg shadow-[#0AC4E0]/20 active:scale-95 transition-all"
+                className="!rounded-full !bg-[#0AC4E0] !px-6 !py-2.5 !text-[9px] font-black !uppercase text-white shadow-lg shadow-[#0AC4E0]/20 transition-all active:scale-95"
               />
             </header>
 
-            {/* BENTO CONTROL BAR */}
-            <div className="flex flex-col md:flex-row gap-3 mb-6 leading-none">
-              <div className="relative flex-1 group">
+            <div className="mb-6 flex flex-col gap-3 leading-none md:flex-row">
+              <div className="group relative flex-1">
                 <Input
-                  placeholder="Cari nama atau email officer..."
+                  placeholder="Cari nama atau email Area Officer..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="w-full !pl-11 !py-3 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[11px] font-bold focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/10 transition-all outline-none"
+                  className="w-full !rounded-xl !border-gray-200/50 !bg-gray-50/50 !py-3 !pl-11 !text-[11px] font-bold outline-none transition-all focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/10"
                 />
+
                 <SearchIcon
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#0AC4E0] transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 transition-colors group-focus-within:text-[#0AC4E0]"
                   size={16}
                 />
               </div>
@@ -300,16 +449,25 @@ const ReadAO = () => {
                   value={filterWilayah}
                   items={[
                     { value: "all", label: "SELURUH WILAYAH" },
-                    ...wilayahList.map((w) => ({
-                      value: w.id_wilayah.toString(),
-                      label: w.nama_wilayah.split("/").filter(Boolean).pop().toUpperCase(),
-                    })),
+                    ...wilayahList
+                      .filter((wilayah) => getWilayahId(wilayah))
+                      .map((wilayah) => {
+                        const idWilayah = getWilayahId(wilayah);
+                        const namaWilayah = cleanWilayahName(
+                          getWilayahName(wilayah),
+                        ).toUpperCase();
+
+                        return {
+                          value: String(idWilayah),
+                          label: namaWilayah,
+                        };
+                      }),
                   ]}
-                  onChange={(v) => {
-                    setFilterWilayah(v);
+                  onChange={(value) => {
+                    setFilterWilayah(value);
                     setCurrentPage(1);
                   }}
-                  className="!py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[9px] font-black uppercase"
+                  className="!rounded-xl !border-gray-200/50 !bg-gray-50/50 !py-2.5 !text-[9px] font-black uppercase"
                 />
               </div>
 
@@ -322,49 +480,60 @@ const ReadAO = () => {
                     { value: "active", label: "STATUS: AKTIF" },
                     { value: "inactive", label: "STATUS: NONAKTIF" },
                   ]}
-                  onChange={(v) => {
-                    setFilterStatus(v);
+                  onChange={(value) => {
+                    setFilterStatus(value);
                     setCurrentPage(1);
                   }}
-                  className="!py-2.5 !bg-gray-50/50 !border-gray-200/50 !rounded-xl !text-[9px] font-black uppercase"
+                  className="!rounded-xl !border-gray-200/50 !bg-gray-50/50 !py-2.5 !text-[9px] font-black uppercase"
                 />
               </div>
 
               <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setFilterWilayah("all");
-                  setFilterStatus("all");
-                  setCurrentPage(1);
-                }}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all active:rotate-180 duration-500 shadow-sm border border-gray-200/50"
+                type="button"
+                onClick={resetFilter}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200/50 bg-gray-50 text-gray-400 shadow-sm transition-all duration-500 hover:bg-rose-50 hover:text-rose-500 active:rotate-180"
+                title="Atur Ulang Filter"
               >
                 <RotateCcw size={16} />
               </button>
             </div>
 
-            <div className="px-4 py-2 bg-[#0AC4E0]/5 text-[#0AC4E0] rounded-lg border border-[#0AC4E0]/10 font-black text-[8px] uppercase tracking-widest w-fit leading-none">
-              <Filter size={12} className="inline mr-2" /> Hasil Filter: {totalItems} Personnel
-            </div>
-          </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="w-fit rounded-lg border border-[#0AC4E0]/10 bg-[#0AC4E0]/5 px-4 py-2 text-[8px] font-black uppercase leading-none tracking-widest text-[#0AC4E0]">
+                <Filter size={12} className="mr-2 inline" />
+                Hasil Filter: {totalItems} Area Officer
+              </div>
 
-          <div className="flex-1 px-10 pb-4 overflow-hidden flex flex-col">
-            <div className="flex-1 bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden no-scrollbar">
-              <Table
-                columns={tableColumns}
-                data={currentData}
-                className="min-w-full border-separate border-spacing-0"
-              />
-              {!loading && currentData.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-32 opacity-20 text-gray-900">
-                  <Database size={64} className="mb-4" strokeWidth={1} />
-                  <p className="text-xs font-black uppercase tracking-widest">Data Tidak Ditemukan</p>
+              {loading && (
+                <div className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-4 py-2 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                  <Loader2 size={12} className="animate-spin" />
+                  Memuat Data
                 </div>
               )}
             </div>
           </div>
 
-          <div className="px-10 py-5 mt-auto border-t border-gray-100 bg-gray-50/30">
+          <div className="flex flex-1 flex-col overflow-hidden px-10 pb-4">
+            <div className="no-scrollbar flex-1 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
+              <Table
+                columns={tableColumns}
+                data={currentData}
+                className="min-w-full border-separate border-spacing-0"
+              />
+
+              {!loading && currentData.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-32 text-gray-900 opacity-20">
+                  <LayoutGrid size={64} className="mb-4" strokeWidth={1} />
+
+                  <p className="text-xs font-black uppercase tracking-widest">
+                    Data Tidak Ditemukan
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-auto border-t border-gray-50 bg-gray-50/30 px-10 py-5">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
@@ -378,47 +547,57 @@ const ReadAO = () => {
         </Card>
       </main>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-in {
-          animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* MacBook Style Table Customization */
-        table { border-collapse: separate; border-spacing: 0; width: 100%; }
-        
-        thead th { 
-          background-color: #0AC4E0 !important; 
-          color: white !important; 
-          font-size: 10px !important; 
-          font-weight: 900 !important; 
-          text-transform: uppercase !important;
-          letter-spacing: 0.12em !important; 
-          padding: 1.5rem 1.5rem !important;
-          border: none !important;
-          position: sticky;
-          top: 0;
-          z-index: 10;
-        }
-        
-        thead th:first-child { border-top-left-radius: 1.8rem !important; }
-        thead th:last-child { border-top-right-radius: 1.8rem !important; }
+            table {
+              border-collapse: separate;
+              border-spacing: 0;
+              width: 100%;
+            }
 
-        tbody td { 
-          padding: 1rem 1.5rem !important; 
-          border-bottom: 1px solid #F8FAFC !important; 
-          vertical-align: middle !important;
-        }
-        tbody tr:last-child td { border-bottom: none !important; }
-        tbody tr:hover td { background-color: #0AC4E0/5 !important; transition: all 0.2s ease; }
-      `}} />
+            thead th {
+              background-color: #0AC4E0 !important;
+              color: white !important;
+              font-size: 10px !important;
+              font-weight: 900 !important;
+              text-transform: uppercase !important;
+              letter-spacing: 0.12em !important;
+              padding: 1.5rem 1.5rem !important;
+              border: none !important;
+              position: sticky;
+              top: 0;
+              z-index: 10;
+            }
+
+            thead th:first-child {
+              border-top-left-radius: 1.8rem !important;
+            }
+
+            thead th:last-child {
+              border-top-right-radius: 1.8rem !important;
+            }
+
+            tbody td {
+              padding: 1rem 1.5rem !important;
+              border-bottom: 1px solid #F8FAFC !important;
+              vertical-align: middle !important;
+            }
+
+            tbody tr:last-child td {
+              border-bottom: none !important;
+            }
+
+            tbody tr:hover td {
+              background-color: rgba(10, 196, 224, 0.05) !important;
+              transition: all 0.2s ease;
+            }
+          `,
+        }}
+      />
     </PageWrapper>
   );
 };

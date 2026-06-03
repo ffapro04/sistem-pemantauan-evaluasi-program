@@ -567,3 +567,303 @@ html {
 .fc .fc-button-primary:disabled {
   background-color: #94a3b8 !important;
 }
+
+/* ================================
+   GLOBAL RESPONSIVE LAYOUT SYSTEM
+   ================================ */
+
+.app-shell {
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: #f6f8fb;
+}
+
+.app-main {
+  min-width: 0;
+  flex: 1;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  min-height: 88px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 1.25rem 1.75rem;
+}
+
+.app-content {
+  width: 100%;
+  max-width: none;
+  padding: 1.5rem 1.75rem 4.5rem;
+}
+
+/* ================================
+   SMART GRID SYSTEM
+   ================================ */
+
+.smart-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.smart-col-3 {
+  grid-column: span 3 / span 3;
+}
+
+.smart-col-4 {
+  grid-column: span 4 / span 4;
+}
+
+.smart-col-5 {
+  grid-column: span 5 / span 5;
+}
+
+.smart-col-6 {
+  grid-column: span 6 / span 6;
+}
+
+.smart-col-7 {
+  grid-column: span 7 / span 7;
+}
+
+.smart-col-8 {
+  grid-column: span 8 / span 8;
+}
+
+.smart-col-9 {
+  grid-column: span 9 / span 9;
+}
+
+.smart-col-12 {
+  grid-column: span 12 / span 12;
+}
+
+/* Grid untuk card otomatis, cocok untuk dashboard/read page */
+.auto-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Grid untuk form yang padat */
+.auto-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Grid untuk summary/statistik kecil */
+.auto-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+/* ================================
+   TABLE RESPONSIVE
+   ================================ */
+
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 1rem;
+}
+
+.responsive-table table {
+  width: 100%;
+  min-width: 860px;
+}
+
+/* ================================
+   FLEX RESPONSIVE HELPERS
+   ================================ */
+
+.responsive-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.responsive-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.responsive-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+/* ================================
+   SCROLLBAR
+   ================================ */
+
+.simple-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.simple-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.simple-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.simple-horizontal-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+
+.simple-horizontal-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.simple-horizontal-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+/* ================================
+   RESPONSIVE BREAKPOINTS
+   ================================ */
+
+/* Laptop kecil / tablet landscape */
+@media (max-width: 1280px) {
+  .smart-col-3,
+  .smart-col-4 {
+    grid-column: span 6 / span 6;
+  }
+
+  .smart-col-5,
+  .smart-col-6,
+  .smart-col-7,
+  .smart-col-8,
+  .smart-col-9 {
+    grid-column: span 12 / span 12;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .app-header {
+    min-height: auto;
+    padding: 1rem;
+  }
+
+  .app-content {
+    padding: 1rem 1rem 5rem;
+  }
+
+  .smart-grid {
+    gap: 1rem;
+  }
+
+  .smart-col-3,
+  .smart-col-4,
+  .smart-col-5,
+  .smart-col-6,
+  .smart-col-7,
+  .smart-col-8,
+  .smart-col-9,
+  .smart-col-12 {
+    grid-column: span 12 / span 12;
+  }
+
+  .responsive-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .responsive-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .app-shell {
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .app-main {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    gap: 1rem;
+  }
+
+  .app-content {
+    padding: 0.9rem 0.9rem 5rem;
+  }
+
+  .responsive-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auto-card-grid,
+  .auto-form-grid,
+  .auto-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .mobile-full {
+    width: 100% !important;
+  }
+
+  .mobile-hide {
+    display: none !important;
+  }
+
+  .mobile-scroll-x {
+    overflow-x: auto;
+  }
+
+  .responsive-table table {
+    min-width: 760px;
+  }
+}
+
+/* HP kecil */
+@media (max-width: 480px) {
+  .app-content {
+    padding: 0.75rem 0.75rem 5rem;
+  }
+
+  .app-header h1 {
+    font-size: 20px !important;
+    line-height: 1.2 !important;
+  }
+
+  .app-header p {
+    max-width: 240px;
+  }
+
+  .responsive-table table {
+    min-width: 700px;
+  }
+}

@@ -9,10 +9,8 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
-  Index,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
-// 1. TAMBAHKAN IMPORT INI DI ATAS
 import { Sekolah } from '../../sekolah/entities/sekolah.entity';
 
 @Entity('m_wilayah')
@@ -37,6 +35,18 @@ export class Wilayah {
 
   @Column({ type: 'text', nullable: true })
   alamat_lengkap: string;
+
+  @Column({ nullable: true })
+  luas_wilayah: string;
+
+  @Column({ type: 'text', nullable: true })
+  letak_geografis: string;
+
+  @Column({ type: 'text', nullable: true })
+  letak_astronomis: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  bounds: number[][];
 
   @Column({ default: true })
   status: boolean;
@@ -73,8 +83,6 @@ export class Wilayah {
   @OneToMany(() => Wilayah, (wilayah) => wilayah.parent)
   children: Wilayah[];
 
-  // --- 2. TAMBAHKAN INI (DI SINI TEMPATNYA) ---
-  // Ini yang bikin error "Property sekolah does not exist" jadi ILANG
   @OneToMany(() => Sekolah, (sekolah) => sekolah.wilayah)
   sekolah: Sekolah[];
 
@@ -90,8 +98,9 @@ export class Wilayah {
     scale: 8,
     nullable: true,
     transformer: {
-      to: (value: number) => value,
-      from: (value: string) => parseFloat(value),
+      to: (value: number | null) => value,
+      from: (value: string | null) =>
+        value === null || value === undefined ? null : parseFloat(value),
     },
   })
   latitude: number;
@@ -102,8 +111,9 @@ export class Wilayah {
     scale: 8,
     nullable: true,
     transformer: {
-      to: (value: number) => value,
-      from: (value: string) => parseFloat(value),
+      to: (value: number | null) => value,
+      from: (value: string | null) =>
+        value === null || value === undefined ? null : parseFloat(value),
     },
   })
   longitude: number;

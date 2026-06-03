@@ -11,7 +11,6 @@ import {
   RefreshCcw,
   ChevronLeft,
   Database,
-  Sparkles,
   MapPin,
   Lock,
   Eye,
@@ -20,39 +19,49 @@ import {
   XCircle,
   CheckCircle2,
   Fingerprint,
-  Activity
+  ShieldCheck,
 } from "lucide-react";
 import Swal from "sweetalert2";
 
 import Sidebar from "../../../../components/Sidebar";
 import PageWrapper from "../../../../components/PageWrapper";
 import Label from "../../../../components/Label";
+import Button from "../../../../components/Button";
 
 const MASTER_AUTH_KEY = "Y4y4s4n4str4";
 
 const DetailAO = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [statusNote, setStatusNote] = useState({ show: false, type: null, message: "" });
+
+  const [statusNote, setStatusNote] = useState({
+    show: false,
+    type: null,
+    message: "",
+  });
 
   useEffect(() => {
     const fetchDetail = async () => {
       try {
         const token = localStorage.getItem("token");
+
         const res = await axios.get(`http://localhost:3000/users/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         setData(res.data);
       } catch (err) {
-        Swal.fire("Error", "Gagal mengambil data personil AO", "error");
+        Swal.fire("Gagal", "Gagal mengambil data Area Officer", "error");
         navigate("/admin/ao");
       } finally {
         setLoading(false);
       }
     };
+
     fetchDetail();
   }, [id, navigate]);
 
@@ -63,19 +72,29 @@ const DetailAO = () => {
     }
 
     const { value: inputKey } = await Swal.fire({
-      title: `<span class="text-xl font-black uppercase tracking-tighter text-[#083344]">Otoritas Keamanan</span>`,
-      html: `<p class="text-[10px] font-bold text-[#0AC4E0] uppercase tracking-[0.2em] mb-4">Input Master Key Protokol Cyan</p>`,
+      title: `<div class="flex flex-col items-center gap-3 mb-2">
+                <div class="p-3 bg-[#0AC4E0]/10 rounded-2xl text-[#0AC4E0]"></div>
+                <span class="text-lg font-black text-slate-800 uppercase">Verifikasi Keamanan</span>
+              </div>`,
+      html: `<p class="text-xs font-medium text-slate-500">Otorisasi diperlukan untuk melihat kredensial pengguna.</p>`,
       input: "password",
-      inputPlaceholder: "••••••••••••",
+      inputAttributes: {
+        autocapitalize: "off",
+        placeholder: "MASTER_KEY",
+        style:
+          "text-align: center; font-weight: 800; border-radius: 1rem; border: 2px solid #F1F5F9; background: #F8FAFC; padding: 0.8rem;",
+      },
       showCancelButton: true,
-      confirmButtonText: "AUTHORIZE",
+      confirmButtonText: "Otorisasi",
+      cancelButtonText: "Batal",
       confirmButtonColor: "#0AC4E0",
-      cancelButtonColor: "#CFFAFE",
+      buttonsStyling: false,
       customClass: {
-        popup: "rounded-[3rem] p-10 shadow-2xl border-2 border-[#0AC4E0] bg-white",
-        input: "rounded-2xl border-2 border-[#CFFAFE] text-center tracking-[0.5em] font-black focus:border-[#0AC4E0] focus:ring-0 text-[#083344]",
-        confirmButton: "rounded-full px-10 py-4 text-[10px] font-black tracking-widest uppercase shadow-xl shadow-cyan-200",
-        cancelButton: "rounded-full px-10 py-4 text-[10px] font-black tracking-widest uppercase text-[#0AC4E0]",
+        popup: "rounded-[2.5rem] border-none shadow-2xl p-8",
+        confirmButton:
+          "w-full py-3.5 bg-[#0AC4E0] text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg mb-2 active:scale-95",
+        cancelButton:
+          "w-full py-3.5 bg-gray-50 text-slate-400 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-gray-100 transition-all",
       },
     });
 
@@ -85,196 +104,263 @@ const DetailAO = () => {
       setStatusNote({
         show: true,
         type: "error",
-        message: "Akses Ditolak: Kunci Otoritas Tidak Valid.",
+        message: "Akses ditolak. Master Key tidak valid.",
       });
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
+      <div className="flex h-screen items-center justify-center bg-white">
         <RefreshCcw className="animate-spin text-[#0AC4E0]" size={40} />
       </div>
     );
+  }
 
-  const displayWilayah = data?.wilayah?.length > 0
-    ? data.wilayah.map((w) => w.nama_wilayah?.split("/").pop()).join(", ")
-    : "Belum Ditugaskan";
+  const displayWilayah =
+    data?.wilayah?.length > 0
+      ? data.wilayah
+        .map((w) => w.nama_wilayah?.split("/").filter(Boolean).pop())
+        .join(", ")
+      : "Belum Ditugaskan";
 
   return (
-    <PageWrapper className="h-screen bg-[#F0FDFA] flex overflow-hidden !p-0 font-sans text-[#083344]">
+    <PageWrapper className="flex h-screen overflow-hidden bg-[#FBFBFD] !p-0 font-sans leading-none text-slate-800">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative items-center justify-end">
-        {/* Dekorasi Background */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#0AC4E0]/10 rounded-full blur-[100px] -z-0" />
-        <div className="absolute bottom-40 left-20 w-[300px] h-[300px] bg-[#0AC4E0]/5 rounded-full blur-[80px] -z-0" />
+      <main className="relative flex h-full flex-1 flex-col items-center justify-end overflow-hidden">
+        <div className="absolute right-0 top-0 -z-0 h-[600px] w-[600px] rounded-full bg-[#0AC4E0]/5 blur-[120px]" />
 
-        {/* --- ALERT NOTIFICATION --- */}
         <AnimatePresence>
           {statusNote.show && (
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="fixed top-10 right-10 z-[100] w-80"
+              initial={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{
+                x: statusNote.type === "error" ? -100 : 100,
+                opacity: 0,
+              }}
+              className={`fixed ${statusNote.type === "error" ? "left-[320px]" : "right-12"
+                } top-[45%] z-[100] w-72`}
             >
-              <div className="bg-white border-2 border-[#0AC4E0] p-6 rounded-[2.5rem] shadow-2xl flex items-center gap-4">
-                <div className="w-12 h-12 bg-[#0AC4E0] rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-cyan-200">
-                  <ShieldAlert size={20} />
+              <div className="rounded-[3rem] border border-slate-100 bg-white/90 p-8 text-center shadow-2xl backdrop-blur-xl">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-lg shadow-rose-200">
+                  <ShieldAlert size={28} />
                 </div>
-                <div className="flex-1">
-                  <p className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest mb-1">Security Alert</p>
-                  <p className="text-xs font-bold text-slate-600 leading-tight">{statusNote.message}</p>
-                </div>
-                <button onClick={() => setStatusNote({ ...statusNote, show: false })} className="text-slate-300 hover:text-[#0AC4E0]">
-                  <XCircle size={18} />
+
+                <h4 className="mb-3 text-[10px] font-black uppercase tracking-widest text-rose-600">
+                  Peringatan Keamanan
+                </h4>
+
+                <p className="mb-8 text-xs font-bold leading-relaxed text-slate-600">
+                  {statusNote.message}
+                </p>
+
+                <button
+                  onClick={() => setStatusNote({ ...statusNote, show: false })}
+                  className="w-full rounded-2xl bg-rose-50 py-4 text-[10px] font-black uppercase text-rose-600 transition-all active:scale-95"
+                >
+                  Mengerti
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* HEADER SECTION */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-5xl px-12 mb-8 flex items-end justify-between relative z-10"
+          className="z-10 mb-6 text-center"
         >
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white rounded-xl shadow-sm border border-[#CFFAFE] text-[#0AC4E0]">
-                <Sparkles size={16} />
-              </div>
-              <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#0AC4E0]">Personnel Bureau v2.0</span>
-            </div>
-            <h1 className="text-5xl font-black tracking-tighter text-[#083344] uppercase leading-none">
-              Identity <span className="text-[#0AC4E0]">Archive</span>
-            </h1>
+          <div className="mb-1 flex items-center justify-center gap-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.4em] text-[#1C0770]/50">
+              Sistem Pemantauan dan Evaluasi Program
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 px-6 py-3 bg-[#0AC4E0]/10 border border-[#0AC4E0]/20 rounded-2xl">
-            <Activity size={16} className="text-[#0AC4E0] animate-pulse" />
-            <span className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest">Status: Active Node</span>
-          </div>
+          <h1 className="text-5xl font-black uppercase leading-none tracking-tighter text-[#0AC4E0]">
+            Detail Area Officer
+          </h1>
         </motion.div>
 
-        {/* MAIN DATA CARD */}
         <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 60, delay: 0.1 }}
-          className="w-full max-w-5xl bg-white rounded-t-[5rem] shadow-[0_-20px_80px_rgba(10,196,224,0.1)] border-t border-x border-[#CFFAFE] p-16 pb-40 relative z-10 overflow-y-auto no-scrollbar"
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "circOut" }}
+          className="relative z-10 w-full max-w-5xl overflow-hidden rounded-t-[5rem] rounded-b-none border-x border-t border-[#0AC4E0]/10 bg-white p-16 pb-40 shadow-[0_-30px_100px_rgba(10,196,224,0.1)]"
         >
-          <div className="grid grid-cols-12 gap-16">
+          <div className="pointer-events-none absolute left-0 top-0 h-24 w-full bg-gradient-to-b from-[#0AC4E0]/5 to-transparent" />
 
-            {/* LEFT: AVATAR & PRIMARY */}
-            <div className="col-span-12 lg:col-span-4 space-y-10">
-              <div className="relative">
-                <div className="w-44 h-44 bg-[#F0FDFA] rounded-[3.5rem] border-2 border-[#CFFAFE] flex items-center justify-center text-6xl font-black text-[#0AC4E0] shadow-inner">
+          <div className="relative z-10 grid grid-cols-12 gap-16">
+            <div className="col-span-12 space-y-8 lg:col-span-4">
+              <div className="relative mx-auto w-fit lg:mx-0">
+                <div className="flex h-44 w-44 items-center justify-center rounded-[3.5rem] border-2 border-cyan-100 bg-cyan-50 text-6xl font-black uppercase text-[#0AC4E0] shadow-inner">
                   {data?.nama?.charAt(0)}
                 </div>
-                <div className="absolute -bottom-2 -right-2 p-4 rounded-3xl shadow-xl bg-[#083344] text-white border-4 border-white">
+
+                <div className="absolute -bottom-2 -right-2 rounded-3xl border-4 border-white bg-slate-900 p-4 text-white shadow-xl">
                   <Fingerprint size={24} />
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label text="Nama Lengkap" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-2" />
-                  <div className="p-6 bg-[#F0FDFA] border-2 border-[#CFFAFE] rounded-[2.5rem]">
-                    <h2 className="text-2xl font-black tracking-tight uppercase text-[#083344]">{data?.nama}</h2>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label
+                  text="Nama Lengkap"
+                  className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                />
 
-                <div className="space-y-2">
-                  <Label text="Keamanan Akses" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-2" />
-                  <div className="flex items-center justify-between p-6 bg-[#083344] rounded-[2.5rem] shadow-xl border border-[#083344]">
-                    <div className="flex items-center gap-4 text-white">
-                      <Lock size={18} className="text-[#0AC4E0]" />
-                      <span className={`font-mono text-sm tracking-[0.3em] font-black ${showPassword ? 'text-white' : 'text-[#164e63]'}`}>
-                        {showPassword ? data?.password : "••••••••"}
-                      </span>
-                    </div>
-                    <button onClick={handleRevealRequest} className="p-2 bg-[#164e63] rounded-xl text-[#0AC4E0] hover:bg-[#24717d] transition-all">
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
+                <div className="rounded-[2.5rem] border border-slate-100 bg-slate-50/50 p-6">
+                  <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">
+                    {data?.nama}
+                  </h2>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label
+                  text="Kode Keamanan Password"
+                  className="!ml-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                />
+
+                <div className="flex items-center justify-between rounded-[2.5rem] border border-slate-900 bg-slate-900 p-6 shadow-xl">
+                  <div className="flex items-center gap-4 text-white">
+                    <Lock size={18} className="text-[#0AC4E0]" />
+
+                    <span
+                      className={`font-mono text-sm font-black tracking-[0.3em] ${showPassword ? "text-white" : "text-slate-700"
+                        }`}
+                    >
+                      {showPassword ? data?.password : "••••••••"}
+                    </span>
                   </div>
+
+                  <button
+                    onClick={handleRevealRequest}
+                    className="rounded-xl bg-slate-800 p-2 text-[#0AC4E0] transition-all hover:bg-slate-700"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* RIGHT: DETAILS GRID */}
-            <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8 self-start">
-
+            <div className="col-span-12 grid grid-cols-1 gap-7 self-start md:grid-cols-2 lg:col-span-8">
               <div className="space-y-2">
-                <Label text="Email Institusi" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-4" />
-                <div className="flex items-center gap-4 p-6 bg-white border-2 border-[#CFFAFE] rounded-[2.5rem] shadow-sm">
+                <Label
+                  text="Email Institusi"
+                  className="!ml-4 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                />
+
+                <div className="flex items-center gap-4 rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
                   <Mail size={18} className="text-[#0AC4E0]" />
-                  <span className="text-sm font-bold text-[#083344] lowercase truncate">{data?.email}</span>
+
+                  <span className="truncate text-sm font-bold lowercase text-slate-700">
+                    {data?.email}
+                  </span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label text="Jabatan Struktural" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-4" />
-                <div className="flex items-center gap-4 p-6 bg-white border-2 border-[#CFFAFE] rounded-[2.5rem] shadow-sm">
+                <Label
+                  text="Jabatan Struktural"
+                  className="!ml-4 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                />
+
+                <div className="flex items-center gap-4 rounded-[2.5rem] border border-slate-100 bg-white p-6 shadow-sm">
                   <Briefcase size={18} className="text-[#0AC4E0]" />
-                  <span className="text-sm font-black text-[#083344] uppercase">{data?.jabatan || "Area Officer Specialist"}</span>
+
+                  <span className="text-sm font-black uppercase text-slate-800">
+                    {data?.jabatan || "Area Officer"}
+                  </span>
                 </div>
               </div>
 
-              <div className="col-span-2 space-y-2">
-                <Label text="Regional Assignment" className="!text-[10px] !font-black !text-[#0AC4E0] !uppercase !tracking-widest ml-4" />
-                <div className="flex items-start gap-4 p-8 bg-[#0AC4E0]/5 border-2 border-[#0AC4E0]/20 rounded-[3rem]">
-                  <MapPin size={24} className="text-[#0AC4E0] shrink-0" />
+              <div className="space-y-2 md:col-span-2">
+                <Label
+                  text="Wilayah Penugasan"
+                  className="!ml-4 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                />
+
+                <div className="flex items-start gap-4 rounded-[3rem] border-2 border-[#0AC4E0]/20 bg-[#0AC4E0]/5 p-8">
+                  <MapPin size={24} className="shrink-0 text-[#0AC4E0]" />
+
                   <div>
-                    <h4 className="text-lg font-black text-[#083344] uppercase tracking-tighter leading-tight mb-1">{displayWilayah}</h4>
-                    <p className="text-[10px] font-bold text-[#0AC4E0] uppercase tracking-widest">Cakupan Wilayah Tugas Aktif</p>
+                    <h4 className="mb-1 text-lg font-black uppercase leading-tight tracking-tighter text-slate-900">
+                      {displayWilayah}
+                    </h4>
+
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[#0AC4E0]">
+                      Cakupan wilayah tugas aktif
+                    </p>
                   </div>
                 </div>
               </div>
 
-              <div className="col-span-2 space-y-2 pt-4">
-                <div className="flex items-center gap-6 p-6 bg-[#F0FDFA] border border-[#CFFAFE] rounded-[2.5rem]">
+              <div className="space-y-2 pt-4 md:col-span-2">
+                <div className="flex items-center gap-6 rounded-[2.5rem] border border-cyan-100 bg-cyan-50/50 p-6">
                   <Database size={20} className="text-[#0AC4E0]" />
+
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-[#0AC4E0] uppercase tracking-widest mb-1">System Reference ID</span>
-                    <span className="text-xs font-mono font-black text-[#083344]">UUID: {data?.id_user}</span>
+                    <span className="mb-1 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                      Nomor Referensi Sistem
+                    </span>
+
+                    <span className="font-mono text-xs font-black text-slate-800">
+                      ID Pengguna: {data?.id_user}
+                    </span>
                   </div>
                 </div>
               </div>
 
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center gap-5 rounded-[2.5rem] border-2 border-dashed border-[#0AC4E0]/10 bg-[#0AC4E0]/5 p-6">
+                  <ShieldCheck className="shrink-0 text-[#0AC4E0]" size={28} />
+
+                  <p className="text-left text-[11px] font-medium italic leading-relaxed text-slate-400">
+                    Identitas Area Officer bersifat rahasia dan digunakan untuk
+                    penugasan wilayah pada sistem.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>
 
-        {/* ACTION DOCK */}
-        <div className="absolute bottom-[-10px] w-[450px] h-[110px] bg-white border-t-2 border-x-2 border-[#CFFAFE] rounded-t-[150px] z-20 flex items-center justify-center px-10 pb-4 shadow-2xl shadow-cyan-100">
-          <div className="flex items-center gap-4 w-full justify-center">
-            <button
+        <motion.div
+          initial={{ y: 100 }}
+          animate={{ y: 0 }}
+          transition={{ delay: 0.3, type: "spring", stiffness: 80 }}
+          className="absolute bottom-[-15px] z-30 flex h-[120px] w-[550px] items-center justify-center rounded-t-[250px] border-x-2 border-t-2 border-white bg-white/80 px-16 pt-6 shadow-[0_-20px_80px_rgba(10,196,224,0.15)] backdrop-blur-3xl"
+        >
+          <div className="mb-2 flex w-full items-center justify-between">
+            <Button
+              text="Kembali"
+              icon={<ChevronLeft size={16} />}
               onClick={() => navigate("/admin/ao")}
-              className="group flex items-center gap-3 px-8 py-4 bg-[#F0FDFA] border-2 border-[#CFFAFE] rounded-full text-[#0AC4E0] hover:bg-[#E0F2FE] transition-all"
-            >
-              <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Kembali</span>
-            </button>
+              className="!rounded-full !border !border-slate-100 !bg-white !px-8 !py-4 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400 shadow-sm hover:!text-slate-800 active:scale-90"
+            />
 
-            <button
+            <Button
+              text="Edit Data"
+              icon={<Edit3 size={18} />}
               onClick={() => navigate(`/admin/ao/edit/${id}`)}
-              className="flex items-center gap-3 px-10 py-4 bg-[#0AC4E0] rounded-full text-white shadow-xl shadow-cyan-200 hover:bg-[#09b3cc] transition-all"
-            >
-              <Edit3 size={18} />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Edit Data</span>
-            </button>
+              className="!rounded-full !bg-[#0AC4E0] !px-10 !py-4 !text-[11px] !font-black !uppercase !tracking-widest !text-white shadow-2xl shadow-[#0AC4E0]/30 hover:!bg-[#09b3cc] active:scale-95"
+            />
           </div>
-        </div>
+        </motion.div>
       </main>
 
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .no-scrollbar::-webkit-scrollbar { display: none; }
+            .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          `,
+        }}
+      />
     </PageWrapper>
   );
 };

@@ -15,18 +15,23 @@ export class AssessmentJawaban {
   id_pertanyaan: number;
 
   @Column({ nullable: true })
-  id_user: number; // ID Sekolah (dari login)
+  id_user: number;
+
+  @Column({ nullable: true })
+  id_guru_assessment: number;
 
   @Column({ type: 'text', nullable: true })
   jawaban: string;
 
-  // REVISI DI SINI: Tambahkan nullable: true
   @Column({ type: 'int', default: 0, nullable: true })
   skor: number;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  nama_pengisi: string; // Nama Guru (input manual di form)
+  nama_pengisi: string;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  nama_guru_snapshot: string;
 
   @CreateDateColumn({ type: 'timestamp' })
-  created_at: Date; // Penanda waktu pengisian
+  created_at: Date;
 }

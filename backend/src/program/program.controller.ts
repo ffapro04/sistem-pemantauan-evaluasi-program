@@ -17,11 +17,38 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { ProgramService } from './program.service';
-import { CreateProgramDto } from './dto/create-program.dto';
+
+function buildFilename(prefix: string, originalname: string) {
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+  return `${prefix}-${uniqueSuffix}${extname(originalname)}`;
+}
 
 @Controller('program')
 export class ProgramController {
   constructor(private readonly programService: ProgramService) {}
+
+  private getUserIdFromAuth(authHeader: string) {
+    if (!authHeader) {
+      throw new UnauthorizedException('Token tidak ada');
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    try {
+      const payloadBase64Url = token.split('.')[1];
+
+      const payloadJson = Buffer.from(
+        payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/'),
+        'base64',
+      ).toString('utf-8');
+
+      const payload = JSON.parse(payloadJson);
+
+      return payload.sub || payload.id_user || payload.id;
+    } catch (e) {
+      throw new UnauthorizedException('Token tidak valid');
+    }
+  }
 
   @Post()
   @UseInterceptors(
@@ -29,54 +56,29 @@ export class ProgramController {
       storage: diskStorage({
         destination: './uploads/mou',
         filename: (req, file, cb) => {
-          // LOG 1: Cek apakah file benar-benar masuk ke Multer
           console.log('--- Multer: Memproses File ---');
           console.log('Original Name:', file.originalname);
 
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `MOU-${uniqueSuffix}${extname(file.originalname)}`);
+          cb(null, buildFilename('MOU', file.originalname));
         },
       }),
     }),
   )
   create(
-    @Body() createProgramDto: CreateProgramDto,
+    @Body() createProgramDto: any,
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    // LOG 2: Cek data body dan file setelah melewati Interceptor
     console.log('--- Controller: Request Masuk ---');
     console.log('Body Data:', createProgramDto);
+    console.log('BODY FASES:', createProgramDto.fases);
+    console.log('BODY FASES TYPE:', typeof createProgramDto.fases);
     console.log('File Terdeteksi:', file ? file.filename : 'TIDAK ADA FILE!');
 
-    if (!authHeader) {
-      console.error('Error: Authorization Header tidak ditemukan');
-      throw new UnauthorizedException('Token tidak ada');
-    }
+    const id_user = this.getUserIdFromAuth(authHeader);
 
-    const token = authHeader.split(' ')[1];
-    let id_user = null;
-
-    try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-      const payloadJson = Buffer.from(payloadBase64, 'base64').toString(
-        'utf-8',
-      );
-      id_user = JSON.parse(payloadJson).sub;
-
-      console.log('User ID dari Token:', id_user);
-    } catch (e) {
-      console.error('Error: Gagal decode token', e.message);
-      throw new UnauthorizedException('Token tidak valid');
-    }
-
-    // LOG 3: Pastikan semua data wajib ada sebelum ke Service
     if (!createProgramDto.nama_program || !createProgramDto.id_sekolah) {
-      console.error('Error: Data wajib (nama_program/id_sekolah) kosong!');
+      console.error('Error: Data wajib nama_program/id_sekolah kosong');
       throw new BadRequestException('Data wajib tidak lengkap');
     }
 
@@ -86,6 +88,102 @@ export class ProgramController {
   @Get()
   findAll(@Query('kategori') kategori?: string) {
     return this.programService.findAll(kategori);
+  }
+
+  @Patch('persyaratan-termin/:id/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/dokumentasi',
+        filename: (req, file, cb) => {
+          cb(null, buildFilename('REQ-TERMIN', file.originalname));
+        },
+      }),
+    }),
+  )
+  uploadPersyaratanTermin(
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.uploadPersyaratanTermin(
+      +id,
+      file,
+      body,
+      id_user,
+    );
+  }
+
+  @Patch('persyaratan-kegiatan/:id/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/dokumentasi',
+        filename: (req, file, cb) => {
+          cb(null, buildFilename('REQ-KEGIATAN', file.originalname));
+        },
+      }),
+    }),
+  )
+  uploadPersyaratanKegiatan(
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.uploadPersyaratanKegiatan(
+      +id,
+      file,
+      body,
+      id_user,
+    );
+  }
+
+  @Patch('persyaratan-termin/:id/approve')
+  approvePersyaratanTermin(
+    @Param('id') id: string,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.approvePersyaratanTermin(+id, id_user);
+  }
+
+  @Patch('persyaratan-termin/:id/reject')
+  rejectPersyaratanTermin(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.rejectPersyaratanTermin(+id, id_user, body);
+  }
+
+  @Patch('persyaratan-kegiatan/:id/approve')
+  approvePersyaratanKegiatan(
+    @Param('id') id: string,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.approvePersyaratanKegiatan(+id, id_user);
+  }
+
+  @Patch('persyaratan-kegiatan/:id/reject')
+  rejectPersyaratanKegiatan(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const id_user = this.getUserIdFromAuth(authHeader);
+
+    return this.programService.rejectPersyaratanKegiatan(+id, id_user, body);
   }
 
   @Get(':id')
@@ -99,9 +197,7 @@ export class ProgramController {
       storage: diskStorage({
         destination: './uploads/mou',
         filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `MOU-EDIT-${uniqueSuffix}${extname(file.originalname)}`);
+          cb(null, buildFilename('MOU-EDIT', file.originalname));
         },
       }),
     }),
@@ -115,20 +211,7 @@ export class ProgramController {
     console.log(`--- Controller: Update Program ID ${id} ---`);
     console.log('Update Data:', updateData);
 
-    if (!authHeader) throw new UnauthorizedException('Token tidak ada');
-
-    const token = authHeader.split(' ')[1];
-    let id_user = null;
-    try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadJson = Buffer.from(
-        payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/'),
-        'base64',
-      ).toString('utf-8');
-      id_user = JSON.parse(payloadJson).sub;
-    } catch (e) {
-      throw new UnauthorizedException('Token tidak valid');
-    }
+    const id_user = this.getUserIdFromAuth(authHeader);
 
     return this.programService.update(+id, updateData, file, id_user);
   }

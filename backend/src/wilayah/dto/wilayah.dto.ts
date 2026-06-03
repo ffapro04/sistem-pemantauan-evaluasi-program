@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsBoolean,
   IsNotEmpty,
+  IsArray,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { Type } from 'class-transformer';
@@ -26,15 +27,35 @@ export class CreateWilayahDto {
   @IsString()
   jenis_wilayah?: string;
 
+  // Biar aman kalau frontend lama/baru masih kirim keterangan.
+  // Ini tidak disimpan sebagai kolom, hanya dipakai buat normalisasi.
+  @IsOptional()
+  @IsString()
+  keterangan?: string;
+
   @IsOptional()
   @IsString()
   deskripsi?: string;
 
-  // --- TAMBAHKAN FIELD INI ---
   @IsOptional()
   @IsString()
   alamat_lengkap?: string;
-  // ---------------------------
+
+  @IsOptional()
+  @IsString()
+  luas_wilayah?: string;
+
+  @IsOptional()
+  @IsString()
+  letak_geografis?: string;
+
+  @IsOptional()
+  @IsString()
+  letak_astronomis?: string;
+
+  @IsOptional()
+  @IsArray()
+  bounds?: number[][];
 
   @IsOptional()
   @Type(() => Number)

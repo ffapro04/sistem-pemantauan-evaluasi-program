@@ -30,7 +30,7 @@ export class Sekolah {
   @Column({ nullable: true, length: 20 })
   npsn: string;
 
-  @Column({ nullable: true, length: 5 })
+  @Column({ nullable: true, length: 50 })
   akreditasi: string;
 
   @Column({ default: 0 })
@@ -42,13 +42,30 @@ export class Sekolah {
   @Column({ type: 'text', nullable: true })
   alamat: string;
 
-  // REVISI DI SINI: Tambahkan nullable: true agar data lama tidak error
+  @Column({ nullable: true })
+  area: string;
+
+  @Column({ nullable: true })
+  kriteria_2022: string;
+
+  @Column({ nullable: true })
+  sertifikat_iso: string;
+
+  @Column({ nullable: true })
+  adiwiyata: string;
+
+  @Column({ type: 'double precision', default: 0 })
+  latitude: number;
+
+  @Column({ type: 'double precision', default: 0 })
+  longitude: number;
+
   @Column({ unique: true, nullable: true })
   email_login: string;
 
-  @Column({ nullable: true }) // Hapus select: false
+  @Column({ nullable: true })
   password_login: string;
-  // REVISI DI SINI: Tambahkan nullable: true
+
   @Column({ default: 'sekolah', nullable: true })
   role: string;
 

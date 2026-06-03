@@ -9,6 +9,51 @@ import {
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
+export class CreateRequirementDto {
+  @IsString()
+  @IsNotEmpty()
+  nama: string;
+
+  @IsOptional()
+  @IsString()
+  tipe?: string;
+
+  @IsOptional()
+  @IsString()
+  deskripsi?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  urutan?: number;
+}
+
+export class CreateTerminDto {
+  @IsString()
+  @IsNotEmpty()
+  nama_termin: string;
+
+  @IsOptional()
+  @IsString()
+  deskripsi?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  urutan?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  jumlah_pembayaran?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateRequirementDto)
+  persyaratan?: CreateRequirementDto[];
+}
+
 export class CreateKegiatansDto {
   @IsString()
   @IsNotEmpty()
@@ -18,9 +63,16 @@ export class CreateKegiatansDto {
   @IsString()
   deskripsi?: string;
 
+  @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  urutan: number;
+  urutan?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateRequirementDto)
+  persyaratan?: CreateRequirementDto[];
 }
 
 export class CreateFaseWithKegiatansDto {
@@ -32,9 +84,16 @@ export class CreateFaseWithKegiatansDto {
   @IsString()
   deskripsi?: string;
 
+  @IsOptional()
   @IsNumber()
   @Type(() => Number)
-  urutan: number;
+  urutan?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTerminDto)
+  termin?: CreateTerminDto[];
 
   @IsOptional()
   @IsArray()
@@ -65,19 +124,89 @@ export class CreateProgramDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (Array.isArray(value)) return value.map(Number);
+
     if (typeof value === 'string' && value.trim() !== '') {
-      return value.split(',').map((v) => Number(v.trim()));
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(Number);
+      } catch {
+        return value.split(',').map((v) => Number(v.trim()));
+      }
     }
+
     if (typeof value === 'number') return [value];
-    return value;
+
+    return [];
   })
   @IsArray()
   @IsNumber({}, { each: true })
-  @Type(() => Number)
   id_vendor?: number[];
 
   @IsOptional()
-  file_mou?: any; // Mencegah error 400 karena field file
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value.map(Number);
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(Number);
+      } catch {
+        return value.split(',').map((v) => Number(v.trim()));
+      }
+    }
+
+    if (typeof value === 'number') return [value];
+
+    return [];
+  })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  sekolah_ids?: number[];
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value.map(Number);
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(Number);
+      } catch {
+        return value.split(',').map((v) => Number(v.trim()));
+      }
+    }
+
+    if (typeof value === 'number') return [value];
+
+    return [];
+  })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  ao_ids?: number[];
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value.map(Number);
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.map(Number);
+      } catch {
+        return value.split(',').map((v) => Number(v.trim()));
+      }
+    }
+
+    if (typeof value === 'number') return [value];
+
+    return [];
+  })
+  @IsArray()
+  @IsNumber({}, { each: true })
+  vendor_ids?: number[];
+
+  @IsOptional()
+  file_mou?: any;
 
   @IsString()
   @IsNotEmpty()
@@ -100,16 +229,37 @@ export class CreateProgramDto {
   tanggal_selesai?: string;
 
   @IsOptional()
+  @IsString()
+  nomor_mou?: string;
+
+  @IsOptional()
+  harga_vendor?: any;
+
+  @IsOptional()
+  @IsString()
+  kpi_nama?: string;
+
+  @IsOptional()
+  kpi_target?: any;
+
+  @IsOptional()
+  @IsString()
+  kpi_satuan?: string;
+
+  @IsOptional()
   @Transform(({ value }) => {
-    // Parsing string JSON dari form-data menjadi object/array beneran
-    if (typeof value === 'string') {
+    if (Array.isArray(value)) return value;
+
+    if (typeof value === 'string' && value.trim() !== '') {
       try {
-        return JSON.parse(value);
-      } catch (e) {
-        return value;
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
       }
     }
-    return value;
+
+    return [];
   })
   @IsArray()
   @ValidateNested({ each: true })
