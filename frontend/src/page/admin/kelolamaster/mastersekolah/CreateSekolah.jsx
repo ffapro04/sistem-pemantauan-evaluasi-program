@@ -15,11 +15,16 @@ import {
   User,
   LockKeyhole,
   ShieldCheck,
+<<<<<<< HEAD
   XCircle,
   CheckCircle2,
   Globe2,
   Mail,
   AlignLeft,
+=======
+  Users,         // Digunakan untuk Jumlah Siswa
+  GraduationCap, // Digunakan untuk Jumlah Guru
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Swal from "sweetalert2";
@@ -79,7 +84,11 @@ const normalizeWilayah = (item) => ({
 
 const CreateSekolah = () => {
   const navigate = useNavigate();
+<<<<<<< HEAD
 
+=======
+  const [wilayahRaw, setWilayahRaw] = useState([]); 
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   const [wilayahList, setWilayahList] = useState([]);
   const [loadingWilayah, setLoadingWilayah] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -96,14 +105,20 @@ const CreateSekolah = () => {
     jenjang: "SD",
     akreditasi: "A",
     id_wilayah: "",
+    jumlah_guru: 0, 
+    jumlah_siswa: 0, 
     alamat: "",
     email_login: "",
     password_login: "",
+<<<<<<< HEAD
     id_role: 5,
     area: "",
     kriteria_2022: "",
     sertifikat_iso: "Belum",
     adiwiyata: "Belum",
+=======
+    id_role: 5, 
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   });
 
   const jenjangOptions = [
@@ -151,6 +166,7 @@ const CreateSekolah = () => {
           headers: { Authorization: `Bearer ${token}` },
         });
 
+<<<<<<< HEAD
         const data = getArrayPayload(res.data)
           .map(normalizeWilayah)
           .filter(
@@ -162,6 +178,20 @@ const CreateSekolah = () => {
           .sort((a, b) => a.nama_wilayah.localeCompare(b.nama_wilayah));
 
         setWilayahList(data);
+=======
+        const activeWilayah = res.data.filter((w) => w.status === true);
+        setWilayahRaw(activeWilayah); 
+
+        const formatted = activeWilayah.map((w) => ({
+          value: w.id_wilayah,
+          label: w.nama_wilayah
+            .split("/")
+            .filter(Boolean)
+            .pop()
+            .toUpperCase(),
+        }));
+        setWilayahList(formatted);
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
       } catch (err) {
         Toast.fire({
           icon: "error",
@@ -236,6 +266,7 @@ const CreateSekolah = () => {
       return false;
     }
 
+<<<<<<< HEAD
     return true;
   };
 
@@ -243,6 +274,16 @@ const CreateSekolah = () => {
     if (e) e.preventDefault();
 
     if (!validateForm()) return;
+=======
+  const targetWilayah = wilayahRaw.find(w => Number(w.id_wilayah) === Number(formData.id_wilayah));
+    
+    // Trik offset koordinat agar antar pin sekolah tidak menumpuk presisi di satu titik tengah wilayah
+    const randomOffsetLat = (Math.random() - 0.5) * 0.02; 
+    const randomOffsetLng = (Math.random() - 0.5) * 0.02;
+
+    const schoolLatitude = targetWilayah?.latitude ? parseFloat(targetWilayah.latitude) + randomOffsetLat : -6.2349;
+    const schoolLongitude = targetWilayah?.longitude ? parseFloat(targetWilayah.longitude) + randomOffsetLng : 107.0014;
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 
     setLoading(true);
 
@@ -255,11 +296,20 @@ const CreateSekolah = () => {
         jenjang: formData.jenjang,
         akreditasi: formData.akreditasi,
         id_wilayah: Number(formData.id_wilayah),
+<<<<<<< HEAD
         alamat: formData.alamat.trim(),
         email_login: formData.email_login.trim(),
         password_login: formData.password_login,
         id_role: 5,
         status: true,
+=======
+        jumlah_guru: Number(formData.jumlah_guru),   
+        jumlah_siswa: Number(formData.jumlah_siswa), 
+        // ⚠️ CATATAN: Pastikan backend kamu tidak crash menerima properti koordinat ini 
+        // jika kolom latitude/longitude belum dibuat di tabel m_sekolah.
+        latitude: schoolLatitude,
+        longitude: schoolLongitude
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
       };
 
       await axios.post("http://localhost:3000/sekolah", payload, {
@@ -477,6 +527,7 @@ const CreateSekolah = () => {
                   </div>
                 </div>
 
+<<<<<<< HEAD
                 <div className="rounded-3xl border border-slate-100 bg-slate-50/50 p-5">
                   <div className="mb-5 flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-[#0AC4E0] shadow-sm">
@@ -564,6 +615,59 @@ const CreateSekolah = () => {
                       sekaligus akun login sekolah. Status awal sekolah otomatis
                       aktif dan dapat dikontrol dari halaman Read Sekolah.
                     </p>
+=======
+                  {/* FIX ICON: JUMLAH GURU & SISWA */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label
+                        text="Jumlah Guru Binaan"
+                        required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={formData.jumlah_guru}
+                          onChange={(e) =>
+                            setFormData({ ...formData, jumlah_guru: e.target.value })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <GraduationCap // FIX: Guru pakai icon Toga / Topi Kelulusan (atau bisa ditukar Staf jika ada)
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label
+                        text="Jumlah Siswa Aktif"
+                        required
+                        className="!text-[9px] text-[#1E5AA5] uppercase font-black"
+                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={formData.jumlah_siswa}
+                          onChange={(e) =>
+                            setFormData({ ...formData, jumlah_siswa: e.target.value })
+                          }
+                          className="!py-4 !pl-10 !bg-gray-50/50 !border-gray-200 !rounded-2xl font-bold"
+                          required
+                        />
+                        <Users // FIX: Siswa pakai icon Users (banyak orang)
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-300"
+                          size={14}
+                        />
+                      </div>
+                    </div>
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
                   </div>
                 </div>
               </div>

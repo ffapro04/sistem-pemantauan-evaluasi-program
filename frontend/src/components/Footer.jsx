@@ -84,12 +84,51 @@ const Footer = () => {
             </ul>
           </div>
 
+<<<<<<< HEAD
           {/* Kontak */}
           <div className="lg:col-span-4 space-y-8">
             <h4 className="text-[10px] font-black tracking-[0.3em] uppercase mb-8 text-white/50">Headquarters</h4>
             <div className="flex gap-4 items-start">
               <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
                 <MapPin size={20} />
+=======
+          {/* Section 4: Kontak */}
+          <div className="lg:col-span-4">
+            <h4 className="text-[12px] font-black tracking-[0.25em] uppercase mb-8 text-white/50 border-l-2 border-blue-300 pl-3">
+              Hubungi Kamis
+            </h4>
+            <div className="space-y-6">
+              <div className="flex gap-5 items-start">
+                <MapPin size={22} className="text-blue-300 shrink-0 mt-1" />
+                <div className="text-[14px] text-white/80 leading-relaxed font-semibold">
+                  <span className="text-white block mb-1 uppercase tracking-wider font-black">
+                    Gedung B, AMDI Lt. 5
+                  </span>
+                  Jl. Gaya Motor Raya No. 8, Jakarta Utara 14330
+                </div>
+              </div>
+              <div className="flex items-center gap-5">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                  <Phone size={18} className="text-blue-300" />
+                </div>
+                <a
+                  href="tel:0216522555"
+                  className="text-[15px] text-white hover:text-blue-200 font-black tracking-tight transition-colors"
+                >
+                  (021) 6522-5555
+                </a>
+              </div>
+              <div className="flex items-center gap-5">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
+                  <Mail size={18} className="text-blue-300" />
+                </div>
+                <a
+                  href="mailto:ypamdr@gmail.com"
+                  className="text-[15px] text-white hover:text-blue-200 font-black tracking-tight transition-colors"
+                >
+                  ypamdr@gmail.com
+                </a>
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
               </div>
               <p className="text-[14px] text-white font-bold leading-snug">
                 Gedung B, AMDI Lt. 5, Jl. Gaya Motor Raya No. 8, Jakarta Utara 14330

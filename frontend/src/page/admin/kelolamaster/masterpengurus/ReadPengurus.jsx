@@ -342,8 +342,13 @@ const ReadPengurus = () => {
               <Button
                 text="Tambah Pengurus"
                 icon={<Plus size={14} />}
+<<<<<<< HEAD
                 onClick={() => navigate("/admin/pengurus/create")}
                 className="!rounded-full !bg-[#0AC4E0] !px-6 !py-2.5 !text-[9px] font-black !uppercase text-white shadow-lg active:scale-95"
+=======
+                onClick={() => navigate("/admin/kadin/create")}
+                className="!bg-[#2E5AA7] !rounded-full !px-6 !py-2.5 !text-[9px] font-black text-white shadow-lg active:scale-95"
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
               />
             </header>
 

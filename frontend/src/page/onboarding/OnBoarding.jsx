@@ -201,4 +201,8 @@ function OnBoarding() {
   );
 }
 
+<<<<<<< HEAD
 export default OnBoarding;
+=======
+export default Onboarding;
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95

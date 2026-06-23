@@ -139,6 +139,98 @@ const Login = () => {
 
   const navigate = useNavigate();
 
+<<<<<<< HEAD
+=======
+  const PRIMARY_BLUE = "#1E5AA5";
+  const ERROR_RED = "#ef4444";
+
+  const pillars = [
+    {
+      title: "Akademik",
+      image: akademikBg,
+      desc: "Meningkatkan kualitas pendidikan melalui berbagai program, salah satunya dengan memberikan pelatihan akademik untuk meningkatkan kompetensi sumber daya manusia (SDM) di lingkungan sekolah binaan.",
+    },
+    {
+      title: "Karakter",
+      image: karakterBg,
+      desc: "Warga sekolah diberikan pembinaan untuk mengembangkan karakter yang berlandaskan nilai-nilai luhur bangsa Indonesia.",
+    },
+    {
+      title: "Kecakapan Hidup",
+      image: kecakapanhidupBg,
+      desc: "Siswa dibekali dengan kecakapan hidup agar dapat meningkatkan perekonomian di daerahnya",
+    },
+    {
+      title: "Seni Budaya",
+      image: senibudayaBg,
+      desc: "Pembinaan seni budaya diberikan agar seni budaya lokal dapat dilestarikan",
+    },
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActivePillar((prev) => (prev + 1) % pillars.length);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Animasi loading progress bar zig zag
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      setLoadingProgress(0);
+      interval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          // Increment random antara 5-15% biar efek zig zag
+          const increment = Math.floor(Math.random() * 15) + 5;
+          return Math.min(prev + increment, 100);
+        });
+      }, 200);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  const handleMouseMove = (e) => {
+    const { clientX, clientY } = e;
+    const { innerWidth, innerHeight } = window;
+    const x = (clientX - innerWidth / 2) / 80;
+    const y = (clientY - innerHeight / 2) / 80;
+    setMousePosition({ x, y });
+  };
+
+  const getTargetPath = (decoded) => {
+    console.log("Isi decoded token:", decoded);
+
+    // Ambil ID Role dan pastikan jadi angka
+    const id_role = Number(decoded.id_role);
+    const jenis = String(decoded.jenis || "").trim().toLowerCase();
+
+    console.log("Role ID:", id_role);
+
+    if (id_role === 1) {
+      return "/admin/dashboard";
+    } 
+    if (id_role === 2) {
+      return "/pengurus/dashboard"; 
+    } 
+    if (id_role === 3) {
+      return jenis === "akademik"
+        ? "/ho/dashboard/akademik"
+        : "/ho/dashboard/non-akademik";
+    }
+
+    if (id_role === 7) {
+      return "/kadin/dashboard";
+
+    }
+    return "/sekolah/dashboard";
+  };
+  
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     if (loading) return;
@@ -162,7 +254,11 @@ const Login = () => {
       const decoded = jwtDecode(token);
       localStorage.setItem("user", JSON.stringify(decoded));
 
+<<<<<<< HEAD
       const redirectPath = getRedirectPath(decoded);
+=======
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 
       console.log("LOGIN DECODED:", decoded);
       console.log("REDIRECT TARGET:", redirectPath);
@@ -179,6 +275,106 @@ const Login = () => {
       alert(err.response?.data?.message || "Gagal Masuk: Kredensial tidak valid.");
     }
   };
+<<<<<<< HEAD
+=======
+  // Komponen Loading Zig Zag Bar
+  const LoadingZigZagBar = () => (
+    <div className="w-full space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity size={10} className="text-[#1E5AA5] animate-pulse" />
+          <span className="text-[8px] text-gray-400 uppercase tracking-wider">
+            Verifying Credentials
+          </span>
+        </div>
+        <span className="text-[8px] font-mono text-[#1E5AA5]">
+          {loadingProgress}%
+        </span>
+      </div>
+
+      {/* Zig Zag Progress Bar Container */}
+      <div className="relative h-1 bg-gray-100 rounded-full overflow-hidden">
+        {/* Main Progress Bar */}
+        <motion.div
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#1E5AA5] via-[#3B82F6] to-[#1E5AA5] rounded-full"
+          style={{ width: `${loadingProgress}%` }}
+          initial={{ width: "0%" }}
+          animate={{ width: `${loadingProgress}%` }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        />
+
+        {/* Zig Zag Effect - Garis horizontal bergerak */}
+        <motion.div
+          className="absolute inset-y-0 w-2 bg-white/40"
+          animate={{
+            left: [`${loadingProgress - 5}%`, `${loadingProgress + 5}%`],
+            opacity: [0.3, 0.8, 0.3],
+          }}
+          transition={{
+            duration: 0.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          style={{ left: `${loadingProgress}%` }}
+        />
+      </div>
+
+      {/* Zig Zag Pattern di bawah progress bar */}
+      <div className="flex justify-between items-center">
+        <div className="flex gap-[2px]">
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="w-[3px] h-[2px] bg-gray-200 rounded-full"
+              animate={{
+                opacity: loadingProgress > i * 5 ? [0.3, 1, 0.3] : 0.2,
+                scale: loadingProgress > i * 5 ? [1, 1.5, 1] : 1,
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                delay: i * 0.05,
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex gap-[2px]">
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="w-[3px] h-[2px] bg-gray-200 rounded-full"
+              animate={{
+                opacity: loadingProgress > i * 5 ? [0.3, 1, 0.3] : 0.2,
+                scale: loadingProgress > i * 5 ? [1, 1.5, 1] : 1,
+              }}
+              transition={{
+                duration: 0.8,
+                repeat: Infinity,
+                delay: i * 0.05 + 0.4,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Loading Steps Text */}
+      <div className="flex justify-between text-[6px] text-gray-300 uppercase tracking-wider mt-1">
+        <span className={loadingProgress > 20 ? "text-[#1E5AA5]" : ""}>
+          Auth
+        </span>
+        <span className={loadingProgress > 40 ? "text-[#1E5AA5]" : ""}>
+          Token
+        </span>
+        <span className={loadingProgress > 60 ? "text-[#1E5AA5]" : ""}>
+          Role
+        </span>
+        <span className={loadingProgress > 80 ? "text-[#1E5AA5]" : ""}>
+          Redirect
+        </span>
+      </div>
+    </div>
+  );
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 
   return (
     <PageWrapper className="!p-0 flex h-screen w-full overflow-hidden bg-[#F6F8FB] font-sans">

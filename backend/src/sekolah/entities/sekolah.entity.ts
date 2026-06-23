@@ -24,6 +24,11 @@ export class Sekolah {
   @Column()
   id_wilayah: number;
 
+ @ManyToOne(() => Wilayah, (wilayah) => wilayah.sekolah)
+@JoinColumn({ name: 'id_wilayah' }) // Ini mengaitkan relasi ke kolom di atas
+wilayah: Wilayah;
+
+
   @Column({ default: true })
   status: boolean;
 
@@ -42,6 +47,7 @@ export class Sekolah {
   @Column({ type: 'text', nullable: true })
   alamat: string;
 
+<<<<<<< HEAD
   @Column({ nullable: true })
   area: string;
 
@@ -60,6 +66,15 @@ export class Sekolah {
   @Column({ type: 'double precision', default: 0 })
   longitude: number;
 
+=======
+  @Column({ type: 'varchar', nullable: true })
+  latitude: string | number;
+
+  @Column({ type: 'varchar', nullable: true })
+  longitude: string | number;
+
+  // REVISI DI SINI: Tambahkan nullable: true agar data lama tidak error
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   @Column({ unique: true, nullable: true })
   email_login: string;
 
@@ -73,8 +88,7 @@ export class Sekolah {
     createForeignKeyConstraints: false,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'id_wilayah' })
-  wilayah: Wilayah;
+
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

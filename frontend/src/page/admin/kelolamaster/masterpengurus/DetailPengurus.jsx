@@ -18,6 +18,7 @@ import Label from "../../../../components/Label";
 import PageWrapper from "../../../../components/PageWrapper";
 import Button from "../../../../components/Button";
 
+<<<<<<< HEAD
 const API_BASE = "http://localhost:3000";
 
 const getRoleName = (idRole, fallback = "") => {
@@ -34,6 +35,9 @@ const getRoleName = (idRole, fallback = "") => {
 
   return roles[Number(idRole)] || fallback || "-";
 };
+=======
+const MASTER_AUTH_KEY = "P3n9uru5";
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 
 const DetailPengurus = () => {
   const navigate = useNavigate();

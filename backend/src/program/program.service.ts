@@ -100,10 +100,22 @@ export class ProgramService {
     await queryRunner.startTransaction();
 
     try {
+<<<<<<< HEAD
       console.log('--- [DEBUG CREATE PROGRAM] ---');
       console.log('DTO:', createProgramDto);
       console.log('FILE:', file ? file.filename : 'TIDAK ADA FILE');
       console.log('USER:', id_user);
+=======
+      
+      console.log('User ID:', id_user);
+      console.log('Raw id_sekolah:', createProgramDto.id_sekolah);
+      console.log('Raw id_pengawas:', createProgramDto.id_pengawas);
+      console.log('Hasil Konversi ke Number:', {
+        sekolah: Number(createProgramDto.id_sekolah),
+        pengawas: Number(createProgramDto.id_pengawas),
+        tahun: Number(createProgramDto.tahun),
+      });
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
 
       const sekolahIds = this.toArray(createProgramDto.sekolah_ids);
       const aoIds = this.toArray(createProgramDto.ao_ids);
@@ -119,6 +131,7 @@ export class ProgramService {
       const idPengawas =
         this.toNumber(createProgramDto.id_pengawas) || aoIds[0] || null;
 
+<<<<<<< HEAD
       if (!idSekolah) {
         throw new Error('id_sekolah tidak valid');
       }
@@ -149,6 +162,10 @@ export class ProgramService {
           : null,
 
         status_program: createProgramDto.status_program || 'Approval',
+=======
+        harga_vendor: createProgramDto.harga_vendor ? Number(createProgramDto.harga_vendor) : 0,
+
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
         dibuat_oleh: id_user,
 
         file_mou: file ? file.filename : null,
@@ -335,6 +352,8 @@ export class ProgramService {
       return await this.programRepo.find({
         where: kategori ? { kategori } : {},
         order: { created_at: 'DESC' },
+
+        relations: ['sekolah'],
       });
     } catch (error) {
       console.error('--- [ERROR DATABASE FINDALL] ---', error.message);
@@ -342,6 +361,7 @@ export class ProgramService {
     }
   }
 
+<<<<<<< HEAD
   async findOne(id: number) {
     try {
       return await this.programRepo.findOne({
@@ -351,10 +371,22 @@ export class ProgramService {
           'fases.termin',
           'fases.termin.persyaratan',
           'fases.termin.chats',
+=======
+async findOne(id: number) {
+  try {
+    const data = await this.programRepo.findOne({
+      where: { id_program: id },
+      relations: [
+        'pengawas', 
+        'vendor',
+        'sekolah',
+        'fases',
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
           'fases.kegiatans',
           'fases.kegiatans.persyaratan',
           'fases.kegiatans.termin',
           'fases.kegiatans.termin.chats',
+<<<<<<< HEAD
         ],
         order: {
           fases: {
@@ -586,5 +618,80 @@ export class ProgramService {
 
   remove(id: number) {
     return this.programRepo.delete(id);
+=======
+      ],
+    });
+    
+    if (!data) throw new Error('Data memang tidak ada');
+    return data;
+
+  } catch (error) {
+    // Tampilkan error aslinya di terminal, jangan cuma "Data tidak ditemukan"
+    console.error('--- [ERROR FINDONE] ---', error.message);
+    throw new InternalServerErrorException(`Detail Error: ${error.message}`);
+>>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   }
+}
+
+
+  async update(id: number, updateData: any, file: Express.Multer.File, id_user: number) {
+  try {
+    const existing = await this.programRepo.findOne({ where: { id_program: id } });
+    if (!existing) {
+      throw new Error('Program tidak ditemukan di database');
+    }
+
+    const { fases, kegiatans, sekolah, pengawas, vendor, dibuat_oleh, created_at, ...dataToUpdate } = updateData;
+
+    let finalVendorIds = existing.id_vendor;
+
+    if (updateData.id_vendor) {
+      // Kita cek apakah datanya string "[1,2]" (dari JSON.stringify di frontend)
+      let parsed = updateData.id_vendor;
+      if (typeof updateData.id_vendor === 'string') {
+        try {
+          parsed = JSON.parse(updateData.id_vendor);
+        } catch (e) {
+          parsed = updateData.id_vendor; // biarkan saja kalau gagal parse
+        }
+      }
+
+      // Pastikan jadi Array of Numbers dan buang yang bukan angka (NaN)
+      if (Array.isArray(parsed)) {
+        finalVendorIds = parsed.map(v => Number(v)).filter(v => !isNaN(v));
+      } else {
+        const singleId = Number(updateData.id_vendor);
+        finalVendorIds = !isNaN(singleId) ? [singleId] : existing.id_vendor;
+      }
+    }
+    
+
+    const finalData = {
+      ...dataToUpdate,
+      id_sekolah: updateData.id_sekolah ? Number(updateData.id_sekolah) : existing.id_sekolah,
+      id_pengawas: updateData.id_pengawas ? Number(updateData.id_pengawas) : existing.id_pengawas,
+      tahun: updateData.tahun ? Number(updateData.tahun) : existing.tahun,
+
+      harga_vendor: updateData.harga_vendor ? Number(updateData.harga_vendor) : existing.harga_vendor,
+      id_vendor: finalVendorIds,
+      // Fix Array format untuk PostgreSQL
+      // id_vendor: updateData.id_vendor ? [Number(updateData.id_vendor)] : existing.id_vendor,
+      updated_at: new Date(),
+    };
+
+    if (file) {
+      finalData.file_mou = file.filename;
+    }
+
+    // Eksekusi Update
+    await this.programRepo.update(id, finalData);
+
+    // Langsung return objek sukses saja daripada panggil findOne lagi yang rawan error relasi
+    return { message: 'Update Berhasil', id_program: id }; 
+    
+  } catch (error) {
+    console.error('--- [ERROR UPDATE SERVICE] ---', error.message);
+    throw new InternalServerErrorException(`Gagal update: ${error.message}`);
+  }
+}
 }
