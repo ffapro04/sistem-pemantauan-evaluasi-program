@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
@@ -9,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { CreateSekolahDto } from './dto/create-sekolah.dto';
 import { Sekolah } from './entities/sekolah.entity';
+import INDONESIA from '../data/indonesiaProvinces'; // Kamus script data lu jirr
+import { NotifikasiService } from '../notifikasi/notifikasi.service';
 
 @Injectable()
 export class SekolahService {
@@ -19,8 +23,9 @@ export class SekolahService {
     private sekolahRepo: Repository<Sekolah>,
 
     private dataSource: DataSource,
-  ) {}
 
+    private readonly notifikasiService: NotifikasiService,
+  ) {}
   // =========================================================
   // HELPER ROLE SEKOLAH
   // =========================================================
@@ -50,8 +55,6 @@ export class SekolahService {
 
   // =========================================================
   // HELPER SYNC USER SEKOLAH
-  // Tidak pakai entity User karena entity User kamu belum punya property id_sekolah.
-  // Semua sync ke m_users dilakukan pakai raw SQL.
   // =========================================================
   private async syncUserSekolah(
     manager: any,
@@ -207,53 +210,103 @@ export class SekolahService {
   // =========================================================
   // CREATE SEKOLAH + AUTO CREATE / AUTO LINK USER SEKOLAH
   // =========================================================
-  async create(createSekolahDto: CreateSekolahDto) {
+  async create(createSekolahDto: any, file?: Express.Multer.File) {
     const queryRunner = this.dataSource.createQueryRunner();
-
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
+      const idKabupatenRaw =
+        createSekolahDto.id_kabupaten || createSekolahDto.id_wilayah;
+
+      const idProvinsiRaw =
+        createSekolahDto.id_provinsi_asal || createSekolahDto.id_wilayah;
+
       const sekolah = queryRunner.manager.create(Sekolah, {
+        npsn: createSekolahDto.npsn,
         nama_sekolah: createSekolahDto.nama_sekolah,
         jenjang: createSekolahDto.jenjang,
-        npsn: createSekolahDto.npsn,
-        akreditasi: createSekolahDto.akreditasi,
-        alamat: createSekolahDto.alamat,
-        id_wilayah: Number(createSekolahDto.id_wilayah),
-        latitude: Number(createSekolahDto.latitude) || 0,
-        longitude: Number(createSekolahDto.longitude) || 0,
+
+        id_wilayah: createSekolahDto.id_wilayah
+          ? Number(createSekolahDto.id_wilayah)
+          : 0,
+
+        id_kabupaten: createSekolahDto.id_kabupaten
+          ? Number(createSekolahDto.id_kabupaten)
+          : 0,
+
+        nama_kabupaten: createSekolahDto.nama_kabupaten || null,
+        kode_kabupaten: createSekolahDto.kode_kabupaten || null,
+
         jumlah_guru: Number(createSekolahDto.jumlah_guru) || 0,
         jumlah_siswa: Number(createSekolahDto.jumlah_siswa) || 0,
-        email_login: createSekolahDto.email_login,
-        password_login: createSekolahDto.password_login,
-        status: true,
-        area: createSekolahDto.area,
-        kriteria_2022: createSekolahDto.kriteria_2022,
+
+        akreditasi: createSekolahDto.akreditasi || 'Belum Terakreditasi',
+        akreditasi_internal: createSekolahDto.akreditasi_internal || 'Dasar',
+
+        tahun_binaan:
+          createSekolahDto.tahun_binaan !== undefined &&
+          createSekolahDto.tahun_binaan !== null &&
+          createSekolahDto.tahun_binaan !== ''
+            ? Number(createSekolahDto.tahun_binaan)
+            : null,
+
+        alamat: createSekolahDto.alamat || null,
+
+        latitude:
+          createSekolahDto.latitude !== undefined &&
+          createSekolahDto.latitude !== ''
+            ? Number(createSekolahDto.latitude)
+            : 0,
+
+        longitude:
+          createSekolahDto.longitude !== undefined &&
+          createSekolahDto.longitude !== ''
+            ? Number(createSekolahDto.longitude)
+            : 0,
+
+        area: createSekolahDto.area || null,
         sertifikat_iso: createSekolahDto.sertifikat_iso || 'Belum',
         adiwiyata: createSekolahDto.adiwiyata || 'Belum',
+
+        email_login: createSekolahDto.email_login || null,
+        password_login: createSekolahDto.password_login || null,
+
+        status:
+          createSekolahDto.status === undefined
+            ? true
+            : createSekolahDto.status === true ||
+              createSekolahDto.status === 'true' ||
+              createSekolahDto.status === 1 ||
+              createSekolahDto.status === '1',
+
+        logo_url: file ? `/uploads/sekolah/${file.filename}` : null,
       });
 
       const sekolahSaved = await queryRunner.manager.save(Sekolah, sekolah);
 
-      await this.syncUserSekolah(queryRunner.manager, sekolahSaved, {
-        nama_sekolah: createSekolahDto.nama_sekolah,
-        email_login: createSekolahDto.email_login,
-        password_login: createSekolahDto.password_login,
-        status: true,
-      });
+      /**
+       * Sekarang akun login sekolah sudah dipisah ke Master Operator Sekolah.
+       * Jadi sync user sekolah hanya dilakukan kalau email_login dikirim.
+       * Ini membuat Create Sekolah tetap bisa tanpa akun login dan tanpa logo.
+       */
+      if (createSekolahDto.email_login) {
+        await this.syncUserSekolah(queryRunner.manager, sekolahSaved, {
+          nama_sekolah: createSekolahDto.nama_sekolah,
+          email_login: createSekolahDto.email_login,
+          password_login: createSekolahDto.password_login,
+          status: sekolahSaved.status,
+        });
+      }
 
       await queryRunner.commitTransaction();
 
       return sekolahSaved;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-
       console.error('Create Sekolah Error:', error);
 
-      if (error instanceof ConflictException) {
-        throw error;
-      }
+      if (error instanceof ConflictException) throw error;
 
       throw new InternalServerErrorException(
         error?.message || 'Gagal membuat data sekolah.',
@@ -264,129 +317,324 @@ export class SekolahService {
   }
 
   // =========================================================
-  // FIND ALL
+  // 🚨 PERBAIKAN: FIND ALL (Suntik objek wilayah & Terjemahkan ID Kabupaten)
   // =========================================================
   async findAll() {
-    return await this.sekolahRepo.find({
-      relations: ['wilayah'],
-      order: {
-        nama_sekolah: 'ASC',
-      },
-      select: {
-        id_sekolah: true,
-        nama_sekolah: true,
-        npsn: true,
-        jenjang: true,
-        akreditasi: true,
-        alamat: true,
-        id_wilayah: true,
-        status: true,
-        email_login: true,
-        area: true,
-        kriteria_2022: true,
-        sertifikat_iso: true,
-        adiwiyata: true,
-        jumlah_guru: true,
-        jumlah_siswa: true,
-      },
+    const dataSekolah = await this.sekolahRepo.find({
+      relations: ['wilayah', 'wilayah.parent'],
+      order: { nama_sekolah: 'ASC' },
     });
+
+    return dataSekolah;
   }
 
   // =========================================================
-  // FIND ONE
+  // 🚨 PERBAIKAN: FIND ONE (Suntik objek wilayah & Terjemahkan ID Kabupaten)
   // =========================================================
   async findOne(id: number) {
     const sekolah = await this.sekolahRepo.findOne({
-      where: {
-        id_sekolah: id,
-      },
-      relations: ['wilayah'],
-      select: {
-        id_sekolah: true,
-        nama_sekolah: true,
-        npsn: true,
-        jenjang: true,
-        akreditasi: true,
-        alamat: true,
-        id_wilayah: true,
-        email_login: true,
-        password_login: true,
-        status: true,
-        area: true,
-        jumlah_guru: true,
-        jumlah_siswa: true,
-        kriteria_2022: true,
-        sertifikat_iso: true,
-        adiwiyata: true,
-      },
+      where: { id_sekolah: id },
+      relations: ['wilayah', 'wilayah.parent'],
     });
 
     if (!sekolah) {
       throw new NotFoundException(`Sekolah #${id} tidak ditemukan`);
     }
 
-    return { ...sekolah };
+    return sekolah;
   }
 
+  private async syncJumlahGuruSekolah(idSekolah: number) {
+    const rows = await this.dataSource.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM public.assessment_guru
+        WHERE id_sekolah = $1
+          AND is_active = true
+      `,
+      [idSekolah],
+    );
+
+    const totalGuru = Number(rows?.[0]?.total || 0);
+
+    await this.sekolahRepo.update(
+      { id_sekolah: idSekolah },
+      { jumlah_guru: totalGuru },
+    );
+
+    return totalGuru;
+  }
+
+  async updateStatistikSekolah(id: number, body: any) {
+    const sekolah = await this.sekolahRepo.findOne({
+      where: { id_sekolah: id },
+    });
+
+    if (!sekolah) {
+      throw new NotFoundException(`Sekolah dengan ID ${id} tidak ditemukan`);
+    }
+
+    const jumlahSiswaRaw = body?.jumlah_siswa;
+
+    if (
+      jumlahSiswaRaw === undefined ||
+      jumlahSiswaRaw === null ||
+      jumlahSiswaRaw === ''
+    ) {
+      throw new BadRequestException('Jumlah siswa wajib diisi.');
+    }
+
+    const jumlahSiswa = Number(jumlahSiswaRaw);
+
+    if (
+      !Number.isFinite(jumlahSiswa) ||
+      jumlahSiswa < 0 ||
+      !Number.isInteger(jumlahSiswa)
+    ) {
+      throw new BadRequestException(
+        'Jumlah siswa harus berupa angka bulat minimal 0.',
+      );
+    }
+
+    const jumlahSiswaSebelum = Number(sekolah.jumlah_siswa || 0);
+
+    await this.sekolahRepo.update(
+      { id_sekolah: id },
+      {
+        jumlah_siswa: jumlahSiswa,
+      },
+    );
+
+    const totalGuruAktif = await this.syncJumlahGuruSekolah(id);
+
+    const updatedSekolah = await this.sekolahRepo.findOne({
+      where: { id_sekolah: id },
+      relations: ['wilayah', 'wilayah.parent'],
+    });
+
+    await this.notifikasiService.notifyAdmins({
+      judul: 'Statistik Sekolah Diperbarui',
+      pesan: `${sekolah.nama_sekolah} memperbarui jumlah siswa dari ${jumlahSiswaSebelum} menjadi ${jumlahSiswa}. Total guru aktif sekarang ${totalGuruAktif}.`,
+      tipe: 'SEKOLAH',
+      targetUrl: `/admin/sekolah/detail/${id}`,
+      metadata: {
+        action: 'UPDATE_STATISTIK_SEKOLAH',
+        id_sekolah: id,
+        nama_sekolah: sekolah.nama_sekolah,
+        jumlah_siswa_sebelum: jumlahSiswaSebelum,
+        jumlah_siswa_sesudah: jumlahSiswa,
+        total_guru_aktif: totalGuruAktif,
+      },
+    });
+
+    return {
+      status: true,
+      message: 'Statistik sekolah berhasil diperbarui.',
+      data: updatedSekolah,
+    };
+  }
   // =========================================================
   // UPDATE SEKOLAH + AUTO SYNC USER SEKOLAH
   // =========================================================
-  async update(id: number, updateData: any) {
-    const queryRunner = this.dataSource.createQueryRunner();
 
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+  async update(id: number, updateSekolahDto: any, file?: Express.Multer.File) {
+    console.log('UPDATE SEKOLAH ID:', id);
+    console.log('PAYLOAD UPDATE SEKOLAH:', updateSekolahDto);
+    console.log('TAHUN BINAAN MASUK:', updateSekolahDto.tahun_binaan);
+    const sekolah = await this.sekolahRepo.findOne({
+      where: { id_sekolah: id },
+    });
 
-    try {
-      const sekolah = await queryRunner.manager.findOne(Sekolah, {
-        where: {
-          id_sekolah: id,
-        },
-      });
-
-      if (!sekolah) {
-        throw new NotFoundException(`Sekolah dengan ID ${id} tidak ditemukan`);
-      }
-
-      await queryRunner.manager.update(Sekolah, { id_sekolah: id }, updateData);
-
-      const sekolahUpdated = await queryRunner.manager.findOne(Sekolah, {
-        where: {
-          id_sekolah: id,
-        },
-      });
-
-      if (!sekolahUpdated) {
-        throw new NotFoundException(`Sekolah dengan ID ${id} tidak ditemukan`);
-      }
-
-      await this.syncUserSekolah(
-        queryRunner.manager,
-        sekolahUpdated,
-        updateData,
-      );
-
-      await queryRunner.commitTransaction();
-
-      return await this.findOne(id);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-
-      console.error('Update Sekolah Error:', error);
-
-      if (
-        error instanceof NotFoundException ||
-        error instanceof ConflictException
-      ) {
-        throw error;
-      }
-
-      throw new InternalServerErrorException(
-        error?.message || 'Gagal memperbarui data sekolah.',
-      );
-    } finally {
-      await queryRunner.release();
+    if (!sekolah) {
+      throw new NotFoundException(`Sekolah dengan ID ${id} tidak ditemukan`);
     }
+
+    const idWilayahRaw = updateSekolahDto.id_wilayah;
+
+    const idKabupatenRaw =
+      updateSekolahDto.id_kabupaten || updateSekolahDto.id_wilayah;
+
+    const dataUpdate: any = {
+      nama_sekolah:
+        updateSekolahDto.nama_sekolah !== undefined
+          ? updateSekolahDto.nama_sekolah
+          : sekolah.nama_sekolah,
+
+      npsn:
+        updateSekolahDto.npsn !== undefined
+          ? updateSekolahDto.npsn
+          : sekolah.npsn,
+
+      alamat:
+        updateSekolahDto.alamat !== undefined
+          ? updateSekolahDto.alamat
+          : sekolah.alamat,
+
+      jenjang:
+        updateSekolahDto.jenjang !== undefined
+          ? updateSekolahDto.jenjang
+          : sekolah.jenjang,
+
+      akreditasi:
+        updateSekolahDto.akreditasi !== undefined
+          ? updateSekolahDto.akreditasi
+          : sekolah.akreditasi,
+
+      akreditasi_internal:
+        updateSekolahDto.akreditasi_internal !== undefined
+          ? updateSekolahDto.akreditasi_internal
+          : sekolah.akreditasi_internal,
+
+      tahun_binaan:
+        updateSekolahDto.tahun_binaan !== undefined &&
+        updateSekolahDto.tahun_binaan !== null &&
+        updateSekolahDto.tahun_binaan !== ''
+          ? Number(updateSekolahDto.tahun_binaan)
+          : sekolah.tahun_binaan,
+
+      email_login:
+        updateSekolahDto.email_login !== undefined
+          ? updateSekolahDto.email_login
+          : sekolah.email_login,
+
+      password_login:
+        updateSekolahDto.password_login !== undefined
+          ? updateSekolahDto.password_login
+          : sekolah.password_login,
+
+      id_wilayah:
+        idWilayahRaw !== undefined && idWilayahRaw !== ''
+          ? Number(idWilayahRaw)
+          : sekolah.id_wilayah,
+
+      id_kabupaten: idKabupatenRaw
+        ? Number(idKabupatenRaw)
+        : sekolah.id_kabupaten,
+
+      nama_kabupaten:
+        updateSekolahDto.nama_kabupaten !== undefined
+          ? updateSekolahDto.nama_kabupaten
+          : sekolah.nama_kabupaten,
+
+      kode_kabupaten:
+        updateSekolahDto.kode_kabupaten !== undefined
+          ? updateSekolahDto.kode_kabupaten
+          : sekolah.kode_kabupaten,
+
+      jumlah_guru:
+        updateSekolahDto.jumlah_guru !== undefined
+          ? Number(updateSekolahDto.jumlah_guru) || 0
+          : sekolah.jumlah_guru,
+
+      jumlah_siswa:
+        updateSekolahDto.jumlah_siswa !== undefined
+          ? Number(updateSekolahDto.jumlah_siswa) || 0
+          : sekolah.jumlah_siswa,
+
+      latitude:
+        updateSekolahDto.latitude !== undefined &&
+        updateSekolahDto.latitude !== ''
+          ? Number(updateSekolahDto.latitude)
+          : sekolah.latitude,
+
+      longitude:
+        updateSekolahDto.longitude !== undefined &&
+        updateSekolahDto.longitude !== ''
+          ? Number(updateSekolahDto.longitude)
+          : sekolah.longitude,
+
+      area:
+        updateSekolahDto.area !== undefined
+          ? updateSekolahDto.area
+          : sekolah.area,
+
+      sertifikat_iso:
+        updateSekolahDto.sertifikat_iso !== undefined
+          ? updateSekolahDto.sertifikat_iso
+          : sekolah.sertifikat_iso,
+
+      adiwiyata:
+        updateSekolahDto.adiwiyata !== undefined
+          ? updateSekolahDto.adiwiyata
+          : sekolah.adiwiyata,
+    };
+    if (updateSekolahDto.status !== undefined) {
+      dataUpdate.status =
+        updateSekolahDto.status === true ||
+        updateSekolahDto.status === 'true' ||
+        updateSekolahDto.status === 1 ||
+        updateSekolahDto.status === '1';
+    }
+
+    if (file) {
+      dataUpdate.logo_url = `/uploads/sekolah/${file.filename}`;
+    }
+
+    await this.sekolahRepo.update({ id_sekolah: id }, dataUpdate);
+
+    const updatedSekolah = await this.sekolahRepo.findOne({
+      where: { id_sekolah: id },
+      relations: ['wilayah', 'wilayah.parent'],
+    });
+
+    if (
+      updateSekolahDto.email_login ||
+      updateSekolahDto.password_login ||
+      updateSekolahDto.nama_sekolah
+    ) {
+      await this.dataSource.transaction(async (manager) => {
+        await this.syncUserSekolah(manager, updatedSekolah, {
+          nama_sekolah: dataUpdate.nama_sekolah,
+          email_login: dataUpdate.email_login,
+          password_login: updateSekolahDto.password_login,
+          status:
+            dataUpdate.status !== undefined
+              ? dataUpdate.status
+              : updatedSekolah.status,
+        });
+      });
+    }
+
+    return {
+      status: true,
+      message: file
+        ? 'Data sekolah dan logo berhasil diperbarui.'
+        : 'Data sekolah berhasil diperbarui.',
+      data: updatedSekolah,
+    };
+  }
+
+  async updateJumlahSiswaOperator(idSekolah: any, jumlahSiswa: any) {
+    const id = Number(idSekolah);
+    const total = Number(jumlahSiswa);
+
+    if (!id || Number.isNaN(id)) {
+      throw new BadRequestException('ID sekolah tidak valid');
+    }
+
+    if (!Number.isInteger(total) || total < 0) {
+      throw new BadRequestException(
+        'Jumlah siswa harus berupa angka minimal 0',
+      );
+    }
+
+    const sekolah = await this.sekolahRepo.findOne({
+      where: { id_sekolah: id },
+    });
+
+    if (!sekolah) {
+      throw new NotFoundException('Sekolah tidak ditemukan');
+    }
+
+    await this.sekolahRepo.update({ id_sekolah: id }, { jumlah_siswa: total });
+
+    return {
+      message: 'Jumlah siswa berhasil diperbarui',
+      data: {
+        id_sekolah: id,
+        jumlah_siswa: total,
+      },
+    };
   }
 
   // =========================================================
@@ -394,15 +642,12 @@ export class SekolahService {
   // =========================================================
   async remove(id: number) {
     const queryRunner = this.dataSource.createQueryRunner();
-
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
       const sekolah = await queryRunner.manager.findOne(Sekolah, {
-        where: {
-          id_sekolah: id,
-        },
+        where: { id_sekolah: id },
       });
 
       if (!sekolah) {
@@ -410,31 +655,18 @@ export class SekolahService {
       }
 
       await queryRunner.manager.query(
-        `
-          DELETE FROM public.m_users
-          WHERE id_sekolah = $1
-        `,
+        `DELETE FROM public.m_users WHERE id_sekolah = $1`,
         [id],
       );
 
-      await queryRunner.manager.delete(Sekolah, {
-        id_sekolah: id,
-      });
-
+      await queryRunner.manager.delete(Sekolah, { id_sekolah: id });
       await queryRunner.commitTransaction();
 
-      return {
-        message: `Sekolah #${id} dan akun aksesnya berhasil dihapus`,
-      };
+      return { message: `Sekolah #${id} dan akun aksesnya berhasil dihapus` };
     } catch (error) {
       await queryRunner.rollbackTransaction();
-
       console.error('Remove Sekolah Error:', error);
-
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-
+      if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException(
         error?.message || 'Gagal menghapus data sekolah.',
       );

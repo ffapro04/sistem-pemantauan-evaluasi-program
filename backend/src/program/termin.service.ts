@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { GoogleDriveService } from '../google-drive/google-drive.service';
 import { Termin } from './entities/termin.entity';
 import { TerminChat } from './entities/termin-chat.entity';
 
@@ -17,6 +18,8 @@ export class TerminService {
 
     @InjectRepository(TerminChat)
     private readonly chatRepo: Repository<TerminChat>,
+
+    private readonly googleDriveService: GoogleDriveService,
   ) {}
 
   private toNumberOrNull(value: any) {
@@ -27,14 +30,42 @@ export class TerminService {
     return Number.isNaN(numberValue) ? null : numberValue;
   }
 
+  private async ensureGoogleDriveConnected(id_user: number) {
+    const driveStatus = await this.googleDriveService.getStatus(id_user);
+
+    if (!driveStatus?.connected) {
+      throw new BadRequestException({
+        code: 'GOOGLE_DRIVE_NOT_CONNECTED',
+        message:
+          'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah dokumentasi termin.',
+      });
+    }
+  }
+
+  private getDriveFilePath(uploadedFile: any, fallbackName: string) {
+    const driveFile = uploadedFile?.file;
+
+    return (
+      driveFile?.web_view_link ||
+      driveFile?.web_content_link ||
+      driveFile?.drive_file_id ||
+      fallbackName
+    );
+  }
+
   async createTermin(
     createDto: any,
     file: Express.Multer.File,
     id_user: number,
     nama_user: string,
     role_user: string,
+    id_role?: number | null,
   ) {
     try {
+      if (file) {
+        await this.ensureGoogleDriveConnected(id_user);
+      }
+
       const termin = this.terminRepo.create({
         nama_termin: createDto.nama_termin,
         deskripsi: createDto.deskripsi || null,
@@ -46,13 +77,39 @@ export class TerminService {
           : null,
         id_fase: createDto.id_fase ? Number(createDto.id_fase) : null,
         status: 'WAITING_UPLOAD',
-        file_dokumentasi: file ? file.filename : null,
+        file_dokumentasi: null,
         nama_file_dokumentasi: file ? file.originalname : null,
       });
 
-      return await this.terminRepo.save(termin);
+      const savedTermin = await this.terminRepo.save(termin);
+
+      if (file) {
+        const uploaded = await this.googleDriveService.uploadFile({
+          idUser: id_user,
+          idRole: id_role || null,
+          file,
+          moduleType: 'TERMIN_DOKUMENTASI',
+          relatedTable: 't_termin',
+          relatedId: savedTermin.id_termin,
+        });
+
+        savedTermin.file_dokumentasi = this.getDriveFilePath(
+          uploaded,
+          file.originalname,
+        );
+        savedTermin.nama_file_dokumentasi = file.originalname;
+
+        return await this.terminRepo.save(savedTermin);
+      }
+
+      return savedTermin;
     } catch (error) {
       console.error('Error saat save termin:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
       throw new InternalServerErrorException('Gagal menyimpan termin!');
     }
   }

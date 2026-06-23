@@ -13,12 +13,16 @@ import { Termin } from './entities/termin.entity';
 import { TerminChat } from './entities/termin-chat.entity';
 import { PersyaratanTermin } from './entities/persyaratan-termin.entity';
 import { PersyaratanKegiatan } from './entities/persyaratan-kegiatan.entity';
+import { KegiatanComment } from './entities/kegiatan-comment.entity';
 
 import { TerminService } from './termin.service';
 import { TerminController } from './termin.controller';
 
+import { GoogleDriveModule } from '../google-drive/google-drive.module';
+
 @Module({
   imports: [
+    GoogleDriveModule,
     TypeOrmModule.forFeature([
       Program,
       DokumenProgram,
@@ -28,6 +32,7 @@ import { TerminController } from './termin.controller';
       TerminChat,
       PersyaratanTermin,
       PersyaratanKegiatan,
+      KegiatanComment,
     ]),
   ],
   controllers: [ProgramController, TerminController],

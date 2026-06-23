@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 /* eslint-disable react/prop-types */
 export default function PageWrapper({ children, className = "" }) {
   return (
@@ -7,3 +7,4 @@ export default function PageWrapper({ children, className = "" }) {
     </div>
   );
 }
+

@@ -25,8 +25,33 @@ export class Program {
   @Column({ nullable: true })
   id_pengawas: number;
 
+  /**
+   * Kategori utama program:
+   * - AKADEMIK
+   * - NON_AKADEMIK
+   */
   @Column()
   kategori: string;
+
+  /**
+   * Penanda 4 Pilar YPA-MDR:
+   * - AKADEMIK
+   * - KARAKTER
+   * - SENI_BUDAYA
+   * - KECAKAPAN_HIDUP
+   *
+   * Dibuat nullable agar data program lama tidak error.
+   */
+  @Column({ nullable: true })
+  pilar_program: string;
+
+  /**
+   * Jenis pelaksanaan program:
+   * - PROJECT
+   * - REGULER
+   */
+  @Column({ default: 'PROJECT' })
+  jenis_program: string;
 
   @Column({ nullable: true })
   tahun: number;
@@ -67,13 +92,25 @@ export class Program {
   @Column({ nullable: true })
   kpi_satuan: string;
 
-  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  @Column('int', {
+    array: true,
+    nullable: true,
+    default: () => "'{}'",
+  })
   sekolah_ids: number[];
 
-  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  @Column('int', {
+    array: true,
+    nullable: true,
+    default: () => "'{}'",
+  })
   ao_ids: number[];
 
-  @Column('int', { array: true, nullable: true, default: () => "'{}'" })
+  @Column('int', {
+    array: true,
+    nullable: true,
+    default: () => "'{}'",
+  })
   vendor_ids: number[];
 
   @OneToMany(() => Fase, (fase) => fase.program)

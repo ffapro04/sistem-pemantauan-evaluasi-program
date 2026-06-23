@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Alert({ message, type = "error" }) {
   if (!message) return null;
 
@@ -15,3 +15,4 @@ export default function Alert({ message, type = "error" }) {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Input({
   type = "text",
   placeholder = "",
@@ -36,3 +36,4 @@ export default function Input({
     />
   );
 }
+

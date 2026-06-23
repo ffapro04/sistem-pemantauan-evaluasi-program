@@ -8,7 +8,7 @@ import {
   OneToOne,
   JoinColumn,
 } from 'typeorm';
-import { User } from '../../users/user.entity'; // Pastikan path ../../ benar
+import { User } from '../../users/user.entity';
 
 @Entity('m_vendor')
 export class Vendor {
@@ -40,9 +40,11 @@ export class Vendor {
   ktp_pj_file: string;
 
   @Column({ nullable: true })
+  akta_notaris_file: string;
+
+  @Column({ nullable: true })
   pilar: string;
 
-  // JANGAN SAMPAI KETINGGALAN BARIS INI, JIR!
   @Column({ type: 'text', nullable: true })
   alamat: string;
 

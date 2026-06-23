@@ -2,13 +2,14 @@
 /* eslint-disable prettier/prettier */
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-
+import { GoogleDriveService } from '../google-drive/google-drive.service';
 import { Program } from './entities/program.entity';
 import { Fase } from './entities/fase.entity';
 import { Kegiatans } from './entities/kegiatans.entity';
@@ -16,7 +17,7 @@ import { Termin } from './entities/termin.entity';
 import { PersyaratanTermin } from './entities/persyaratan-termin.entity';
 import { PersyaratanKegiatan } from './entities/persyaratan-kegiatan.entity';
 import { DokumenProgram } from './entities/dokumen-program.entity';
-
+import { KegiatanComment } from './entities/kegiatan-comment.entity';
 import { CreateProgramDto } from './dto/create-program.dto';
 
 @Injectable()
@@ -42,6 +43,10 @@ export class ProgramService {
 
     @InjectRepository(DokumenProgram)
     private readonly dokumenProgramRepo: Repository<DokumenProgram>,
+
+    @InjectRepository(KegiatanComment)
+    private readonly kegiatanCommentRepo: Repository<KegiatanComment>,
+    private readonly googleDriveService: GoogleDriveService,
   ) {}
 
   private toNumber(value: any, fallback: any = null) {
@@ -53,11 +58,9 @@ export class ProgramService {
     if (Array.isArray(value)) {
       return value.map(Number).filter((item) => !Number.isNaN(item));
     }
-
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
-
         if (Array.isArray(parsed)) {
           return parsed.map(Number).filter((item) => !Number.isNaN(item));
         }
@@ -68,15 +71,12 @@ export class ProgramService {
           .filter((item) => !Number.isNaN(item));
       }
     }
-
     if (typeof value === 'number') return [value];
-
     return [];
   }
 
   private parseFases(value: any) {
     if (Array.isArray(value)) return value;
-
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
@@ -85,26 +85,148 @@ export class ProgramService {
         return [];
       }
     }
-
     return [];
+  }
+
+  private normalizeProgramCategory(value: any): string {
+    const normalized = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+
+    if (normalized === 'NONAKADEMIK') return 'NON_AKADEMIK';
+
+    return normalized;
+  }
+
+  private normalizeProgramPilar(value: any): string | null {
+    const normalized = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+
+    if (!normalized) return null;
+    if (normalized === 'SENIBUDAYA') return 'SENI_BUDAYA';
+    if (normalized === 'KECAKAPANHIDUP') return 'KECAKAPAN_HIDUP';
+
+    return normalized;
+  }
+
+  private validateProgramPilar(kategori: any, pilarProgram: any): void {
+    if (!pilarProgram) return;
+
+    const normalizedKategori = this.normalizeProgramCategory(kategori);
+    const normalizedPilar = this.normalizeProgramPilar(pilarProgram);
+
+    const allowedPillars: Record<string, string[]> = {
+      AKADEMIK: ['AKADEMIK', 'KARAKTER'],
+      NON_AKADEMIK: ['SENI_BUDAYA', 'KECAKAPAN_HIDUP'],
+    };
+
+    const allowed = allowedPillars[normalizedKategori];
+
+    if (!allowed) {
+      throw new BadRequestException(
+        `Kategori program tidak valid: ${normalizedKategori || '-'}`,
+      );
+    }
+
+    if (!normalizedPilar || !allowed.includes(normalizedPilar)) {
+      throw new BadRequestException(
+        `Pilar ${normalizedPilar || '-'} tidak sesuai dengan kategori ${normalizedKategori}`,
+      );
+    }
+  }
+
+  private normalizeRole(role: any) {
+    return String(role || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private isVendorRole(role: any) {
+    const value = this.normalizeRole(role);
+    return (
+      value === '6' ||
+      value === 'vendor' ||
+      value.includes('vendor') ||
+      value.includes('narasumber')
+    );
+  }
+
+  private isAORole(role: any) {
+    const value = this.normalizeRole(role);
+    return (
+      value === '4' ||
+      value === 'ao' ||
+      value === 'area officer' ||
+      value.includes('area officer')
+    );
+  }
+
+  private isHORole(role: any) {
+    const value = this.normalizeRole(role);
+    return (
+      value === '3' ||
+      value === 'ho' ||
+      value === 'head office' ||
+      value.includes('head office')
+    );
+  }
+
+  private decodeUserFromToken(authHeader: string) {
+    try {
+      const token = authHeader?.split(' ')[1];
+      const payloadJson = Buffer.from(
+        token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
+        'base64',
+      ).toString('utf-8');
+      return JSON.parse(payloadJson);
+    } catch {
+      return null;
+    }
+  }
+
+  private async ensureGoogleDriveConnected(id_user: number, message: string) {
+    const driveStatus = await this.googleDriveService.getStatus(id_user);
+
+    if (!driveStatus?.connected) {
+      throw new BadRequestException({
+        code: 'GOOGLE_DRIVE_NOT_CONNECTED',
+        message,
+      });
+    }
+  }
+
+  private getDriveFilePath(uploadedFile: any, fallbackName: string) {
+    const driveFile = uploadedFile?.file;
+
+    return (
+      driveFile?.web_view_link ||
+      driveFile?.web_content_link ||
+      driveFile?.drive_file_id ||
+      fallbackName
+    );
   }
 
   async create(
     createProgramDto: CreateProgramDto,
     file: Express.Multer.File,
     id_user: number,
+    id_role?: number | null,
   ) {
-    const queryRunner = this.programRepo.manager.connection.createQueryRunner();
+    if (file) {
+      await this.ensureGoogleDriveConnected(
+        id_user,
+        'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah MOU.',
+      );
+    }
 
+    const queryRunner = this.programRepo.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      console.log('--- [DEBUG CREATE PROGRAM] ---');
-      console.log('DTO:', createProgramDto);
-      console.log('FILE:', file ? file.filename : 'TIDAK ADA FILE');
-      console.log('USER:', id_user);
-
       const sekolahIds = this.toArray(createProgramDto.sekolah_ids);
       const aoIds = this.toArray(createProgramDto.ao_ids);
       const vendorIds = this.toArray(
@@ -115,31 +237,31 @@ export class ProgramService {
 
       const idSekolah =
         this.toNumber(createProgramDto.id_sekolah) || sekolahIds[0] || null;
-
       const idPengawas =
         this.toNumber(createProgramDto.id_pengawas) || aoIds[0] || null;
 
-      if (!idSekolah) {
-        throw new Error('id_sekolah tidak valid');
-      }
+      if (!idSekolah) throw new Error('id_sekolah tidak valid');
+      if (!idPengawas) throw new Error('id_pengawas tidak valid');
 
-      if (!idPengawas) {
-        throw new Error('id_pengawas tidak valid');
-      }
+      const kategori = this.normalizeProgramCategory(createProgramDto.kategori);
+      const pilarProgram = this.normalizeProgramPilar(
+        createProgramDto.pilar_program,
+      );
+
+      this.validateProgramPilar(kategori, pilarProgram);
 
       const program = this.programRepo.create({
         nama_program: createProgramDto.nama_program,
         deskripsi: createProgramDto.deskripsi || null,
-
         id_sekolah: idSekolah,
         id_pengawas: idPengawas,
-
         id_vendor: vendorIds,
         vendor_ids: vendorIds,
         sekolah_ids: sekolahIds.length ? sekolahIds : [idSekolah],
         ao_ids: aoIds.length ? aoIds : [idPengawas],
-
-        kategori: createProgramDto.kategori,
+        kategori,
+        pilar_program: pilarProgram,
+        jenis_program: createProgramDto.jenis_program || 'PROJECT',
         tahun: this.toNumber(createProgramDto.tahun),
         tanggal_mulai: createProgramDto.tanggal_mulai
           ? new Date(createProgramDto.tanggal_mulai)
@@ -147,15 +269,11 @@ export class ProgramService {
         tanggal_selesai: createProgramDto.tanggal_selesai
           ? new Date(createProgramDto.tanggal_selesai)
           : null,
-
         status_program: createProgramDto.status_program || 'Approval',
         dibuat_oleh: id_user,
-
-        file_mou: file ? file.filename : null,
-
+        file_mou: null,
         nomor_mou: createProgramDto.nomor_mou || null,
         harga_vendor: this.toNumber(createProgramDto.harga_vendor, 0),
-
         kpi_nama: createProgramDto.kpi_nama || null,
         kpi_target: this.toNumber(createProgramDto.kpi_target, 0),
         kpi_satuan: createProgramDto.kpi_satuan || null,
@@ -164,33 +282,44 @@ export class ProgramService {
       const savedProgram = await queryRunner.manager.save(Program, program);
 
       if (file) {
+        const uploadedMou = await this.googleDriveService.uploadFile({
+          idUser: id_user,
+          idRole: id_role || null,
+          file,
+          moduleType: 'PROGRAM_MOU',
+          relatedTable: 't_program',
+          relatedId: savedProgram.id_program,
+        });
+
+        const driveFile = uploadedMou.file;
+
+        savedProgram.file_mou =
+          driveFile?.web_view_link ||
+          driveFile?.drive_file_id ||
+          file.originalname;
+
+        await queryRunner.manager.save(Program, savedProgram);
+
         const dokumen = this.dokumenProgramRepo.create({
           id_program: savedProgram.id_program,
           jenis_dokumen: 'MOU',
           nama_file: file.originalname,
-          file_path: file.filename,
+          file_path:
+            driveFile?.web_view_link ||
+            driveFile?.web_content_link ||
+            driveFile?.drive_file_id ||
+            file.originalname,
           upload_by: id_user,
         });
 
         await queryRunner.manager.save(DokumenProgram, dokumen);
       }
 
-      console.log('FASES RAW:', createProgramDto.fases);
-      console.log('FASES RAW TYPE:', typeof createProgramDto.fases);
-      console.log('FASES RAW IS ARRAY:', Array.isArray(createProgramDto.fases));
-
       const fases = this.parseFases(createProgramDto.fases);
-
-      console.log('FASES PARSED:', fases);
-      console.log('FASES PARSED LENGTH:', fases.length);
 
       for (let faseIndex = 0; faseIndex < fases.length; faseIndex++) {
         const fData = fases[faseIndex];
-
-        if (!fData?.nama_fase?.trim()) {
-          console.warn('Fase kosong dilewati:', fData);
-          continue;
-        }
+        if (!fData?.nama_fase?.trim()) continue;
 
         const fase = this.faseRepo.create({
           nama_fase: fData.nama_fase.trim(),
@@ -209,11 +338,7 @@ export class ProgramService {
           terminIndex++
         ) {
           const tData = terminList[terminIndex];
-
-          if (!tData?.nama_termin?.trim()) {
-            console.warn('Termin kosong dilewati:', tData);
-            continue;
-          }
+          if (!tData?.nama_termin?.trim()) continue;
 
           const termin = this.terminRepo.create({
             nama_termin: tData.nama_termin.trim(),
@@ -236,22 +361,19 @@ export class ProgramService {
             syaratIndex++
           ) {
             const req = persyaratanTermin[syaratIndex];
+            if (!req?.nama?.trim()) continue;
 
-            if (!req?.nama?.trim()) {
-              console.warn('Persyaratan termin kosong dilewati:', req);
-              continue;
-            }
-
-            const persyaratan = this.persyaratanTerminRepo.create({
-              id_termin: savedTermin.id_termin,
-              nama: req.nama.trim(),
-              tipe: req.tipe || 'upload',
-              deskripsi: req.deskripsi || null,
-              urutan: this.toNumber(req.urutan, syaratIndex + 1),
-              status: 'WAITING_UPLOAD',
-            });
-
-            await queryRunner.manager.save(PersyaratanTermin, persyaratan);
+            await queryRunner.manager.save(
+              PersyaratanTermin,
+              this.persyaratanTerminRepo.create({
+                id_termin: savedTermin.id_termin,
+                nama: req.nama.trim(),
+                tipe: req.tipe || 'upload',
+                deskripsi: req.deskripsi || null,
+                urutan: this.toNumber(req.urutan, syaratIndex + 1),
+                status: 'WAITING_UPLOAD',
+              }),
+            );
           }
         }
 
@@ -265,17 +387,20 @@ export class ProgramService {
           kegiatanIndex++
         ) {
           const kegData = kegiatanList[kegiatanIndex];
-
-          if (!kegData?.nama_kegiatans?.trim()) {
-            console.warn('Kegiatan kosong dilewati:', kegData);
-            continue;
-          }
+          if (!kegData?.nama_kegiatans?.trim()) continue;
 
           const kegiatan = this.kegiatansRepo.create({
             nama_kegiatans: kegData.nama_kegiatans.trim(),
             deskripsi: kegData.deskripsi || null,
             urutan: this.toNumber(kegData.urutan, kegiatanIndex + 1),
+            tanggal_mulai: kegData.tanggal_mulai
+              ? new Date(kegData.tanggal_mulai)
+              : null,
+            tanggal_selesai: kegData.tanggal_selesai
+              ? new Date(kegData.tanggal_selesai)
+              : null,
             id_fase: savedFase.id_fase,
+            status_kegiatan: 'LOCKED',
           });
 
           const savedKegiatan = await queryRunner.manager.save(
@@ -293,91 +418,92 @@ export class ProgramService {
             syaratIndex++
           ) {
             const req = persyaratanKegiatan[syaratIndex];
+            if (!req?.nama?.trim()) continue;
 
-            if (!req?.nama?.trim()) {
-              console.warn('Persyaratan kegiatan kosong dilewati:', req);
-              continue;
-            }
-
-            const persyaratan = this.persyaratanKegiatanRepo.create({
-              id_kegiatans: savedKegiatan.id_kegiatans,
-              nama: req.nama.trim(),
-              tipe: req.tipe || 'upload',
-              deskripsi: req.deskripsi || null,
-              urutan: this.toNumber(req.urutan, syaratIndex + 1),
-              status: 'WAITING_UPLOAD',
-            });
-
-            await queryRunner.manager.save(PersyaratanKegiatan, persyaratan);
+            await queryRunner.manager.save(
+              PersyaratanKegiatan,
+              this.persyaratanKegiatanRepo.create({
+                id_kegiatans: savedKegiatan.id_kegiatans,
+                nama: req.nama.trim(),
+                tipe: req.tipe || 'upload',
+                deskripsi: req.deskripsi || null,
+                urutan: this.toNumber(req.urutan, syaratIndex + 1),
+                status: 'WAITING_UPLOAD',
+              }),
+            );
           }
         }
       }
 
       await queryRunner.commitTransaction();
-
       return this.findOne(savedProgram.id_program);
     } catch (error) {
       await queryRunner.rollbackTransaction();
 
-      console.error('--- [ERROR CREATE PROGRAM] ---');
-      console.error(error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
 
-      throw new InternalServerErrorException(
-        `Gagal simpan program: ${error.message}`,
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Gagal simpan program: ${msg}`);
     } finally {
       await queryRunner.release();
     }
   }
 
-  async findAll(kategori?: string) {
-    try {
-      return await this.programRepo.find({
-        where: kategori ? { kategori } : {},
-        order: { created_at: 'DESC' },
-      });
-    } catch (error) {
-      console.error('--- [ERROR DATABASE FINDALL] ---', error.message);
-      throw new InternalServerErrorException('Gagal mengambil data program');
+  async findAll(kategori?: string, jenis_program?: string) {
+    const where: any = {};
+    if (kategori) where.kategori = kategori;
+    if (jenis_program) where.jenis_program = jenis_program;
+
+    return this.programRepo.find({
+      where,
+      order: { created_at: 'DESC' },
+    });
+  }
+
+  async findBySekolah(id_sekolah: number) {
+    const idSekolah = Number(id_sekolah);
+    if (!idSekolah || Number.isNaN(idSekolah)) {
+      throw new BadRequestException('ID sekolah tidak valid');
     }
+
+    return this.programRepo
+      .createQueryBuilder('p')
+      .where('p.id_sekolah = :id_sekolah', { id_sekolah: idSekolah })
+      .orWhere(':id_sekolah = ANY(p.sekolah_ids)', { id_sekolah: idSekolah })
+      .orderBy('p.created_at', 'DESC')
+      .getMany();
   }
 
   async findOne(id: number) {
-    try {
-      return await this.programRepo.findOne({
-        where: { id_program: id },
-        relations: [
-          'fases',
-          'fases.termin',
-          'fases.termin.persyaratan',
-          'fases.termin.chats',
-          'fases.kegiatans',
-          'fases.kegiatans.persyaratan',
-          'fases.kegiatans.termin',
-          'fases.kegiatans.termin.chats',
-        ],
-        order: {
-          fases: {
+    return this.programRepo.findOne({
+      where: { id_program: id },
+      relations: [
+        'fases',
+        'fases.termin',
+        'fases.termin.persyaratan',
+        'fases.termin.chats',
+        'fases.kegiatans',
+        'fases.kegiatans.persyaratan',
+        'fases.kegiatans.comments',
+        'fases.kegiatans.termin',
+        'fases.kegiatans.termin.chats',
+      ],
+      order: {
+        fases: {
+          urutan: 'ASC',
+          termin: {
+            created_at: 'ASC',
+            persyaratan: { urutan: 'ASC' },
+          },
+          kegiatans: {
             urutan: 'ASC',
-            termin: {
-              created_at: 'ASC',
-              persyaratan: {
-                urutan: 'ASC',
-              },
-            },
-            kegiatans: {
-              urutan: 'ASC',
-              persyaratan: {
-                urutan: 'ASC',
-              },
-            },
+            persyaratan: { urutan: 'ASC' },
           },
         },
-      });
-    } catch (error) {
-      console.error('--- [ERROR FINDONE PROGRAM] ---', error.message);
-      throw new InternalServerErrorException('Data program tidak ditemukan');
-    }
+      },
+    });
   }
 
   async uploadPersyaratanTermin(
@@ -385,6 +511,8 @@ export class ProgramService {
     file: Express.Multer.File,
     body: any,
     id_user: number,
+    role_user: string,
+    id_role?: number | null,
   ) {
     const persyaratan = await this.persyaratanTerminRepo.findOne({
       where: { id_persyaratan },
@@ -394,56 +522,164 @@ export class ProgramService {
       throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
+    if (!this.isVendorRole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya Vendor/Narasumber yang boleh upload bukti administratif',
+      );
+    }
+
+    if (persyaratan.status === 'APPROVED') {
+      throw new BadRequestException(
+        'Bukti sudah disetujui HO dan tidak bisa diupload ulang',
+      );
+    }
+
+    if (['WAITING_AO', 'WAITING_HO'].includes(persyaratan.status)) {
+      throw new BadRequestException(
+        'Bukti sedang dalam proses review. Tunggu hasil review terlebih dahulu.',
+      );
+    }
+
     if (persyaratan.tipe === 'upload' && !file) {
       throw new BadRequestException('File wajib diupload');
     }
 
-    persyaratan.status = 'WAITING_HO';
-    persyaratan.updated_at = new Date();
-
     if (file) {
-      persyaratan.file_path = file.filename;
+      await this.ensureGoogleDriveConnected(
+        id_user,
+        'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti administratif termin.',
+      );
+
+      const uploaded = await this.googleDriveService.uploadFile({
+        idUser: id_user,
+        idRole: id_role || null,
+        file,
+        moduleType: 'PROGRAM_TERMIN',
+        relatedTable: 't_persyaratan_termin',
+        relatedId: persyaratan.id_persyaratan,
+      });
+
+      persyaratan.file_path = this.getDriveFilePath(
+        uploaded,
+        file.originalname,
+      );
       persyaratan.nama_file = file.originalname;
     }
+
+    persyaratan.status = 'WAITING_AO';
+    persyaratan.uploaded_by = id_user;
+    persyaratan.uploaded_at = new Date();
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = null;
+    persyaratan.rejected_at = null;
+    persyaratan.rejected_reason = null;
+
+    persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
 
     return {
-      message: 'Bukti persyaratan termin berhasil dikirim ke HO',
+      message: 'Upload bukti administratif berhasil, menunggu review AO',
       data: persyaratan,
     };
   }
 
-  async uploadPersyaratanKegiatan(
+  async aoApprovePersyaratanTermin(
     id_persyaratan: number,
-    file: Express.Multer.File,
-    body: any,
     id_user: number,
+    role_user: string,
+    body: any,
   ) {
-    const persyaratan = await this.persyaratanKegiatanRepo.findOne({
+    if (!this.isAORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya AO yang boleh review',
+      );
+    }
+
+    const persyaratan = await this.persyaratanTerminRepo.findOne({
       where: { id_persyaratan },
     });
 
     if (!persyaratan) {
-      throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
+      throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
-    if (persyaratan.tipe === 'upload' && !file) {
-      throw new BadRequestException('File wajib diupload');
+    if (persyaratan.status !== 'WAITING_AO') {
+      throw new BadRequestException(
+        'Persyaratan belum dalam status menunggu review AO',
+      );
     }
 
     persyaratan.status = 'WAITING_HO';
+
+    persyaratan.rejected_by = null;
+    persyaratan.rejected_at = null;
+    persyaratan.rejected_reason = null;
+
     persyaratan.updated_at = new Date();
 
-    if (file) {
-      persyaratan.file_path = file.filename;
-      persyaratan.nama_file = file.originalname;
-    }
-
-    await this.persyaratanKegiatanRepo.save(persyaratan);
+    await this.persyaratanTerminRepo.save(persyaratan);
 
     return {
-      message: 'Bukti persyaratan kegiatan berhasil dikirim ke HO',
+      message: 'Review AO disetujui, bukti administratif diteruskan ke HO',
+      data: persyaratan,
+    };
+  }
+
+  async aoRejectPersyaratanTermin(
+    id_persyaratan: number,
+    id_user: number,
+    role_user: string,
+    body: any,
+  ) {
+    if (!this.isAORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya AO yang boleh review',
+      );
+    }
+
+    const persyaratan = await this.persyaratanTerminRepo.findOne({
+      where: { id_persyaratan },
+    });
+
+    if (!persyaratan) {
+      throw new NotFoundException('Persyaratan termin tidak ditemukan');
+    }
+
+    if (persyaratan.status !== 'WAITING_AO') {
+      throw new BadRequestException(
+        'Persyaratan belum dalam status menunggu review AO',
+      );
+    }
+
+    persyaratan.status = 'REJECTED_AO';
+
+    // Penting: kosongkan file agar vendor wajib upload ulang
+    persyaratan.file_path = null;
+    persyaratan.nama_file = null;
+    persyaratan.uploaded_by = null;
+    persyaratan.uploaded_at = null;
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = id_user;
+    persyaratan.rejected_at = new Date();
+    persyaratan.rejected_reason =
+      body?.alasan ||
+      body?.reason ||
+      body?.komentar ||
+      'Bukti ditolak AO. Silakan upload ulang.';
+
+    persyaratan.updated_at = new Date();
+
+    await this.persyaratanTerminRepo.save(persyaratan);
+
+    return {
+      message: 'Bukti administratif ditolak AO, narasumber perlu upload ulang',
       data: persyaratan,
     };
   }
@@ -464,12 +700,25 @@ export class ProgramService {
     }
 
     persyaratan.status = 'APPROVED';
+    persyaratan.approved_by = id_user;
+    persyaratan.approved_at = new Date();
     persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
 
+    await this.checkAndUnlockKegiatanAfterTerminApproval(persyaratan.id_termin);
+
+    const termin = await this.terminRepo.findOne({
+      where: { id_termin: persyaratan.id_termin },
+    });
+
+    if (termin?.id_fase) {
+      await this.syncProgramStatusByFase(termin.id_fase);
+    }
+
     return {
-      message: 'Persyaratan termin berhasil di-ACC',
+      message:
+        'Administrasi pembuka periode di-ACC HO, aktivitas akan terbuka jika seluruh bukti administratif periode ini telah disetujui',
       data: persyaratan,
     };
   }
@@ -493,14 +742,216 @@ export class ProgramService {
       );
     }
 
-    persyaratan.status = 'REJECTED';
+    persyaratan.status = 'REJECTED_HO';
+
+    // Penting: kosongkan file agar vendor wajib upload ulang
+    persyaratan.file_path = null;
+    persyaratan.nama_file = null;
+    persyaratan.uploaded_by = null;
+    persyaratan.uploaded_at = null;
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = id_user;
+    persyaratan.rejected_at = new Date();
+    persyaratan.rejected_reason =
+      body?.alasan ||
+      body?.reason ||
+      body?.komentar ||
+      'Bukti ditolak HO. Silakan upload ulang.';
+
     persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
 
     return {
-      message: 'Persyaratan termin berhasil ditolak',
-      alasan: body?.alasan || body?.reason || null,
+      message: 'Bukti administratif ditolak HO, narasumber perlu upload ulang',
+      data: persyaratan,
+    };
+  }
+  async uploadPersyaratanKegiatan(
+    id_persyaratan: number,
+    file: Express.Multer.File,
+    body: any,
+    id_user: number,
+    role_user: string,
+    id_role?: number | null,
+  ) {
+    const persyaratan = await this.persyaratanKegiatanRepo.findOne({
+      where: { id_persyaratan },
+    });
+
+    if (!persyaratan) {
+      throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
+    }
+
+    if (!this.isVendorRole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya Vendor/Narasumber yang boleh upload bukti kegiatan',
+      );
+    }
+
+    if (persyaratan.status === 'APPROVED') {
+      throw new BadRequestException(
+        'Bukti sudah disetujui HO dan tidak bisa diupload ulang',
+      );
+    }
+
+    if (['WAITING_AO', 'WAITING_HO'].includes(persyaratan.status)) {
+      throw new BadRequestException(
+        'Bukti sedang dalam proses review. Tunggu hasil review terlebih dahulu.',
+      );
+    }
+
+    if (persyaratan.tipe === 'upload' && !file) {
+      throw new BadRequestException('File wajib diupload');
+    }
+
+    if (file) {
+      await this.ensureGoogleDriveConnected(
+        id_user,
+        'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti kegiatan.',
+      );
+
+      const uploaded = await this.googleDriveService.uploadFile({
+        idUser: id_user,
+        idRole: id_role || null,
+        file,
+        moduleType: 'PROGRAM_KEGIATAN',
+        relatedTable: 't_persyaratan_kegiatan',
+        relatedId: persyaratan.id_persyaratan,
+      });
+
+      persyaratan.file_path = this.getDriveFilePath(
+        uploaded,
+        file.originalname,
+      );
+      persyaratan.nama_file = file.originalname;
+    }
+
+    persyaratan.status = 'WAITING_AO';
+    persyaratan.uploaded_by = id_user;
+    persyaratan.uploaded_at = new Date();
+
+    persyaratan.ao_reviewed_by = null;
+    persyaratan.ao_reviewed_at = null;
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = null;
+    persyaratan.rejected_at = null;
+    persyaratan.rejected_reason = null;
+
+    persyaratan.updated_at = new Date();
+
+    await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    return {
+      message: 'Upload bukti kegiatan berhasil, menunggu review AO',
+      data: persyaratan,
+    };
+  }
+
+  async aoApprovePersyaratanKegiatan(
+    id_persyaratan: number,
+    id_user: number,
+    role_user: string,
+    body: any,
+  ) {
+    if (!this.isAORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya AO yang boleh review',
+      );
+    }
+
+    const persyaratan = await this.persyaratanKegiatanRepo.findOne({
+      where: { id_persyaratan },
+    });
+
+    if (!persyaratan) {
+      throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
+    }
+
+    if (persyaratan.status !== 'WAITING_AO') {
+      throw new BadRequestException(
+        'Persyaratan belum dalam status menunggu review AO',
+      );
+    }
+
+    persyaratan.status = 'WAITING_HO';
+    persyaratan.ao_reviewed_by = id_user;
+    persyaratan.ao_reviewed_at = new Date();
+
+    persyaratan.rejected_by = null;
+    persyaratan.rejected_at = null;
+    persyaratan.rejected_reason = null;
+
+    persyaratan.updated_at = new Date();
+
+    await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    return {
+      message: 'Review AO disetujui, bukti kegiatan diteruskan ke HO',
+      data: persyaratan,
+    };
+  }
+
+  async aoRejectPersyaratanKegiatan(
+    id_persyaratan: number,
+    id_user: number,
+    role_user: string,
+    body: any,
+  ) {
+    if (!this.isAORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya AO yang boleh review',
+      );
+    }
+
+    const persyaratan = await this.persyaratanKegiatanRepo.findOne({
+      where: { id_persyaratan },
+    });
+
+    if (!persyaratan) {
+      throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
+    }
+
+    if (persyaratan.status !== 'WAITING_AO') {
+      throw new BadRequestException(
+        'Persyaratan belum dalam status menunggu review AO',
+      );
+    }
+
+    persyaratan.status = 'REJECTED_AO';
+
+    // Penting: kosongkan file agar vendor wajib upload ulang
+    persyaratan.file_path = null;
+    persyaratan.nama_file = null;
+    persyaratan.uploaded_by = null;
+    persyaratan.uploaded_at = null;
+
+    persyaratan.ao_reviewed_by = id_user;
+    persyaratan.ao_reviewed_at = new Date();
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = id_user;
+    persyaratan.rejected_at = new Date();
+    persyaratan.rejected_reason =
+      body?.alasan ||
+      body?.reason ||
+      body?.komentar ||
+      'Bukti ditolak AO. Silakan upload ulang.';
+
+    persyaratan.updated_at = new Date();
+
+    await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    return {
+      message: 'Bukti kegiatan ditolak AO, narasumber perlu upload ulang',
       data: persyaratan,
     };
   }
@@ -521,12 +972,24 @@ export class ProgramService {
     }
 
     persyaratan.status = 'APPROVED';
+    persyaratan.approved_by = id_user;
+    persyaratan.approved_at = new Date();
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
 
+    await this.checkAndFinalizeKegiatan(persyaratan.id_kegiatans, id_user);
+
+    const kegiatan = await this.kegiatansRepo.findOne({
+      where: { id_kegiatans: persyaratan.id_kegiatans },
+    });
+
+    if (kegiatan?.id_fase) {
+      await this.syncProgramStatusByFase(kegiatan.id_fase);
+    }
+
     return {
-      message: 'Persyaratan kegiatan berhasil di-ACC',
+      message: 'Bukti kegiatan di-ACC HO',
       data: persyaratan,
     };
   }
@@ -550,15 +1013,317 @@ export class ProgramService {
       );
     }
 
-    persyaratan.status = 'REJECTED';
+    persyaratan.status = 'REJECTED_HO';
+
+    // Penting: kosongkan file agar vendor wajib upload ulang
+    persyaratan.file_path = null;
+    persyaratan.nama_file = null;
+    persyaratan.uploaded_by = null;
+    persyaratan.uploaded_at = null;
+
+    persyaratan.approved_by = null;
+    persyaratan.approved_at = null;
+
+    persyaratan.rejected_by = id_user;
+    persyaratan.rejected_at = new Date();
+    persyaratan.rejected_reason =
+      body?.alasan ||
+      body?.reason ||
+      body?.komentar ||
+      'Bukti ditolak HO. Silakan upload ulang.';
+
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
 
     return {
-      message: 'Persyaratan kegiatan berhasil ditolak',
-      alasan: body?.alasan || body?.reason || null,
+      message: 'Bukti kegiatan ditolak HO, narasumber perlu upload ulang',
       data: persyaratan,
+    };
+  }
+
+  private async checkAndUnlockKegiatanAfterTerminApproval(id_termin: number) {
+    try {
+      const termin = await this.terminRepo.findOne({
+        where: { id_termin },
+        relations: ['persyaratan'],
+      });
+
+      if (!termin || !termin.id_fase) return;
+
+      const allTerminInFase = await this.terminRepo.find({
+        where: { id_fase: termin.id_fase },
+        relations: ['persyaratan'],
+      });
+
+      const terminPembukaPeriode = allTerminInFase.filter(
+        (item) => !item.id_kegiatans,
+      );
+
+      const allApproved = terminPembukaPeriode.every(
+        (item) =>
+          item.persyaratan.length > 0 &&
+          item.persyaratan.every((p) => p.status === 'APPROVED'),
+      );
+
+      if (!allApproved) return;
+
+      const kegiatan = await this.kegiatansRepo.find({
+        where: { id_fase: termin.id_fase },
+        order: { urutan: 'ASC' },
+      });
+
+      if (kegiatan.length === 0) return;
+
+      const first = kegiatan[0];
+      if (first.status_kegiatan === 'LOCKED') {
+        first.status_kegiatan = 'UNLOCKED';
+        await this.kegiatansRepo.save(first);
+      }
+    } catch (error) {
+      console.error('checkAndUnlockKegiatanAfterTerminApproval error:', error);
+    }
+  }
+
+  private async checkAndFinalizeKegiatan(
+    id_kegiatans: number,
+    id_user: number,
+  ) {
+    try {
+      const kegiatan = await this.kegiatansRepo.findOne({
+        where: { id_kegiatans },
+        relations: ['persyaratan'],
+      });
+
+      if (!kegiatan) return;
+
+      const allApproved =
+        kegiatan.persyaratan.length > 0 &&
+        kegiatan.persyaratan.every((p) => p.status === 'APPROVED');
+
+      if (!allApproved) return;
+
+      kegiatan.status_kegiatan = 'APPROVED';
+      kegiatan.approved_at = new Date();
+      await this.kegiatansRepo.save(kegiatan);
+
+      const siblings = await this.kegiatansRepo.find({
+        where: { id_fase: kegiatan.id_fase },
+        order: { urutan: 'ASC' },
+      });
+
+      const currentIndex = siblings.findIndex(
+        (item) => item.id_kegiatans === id_kegiatans,
+      );
+
+      const nextKegiatan = siblings[currentIndex + 1];
+      if (nextKegiatan && nextKegiatan.status_kegiatan === 'LOCKED') {
+        nextKegiatan.status_kegiatan = 'UNLOCKED';
+        await this.kegiatansRepo.save(nextKegiatan);
+      }
+    } catch (error) {
+      console.error('checkAndFinalizeKegiatan error:', error);
+    }
+  }
+
+  private async syncProgramStatusByFase(id_fase: number) {
+    const fase = await this.faseRepo.findOne({
+      where: { id_fase },
+    });
+
+    if (!fase?.id_program) return;
+
+    await this.syncProgramStatus(fase.id_program);
+  }
+
+  private async syncProgramStatus(id_program: number) {
+    const fases = await this.faseRepo.find({
+      where: { id_program },
+      order: { urutan: 'ASC' },
+    });
+
+    if (!fases.length) return;
+
+    const faseIds = fases.map((fase) => fase.id_fase);
+
+    const kegiatanList = await this.kegiatansRepo.find({
+      where: faseIds.map((id_fase) => ({ id_fase })),
+      relations: ['persyaratan'],
+      order: { urutan: 'ASC' },
+    });
+
+    const terminList = await this.terminRepo.find({
+      where: faseIds.map((id_fase) => ({ id_fase })),
+      relations: ['persyaratan'],
+    });
+
+    const hasAnyUploadOrApproval =
+      terminList.some((termin) =>
+        (termin.persyaratan || []).some((item) =>
+          [
+            'WAITING_AO',
+            'WAITING_HO',
+            'APPROVED',
+            'REJECTED_AO',
+            'REJECTED_HO',
+          ].includes(String(item.status || '')),
+        ),
+      ) ||
+      kegiatanList.some((kegiatan) =>
+        (kegiatan.persyaratan || []).some((item) =>
+          [
+            'WAITING_AO',
+            'WAITING_HO',
+            'APPROVED',
+            'REJECTED_AO',
+            'REJECTED_HO',
+          ].includes(String(item.status || '')),
+        ),
+      );
+
+    const allTerminApproved =
+      terminList.length === 0 ||
+      terminList.every(
+        (termin) =>
+          (termin.persyaratan || []).length > 0 &&
+          termin.persyaratan.every((item) => item.status === 'APPROVED'),
+      );
+
+    const allKegiatanApproved =
+      kegiatanList.length === 0 ||
+      kegiatanList.every((kegiatan) => {
+        const persyaratan = kegiatan.persyaratan || [];
+
+        return (
+          kegiatan.status_kegiatan === 'APPROVED' &&
+          persyaratan.length > 0 &&
+          persyaratan.every((item) => item.status === 'APPROVED')
+        );
+      });
+
+    let nextStatus = 'Approval';
+
+    if (allTerminApproved && allKegiatanApproved) {
+      nextStatus = 'Selesai';
+    } else if (hasAnyUploadOrApproval) {
+      nextStatus = 'Implementasi';
+    }
+
+    await this.programRepo.update(id_program, {
+      status_program: nextStatus,
+      updated_at: new Date(),
+    });
+  }
+
+  async addComment(
+    id_kegiatan: number,
+    body: any,
+    id_user: number,
+    nama_user: string,
+    role_user: string,
+  ) {
+    const kegiatan = await this.kegiatansRepo.findOne({
+      where: { id_kegiatans: id_kegiatan },
+    });
+
+    if (!kegiatan) {
+      throw new NotFoundException('Kegiatan tidak ditemukan');
+    }
+
+    if (!body?.comment_text?.trim()) {
+      throw new BadRequestException('Teks komentar wajib diisi');
+    }
+
+    const validTypes = ['AO_REVIEW', 'HO_APPROVAL', 'GURU_RATING'];
+    const commentType = validTypes.includes(body.comment_type)
+      ? body.comment_type
+      : 'AO_REVIEW';
+
+    const comment = this.kegiatanCommentRepo.create({
+      id_kegiatan,
+      id_persyaratan: body.id_persyaratan ? Number(body.id_persyaratan) : null,
+      id_user,
+      nama_user,
+      role_user,
+      comment_text: body.comment_text.trim(),
+      comment_type: commentType,
+      attachment_file: null,
+      attachment_original_name: null,
+    });
+
+    const saved = await this.kegiatanCommentRepo.save(comment);
+
+    return {
+      message: 'Komentar berhasil ditambahkan',
+      data: saved,
+    };
+  }
+
+  async getCommentsByKegiatan(id_kegiatan: number) {
+    const kegiatan = await this.kegiatansRepo.findOne({
+      where: { id_kegiatans: id_kegiatan },
+    });
+
+    if (!kegiatan) {
+      throw new NotFoundException('Kegiatan tidak ditemukan');
+    }
+
+    return this.kegiatanCommentRepo.find({
+      where: { id_kegiatan },
+      order: { created_at: 'ASC' },
+    });
+  }
+
+  async submitGuruRating(
+    id_kegiatan: number,
+    body: any,
+    id_user: number,
+    nama_user: string,
+  ) {
+    const kegiatan = await this.kegiatansRepo.findOne({
+      where: { id_kegiatans: id_kegiatan },
+    });
+
+    if (!kegiatan) {
+      throw new NotFoundException('Kegiatan tidak ditemukan');
+    }
+
+    if (kegiatan.status_kegiatan !== 'APPROVED') {
+      throw new BadRequestException(
+        'Kegiatan belum selesai, guru belum bisa memberi rating',
+      );
+    }
+
+    const rating = Number(body.rating);
+    if (!rating || rating < 1 || rating > 5) {
+      throw new BadRequestException('Rating harus antara 1 sampai 5');
+    }
+
+    kegiatan.guru_rating = rating;
+    kegiatan.guru_comment = body.comment?.trim() || null;
+    kegiatan.guru_rated_by = id_user;
+    kegiatan.guru_rated_at = new Date();
+    await this.kegiatansRepo.save(kegiatan);
+
+    if (body.comment?.trim()) {
+      await this.kegiatanCommentRepo.save(
+        this.kegiatanCommentRepo.create({
+          id_kegiatan,
+          id_user,
+          nama_user,
+          role_user: 'Guru Assessment',
+          comment_text: body.comment.trim(),
+          comment_type: 'GURU_RATING',
+        }),
+      );
+    }
+
+    return {
+      message: 'Rating guru berhasil disimpan',
+      data: {
+        rating,
+        comment: body.comment,
+      },
     };
   }
 
@@ -567,21 +1332,198 @@ export class ProgramService {
     updateData: any,
     file: Express.Multer.File,
     id_user: number,
+    id_role?: number | null,
   ) {
-    try {
-      const dataToSave = { ...updateData };
+    const existingProgram = await this.programRepo.findOne({
+      where: { id_program: id },
+    });
 
-      if (file) {
-        dataToSave.file_mou = file.filename;
+    if (!existingProgram) {
+      throw new NotFoundException('Program tidak ditemukan');
+    }
+
+    const sekolahIds = this.toArray(updateData.sekolah_ids);
+    const aoIds = this.toArray(updateData.ao_ids);
+    const vendorIds = this.toArray(
+      updateData.vendor_ids?.length
+        ? updateData.vendor_ids
+        : updateData.id_vendor,
+    );
+
+    const idSekolah =
+      this.toNumber(updateData.id_sekolah) ||
+      sekolahIds[0] ||
+      existingProgram.id_sekolah ||
+      null;
+
+    const idPengawas =
+      this.toNumber(updateData.id_pengawas) ||
+      aoIds[0] ||
+      existingProgram.id_pengawas ||
+      null;
+
+    const finalSekolahIds =
+      sekolahIds.length > 0
+        ? sekolahIds
+        : Array.isArray(existingProgram.sekolah_ids)
+          ? existingProgram.sekolah_ids
+          : idSekolah
+            ? [idSekolah]
+            : [];
+
+    const finalAoIds =
+      aoIds.length > 0
+        ? aoIds
+        : Array.isArray(existingProgram.ao_ids)
+          ? existingProgram.ao_ids
+          : idPengawas
+            ? [idPengawas]
+            : [];
+
+    const finalVendorIds =
+      vendorIds.length > 0
+        ? vendorIds
+        : Array.isArray(existingProgram.vendor_ids)
+          ? existingProgram.vendor_ids
+          : this.toArray(existingProgram.id_vendor);
+
+    const kategori =
+      updateData.kategori !== undefined
+        ? this.normalizeProgramCategory(updateData.kategori)
+        : existingProgram.kategori;
+
+    const pilarProgram =
+      updateData.pilar_program !== undefined
+        ? this.normalizeProgramPilar(updateData.pilar_program)
+        : existingProgram.pilar_program;
+
+    this.validateProgramPilar(kategori, pilarProgram);
+
+    const dataToSave: any = {
+      nama_program:
+        updateData.nama_program !== undefined
+          ? updateData.nama_program
+          : existingProgram.nama_program,
+
+      deskripsi:
+        updateData.deskripsi !== undefined
+          ? updateData.deskripsi || null
+          : existingProgram.deskripsi,
+
+      nomor_mou:
+        updateData.nomor_mou !== undefined
+          ? updateData.nomor_mou || null
+          : existingProgram.nomor_mou,
+
+      harga_vendor:
+        updateData.harga_vendor !== undefined
+          ? this.toNumber(updateData.harga_vendor, 0)
+          : existingProgram.harga_vendor,
+
+      kategori,
+      pilar_program: pilarProgram,
+
+      jenis_program:
+        updateData.jenis_program !== undefined
+          ? updateData.jenis_program || 'PROJECT'
+          : existingProgram.jenis_program,
+
+      tahun:
+        updateData.tahun !== undefined
+          ? this.toNumber(updateData.tahun)
+          : existingProgram.tahun,
+
+      tanggal_mulai:
+        updateData.tanggal_mulai !== undefined
+          ? updateData.tanggal_mulai
+            ? new Date(updateData.tanggal_mulai)
+            : null
+          : existingProgram.tanggal_mulai,
+
+      tanggal_selesai:
+        updateData.tanggal_selesai !== undefined
+          ? updateData.tanggal_selesai
+            ? new Date(updateData.tanggal_selesai)
+            : null
+          : existingProgram.tanggal_selesai,
+
+      status_program:
+        updateData.status_program !== undefined
+          ? updateData.status_program
+          : existingProgram.status_program,
+
+      id_sekolah: idSekolah,
+      sekolah_ids: finalSekolahIds,
+
+      id_pengawas: idPengawas,
+      ao_ids: finalAoIds,
+
+      id_vendor: finalVendorIds,
+      vendor_ids: finalVendorIds,
+
+      kpi_nama:
+        updateData.kpi_nama !== undefined
+          ? updateData.kpi_nama || null
+          : existingProgram.kpi_nama,
+
+      kpi_target:
+        updateData.kpi_target !== undefined
+          ? this.toNumber(updateData.kpi_target, 0)
+          : existingProgram.kpi_target,
+
+      kpi_satuan:
+        updateData.kpi_satuan !== undefined
+          ? updateData.kpi_satuan || null
+          : existingProgram.kpi_satuan,
+
+      updated_at: new Date(),
+    };
+
+    if (file) {
+      const driveStatus = await this.googleDriveService.getStatus(id_user);
+
+      if (!driveStatus?.connected) {
+        throw new BadRequestException({
+          code: 'GOOGLE_DRIVE_NOT_CONNECTED',
+          message:
+            'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah MOU.',
+        });
       }
 
-      await this.programRepo.update(id, dataToSave);
+      const uploadedMou = await this.googleDriveService.uploadFile({
+        idUser: id_user,
+        idRole: id_role ?? null,
+        file,
+        moduleType: 'PROGRAM_MOU_EDIT',
+        relatedTable: 't_program',
+        relatedId: id,
+      });
 
-      return this.findOne(id);
-    } catch (error) {
-      console.error('--- [ERROR UPDATE PROGRAM] ---', error.message);
-      throw new InternalServerErrorException('Gagal update program');
+      const driveFile = uploadedMou.file;
+
+      dataToSave.file_mou =
+        driveFile?.web_view_link ||
+        driveFile?.drive_file_id ||
+        file.originalname;
+
+      const dokumen = this.dokumenProgramRepo.create({
+        id_program: id,
+        jenis_dokumen: 'MOU_EDIT',
+        nama_file: file.originalname,
+        file_path:
+          driveFile?.web_view_link ||
+          driveFile?.web_content_link ||
+          driveFile?.drive_file_id ||
+          file.originalname,
+        upload_by: id_user,
+      });
+
+      await this.dokumenProgramRepo.save(dokumen);
     }
+
+    await this.programRepo.update(id, dataToSave);
+
+    return this.findOne(id);
   }
 
   remove(id: number) {

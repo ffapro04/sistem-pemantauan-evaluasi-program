@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function AuthSplit({ children, rightContent }) {
   return (
     <div className="min-h-screen flex">
@@ -16,3 +16,4 @@ export default function AuthSplit({ children, rightContent }) {
     </div>
   );
 }
+

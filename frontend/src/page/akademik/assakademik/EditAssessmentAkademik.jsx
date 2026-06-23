@@ -1,4 +1,4 @@
-import AssessmentEditBase from "../../../components/assessment/EditAssessmentForm";
+﻿import AssessmentEditBase from "../../../components/assessment/EditAssessmentForm";
 
 function EditAssessmentAkademik() {
   return (

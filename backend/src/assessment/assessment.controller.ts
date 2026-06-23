@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { AssessmentService } from './assessment.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
+import { UpdateAssessmentDto } from './dto/update-assessment.dto';
 
 @Controller('assessment')
 export class AssessmentController {
@@ -29,8 +30,16 @@ export class AssessmentController {
   }
 
   @Get()
-  findAll(@Query('jenis') jenis?: string, @Query('id_ho') id_ho?: string) {
-    return this.assessmentService.findAll(jenis, id_ho ? +id_ho : undefined);
+  findAll(
+    @Query('jenis') jenis?: string,
+    @Query('id_ho') id_ho?: string,
+    @Query('pilar') pilar?: string,
+  ) {
+    return this.assessmentService.findAll(
+      jenis,
+      id_ho ? +id_ho : undefined,
+      pilar,
+    );
   }
 
   @Get('best-renggo')
@@ -60,7 +69,7 @@ export class AssessmentController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() body: any) {
+  update(@Param('id') id: string, @Body() body: UpdateAssessmentDto) {
     return this.assessmentService.update(+id, body);
   }
 

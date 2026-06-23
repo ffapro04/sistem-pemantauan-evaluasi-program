@@ -12,9 +12,10 @@ import {
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { TerminService } from './termin.service';
+
+const FILE_LIMIT_10_MB = 10 * 1024 * 1024;
 
 @Controller('termin')
 export class TerminController {
@@ -26,6 +27,10 @@ export class TerminController {
     }
 
     const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('Format token tidak valid');
+    }
 
     try {
       const payloadBase64Url = token.split('.')[1];
@@ -41,6 +46,7 @@ export class TerminController {
 
       return {
         id_user: payload.sub || payload.id_user || payload.id,
+        id_role: payload.id_role ? Number(payload.id_role) : null,
         nama_user: payload.nama || payload.name || payload.email || '',
         role_user:
           payload.role ||
@@ -56,14 +62,10 @@ export class TerminController {
   @Post()
   @UseInterceptors(
     FileInterceptor('file_dokumentasi', {
-      storage: diskStorage({
-        destination: './uploads/dokumentasi',
-        filename: (req, file, cb) => {
-          const uniqueSuffix =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `DOC-${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
+      limits: {
+        fileSize: FILE_LIMIT_10_MB,
+      },
     }),
   )
   createTermin(
@@ -79,6 +81,7 @@ export class TerminController {
       user.id_user,
       user.nama_user,
       user.role_user,
+      user.id_role,
     );
   }
 

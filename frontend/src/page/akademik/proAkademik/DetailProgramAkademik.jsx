@@ -1,4 +1,4 @@
-import DetailProgramPage from "../../../components/program/DetailProgramPage";
+﻿import DetailProgramPage from "../../../components/program/DetailProgramPage";
 
 function DetailProgramAkademik() {
   return (

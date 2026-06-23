@@ -1,8 +1,14 @@
 /* eslint-disable prettier/prettier */
-import { IsString, IsNotEmpty, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
-// DTO untuk satu pertanyaan
 class QuestionDto {
   @IsString()
   @IsNotEmpty()
@@ -12,14 +18,31 @@ class QuestionDto {
   options: string[];
 }
 
-// DTO utama untuk update assessment
 export class UpdateAssessmentDto {
   @IsString()
-  @IsNotEmpty()
-  nama: string;
+  @IsOptional()
+  nama?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => QuestionDto)
-  questions: QuestionDto[];
+  @IsOptional()
+  questions?: QuestionDto[];
+
+  @IsArray()
+  @IsNumber({}, { each: true })
+  @IsOptional()
+  target_sekolah_ids?: number[];
+
+  @IsNumber()
+  @IsOptional()
+  tenggat?: number;
+
+  @IsString()
+  @IsOptional()
+  jenis?: string;
+
+  @IsString()
+  @IsOptional()
+  pilar?: string;
 }

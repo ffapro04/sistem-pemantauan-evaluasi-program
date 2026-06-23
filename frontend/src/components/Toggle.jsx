@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Toggle({ checked, onChange }) {
   return (
     <button
@@ -15,3 +15,4 @@ export default function Toggle({ checked, onChange }) {
     </button>
   );
 }
+

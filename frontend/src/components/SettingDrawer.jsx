@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+﻿/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import React from "react";
 import { X, ShieldCheck, ChevronRight } from "lucide-react";
@@ -86,3 +86,4 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
 };
 
 export default SettingDrawer;
+

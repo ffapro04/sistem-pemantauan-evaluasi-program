@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Arrow({ direction = "right" }) {
   // RIGHT & LEFT
   if (direction === "right" || direction === "left") {
@@ -54,3 +54,4 @@ export default function Arrow({ direction = "right" }) {
 
   return null;
 }
+

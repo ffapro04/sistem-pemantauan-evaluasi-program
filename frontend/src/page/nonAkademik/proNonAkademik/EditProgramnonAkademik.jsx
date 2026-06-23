@@ -1,4 +1,4 @@
-import EditProgramForm from "../../../components/program/EditProgramForm";
+﻿import EditProgramForm from "../../../components/program/EditProgramForm";
 
 function EditProgramnonAkademik() {
   return (
@@ -6,7 +6,7 @@ function EditProgramnonAkademik() {
       kategori="NON_AKADEMIK"
       title="Program Non-Akademik"
       titleHighlight="Non-Akademik"
-      vendorEndpoint="http://localhost:3000/vendor?kategori=NON_AKADEMIK"
+      vendorEndpoint="/vendor?kategori=NON_AKADEMIK"
       backPath="/ho/program/non-akademik"
       detailPathPrefix="/ho/program/non-akademik/detail"
       programPlaceholder="Masukkan nama program non-akademik..."

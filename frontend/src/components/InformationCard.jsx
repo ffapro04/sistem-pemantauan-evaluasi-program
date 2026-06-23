@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 // components/InformationCard.jsx
 import React from "react";
 import Button from "./Button";
@@ -141,3 +141,4 @@ const InformationCard = ({
 };
 
 export default InformationCard;
+

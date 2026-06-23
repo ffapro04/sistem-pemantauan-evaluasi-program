@@ -6,10 +6,15 @@ import {
   IsNotEmpty,
   IsEmail,
   MinLength,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateSekolahDto {
+  @IsString()
+  @IsNotEmpty()
+  npsn: string;
+
   @IsString()
   @IsNotEmpty()
   nama_sekolah: string;
@@ -19,21 +24,17 @@ export class CreateSekolahDto {
   jenjang: string;
 
   @IsNotEmpty()
-  @IsString()
-  npsn: string;
-
-  @IsNotEmpty()
-  @IsString()
-  akreditasi: string;
+  @Type(() => Number)
+  @IsNumber()
+  id_wilayah: number;
 
   @IsOptional()
   @IsString()
-  alamat?: string;
+  nama_kabupaten?: string;
 
-  @Type(() => Number)
-  @IsNumber()
-  @IsNotEmpty()
-  id_wilayah: number;
+  @IsOptional()
+  @IsString()
+  kode_kabupaten?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -44,6 +45,28 @@ export class CreateSekolahDto {
   @Type(() => Number)
   @IsNumber()
   jumlah_siswa?: number;
+
+  @IsEmail({}, { message: 'Format email tidak valid' })
+  @IsNotEmpty()
+  email_login: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8, { message: 'Password minimal 8 karakter' })
+  password_login: string;
+
+  // Field opsional untuk Edit nanti
+  @IsOptional()
+  @IsString()
+  akreditasi?: string;
+
+  @IsOptional()
+  @IsString()
+  akreditasi_internal?: string;
+
+  @IsOptional()
+  @IsString()
+  alamat?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -60,6 +83,11 @@ export class CreateSekolahDto {
   area?: string;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  tahun_binaan?: number;
+
+  @IsOptional()
   @IsString()
   kriteria_2022?: string;
 
@@ -71,12 +99,7 @@ export class CreateSekolahDto {
   @IsString()
   adiwiyata?: string;
 
-  @IsEmail({}, { message: 'Format email tidak valid' })
-  @IsNotEmpty()
-  email_login: string;
-
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @MinLength(8, { message: 'Password minimal harus 8 karakter' })
-  password_login: string;
+  logo_url?: string;
 }

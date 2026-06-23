@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import React from "react";
 import { Edit3, Power, PowerOff, Eye, Send, Trash2 } from "lucide-react";
 

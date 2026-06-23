@@ -24,6 +24,9 @@ export class Sekolah {
   @Column()
   id_wilayah: number;
 
+  @Column()
+  id_kabupaten: number;
+
   @Column({ default: true })
   status: boolean;
 
@@ -32,6 +35,9 @@ export class Sekolah {
 
   @Column({ nullable: true, length: 50 })
   akreditasi: string;
+
+  @Column({ nullable: true, length: 50, default: 'Dasar' })
+  akreditasi_internal: string;
 
   @Column({ default: 0 })
   jumlah_guru: number;
@@ -43,7 +49,16 @@ export class Sekolah {
   alamat: string;
 
   @Column({ nullable: true })
+  nama_kabupaten: string;
+
+  @Column({ nullable: true })
+  kode_kabupaten: string;
+
+  @Column({ nullable: true })
   area: string;
+
+  @Column({ type: 'int', nullable: true })
+  tahun_binaan: number;
 
   @Column({ nullable: true })
   kriteria_2022: string;
@@ -59,6 +74,9 @@ export class Sekolah {
 
   @Column({ type: 'double precision', default: 0 })
   longitude: number;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  logo_url: string;
 
   @Column({ unique: true, nullable: true })
   email_login: string;

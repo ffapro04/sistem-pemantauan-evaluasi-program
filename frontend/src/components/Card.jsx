@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Card({ title, description, className = "" , children }) {
   return (
     <div
@@ -32,3 +32,4 @@ export default function Card({ title, description, className = "" , children }) 
     </div>
   );
 }
+

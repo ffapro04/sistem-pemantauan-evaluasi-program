@@ -6,6 +6,7 @@ import {
   IsArray,
   ValidateNested,
   IsNumber,
+  IsIn,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
@@ -69,6 +70,14 @@ export class CreateKegiatansDto {
   urutan?: number;
 
   @IsOptional()
+  @IsString()
+  tanggal_mulai?: string;
+
+  @IsOptional()
+  @IsString()
+  tanggal_selesai?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateRequirementDto)
@@ -128,7 +137,10 @@ export class CreateProgramDto {
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.map(Number);
+
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number);
+        }
       } catch {
         return value.split(',').map((v) => Number(v.trim()));
       }
@@ -149,7 +161,10 @@ export class CreateProgramDto {
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.map(Number);
+
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number);
+        }
       } catch {
         return value.split(',').map((v) => Number(v.trim()));
       }
@@ -170,7 +185,10 @@ export class CreateProgramDto {
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.map(Number);
+
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number);
+        }
       } catch {
         return value.split(',').map((v) => Number(v.trim()));
       }
@@ -191,7 +209,10 @@ export class CreateProgramDto {
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) return parsed.map(Number);
+
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number);
+        }
       } catch {
         return value.split(',').map((v) => Number(v.trim()));
       }
@@ -208,9 +229,39 @@ export class CreateProgramDto {
   @IsOptional()
   file_mou?: any;
 
+  /**
+   * Kategori utama:
+   * - AKADEMIK
+   * - NON_AKADEMIK
+   */
   @IsString()
   @IsNotEmpty()
   kategori: string;
+
+  /**
+   * Penanda 4 Pilar:
+   * - AKADEMIK
+   * - KARAKTER
+   * - SENI_BUDAYA
+   * - KECAKAPAN_HIDUP
+   *
+   * Sementara optional agar proses lama tidak langsung rusak
+   * sebelum frontend selesai diperbarui.
+   */
+  @IsOptional()
+  @IsString()
+  @IsIn(['AKADEMIK', 'KARAKTER', 'SENI_BUDAYA', 'KECAKAPAN_HIDUP'])
+  pilar_program?: string;
+
+  /**
+   * Jenis program:
+   * - PROJECT
+   * - REGULER
+   */
+  @IsOptional()
+  @IsString()
+  @IsIn(['PROJECT', 'REGULER'])
+  jenis_program?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -253,6 +304,7 @@ export class CreateProgramDto {
     if (typeof value === 'string' && value.trim() !== '') {
       try {
         const parsed = JSON.parse(value);
+
         return Array.isArray(parsed) ? parsed : [];
       } catch {
         return [];

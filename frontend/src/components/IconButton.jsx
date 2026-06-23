@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function IconButton({
   icon,
   onClick,
@@ -27,3 +27,4 @@ export default function IconButton({
     </button>
   );
 }
+

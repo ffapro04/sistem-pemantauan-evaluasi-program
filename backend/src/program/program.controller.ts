@@ -14,25 +14,30 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { ProgramService } from './program.service';
 
-function buildFilename(prefix: string, originalname: string) {
-  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-  return `${prefix}-${uniqueSuffix}${extname(originalname)}`;
-}
+const FILE_LIMIT_10_MB = 10 * 1024 * 1024;
 
 @Controller('program')
 export class ProgramController {
   constructor(private readonly programService: ProgramService) {}
 
-  private getUserIdFromAuth(authHeader: string) {
+  private decodeToken(authHeader: string): {
+    id_user: number;
+    nama: string;
+    role: string;
+    id_role?: number;
+  } {
     if (!authHeader) {
       throw new UnauthorizedException('Token tidak ada');
     }
 
     const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('Format token tidak valid');
+    }
 
     try {
       const payloadBase64Url = token.split('.')[1];
@@ -44,24 +49,35 @@ export class ProgramController {
 
       const payload = JSON.parse(payloadJson);
 
-      return payload.sub || payload.id_user || payload.id;
-    } catch (e) {
+      return {
+        id_user: payload.sub || payload.id_user || payload.id,
+        nama:
+          payload.nama ||
+          payload.name ||
+          payload.username ||
+          payload.email ||
+          'User',
+        role:
+          payload.role ||
+          payload.nama_role ||
+          payload.jabatan ||
+          String(payload.id_role || ''),
+        id_role: payload.id_role ? Number(payload.id_role) : undefined,
+      };
+    } catch {
       throw new UnauthorizedException('Token tidak valid');
     }
   }
 
+  // ─── CREATE PROGRAM ──────────────────────────────────────────────────────────
+
   @Post()
   @UseInterceptors(
     FileInterceptor('file_mou', {
-      storage: diskStorage({
-        destination: './uploads/mou',
-        filename: (req, file, cb) => {
-          console.log('--- Multer: Memproses File ---');
-          console.log('Original Name:', file.originalname);
-
-          cb(null, buildFilename('MOU', file.originalname));
-        },
-      }),
+      storage: memoryStorage(),
+      limits: {
+        fileSize: FILE_LIMIT_10_MB,
+      },
     }),
   )
   create(
@@ -69,36 +85,45 @@ export class ProgramController {
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    console.log('--- Controller: Request Masuk ---');
-    console.log('Body Data:', createProgramDto);
-    console.log('BODY FASES:', createProgramDto.fases);
-    console.log('BODY FASES TYPE:', typeof createProgramDto.fases);
-    console.log('File Terdeteksi:', file ? file.filename : 'TIDAK ADA FILE!');
-
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user, id_role } = this.decodeToken(authHeader);
 
     if (!createProgramDto.nama_program || !createProgramDto.id_sekolah) {
-      console.error('Error: Data wajib nama_program/id_sekolah kosong');
       throw new BadRequestException('Data wajib tidak lengkap');
     }
 
-    return this.programService.create(createProgramDto, file, id_user);
+    return this.programService.create(createProgramDto, file, id_user, id_role);
   }
 
+  // ─── READ PROGRAM ────────────────────────────────────────────────────────────
+
   @Get()
-  findAll(@Query('kategori') kategori?: string) {
-    return this.programService.findAll(kategori);
+  findAll(
+    @Query('kategori') kategori?: string,
+    @Query('jenis_program') jenis_program?: string,
+  ) {
+    return this.programService.findAll(kategori, jenis_program);
   }
+
+  @Get('sekolah/:id_sekolah')
+  findBySekolah(@Param('id_sekolah') id_sekolah: string) {
+    return this.programService.findBySekolah(+id_sekolah);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.programService.findOne(+id);
+  }
+
+  // ─── UPLOAD ADMINISTRASI PEMBUKA / TERMIN ───────────────────────────────────
+  // Vendor/Narasumber upload → Google Drive → WAITING_AO
 
   @Patch('persyaratan-termin/:id/upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/dokumentasi',
-        filename: (req, file, cb) => {
-          cb(null, buildFilename('REQ-TERMIN', file.originalname));
-        },
-      }),
+      storage: memoryStorage(),
+      limits: {
+        fileSize: FILE_LIMIT_10_MB,
+      },
     }),
   )
   uploadPersyaratanTermin(
@@ -107,49 +132,62 @@ export class ProgramController {
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user, role, id_role } = this.decodeToken(authHeader);
 
     return this.programService.uploadPersyaratanTermin(
       +id,
       file,
       body,
       id_user,
+      role,
+      id_role,
     );
   }
 
-  @Patch('persyaratan-kegiatan/:id/upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/dokumentasi',
-        filename: (req, file, cb) => {
-          cb(null, buildFilename('REQ-KEGIATAN', file.originalname));
-        },
-      }),
-    }),
-  )
-  uploadPersyaratanKegiatan(
+  // ─── AO REVIEW ADMINISTRASI PEMBUKA / TERMIN ────────────────────────────────
+  // WAITING_AO → WAITING_HO / REJECTED_AO
+
+  @Patch('persyaratan-termin/:id/ao-approve')
+  aoApprovePersyaratanTermin(
     @Param('id') id: string,
     @Body() body: any,
-    @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user, role } = this.decodeToken(authHeader);
 
-    return this.programService.uploadPersyaratanKegiatan(
+    return this.programService.aoApprovePersyaratanTermin(
       +id,
-      file,
-      body,
       id_user,
+      role,
+      body,
     );
   }
+
+  @Patch('persyaratan-termin/:id/ao-reject')
+  aoRejectPersyaratanTermin(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, role } = this.decodeToken(authHeader);
+
+    return this.programService.aoRejectPersyaratanTermin(
+      +id,
+      id_user,
+      role,
+      body,
+    );
+  }
+
+  // ─── HO FINAL REVIEW ADMINISTRASI PEMBUKA / TERMIN ──────────────────────────
+  // WAITING_HO → APPROVED / REJECTED_HO
 
   @Patch('persyaratan-termin/:id/approve')
   approvePersyaratanTermin(
     @Param('id') id: string,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user } = this.decodeToken(authHeader);
 
     return this.programService.approvePersyaratanTermin(+id, id_user);
   }
@@ -160,17 +198,85 @@ export class ProgramController {
     @Body() body: any,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user } = this.decodeToken(authHeader);
 
     return this.programService.rejectPersyaratanTermin(+id, id_user, body);
   }
+
+  // ─── UPLOAD BUKTI KEGIATAN / AKTIVITAS ──────────────────────────────────────
+  // Vendor/Narasumber upload → Google Drive → WAITING_AO
+
+  @Patch('persyaratan-kegiatan/:id/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: FILE_LIMIT_10_MB,
+      },
+    }),
+  )
+  uploadPersyaratanKegiatan(
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, role, id_role } = this.decodeToken(authHeader);
+
+    return this.programService.uploadPersyaratanKegiatan(
+      +id,
+      file,
+      body,
+      id_user,
+      role,
+      id_role,
+    );
+  }
+
+  // ─── AO REVIEW BUKTI KEGIATAN / AKTIVITAS ───────────────────────────────────
+  // WAITING_AO → WAITING_HO / REJECTED_AO
+
+  @Patch('persyaratan-kegiatan/:id/ao-approve')
+  aoApprovePersyaratanKegiatan(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, role } = this.decodeToken(authHeader);
+
+    return this.programService.aoApprovePersyaratanKegiatan(
+      +id,
+      id_user,
+      role,
+      body,
+    );
+  }
+
+  @Patch('persyaratan-kegiatan/:id/ao-reject')
+  aoRejectPersyaratanKegiatan(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, role } = this.decodeToken(authHeader);
+
+    return this.programService.aoRejectPersyaratanKegiatan(
+      +id,
+      id_user,
+      role,
+      body,
+    );
+  }
+
+  // ─── HO FINAL REVIEW BUKTI KEGIATAN / AKTIVITAS ─────────────────────────────
+  // WAITING_HO → APPROVED / REJECTED_HO
 
   @Patch('persyaratan-kegiatan/:id/approve')
   approvePersyaratanKegiatan(
     @Param('id') id: string,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user } = this.decodeToken(authHeader);
 
     return this.programService.approvePersyaratanKegiatan(+id, id_user);
   }
@@ -181,25 +287,51 @@ export class ProgramController {
     @Body() body: any,
     @Headers('authorization') authHeader: string,
   ) {
-    const id_user = this.getUserIdFromAuth(authHeader);
+    const { id_user } = this.decodeToken(authHeader);
 
     return this.programService.rejectPersyaratanKegiatan(+id, id_user, body);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.programService.findOne(+id);
+  // ─── COMMENT PER KEGIATAN ───────────────────────────────────────────────────
+
+  @Post('kegiatan/:id/comment')
+  addComment(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, nama, role } = this.decodeToken(authHeader);
+
+    return this.programService.addComment(+id, body, id_user, nama, role);
   }
+
+  @Get('kegiatan/:id/comments')
+  getComments(@Param('id') id: string) {
+    return this.programService.getCommentsByKegiatan(+id);
+  }
+
+  // ─── GURU RATING / KOMENTAR SEKOLAH ─────────────────────────────────────────
+
+  @Post('kegiatan/:id/rating')
+  submitRating(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    const { id_user, nama } = this.decodeToken(authHeader);
+
+    return this.programService.submitGuruRating(+id, body, id_user, nama);
+  }
+
+  // ─── UPDATE PROGRAM ─────────────────────────────────────────────────────────
 
   @Patch(':id')
   @UseInterceptors(
     FileInterceptor('file_mou', {
-      storage: diskStorage({
-        destination: './uploads/mou',
-        filename: (req, file, cb) => {
-          cb(null, buildFilename('MOU-EDIT', file.originalname));
-        },
-      }),
+      storage: memoryStorage(),
+      limits: {
+        fileSize: FILE_LIMIT_10_MB,
+      },
     }),
   )
   update(
@@ -208,11 +340,8 @@ export class ProgramController {
     @UploadedFile() file: Express.Multer.File,
     @Headers('authorization') authHeader: string,
   ) {
-    console.log(`--- Controller: Update Program ID ${id} ---`);
-    console.log('Update Data:', updateData);
+    const { id_user, id_role } = this.decodeToken(authHeader);
 
-    const id_user = this.getUserIdFromAuth(authHeader);
-
-    return this.programService.update(+id, updateData, file, id_user);
+    return this.programService.update(+id, updateData, file, id_user, id_role);
   }
 }

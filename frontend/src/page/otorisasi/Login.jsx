@@ -1,7 +1,8 @@
-/* eslint-disable no-unused-vars */
-import React, { useState } from "react";
+﻿/* eslint-disable no-unused-vars */
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { toast } from "react-toastify";
 import { motion, AnimatePresence } from "framer-motion";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -13,6 +14,10 @@ import {
   Activity,
   LogIn,
   ArrowLeft,
+  ChevronDown,
+  School,
+  User,
+  Search,
 } from "lucide-react";
 
 // ASSETS
@@ -29,7 +34,72 @@ import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Label from "../../components/Label";
 
+const API_BASE_URL = "";
+
+// =========================================================================
+// DAFTAR ROLE UNTUK DROPDOWN
+// =========================================================================
+const ROLE_OPTIONS = [
+  { value: "sistem", label: "Admin" },
+  { value: "sistem", label: "Pengurus" },
+  { value: "sistem", label: "Head Office" },
+  { value: "sistem", label: "Area Officer" },
+  { value: "sistem", label: "Sekolah" },
+  { value: "sistem", label: "Vendor" },
+  { value: "sistem", label: "Kepala Dinas" },
+  { value: "sistem", label: "Operator Sekolah" },
+  { value: "guru", label: "Guru Assessment" },
+];
+
+const normalizeText = (value = "") => String(value || "").trim().toLowerCase();
+
+const getDecodedRoleInfo = (decoded = {}) => {
+  const idRole = Number(decoded.id_role || decoded.role_id || 0);
+  const role = normalizeText(decoded.role || decoded.nama_role);
+  const jabatan = normalizeText(decoded.jabatan);
+  const jenis = normalizeText(decoded.jenis);
+  return { idRole, role, jabatan, jenis };
+};
+
+const isRoleMatch = (selectedRole, decoded = {}) => {
+  const { idRole, role, jabatan } = getDecodedRoleInfo(decoded);
+  switch (selectedRole) {
+    case "Admin":
+      return idRole === 1 || role === "admin";
+    case "Pengurus":
+      return idRole === 2 || role === "pengurus";
+    case "Head Office":
+      return idRole === 3 || role.includes("head office");
+    case "Area Officer":
+      return idRole === 4 || role.includes("area officer");
+    case "Sekolah":
+      return idRole === 5 && !jabatan.includes("operator");
+    case "Vendor":
+      return idRole === 6 || role === "vendor";
+    case "Kepala Dinas":
+      return idRole === 7 || role.includes("kepala dinas");
+    case "Guru Assessment":
+      return idRole === 8 || role.includes("guru");
+    case "Operator Sekolah":
+      return (
+        idRole === 9 ||
+        jabatan.includes("operator sekolah") ||
+        jabatan.includes("operator")
+      );
+    default:
+      return false;
+  }
+};
+
+const getRoleMismatchMessage = (selectedRole) =>
+  `Akun dengan role ${selectedRole} belum terdaftar atau kredensial tidak sesuai dengan role yang dipilih.`;
+
+// =========================================================================
+// REDIRECT BERDASARKAN JWT
+// =========================================================================
 const getRedirectPath = (decoded) => {
+  const idRole = Number(decoded.id_role || decoded.role_id || 0);
+
   const role = String(decoded.role || decoded.nama_role || "")
     .trim()
     .toLowerCase();
@@ -42,133 +112,413 @@ const getRedirectPath = (decoded) => {
     .trim()
     .toLowerCase();
 
-  const idRole = Number(decoded.id_role || decoded.role_id || 0);
-
-  console.log("ROLE CHECK:", {
-    role,
-    jenis,
-    jabatan,
-    idRole,
-  });
-
-  // ADMIN + PENGURUS
-  if (
-    idRole === 1 ||
-    idRole === 2 ||
-    role === "admin" ||
-    role === "pengurus" ||
-    jabatan.includes("admin") ||
-    jabatan.includes("pengurus")
-  ) {
+  // Admin
+  if (idRole === 1 || role === "admin") {
     return "/admin/dashboard";
   }
 
-  // HEAD OFFICE
-  if (
-    idRole === 3 ||
-    role === "ho" ||
-    role.includes("head office") ||
-    jabatan.includes("head office") ||
-    jabatan.includes("ho")
-  ) {
-    if (jenis.includes("non")) return "/ho/dashboard/non-akademik";
-    return "/ho/dashboard/akademik";
+  // Pengurus
+  if (idRole === 2 || role === "pengurus") {
+    return "/pengurus/dashboard";
   }
 
-  // AREA OFFICER
-  if (
-    idRole === 4 ||
-    role === "ao" ||
-    role.includes("area officer") ||
-    jabatan.includes("area officer")
-  ) {
+  // Head Office
+  if (idRole === 3 || role.includes("head office")) {
+    return jenis.includes("non")
+      ? "/ho/dashboard/non-akademik"
+      : "/ho/dashboard/akademik";
+  }
+
+  // Area Officer
+  if (idRole === 4 || role.includes("area officer")) {
     return "/ao/dashboard";
   }
 
-  // SEKOLAH
+  // Operator Sekolah
   if (
-    idRole === 5 ||
-    role === "sekolah" ||
-    role === "institusi" ||
-    jenis === "sekolah" ||
-    jabatan.includes("sekolah") ||
-    jabatan.includes("institusi")
+    idRole === 9 ||
+    role.includes("operator") ||
+    jabatan.includes("operator sekolah") ||
+    jabatan.includes("operator")
   ) {
     return "/sekolah/dashboard";
   }
 
-  // VENDOR
-  if (
-    idRole === 6 ||
-    role === "vendor" ||
-    jabatan.includes("vendor")
-  ) {
+  // Sekolah
+  if (idRole === 5 || role === "sekolah") {
+    return "/sekolah/dashboard";
+  }
+
+  // Vendor / Narasumber
+  if (idRole === 6 || role === "vendor" || role.includes("narasumber")) {
     return "/vendor/dashboard";
   }
 
-  // KEPALA DINAS
-  if (
-    idRole === 7 ||
-    role.includes("kepala dinas") ||
-    role.includes("dinas") ||
-    jabatan.includes("kepala dinas") ||
-    jabatan.includes("dinas")
-  ) {
-    return "/kepaladinas/dashboard";
+  // Kepala Dinas
+  if (idRole === 7 || role.includes("kepala dinas")) {
+    return "/kepala-dinas/dashboard";
   }
 
-  // GURU ASSESSMENT
-  // Guru tetap masuk lewat akun sekolah + mini login guru.
-  // Kalau role ini tidak sengaja login lewat halaman utama, arahkan ke dashboard sekolah.
-  if (
-    idRole === 8 ||
-    role.includes("guru") ||
-    jabatan.includes("guru")
-  ) {
+  // Guru Assessment
+  if (idRole === 8 || role.includes("guru")) {
     return "/sekolah/dashboard";
   }
 
   return "/login";
 };
+
+// =========================================================================
+// KOMPONEN DROPDOWN ROLE
+// =========================================================================
+const RoleDropdown = ({ selectedRole, onSelect }) => {
+  const [open, setOpen] = useState(false);
+  const selected = ROLE_OPTIONS.find((role) => role.label === selectedRole);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between rounded-[0.9rem] border border-slate-200 bg-white/70 px-4 py-3 text-left text-[13px] font-black text-slate-700 shadow-sm transition hover:border-[#0AC4E0]/40 hover:bg-white"
+      >
+        <span className={selected ? "text-slate-800" : "text-slate-400"}>
+          {selected ? selected.label : "Pilih peran Anda"}
+        </span>
+        <ChevronDown
+          size={16}
+          className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""
+            }`}
+        />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-[0.9rem] border border-slate-100 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
+          >
+            {ROLE_OPTIONS.map((role, index) => (
+              <li key={`${role.label}-${index}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelect(role.label);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[12px] font-black transition-colors ${selectedRole === role.label
+                    ? "bg-[#0AC4E0]/10 text-[#0AC4E0]"
+                    : "text-slate-600 hover:bg-slate-50"
+                    } ${role.value === "guru" ? "border-t border-slate-100" : ""}`}
+                >
+                  {role.value === "guru" ? (
+                    <School size={13} className="shrink-0 text-[#0AC4E0]" />
+                  ) : (
+                    <User size={13} className="shrink-0 text-slate-300" />
+                  )}
+                  {role.label}
+                  {role.value === "guru" && (
+                    <span className="ml-auto rounded-full bg-[#0AC4E0]/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                      Guru
+                    </span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// =========================================================================
+// KOMPONEN DROPDOWN SEKOLAH UNTUK LOGIN GURU
+// =========================================================================
+const SekolahDropdown = ({
+  sekolahList = [],
+  selectedId,
+  onSelect,
+  loading = false,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [keyword, setKeyword] = useState("");
+
+  const selected = sekolahList.find(
+    (sekolah) => String(sekolah.id_sekolah) === String(selectedId)
+  );
+
+  const filteredSekolah = useMemo(() => {
+    const search = normalizeText(keyword);
+    if (!search) return sekolahList;
+    return sekolahList.filter((sekolah) => {
+      const nama = normalizeText(sekolah.nama_sekolah);
+      const npsn = normalizeText(sekolah.npsn);
+      const jenjang = normalizeText(sekolah.jenjang);
+      return (
+        nama.includes(search) ||
+        npsn.includes(search) ||
+        jenjang.includes(search)
+      );
+    });
+  }, [keyword, sekolahList]);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => {
+          if (!loading) setOpen(!open);
+        }}
+        disabled={loading}
+        className="flex w-full items-center justify-between rounded-[0.9rem] border border-slate-200 bg-white/70 px-4 py-3 text-left text-[13px] font-black text-slate-700 shadow-sm transition hover:border-[#0AC4E0]/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className={selected ? "text-slate-800" : "text-slate-400"}>
+          {loading
+            ? "Memuat daftar sekolah..."
+            : selected
+              ? `${selected.nama_sekolah}${selected.jenjang ? ` (${selected.jenjang})` : ""
+              }`
+              : "Pilih sekolah Anda"}
+        </span>
+        {loading ? (
+          <Loader2 size={16} className="animate-spin text-[#0AC4E0]" />
+        ) : (
+          <ChevronDown
+            size={16}
+            className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""
+              }`}
+          />
+        )}
+      </button>
+      <AnimatePresence>
+        {open && !loading && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-[0.9rem] border border-slate-100 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
+          >
+            <div className="border-b border-slate-100 p-3">
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"
+                />
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="Cari nama sekolah / NPSN..."
+                  className="h-10 w-full rounded-xl border border-slate-100 bg-slate-50 pl-9 pr-3 text-[11px] font-bold text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
+                />
+              </div>
+            </div>
+            <ul className="max-h-64 overflow-y-auto py-1">
+              {filteredSekolah.length === 0 ? (
+                <li className="px-4 py-3 text-[12px] font-bold text-slate-400">
+                  Sekolah tidak ditemukan.
+                </li>
+              ) : (
+                filteredSekolah.map((sekolah) => (
+                  <li key={sekolah.id_sekolah}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelect(String(sekolah.id_sekolah));
+                        setOpen(false);
+                        setKeyword("");
+                      }}
+                      className={`flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors ${String(selectedId) === String(sekolah.id_sekolah)
+                        ? "bg-[#0AC4E0]/10 text-[#0AC4E0]"
+                        : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                    >
+                      <School
+                        size={14}
+                        className="mt-0.5 shrink-0 text-[#0AC4E0]"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] font-black uppercase leading-snug">
+                          {sekolah.nama_sekolah || "Nama sekolah belum ada"}
+                        </span>
+                        <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                          {sekolah.jenjang || "Jenjang belum ada"}
+                          {sekolah.npsn ? ` · NPSN ${sekolah.npsn}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// =========================================================================
+// KOMPONEN UTAMA LOGIN
+// =========================================================================
 const Login = () => {
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [selectedRole, setSelectedRole] = useState("");
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    id_sekolah: "",
+    nama_guru: "",
+  });
+  const [sekolahList, setSekolahList] = useState([]);
+  const [loadingSekolah, setLoadingSekolah] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState(null);
-
   const navigate = useNavigate();
+
+  const isGuru = selectedRole === "Guru Assessment";
+  const isSistem = selectedRole && !isGuru;
+
+  useEffect(() => {
+    if (!isGuru) return;
+
+    const fetchSekolah = async () => {
+      setLoadingSekolah(true);
+      try {
+        const { data } = await axios.get(`${API_BASE_URL}/sekolah`);
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data?.result)
+              ? data.result
+              : [];
+
+        const normalized = list
+          .filter((sekolah) => sekolah?.id_sekolah)
+          .map((sekolah) => ({
+            ...sekolah,
+            id_sekolah: sekolah.id_sekolah,
+            nama_sekolah:
+              sekolah.nama_sekolah ||
+              sekolah.namaSekolah ||
+              sekolah.nama ||
+              "Sekolah",
+            npsn: sekolah.npsn || "",
+            jenjang: sekolah.jenjang || sekolah.tingkat || "",
+          }))
+          .sort((a, b) =>
+            String(a.nama_sekolah || "").localeCompare(
+              String(b.nama_sekolah || "")
+            )
+          );
+
+        setSekolahList(normalized);
+      } catch (error) {
+        console.error("GAGAL MEMUAT SEKOLAH:", error);
+        toast.error("Gagal memuat daftar sekolah.", {
+          position: "top-right",
+          autoClose: 2200,
+        });
+        setSekolahList([]);
+      } finally {
+        setLoadingSekolah(false);
+      }
+    };
+
+    fetchSekolah();
+  }, [isGuru]);
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
-    if (loading) return;
+    if (loading || !selectedRole) return;
 
     setLoading(true);
 
-    try {
-      const res = await axios.post("http://localhost:3000/auth/login", {
-        email: formData.email,
-        password: formData.password,
+    if (isGuru && !formData.id_sekolah) {
+      toast.error("Pilih sekolah terlebih dahulu.", {
+        position: "top-right",
+        autoClose: 2200,
       });
+      setLoading(false);
+      return;
+    }
 
-      const token = res.data.access_token || res.data.token;
+    if (isGuru && !formData.nama_guru?.trim()) {
+      toast.error("Nama guru wajib diisi.", {
+        position: "top-right",
+        autoClose: 2200,
+      });
+      setLoading(false);
+      return;
+    }
 
-      if (!token) {
-        throw new Error("Token tidak ditemukan dari server");
+    if (!formData.password?.trim()) {
+      toast.error("Password wajib diisi.", {
+        position: "top-right",
+        autoClose: 2200,
+      });
+      setLoading(false);
+      return;
+    }
+
+    if (isSistem && !formData.email?.trim()) {
+      toast.error("Email wajib diisi.", {
+        position: "top-right",
+        autoClose: 2200,
+      });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      let token;
+
+      if (isGuru) {
+        const res = await axios.post(`${API_BASE_URL}/auth/login-guru`, {
+          id_sekolah: Number(formData.id_sekolah),
+          nama_guru: formData.nama_guru.trim(),
+          password: formData.password,
+        });
+        token = res.data.access_token || res.data.token;
+      } else {
+        const res = await axios.post(`${API_BASE_URL}/auth/login`, {
+          email: formData.email.trim(),
+          password: formData.password,
+        });
+        token = res.data.access_token || res.data.token;
+      }
+
+      if (!token) throw new Error("Token tidak ditemukan dari server");
+
+      const decoded = jwtDecode(token);
+
+      if (!isRoleMatch(selectedRole, decoded)) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        throw {
+          isRoleMismatch: true,
+          message: getRoleMismatchMessage(selectedRole),
+        };
       }
 
       localStorage.setItem("token", token);
-
-      const decoded = jwtDecode(token);
       localStorage.setItem("user", JSON.stringify(decoded));
 
       const redirectPath = getRedirectPath(decoded);
-
       console.log("LOGIN DECODED:", decoded);
       console.log("REDIRECT TARGET:", redirectPath);
 
-      setIsSuccess(true);
+      toast.success("Login berhasil. Mengarahkan ke dashboard...", {
+        position: "top-right",
+        autoClose: 1200,
+      });
 
+      setIsSuccess(true);
       setTimeout(() => {
         navigate(redirectPath, { replace: true });
       }, 900);
@@ -176,8 +526,199 @@ const Login = () => {
       console.error("LOGIN ERROR:", err);
       setLoading(false);
       setIsSuccess(false);
-      alert(err.response?.data?.message || "Gagal Masuk: Kredensial tidak valid.");
+      toast.error(
+        err.isRoleMismatch
+          ? err.message
+          : err.response?.data?.message ||
+          "Gagal Masuk: Kredensial tidak valid.",
+        {
+          position: "top-right",
+          autoClose: 2600,
+          pauseOnHover: true,
+          draggable: true,
+        }
+      );
     }
+  };
+
+  const renderPasswordField = () => (
+    <div>
+      <div className="mb-2 flex items-center gap-3">
+        <Lock
+          size={18}
+          className={
+            focused === "password" ? "text-[#0AC4E0]" : "text-slate-500"
+          }
+        />
+        <Label
+          text="Password"
+          className="!mb-0 !text-[13px] !font-black !text-slate-700"
+        />
+      </div>
+      <div className="relative">
+        <Input
+          type={showPassword ? "text" : "password"}
+          placeholder="Masukkan password Anda"
+          value={formData.password}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              password: e.target.value,
+            })
+          }
+          onFocus={() => setFocused("password")}
+          onBlur={() => setFocused(null)}
+          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !pr-10 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+        <span
+          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "password" ? "w-full" : "w-0"
+            }`}
+        />
+      </div>
+    </div>
+  );
+
+  // =========================================================================
+  // RENDER FIELD BERDASARKAN ROLE
+  // =========================================================================
+  const renderFields = () => {
+    if (!selectedRole) return null;
+
+    if (isGuru) {
+      return (
+        <motion.div
+          key="guru-fields"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.2 }}
+          className="space-y-7"
+        >
+          {/* Pilih Sekolah */}
+          <div>
+            <div className="mb-2 flex items-center gap-3">
+              <School
+                size={18}
+                className={
+                  focused === "id_sekolah" ? "text-[#0AC4E0]" : "text-slate-500"
+                }
+              />
+              <Label
+                text="Sekolah"
+                className="!mb-0 !text-[13px] !font-black !text-slate-700"
+              />
+            </div>
+            <SekolahDropdown
+              sekolahList={sekolahList}
+              selectedId={formData.id_sekolah}
+              loading={loadingSekolah}
+              onSelect={(idSekolah) =>
+                setFormData({
+                  ...formData,
+                  id_sekolah: idSekolah,
+                })
+              }
+            />
+          </div>
+
+          {/* Nama Guru */}
+          <div>
+            <div className="mb-2 flex items-center gap-3">
+              <User
+                size={18}
+                className={
+                  focused === "nama_guru" ? "text-[#0AC4E0]" : "text-slate-500"
+                }
+              />
+              <Label
+                text="Nama Guru"
+                className="!mb-0 !text-[13px] !font-black !text-slate-700"
+              />
+            </div>
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Masukkan nama lengkap Anda"
+                value={formData.nama_guru}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    nama_guru: e.target.value,
+                  })
+                }
+                onFocus={() => setFocused("nama_guru")}
+                onBlur={() => setFocused(null)}
+                className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+              />
+              <span
+                className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "nama_guru" ? "w-full" : "w-0"
+                  }`}
+              />
+            </div>
+          </div>
+
+          {/* Password */}
+          {renderPasswordField()}
+        </motion.div>
+      );
+    }
+
+    return (
+      <motion.div
+        key="sistem-fields"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 8 }}
+        transition={{ duration: 0.2 }}
+        className="space-y-7"
+      >
+        {/* Email */}
+        <div>
+          <div className="mb-2 flex items-center gap-3">
+            <Mail
+              size={18}
+              className={
+                focused === "email" ? "text-[#0AC4E0]" : "text-slate-500"
+              }
+            />
+            <Label
+              text="Email"
+              className="!mb-0 !text-[13px] !font-black !text-slate-700"
+            />
+          </div>
+          <div className="relative">
+            <Input
+              type="email"
+              placeholder="nama@ypamdr.or.id"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  email: e.target.value,
+                })
+              }
+              onFocus={() => setFocused("email")}
+              onBlur={() => setFocused(null)}
+              className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+            />
+            <span
+              className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "email" ? "w-full" : "w-0"
+                }`}
+            />
+          </div>
+        </div>
+
+        {/* Password */}
+        {renderPasswordField()}
+      </motion.div>
+    );
   };
 
   return (
@@ -191,23 +732,24 @@ const Login = () => {
             exit={{
               opacity: 0,
               filter: "blur(10px)",
-              transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] },
+              transition: {
+                duration: 0.45,
+                ease: [0.16, 1, 0.3, 1],
+              },
             }}
             className="relative h-full w-full overflow-hidden"
           >
+            {/* BACKGROUND SPLIT */}
             <div className="absolute inset-0 flex">
               <div className="h-full w-[48%] bg-[#F6F8FB]" />
-
               <div className="relative hidden h-full flex-1 overflow-hidden lg:block">
                 <img
                   src={library_YPAMDR}
                   className="h-full w-full object-cover"
                   alt="Library YPA-MDR"
                 />
-
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-[#0AC4E0]/10 to-slate-950/65" />
                 <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.18)_0%,transparent_36%,rgba(15,23,42,0.25)_100%)]" />
-
                 <div className="absolute right-10 top-10 grid grid-cols-6 gap-2 opacity-45">
                   {Array.from({ length: 36 }).map((_, index) => (
                     <span
@@ -216,25 +758,21 @@ const Login = () => {
                     />
                   ))}
                 </div>
-
                 <div className="absolute bottom-10 right-12 max-w-[510px] text-right text-white">
                   <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">
                     Yayasan Pendidikan Astra Michael D. Ruslim
                   </p>
-
                   <h2 className="mt-4 text-[35px] font-black leading-tight tracking-[-0.055em]">
                     Monitoring program yang lebih terarah dan terukur.
                   </h2>
-
                   <p className="ml-auto mt-4 max-w-[420px] text-[13px] font-semibold leading-6 text-white/70">
                     Progres program, dokumen, validasi, dan evaluasi dapat
                     dipantau dalam satu alur kerja.
                   </p>
-
                   <div className="mt-7 flex justify-end gap-5">
-                    {[pilar1, pilar2, pilar3, pilar4].map((src, i) => (
+                    {[pilar1, pilar2, pilar3, pilar4].map((src, index) => (
                       <img
-                        key={i}
+                        key={index}
                         src={src}
                         className="h-9 w-9 object-contain brightness-0 invert opacity-55 transition hover:opacity-100"
                         alt="pilar"
@@ -245,12 +783,14 @@ const Login = () => {
               </div>
             </div>
 
+            {/* FORM PANEL */}
             <div className="relative z-10 flex h-full w-full">
               <section className="flex h-full w-full items-center justify-center px-7 py-7 lg:w-[48%]">
                 <div className="paper-sheet relative w-full max-w-[500px] px-9 py-9 lg:px-11 lg:py-10">
                   <div className="absolute left-1/2 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0AC4E0] shadow-[0_12px_22px_rgba(10,196,224,0.32)] ring-4 ring-white/80" />
 
-                  <div className="mb-10 flex items-center gap-5">
+                  {/* HEADER */}
+                  <div className="mb-8 flex items-center gap-5">
                     <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] bg-white/40">
                       <img
                         src={logo_ypamdr_blue}
@@ -258,127 +798,70 @@ const Login = () => {
                         alt="Logo YPA-MDR"
                       />
                     </div>
-
                     <div className="h-20 w-px bg-slate-300/70" />
-
                     <div className="min-w-0">
                       <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-slate-800">
                         Sistem
                       </p>
-
                       <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-slate-800">
                         Pemantauan dan
                       </p>
-
                       <p className="text-[25px] font-black leading-[1.12] tracking-[-0.04em] text-[#0AC4E0]">
                         Evaluasi Program
                       </p>
                     </div>
                   </div>
 
-                  <div className="mb-7">
+                  {/* TITLE */}
+                  <div className="mb-6">
                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                       Login Sistem
                     </p>
-
                     <h1 className="mt-2 text-[42px] font-black leading-none tracking-[-0.06em] text-slate-900">
                       Masuk
                     </h1>
-
                     <p className="mt-3 max-w-sm text-[12px] font-semibold leading-6 text-slate-500">
-                      Gunakan akun yang telah terdaftar sesuai peran pengguna.
+                      Pilih peran Anda terlebih dahulu, lalu masukkan
+                      kredensial yang sesuai.
                     </p>
                   </div>
 
-                  <form onSubmit={handleLogin} className="space-y-8">
+                  <form onSubmit={handleLogin} className="space-y-6">
+                    {/* DROPDOWN ROLE */}
                     <div>
-                      <div className="mb-2 flex items-center gap-3">
-                        <Mail
-                          size={18}
-                          className={
-                            focused === "email"
-                              ? "text-[#0AC4E0]"
-                              : "text-slate-500"
-                          }
-                        />
-
-                        <Label
-                          text="Email"
-                          className="!mb-0 !text-[13px] !font-black !text-slate-700"
-                        />
-                      </div>
-
-                      <div className="relative">
-                        <Input
-                          type="email"
-                          placeholder="nama@ypamdr.or.id"
-                          value={formData.email}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              email: e.target.value,
-                            })
-                          }
-                          onFocus={() => setFocused("email")}
-                          onBlur={() => setFocused(null)}
-                          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
-                        />
-
-                        <span
-                          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "email" ? "w-full" : "w-0"
-                            }`}
-                        />
-                      </div>
+                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                        Peran / Role
+                      </p>
+                      <RoleDropdown
+                        selectedRole={selectedRole}
+                        onSelect={(label) => {
+                          setSelectedRole(label);
+                          setFormData({
+                            email: "",
+                            password: "",
+                            id_sekolah: "",
+                            nama_guru: "",
+                          });
+                        }}
+                      />
                     </div>
 
-                    <div>
-                      <div className="mb-2 flex items-center gap-3">
-                        <Lock
-                          size={18}
-                          className={
-                            focused === "password"
-                              ? "text-[#0AC4E0]"
-                              : "text-slate-500"
-                          }
-                        />
-
-                        <Label
-                          text="Password"
-                          className="!mb-0 !text-[13px] !font-black !text-slate-700"
-                        />
-                      </div>
-
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Masukkan password Anda"
-                          value={formData.password}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              password: e.target.value,
-                            })
-                          }
-                          onFocus={() => setFocused("password")}
-                          onBlur={() => setFocused(null)}
-                          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !pr-10 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
-                        />
-
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                    {/* FIELDS */}
+                    <AnimatePresence mode="wait">
+                      {selectedRole && (
+                        <motion.div
+                          key={isGuru ? "guru" : "sistem"}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          transition={{ duration: 0.2 }}
                         >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
+                          {renderFields()}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
-                        <span
-                          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "password" ? "w-full" : "w-0"
-                            }`}
-                        />
-                      </div>
-                    </div>
-
+                    {/* TOMBOL */}
                     <div className="space-y-3 pt-1">
                       <Button
                         text={loading ? "Proses..." : "Masuk"}
@@ -390,10 +873,9 @@ const Login = () => {
                           )
                         }
                         type="submit"
-                        disabled={loading}
-                        className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-70"
+                        disabled={loading || !selectedRole}
+                        className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-40"
                       />
-
                       <button
                         type="button"
                         onClick={() => navigate("/")}
@@ -405,9 +887,8 @@ const Login = () => {
                     </div>
                   </form>
 
-                  <div className="mt-8 flex items-center justify-center gap-3 text-center opacity-55">
+                  <div className="mt-6 flex items-center justify-center gap-3 text-center opacity-55">
                     <Activity size={14} className="text-[#0AC4E0]" />
-
                     <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
                       Yayasan Pendidikan Astra
                     </span>
@@ -431,7 +912,6 @@ const Login = () => {
               >
                 Sistem Pemantauan dan Evaluasi Program
               </motion.h2>
-
               <motion.p
                 initial={{ y: 14, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -440,7 +920,6 @@ const Login = () => {
               >
                 Login berhasil, mengarahkan ke dashboard...
               </motion.p>
-
               <motion.div
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -455,76 +934,60 @@ const Login = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
       <style
         dangerouslySetInnerHTML={{
           __html: `
-            .paper-sheet {
-              background:
-                radial-gradient(circle at 18% 16%, rgba(255,255,255,0.72), transparent 20%),
-                radial-gradient(circle at 82% 22%, rgba(15,23,42,0.035), transparent 18%),
-                radial-gradient(circle at 22% 78%, rgba(15,23,42,0.045), transparent 20%),
-                linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9));
-              box-shadow:
-                0 28px 60px rgba(15, 23, 42, 0.16),
-                0 8px 18px rgba(15, 23, 42, 0.08);
-              filter: drop-shadow(0 16px 18px rgba(15,23,42,0.10));
-              border: 1px solid rgba(226, 232, 240, 0.85);
-              border-radius: 18px;
-            }
-
-            .paper-sheet::before {
-              content: "";
-              position: absolute;
-              inset: 0;
-              pointer-events: none;
-              border-radius: inherit;
-              opacity: 0.45;
-              background-image:
-                linear-gradient(115deg, transparent 0%, rgba(15,23,42,0.04) 18%, transparent 32%),
-                linear-gradient(72deg, transparent 0%, rgba(255,255,255,0.55) 36%, transparent 51%),
-                repeating-linear-gradient(
-                  0deg,
-                  rgba(15,23,42,0.035) 0px,
-                  rgba(15,23,42,0.035) 1px,
-                  transparent 1px,
-                  transparent 7px
-                );
-              mix-blend-mode: multiply;
-            }
-
-            .paper-sheet::after {
-              content: "";
-              position: absolute;
-              inset: -1px;
-              pointer-events: none;
-              border-radius: inherit;
-              background:
-                linear-gradient(90deg, rgba(255,255,255,0.92), transparent 12%, transparent 88%, rgba(15,23,42,0.04)),
-                linear-gradient(0deg, rgba(15,23,42,0.06), transparent 10%, transparent 90%, rgba(255,255,255,0.72));
-              opacity: 0.45;
-            }
-
-            .paper-line-input {
-              border-bottom-color: rgba(51, 65, 85, 0.55) !important;
-            }
-
-            .paper-line-input::placeholder {
-              color: rgba(100, 116, 139, 0.52) !important;
-              font-weight: 600 !important;
-            }
-
-            .paper-line-input:focus {
-              box-shadow: none !important;
-              border-bottom-color: rgba(51, 65, 85, 0.55) !important;
-            }
-
-            @media (max-height: 760px) {
-              .paper-sheet {
-                transform: scale(0.94);
-              }
-            }
-          `,
+        .paper-sheet {
+          background: radial-gradient(circle at 18% 16%, rgba(255,255,255,0.72), transparent 20%),
+            radial-gradient(circle at 82% 22%, rgba(15,23,42,0.035), transparent 18%),
+            radial-gradient(circle at 22% 78%, rgba(15,23,42,0.045), transparent 20%),
+            linear-gradient(135deg, rgba(255,255,255,0.96), rgba(248,250,252,0.9));
+          box-shadow: 0 28px 60px rgba(15,23,42,0.16), 0 8px 18px rgba(15,23,42,0.08);
+          filter: drop-shadow(0 16px 18px rgba(15,23,42,0.10));
+          border: 1px solid rgba(226,232,240,0.85);
+          border-radius: 18px;
+        }
+        .paper-sheet::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          border-radius: inherit;
+          opacity: 0.45;
+          background-image:
+            linear-gradient(115deg, transparent 0%, rgba(15,23,42,0.04) 18%, transparent 32%),
+            linear-gradient(72deg, transparent 0%, rgba(255,255,255,0.55) 36%, transparent 51%),
+            repeating-linear-gradient(0deg, rgba(15,23,42,0.035) 0px, rgba(15,23,42,0.035) 1px, transparent 1px, transparent 7px);
+          mix-blend-mode: multiply;
+        }
+        .paper-sheet::after {
+          content: "";
+          position: absolute;
+          inset: -1px;
+          pointer-events: none;
+          border-radius: inherit;
+          background:
+            linear-gradient(90deg, rgba(255,255,255,0.92), transparent 12%, transparent 88%, rgba(15,23,42,0.04)),
+            linear-gradient(0deg, rgba(15,23,42,0.06), transparent 10%, transparent 90%, rgba(255,255,255,0.72));
+          opacity: 0.45;
+        }
+        .paper-line-input {
+          border-bottom-color: rgba(51,65,85,0.55) !important;
+        }
+        .paper-line-input::placeholder {
+          color: rgba(100,116,139,0.52) !important;
+          font-weight: 600 !important;
+        }
+        .paper-line-input:focus {
+          box-shadow: none !important;
+          border-bottom-color: rgba(51,65,85,0.55) !important;
+        }
+        @media (max-height: 760px) {
+          .paper-sheet {
+            transform: scale(0.94);
+          }
+        }
+      `,
         }}
       />
     </PageWrapper>
