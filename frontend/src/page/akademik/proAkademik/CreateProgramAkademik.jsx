@@ -1,4 +1,4 @@
-import CreateProgramForm from "../../../components/program/CreateProgramForm";
+﻿import CreateProgramForm from "../../../components/program/CreateProgramForm";
 
 function CreateProgramAkademik() {
 <<<<<<< HEAD
@@ -7,7 +7,7 @@ function CreateProgramAkademik() {
       kategori="AKADEMIK"
       title="Program Akademik"
       redirectPath="/ho/program/akademik"
-      vendorEndpoint="http://localhost:3000/vendor?kategori=AKADEMIK"
+      vendorEndpoint="/vendor?kategori=AKADEMIK"
       defaultFaseName="Fase 1: Inisiasi"
       programPlaceholder="Contoh: Digitalisasi Kurikulum Nasional"
       successMessage="Program Akademik berhasil dibuat"

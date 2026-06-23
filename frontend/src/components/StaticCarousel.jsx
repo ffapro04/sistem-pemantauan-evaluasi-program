@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import { useState } from "react";
 
 export default function StaticCarousel({ slides }) {
@@ -8,7 +8,7 @@ export default function StaticCarousel({ slides }) {
 
   return (
     <div className="text-center text-white w-full">
-      {/* ✅ Render Slide Object */}
+      {/* âœ… Render Slide Object */}
       <div className="transition-all duration-500">
         <h2 className="text-2xl font-bold">{current.title}</h2>
 
@@ -21,7 +21,7 @@ export default function StaticCarousel({ slides }) {
         )}
       </div>
 
-      {/* ✅ Dots */}
+      {/* âœ… Dots */}
       <div className="flex justify-center gap-2 mt-6">
         {slides.map((_, index) => (
           <button
@@ -36,3 +36,4 @@ export default function StaticCarousel({ slides }) {
     </div>
   );
 }
+

@@ -10,7 +10,7 @@ import {
 export class CreateVendorDto {
   @IsString()
   @IsNotEmpty()
-  nama_vendor: string; // Nama Lembaga
+  nama_vendor: string;
 
   @IsString()
   @IsOptional()
@@ -41,18 +41,22 @@ export class CreateVendorDto {
   @IsOptional()
   ktp_pj_file?: string;
 
+  @IsString()
+  @IsOptional()
+  akta_notaris_file?: string;
+
   // --- PILAR & AKSES ---
   @IsString()
   @IsNotEmpty()
-  pilar: string; // [Akademik, Karakter, Seni Budaya, Kecakapan Hidup]
+  pilar: string;
 
   @IsEmail()
   @IsNotEmpty()
-  email: string; // Penting untuk login PJ
+  email: string;
 
   @IsString()
   @IsNotEmpty()
-  password: string; // Penting untuk login PJ
+  password: string;
 
   @IsOptional()
   @IsString()
@@ -62,7 +66,6 @@ export class CreateVendorDto {
   @IsString()
   alamat?: string;
 
-  // id_user opsional dikirim atau dihandle di service
   @IsOptional()
   @IsNumber()
   id_user?: number;

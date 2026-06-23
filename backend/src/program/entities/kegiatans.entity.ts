@@ -6,10 +6,13 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { Fase } from './fase.entity';
 import { Termin } from './termin.entity';
 import { PersyaratanKegiatan } from './persyaratan-kegiatan.entity';
+import { KegiatanComment } from './kegiatan-comment.entity';
 
 @Entity('t_kegiatans')
 export class Kegiatans {
@@ -25,8 +28,40 @@ export class Kegiatans {
   @Column()
   urutan: number;
 
+  @Column({ type: 'date', nullable: true })
+  tanggal_mulai: Date;
+
+  @Column({ type: 'date', nullable: true })
+  tanggal_selesai: Date;
+
   @Column()
   id_fase: number;
+
+  // Status kegiatan: LOCKED | UNLOCKED | IN_PROGRESS | WAITING_HO | APPROVED | REJECTED
+  @Column({ default: 'LOCKED' })
+  status_kegiatan: string;
+
+  // Rating dari Guru (1-5) setelah kegiatan APPROVED
+  @Column({ type: 'int', nullable: true })
+  guru_rating: number;
+
+  @Column({ type: 'text', nullable: true })
+  guru_comment: string;
+
+  @Column({ nullable: true })
+  guru_rated_by: number;
+
+  @Column({ type: 'timestamp', nullable: true })
+  guru_rated_at: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  approved_at: Date;
+
+  @CreateDateColumn()
+  created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 
   @ManyToOne(() => Fase, (fase) => fase.kegiatans, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'id_fase' })
@@ -37,4 +72,7 @@ export class Kegiatans {
 
   @OneToMany(() => PersyaratanKegiatan, (persyaratan) => persyaratan.kegiatan)
   persyaratan: PersyaratanKegiatan[];
+
+  @OneToMany(() => KegiatanComment, (comment) => comment.kegiatan)
+  comments: KegiatanComment[];
 }

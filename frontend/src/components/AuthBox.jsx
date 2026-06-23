@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function AuthBox({ 
   leftContent, 
   rightContent,
@@ -22,3 +22,4 @@ export default function AuthBox({
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import React from "react";
 import { Check } from "lucide-react";
 
@@ -37,3 +37,4 @@ const Checkbox = ({ label, checked, onChange, value }) => {
 };
 
 export default Checkbox;
+

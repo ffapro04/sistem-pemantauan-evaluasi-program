@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import { Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
@@ -21,7 +21,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   if (allowedRoles && !allowedRoles.includes(role)) {
     return (
       <div className="p-10">
-        <h1 className="text-2xl font-bold text-red-600">🚫 Akses Ditolak</h1>
+        <h1 className="text-2xl font-bold text-red-600">ðŸš« Akses Ditolak</h1>
         <p className="text-gray-600 mt-2">
           Anda tidak memiliki izin untuk membuka halaman ini.
         </p>
@@ -31,3 +31,4 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
   return children;
 }
+

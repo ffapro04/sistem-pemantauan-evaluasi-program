@@ -28,13 +28,8 @@ export class CreateAssessmentDto {
   @Type(() => QuestionDto)
   questions: QuestionDto[];
 
-  /**
-   * REVISI DI SINI:
-   * Kita hapus id_sekolah (tunggal)
-   * Ganti dengan target_sekolah_ids (Array Number)
-   */
   @IsArray()
-  @IsNumber({}, { each: true }) // Memastikan setiap isi array adalah angka
+  @IsNumber({}, { each: true })
   @IsOptional()
   target_sekolah_ids: number[];
 
@@ -45,4 +40,8 @@ export class CreateAssessmentDto {
   @IsString()
   @IsOptional()
   jenis: string;
+
+  @IsString()
+  @IsOptional()
+  pilar: string;
 }

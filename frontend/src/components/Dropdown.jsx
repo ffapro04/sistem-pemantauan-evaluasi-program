@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -155,3 +155,4 @@ function DropdownItem({ label, active, onClick }) {
     </button>
   );
 }
+

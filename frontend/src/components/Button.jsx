@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Button({
   text,
   type = "button",
@@ -62,3 +62,4 @@ export default function Button({
     </button>
   );
 }
+

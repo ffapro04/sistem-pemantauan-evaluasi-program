@@ -1,58 +1,141 @@
-/* eslint-disable no-undef */
-/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+﻿/* eslint-disable no-unused-vars */
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import axios from "axios";
 import {
-    AlertCircle,
+    Award,
+    BarChart3,
+    BookOpen,
+    Building2,
     CalendarDays,
     CheckCircle2,
-    FolderKanban,
-    Search as SearchIcon,
+    ChevronDown,
+    FolderOpen,
+    Globe,
+    GraduationCap,
+    Image,
+    Layers,
+    Leaf,
+    Loader2,
+    Mail,
+    MapPin,
+    MapPinned,
+    RefreshCcw,
+    School,
+    Search,
+    ShieldCheck,
+    Sparkles,
+    Target,
     TrendingUp,
-    Activity,
-    Building2,
-    UserCog,
-    ChevronLeft,
-    ChevronRight,
+    UserRound,
+    UsersRound,
+    Zap,
+    ArrowUpRight,
 } from "lucide-react";
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip as RechartsTooltip,
+    XAxis,
+    YAxis,
+} from "recharts";
+import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 
-import Sidebar from "../../components/Sidebar";
-import Card from "../../components/Card";
-import Search from "../../components/Search";
-import Table from "../../components/Table";
-import PageWrapper from "../../components/PageWrapper";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
-const API_BASE = "http://localhost:3000";
+const COLORS = {
+    cyan: "#0AC4E0",
+    blue: "#2563EB",
+    sky: "#38BDF8",
+    violet: "#8B5CF6",
+    pink: "#EC4899",
+    amber: "#F59E0B",
+    emerald: "#10B981",
+    orange: "#F97316",
+    red: "#EF4444",
+    slate: "#64748B",
+};
+
+const CHART_COLORS = [
+    "#0AC4E0",
+    "#2563EB",
+    "#8B5CF6",
+    "#EC4899",
+    "#F59E0B",
+    "#10B981",
+    "#F97316",
+    "#64748B",
+];
 
 const normalizeArray = (payload) => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.data)) return payload.data;
     if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.rows)) return payload.rows;
     if (Array.isArray(payload?.result)) return payload.result;
     if (Array.isArray(payload?.results)) return payload.results;
-    if (Array.isArray(payload?.rows)) return payload.rows;
-
-    if (Array.isArray(payload?.program)) return payload.program;
-    if (Array.isArray(payload?.programs)) return payload.programs;
-    if (Array.isArray(payload?.transaksi_program)) return payload.transaksi_program;
-    if (Array.isArray(payload?.transaksiProgram)) return payload.transaksiProgram;
-    if (Array.isArray(payload?.program_sekolah)) return payload.program_sekolah;
-    if (Array.isArray(payload?.programSekolah)) return payload.programSekolah;
-
-    if (Array.isArray(payload?.users)) return payload.users;
-    if (Array.isArray(payload?.user)) return payload.user;
-    if (Array.isArray(payload?.vendor)) return payload.vendor;
-    if (Array.isArray(payload?.vendors)) return payload.vendors;
-
     return [];
 };
 
-const normalizeText = (value) =>
-    String(value || "")
+const normalizeValue = (value) => {
+    return String(value || "")
         .trim()
-        .toLowerCase();
+        .toUpperCase()
+        .replaceAll("-", "_")
+        .replaceAll(" ", "_");
+};
+
+const normalizeSearch = (value) => {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replaceAll("_", " ")
+        .replaceAll("-", " ");
+};
+
+const isActiveValue = (value) => {
+    return (
+        value === true ||
+        value === 1 ||
+        value === "1" ||
+        String(value).toLowerCase() === "true" ||
+        String(value).toLowerCase() === "aktif"
+    );
+};
+
+const getAssetUrl = (logoUrl) => {
+    if (!logoUrl) return "";
+
+    const value = String(logoUrl);
+
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        return value;
+    }
+
+    return `${API_BASE_URL}/${value.replace(/^\/+/, "")}`;
+};
+
+const getTokenPayload = () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) return null;
+
+    try {
+        return jwtDecode(token);
+    } catch {
+        return null;
+    }
+};
+
+const getUserId = (decoded) => {
+    return decoded?.sub || decoded?.id_user || decoded?.id || null;
+};
 
 const getSekolahIdFromToken = (decoded) => {
     return (
@@ -67,17 +150,54 @@ const getSekolahIdFromToken = (decoded) => {
     );
 };
 
-const getUserIdFromToken = (decoded) => {
-    return decoded?.sub || decoded?.id_user || decoded?.id || null;
+const getSchoolName = (sekolah, user) => {
+    return sekolah?.nama_sekolah || user?.nama_sekolah || user?.nama || "Sekolah";
 };
 
-const getProgramId = (program) => {
+const getWilayahObject = (sekolah) => {
+    if (sekolah?.wilayah && typeof sekolah.wilayah === "object") {
+        return sekolah.wilayah;
+    }
+
+    return null;
+};
+
+const getKabupatenText = (sekolah) => {
+    const wilayah = getWilayahObject(sekolah);
+
     return (
-        program?.id_program ??
-        program?.id_transaksi_program ??
-        program?.id_program_sekolah ??
-        program?.id
+        sekolah?.nama_kabupaten ||
+        wilayah?.nama_wilayah ||
+        sekolah?.nama_wilayah ||
+        "Kabupaten/Kota belum tersedia"
     );
+};
+
+const getProvinsiText = (sekolah) => {
+    const wilayah = getWilayahObject(sekolah);
+
+    return (
+        wilayah?.parent?.nama_wilayah ||
+        wilayah?.parent_wilayah?.nama_wilayah ||
+        sekolah?.nama_provinsi ||
+        sekolah?.provinsi?.nama_wilayah ||
+        sekolah?.provinsi?.nama_provinsi ||
+        "Provinsi belum tersedia"
+    );
+};
+
+const getTahunBinaan = (sekolah) => {
+    return (
+        sekolah?.tahun_binaan ||
+        sekolah?.tahunBinaan ||
+        sekolah?.tahun_awal_binaan ||
+        sekolah?.wilayah?.tahun_awal_binaan ||
+        "-"
+    );
+};
+
+const getAddressText = (sekolah) => {
+    return sekolah?.alamat || "Alamat belum diatur.";
 };
 
 const formatDate = (value) => {
@@ -87,1425 +207,1563 @@ const formatDate = (value) => {
 
     if (Number.isNaN(date.getTime())) return "-";
 
-    return date.toLocaleDateString("id-ID", {
+    return new Intl.DateTimeFormat("id-ID", {
         day: "2-digit",
         month: "short",
         year: "numeric",
-    });
+    }).format(date);
 };
 
-const pushFlexibleIds = (ids, value) => {
-    if (value === null || value === undefined || value === "") return;
+const getProgramId = (program) => {
+    return program?.id_program || program?.id || null;
+};
 
-    if (Array.isArray(value)) {
-        value.forEach((item) => pushFlexibleIds(ids, item));
-        return;
+const getProgramTitle = (program) => {
+    return program?.nama_program || program?.nama || program?.title || "-";
+};
+
+const getProgramCategory = (program) => {
+    const value = normalizeValue(
+        program?.kategori ||
+        program?.category ||
+        program?.jenis ||
+        program?.jenis_kategori ||
+        "",
+    );
+
+    if (value.includes("NON_AKADEMIK") || value.includes("NONAKADEMIK")) {
+        return "NON_AKADEMIK";
     }
 
-    if (typeof value === "string") {
-        const trimmed = value.trim();
+    if (value.includes("AKADEMIK")) return "AKADEMIK";
 
-        if (!trimmed) return;
+    return "LAINNYA";
+};
 
-        if (
-            (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
-            (trimmed.startsWith("{") && trimmed.endsWith("}"))
-        ) {
-            try {
-                pushFlexibleIds(ids, JSON.parse(trimmed));
-                return;
-            } catch {
-                ids.push(trimmed);
-                return;
-            }
+const getProgramCategoryLabel = (value) => {
+    if (value === "AKADEMIK") return "Akademik";
+    if (value === "NON_AKADEMIK") return "Non Akademik";
+    return "Kategori Lainnya";
+};
+
+const getProgramType = (program) => {
+    const value = normalizeValue(
+        program?.jenis_program ||
+        program?.jenisProgram ||
+        program?.tipe_program ||
+        program?.tipeProgram ||
+        program?.type_program ||
+        program?.type ||
+        "",
+    );
+
+    if (value.includes("PROJECT")) return "PROJECT";
+    if (value.includes("REGULER")) return "REGULER";
+
+    return "LAINNYA";
+};
+
+const getProgramTypeLabel = (value) => {
+    if (value === "PROJECT") return "Project";
+    if (value === "REGULER") return "Reguler";
+    return "Lainnya";
+};
+
+const getProgramStatus = (program) => {
+    return program?.status_program || program?.status || "Berjalan";
+};
+
+const getProgramStatusTone = (status) => {
+    const value = normalizeValue(status);
+
+    if (value.includes("SELESAI")) {
+        return {
+            color: COLORS.emerald,
+            className: "border-emerald-100 bg-emerald-50 text-emerald-600",
+        };
+    }
+
+    if (value.includes("EVALUASI")) {
+        return {
+            color: COLORS.violet,
+            className: "border-violet-100 bg-violet-50 text-violet-600",
+        };
+    }
+
+    if (value.includes("IMPLEMENTASI")) {
+        return {
+            color: COLORS.blue,
+            className: "border-blue-100 bg-blue-50 text-blue-600",
+        };
+    }
+
+    if (value.includes("SOSIALISASI")) {
+        return {
+            color: COLORS.amber,
+            className: "border-amber-100 bg-amber-50 text-amber-600",
+        };
+    }
+
+    if (value.includes("APPROVAL")) {
+        return {
+            color: COLORS.cyan,
+            className: "border-cyan-100 bg-cyan-50 text-[#0AC4E0]",
+        };
+    }
+
+    return {
+        color: COLORS.slate,
+        className: "border-slate-100 bg-slate-50 text-slate-500",
+    };
+};
+
+const getProgramPeriod = (program) => {
+    const start =
+        program?.tanggal_mulai ||
+        program?.start_date ||
+        program?.mulai ||
+        program?.periode_mulai;
+
+    const end =
+        program?.tanggal_selesai ||
+        program?.end_date ||
+        program?.selesai ||
+        program?.periode_selesai;
+
+    if (!start && !end) return program?.tahun || "-";
+
+    return `${formatDate(start)} - ${formatDate(end)}`;
+};
+
+const getVendorName = (program) => {
+    return (
+        program?.vendor?.nama_vendor ||
+        program?.vendors?.[0]?.nama_vendor ||
+        program?.vendor_nama ||
+        program?.nama_vendor ||
+        "-"
+    );
+};
+
+const getAoName = (program) => {
+    return (
+        program?.pengawas?.nama ||
+        program?.ao?.nama ||
+        program?.aos?.[0]?.nama ||
+        program?.nama_pengawas ||
+        program?.nama_ao ||
+        "-"
+    );
+};
+
+const getProgramCompositionLabel = (program) => {
+    return `${getProgramTypeLabel(getProgramType(program))} ${getProgramCategoryLabel(
+        getProgramCategory(program),
+    )}`;
+};
+
+const getProgramCompositionColor = (program) => {
+    const type = getProgramType(program);
+    const category = getProgramCategory(program);
+
+    if (type === "PROJECT" && category === "AKADEMIK") return COLORS.violet;
+    if (type === "PROJECT" && category === "NON_AKADEMIK") return COLORS.pink;
+    if (type === "REGULER" && category === "AKADEMIK") return COLORS.cyan;
+    if (type === "REGULER" && category === "NON_AKADEMIK") return COLORS.emerald;
+
+    return COLORS.slate;
+};
+
+const buildRows = (rows, getValue, fallback = "Lainnya") => {
+    const counter = new Map();
+
+    rows.forEach((item) => {
+        const key = String(getValue(item) || fallback).trim() || fallback;
+
+        if (!counter.has(key)) {
+            counter.set(key, {
+                name: key,
+                total: 0,
+                color: CHART_COLORS[counter.size % CHART_COLORS.length],
+            });
         }
 
-        if (trimmed.includes(",")) {
-            trimmed
-                .split(",")
-                .map((item) => item.trim())
-                .filter(Boolean)
-                .forEach((item) => ids.push(item));
+        counter.get(key).total += 1;
+    });
 
+    return Array.from(counter.values()).sort((a, b) => b.total - a.total);
+};
+
+const renderPieLabel = ({ percent }) => {
+    if (!percent || percent < 0.08) return "";
+    return `${Math.round(percent * 100)}%`;
+};
+
+function FilterButton({ active, label, onClick, color }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`rounded-2xl border px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.14em] transition ${active
+                ? "text-white shadow-[0_14px_30px_rgba(15,23,42,0.12)]"
+                : "border-slate-100 bg-white text-slate-400 hover:border-cyan-100 hover:text-[#0AC4E0]"
+                }`}
+            style={{
+                backgroundColor: active ? color : undefined,
+                borderColor: active ? color : undefined,
+            }}
+        >
+            {label}
+        </button>
+    );
+}
+
+function ProgramMetricItem({ label, helper, value, icon, accentClass }) {
+    return (
+        <div className="group relative flex min-h-[126px] items-center gap-4 px-5 py-5 sm:px-6">
+            <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${accentClass}`}
+            >
+                {icon}
+            </div>
+
+            <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+                    {label}
+                </p>
+
+                <div className="mt-1 flex items-end gap-2">
+                    <p className="text-3xl font-black leading-none tracking-[-0.07em] text-slate-950">
+                        {value}
+                    </p>
+                    <span className="pb-0.5 text-[10px] font-bold text-slate-400">
+                        program
+                    </span>
+                </div>
+
+                <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                    {helper}
+                </p>
+            </div>
+
+            <div className="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-100 sm:hidden" />
+        </div>
+    );
+}
+
+function ProgramPortfolioSummary({ stats }) {
+    const totalPrograms = Math.max(
+        Number(stats.akademik || 0) + Number(stats.nonAkademik || 0),
+        Number(stats.reguler || 0) + Number(stats.project || 0),
+        0,
+    );
+
+    return (
+        <section className="mb-10 overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                        Ringkasan Program
+                    </p>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-950">
+                        Komposisi Program Sekolah
+                    </h2>
+                </div>
+
+                <div className="inline-flex w-fit items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 py-2">
+                    <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">
+                        Total
+                    </span>
+                    <span className="text-lg font-black leading-none text-slate-950">
+                        {totalPrograms}
+                    </span>
+                </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4 [&>*:not(:last-child)]:border-slate-100 sm:[&>*:nth-child(odd)]:border-r xl:[&>*:not(:last-child)]:border-r">
+                <ProgramMetricItem
+                    label="Program Akademik"
+                    helper="Kategori akademik"
+                    value={stats.akademik}
+                    icon={<BookOpen size={18} />}
+                    accentClass="bg-cyan-50 text-cyan-600"
+                />
+
+                <ProgramMetricItem
+                    label="Program Non Akademik"
+                    helper="Kategori non akademik"
+                    value={stats.nonAkademik}
+                    icon={<Sparkles size={18} />}
+                    accentClass="bg-violet-50 text-violet-600"
+                />
+
+                <ProgramMetricItem
+                    label="Program Reguler"
+                    helper="Jenis reguler"
+                    value={stats.reguler}
+                    icon={<FolderOpen size={18} />}
+                    accentClass="bg-emerald-50 text-emerald-600"
+                />
+
+                <ProgramMetricItem
+                    label="Program Project"
+                    helper="Jenis project"
+                    value={stats.project}
+                    icon={<Target size={18} />}
+                    accentClass="bg-amber-50 text-amber-600"
+                />
+            </div>
+        </section>
+    );
+}
+
+function ProgramStatusBadge({ status }) {
+    const tone = getProgramStatusTone(status);
+
+    return (
+        <span
+            className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${tone.className}`}
+        >
+            {status}
+        </span>
+    );
+}
+
+function StatusPill({ active }) {
+    return (
+        <span
+            className={`inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${active
+                ? "bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100"
+                : "bg-red-50 text-red-600 ring-1 ring-red-100"
+                }`}
+        >
+            {active ? "Aktif" : "Nonaktif"}
+        </span>
+    );
+}
+
+function EmptyProgramState() {
+    return (
+        <div className="flex min-h-[280px] flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/70 px-5 py-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+                <FolderOpen size={24} />
+            </div>
+
+            <p className="mt-3 text-sm font-black text-slate-700">
+                Program belum ditemukan
+            </p>
+
+            <p className="mt-1 max-w-sm text-xs font-semibold leading-5 text-slate-400">
+                Belum ada program sekolah yang sesuai dengan filter saat ini.
+            </p>
+        </div>
+    );
+}
+
+function ProgramCompositionChart({ rows, total }) {
+    if (!rows.length) return <EmptyProgramState />;
+
+    return (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+            <div className="relative h-[300px] rounded-[1.6rem] border border-slate-100 bg-white p-4">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={rows}
+                            dataKey="total"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={72}
+                            outerRadius={112}
+                            paddingAngle={4}
+                            stroke="#ffffff"
+                            strokeWidth={4}
+                            labelLine={false}
+                            label={renderPieLabel}
+                        >
+                            {rows.map((item) => (
+                                <Cell key={item.name} fill={item.color} />
+                            ))}
+                        </Pie>
+
+                        <RechartsTooltip
+                            formatter={(value, name) => [
+                                `${value} program`,
+                                name,
+                            ]}
+                        />
+                    </PieChart>
+                </ResponsiveContainer>
+
+                <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
+                    <span className="text-[36px] font-black leading-none tracking-[-0.08em] text-slate-800">
+                        {total}
+                    </span>
+
+                    <span className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                        Program
+                    </span>
+                </div>
+            </div>
+
+            <div className="h-[300px] rounded-[1.6rem] border border-slate-100 bg-white p-4">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                        data={rows}
+                        layout="vertical"
+                        margin={{ top: 12, right: 24, left: 10, bottom: 12 }}
+                    >
+                        <CartesianGrid
+                            strokeDasharray="3 3"
+                            horizontal={false}
+                            stroke="#E2E8F0"
+                        />
+
+                        <XAxis
+                            type="number"
+                            allowDecimals={false}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                fill: "#94A3B8",
+                            }}
+                        />
+
+                        <YAxis
+                            type="category"
+                            dataKey="name"
+                            width={150}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{
+                                fontSize: 10,
+                                fontWeight: 900,
+                                fill: "#64748B",
+                            }}
+                        />
+
+                        <RechartsTooltip />
+
+                        <Bar dataKey="total" radius={[0, 12, 12, 0]} barSize={24}>
+                            {rows.map((item) => (
+                                <Cell key={item.name} fill={item.color} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+    );
+}
+
+function CredentialItem({ label, value, icon, tone }) {
+    const toneClass = {
+        cyan: "bg-cyan-100 text-cyan-700",
+        blue: "bg-blue-100 text-blue-700",
+        indigo: "bg-indigo-100 text-indigo-700",
+        emerald: "bg-emerald-100 text-emerald-700",
+        amber: "bg-amber-100 text-amber-700",
+        slate: "bg-slate-100 text-slate-700",
+    }[tone];
+
+    return (
+        <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <div className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {label}
+                </span>
+                <span className="mt-0.5 block truncate text-sm font-black text-slate-800">
+                    {value || "-"}
+                </span>
+            </div>
+
+            <div
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${toneClass}`}
+            >
+                {icon}
+            </div>
+        </div>
+    );
+}
+
+function JurusanSelector({ jurusanList, selectedJurusanId, selectedJurusan, onChange }) {
+    return (
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:col-span-2">
+            <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Pilih Jurusan
+                    </span>
+                    <span className="mt-0.5 block truncate text-sm font-black text-slate-800">
+                        {selectedJurusan?.nama_jurusan || "Belum memilih jurusan"}
+                    </span>
+                </div>
+
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                    <Layers size={15} />
+                </div>
+            </div>
+
+            <div className="relative mt-4">
+                <select
+                    value={selectedJurusanId}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="h-11 w-full appearance-none rounded-2xl border border-slate-100 bg-white px-4 pr-10 text-xs font-black uppercase tracking-wide text-slate-700 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
+                >
+                    <option value="">
+                        {jurusanList.length
+                            ? "Pilih salah satu jurusan"
+                            : "Belum ada data jurusan"}
+                    </option>
+
+                    {jurusanList.map((jurusan) => (
+                        <option key={jurusan.id_jurusan} value={jurusan.id_jurusan}>
+                            {jurusan.nama_jurusan}
+                        </option>
+                    ))}
+                </select>
+
+                <ChevronDown
+                    size={16}
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+            </div>
+
+            {selectedJurusan && (
+                <div className="mt-4 rounded-2xl border border-violet-100 bg-white p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span
+                            className={`rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-widest ${isActiveValue(selectedJurusan.status)
+                                ? "bg-emerald-50 text-emerald-600"
+                                : "bg-rose-50 text-rose-600"
+                                }`}
+                        >
+                            {isActiveValue(selectedJurusan.status) ? "Aktif" : "Nonaktif"}
+                        </span>
+                    </div>
+
+                    <h4 className="mt-3 text-base font-black leading-snug text-slate-900">
+                        {selectedJurusan.nama_jurusan}
+                    </h4>
+
+                    <p className="mt-2 text-xs font-semibold leading-6 text-slate-500">
+                        {selectedJurusan.deskripsi ||
+                            "Belum ada deskripsi jurusan. Tambahkan deskripsi melalui Master Jurusan."}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function GeoItem({ icon, label, value, color }) {
+    const toneClass = {
+        blue: "bg-blue-50 text-blue-600",
+        cyan: "bg-cyan-50 text-cyan-600",
+        slate: "bg-slate-50 text-slate-600",
+        amber: "bg-amber-50 text-amber-600",
+    }[color];
+
+    return (
+        <div className="flex items-center gap-3 border-t border-slate-100 pt-4 first:border-t-0 first:pt-0 md:border-l md:border-t-0 md:pl-6 md:pt-0 md:first:border-l-0 md:first:pl-0">
+            <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}
+            >
+                {icon}
+            </div>
+
+            <div className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {label}
+                </span>
+                <span className="mt-0.5 block truncate text-xs font-black text-slate-800">
+                    {value || "-"}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function InfoRow({ label, value }) {
+    return (
+        <div className="flex items-start justify-between gap-4">
+            <p className="shrink-0 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                {label}
+            </p>
+
+            <p className="line-clamp-2 text-right text-[11px] font-bold leading-5 text-slate-700">
+                {value || "-"}
+            </p>
+        </div>
+    );
+}
+
+function ProgramCard({ program }) {
+    const category = getProgramCategory(program);
+    const type = getProgramType(program);
+    const status = getProgramStatus(program);
+
+    return (
+        <article className="group overflow-hidden rounded-[1.75rem] border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-cyan-200 hover:shadow-xl hover:shadow-slate-200/70">
+            <div
+                className="h-2 w-full"
+                style={{
+                    background:
+                        category === "AKADEMIK"
+                            ? `linear-gradient(90deg, ${COLORS.cyan}, ${COLORS.blue})`
+                            : `linear-gradient(90deg, ${COLORS.violet}, ${COLORS.pink})`,
+                }}
+            />
+
+            <div className="p-5">
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span
+                        className="rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-widest text-white"
+                        style={{
+                            backgroundColor:
+                                category === "AKADEMIK"
+                                    ? COLORS.cyan
+                                    : COLORS.violet,
+                        }}
+                    >
+                        {getProgramCategoryLabel(category)}
+                    </span>
+
+                    <span
+                        className="rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest"
+                        style={{
+                            borderColor:
+                                type === "PROJECT" ? "#DDD6FE" : "#BBF7D0",
+                            backgroundColor:
+                                type === "PROJECT" ? "#F5F3FF" : "#F0FDF4",
+                            color:
+                                type === "PROJECT"
+                                    ? COLORS.violet
+                                    : COLORS.emerald,
+                        }}
+                    >
+                        {getProgramTypeLabel(type)}
+                    </span>
+
+                    <ProgramStatusBadge status={status} />
+                </div>
+
+                <h3 className="line-clamp-2 min-h-[42px] text-[16px] font-black leading-snug tracking-[-0.03em] text-slate-900">
+                    {getProgramTitle(program)}
+                </h3>
+
+                {program?.tahun && (
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                        Tahun {program.tahun}
+                    </p>
+                )}
+
+                <div className="mt-4 space-y-2 rounded-[1.25rem] bg-slate-50 p-4">
+                    <InfoRow label="Periode" value={getProgramPeriod(program)} />
+                    <InfoRow label="AO" value={getAoName(program)} />
+                    <InfoRow label="Vendor" value={getVendorName(program)} />
+
+                    <InfoRow
+                        label="KPI"
+                        value={
+                            program?.kpi_nama
+                                ? `${program.kpi_nama} ${program.kpi_target || ""} ${program.kpi_satuan || ""}`
+                                : "-"
+                        }
+                    />
+                </div>
+
+                <Link
+                    to={`/sekolah/program/detail/${getProgramId(program)}`}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]"
+                >
+                    Lihat Detail Program
+                    <ArrowUpRight size={14} />
+                </Link>
+            </div>
+        </article>
+    );
+}
+
+export default function DashboardSekolah() {
+    const [user, setUser] = useState(null);
+    const [sekolah, setSekolah] = useState(null);
+    const [programs, setPrograms] = useState([]);
+    const [loadingSekolah, setLoadingSekolah] = useState(false);
+    const [loadingProgram, setLoadingProgram] = useState(false);
+    const [categoryFilter, setCategoryFilter] = useState("ALL");
+    const [typeFilter, setTypeFilter] = useState("ALL");
+    const [keyword, setKeyword] = useState("");
+    const [jurusanList, setJurusanList] = useState([]);
+    const [selectedJurusanId, setSelectedJurusanId] = useState("");
+    const [loadingJurusan, setLoadingJurusan] = useState(false);
+    const [editingJumlahSiswa, setEditingJumlahSiswa] = useState(false);
+    const [jumlahSiswaDraft, setJumlahSiswaDraft] = useState("");
+    const [savingJumlahSiswa, setSavingJumlahSiswa] = useState(false);
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+
+        if (token) {
+            try {
+                const decoded = jwtDecode(token);
+                setUser(decoded);
+            } catch (error) {
+                console.warn("Gagal decode token:", error);
+            }
+        }
+    }, []);
+
+    const fetchSekolah = async () => {
+        const idSekolah = getSekolahIdFromToken(user);
+
+        console.log("ID SEKOLAH DARI TOKEN:", idSekolah);
+
+        if (!idSekolah) return;
+
+        try {
+            setLoadingSekolah(true);
+
+            const response = await axios.get(
+                `${API_BASE_URL}/sekolah/${idSekolah}?_t=${Date.now()}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        "Cache-Control": "no-cache",
+                        Pragma: "no-cache",
+                    },
+                },
+            );
+
+            const dataSekolah = response.data?.data || response.data;
+
+            console.log("DATA SEKOLAH DASHBOARD:", dataSekolah);
+            console.log("TAHUN BINAAN DASHBOARD:", dataSekolah?.tahun_binaan);
+
+            setSekolah(dataSekolah);
+        } catch (error) {
+            console.warn("Gagal mengambil detail sekolah:", error);
+            setSekolah(null);
+        } finally {
+            setLoadingSekolah(false);
+        }
+    };
+
+    const fetchProgramSekolah = async () => {
+        const idSekolah = getSekolahIdFromToken(user);
+
+        if (!idSekolah) return;
+
+        try {
+            setLoadingProgram(true);
+
+            const response = await axios.get(
+                `${API_BASE_URL}/program/sekolah/${idSekolah}?id_user=${getUserId(user) || ""}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                },
+            );
+
+            setPrograms(normalizeArray(response.data));
+        } catch (error) {
+            console.warn("Gagal mengambil program sekolah:", error);
+            setPrograms([]);
+        } finally {
+            setLoadingProgram(false);
+        }
+    };
+
+    const fetchJurusanSekolah = async () => {
+        const idSekolah = getSekolahIdFromToken(user);
+
+        if (!idSekolah) return;
+
+        try {
+            setLoadingJurusan(true);
+
+            const response = await axios.get(
+                `${API_BASE_URL}/jurusan/sekolah/${idSekolah}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                },
+            );
+
+            const rows = Array.isArray(response.data)
+                ? response.data
+                : response.data?.data || [];
+
+            setJurusanList(rows);
+
+            if (rows.length > 0) {
+                setSelectedJurusanId(String(rows[0].id_jurusan));
+            }
+        } catch (error) {
+            console.warn("Gagal mengambil jurusan sekolah:", error);
+            setJurusanList([]);
+            setSelectedJurusanId("");
+        } finally {
+            setLoadingJurusan(false);
+        }
+    };
+
+    const refreshDashboard = async () => {
+        await Promise.all([
+            fetchSekolah(),
+            fetchProgramSekolah(),
+            fetchJurusanSekolah(),
+        ]);
+    };
+
+    useEffect(() => {
+        refreshDashboard();
+    }, [user?.id_sekolah, user?.sekolah_id, user?.school_id]);
+
+    const roleId = Number(user?.id_role);
+    const isGuru = roleId === 8;
+    const isOperator = roleId === 9;
+    const active = isActiveValue(sekolah?.status);
+
+    const jenjang = String(
+        sekolah?.jenjang ||
+        user?.jenjang ||
+        user?.sekolah?.jenjang ||
+        user?.school?.jenjang ||
+        "",
+    ).toUpperCase();
+
+    const roleLabel = isGuru
+        ? "Guru Assessment"
+        : isOperator
+            ? "Operator Sekolah"
+            : "Sekolah";
+
+    const schoolName = getSchoolName(sekolah, user);
+    const logoUrl = getAssetUrl(
+        sekolah?.logo_url ||
+        sekolah?.logo ||
+        sekolah?.logo_sekolah ||
+        sekolah?.foto_logo,
+    );
+
+    const selectedJurusan = useMemo(() => {
+        return jurusanList.find(
+            (item) => String(item.id_jurusan) === String(selectedJurusanId),
+        );
+    }, [jurusanList, selectedJurusanId]);
+
+    const programStats = useMemo(() => {
+        return programs.reduce(
+            (acc, program) => {
+                const category = getProgramCategory(program);
+                const type = getProgramType(program);
+                const status = normalizeValue(getProgramStatus(program));
+
+                if (category === "AKADEMIK") acc.akademik += 1;
+                else if (category === "NON_AKADEMIK") acc.nonAkademik += 1;
+
+                if (type === "PROJECT") acc.project += 1;
+                else if (type === "REGULER") acc.reguler += 1;
+
+                if (status.includes("SELESAI")) acc.done += 1;
+                else acc.active += 1;
+
+                return acc;
+            },
+            {
+                akademik: 0,
+                nonAkademik: 0,
+                project: 0,
+                reguler: 0,
+                active: 0,
+                done: 0,
+            },
+        );
+    }, [programs]);
+
+    const filteredPrograms = useMemo(() => {
+        const search = normalizeSearch(keyword);
+
+        return programs.filter((program) => {
+            const category = getProgramCategory(program);
+            const type = getProgramType(program);
+
+            const matchCategory =
+                categoryFilter === "ALL" || category === categoryFilter;
+
+            const matchType = typeFilter === "ALL" || type === typeFilter;
+
+            const matchSearch =
+                !search ||
+                normalizeSearch(
+                    [
+                        getProgramTitle(program),
+                        program?.kategori,
+                        program?.jenis_program,
+                        program?.tahun,
+                        getProgramStatus(program),
+                        getVendorName(program),
+                        getAoName(program),
+                    ]
+                        .filter(Boolean)
+                        .join(" "),
+                ).includes(search);
+
+            return matchCategory && matchType && matchSearch;
+        });
+    }, [programs, categoryFilter, typeFilter, keyword]);
+
+    const compositionRows = useMemo(() => {
+        return buildRows(filteredPrograms, getProgramCompositionLabel).map((row) => {
+            const sample = filteredPrograms.find(
+                (program) => getProgramCompositionLabel(program) === row.name,
+            );
+
+            return {
+                ...row,
+                color: sample ? getProgramCompositionColor(sample) : row.color,
+            };
+        });
+    }, [filteredPrograms]);
+
+    const handleStartEditJumlahSiswa = () => {
+        setJumlahSiswaDraft(String(sekolah?.jumlah_siswa ?? 0));
+        setEditingJumlahSiswa(true);
+    };
+
+    const handleCancelEditJumlahSiswa = () => {
+        if (savingJumlahSiswa) return;
+
+        setJumlahSiswaDraft("");
+        setEditingJumlahSiswa(false);
+    };
+
+    const handleSaveJumlahSiswa = async () => {
+        const nextValue = Number(jumlahSiswaDraft);
+
+        if (!Number.isInteger(nextValue) || nextValue < 0) {
+            alert("Jumlah siswa harus berupa angka minimal 0.");
             return;
         }
 
-        ids.push(trimmed);
-        return;
-    }
+        const previousValue = Number(sekolah?.jumlah_siswa ?? 0);
 
-    if (typeof value === "object") {
-        if (value.id_sekolah) ids.push(value.id_sekolah);
-        if (value.sekolah_id) ids.push(value.sekolah_id);
-        if (value.school_id) ids.push(value.school_id);
+        if (nextValue === previousValue) {
+            setJumlahSiswaDraft("");
+            setEditingJumlahSiswa(false);
+            return;
+        }
 
-        if (value.id_vendor) ids.push(value.id_vendor);
-        if (value.vendor_id) ids.push(value.vendor_id);
-        if (value.id_narasumber) ids.push(value.id_narasumber);
-        if (value.narasumber_id) ids.push(value.narasumber_id);
-
-        if (value.id_user) ids.push(value.id_user);
-        if (value.id_ao) ids.push(value.id_ao);
-        if (value.id_pengawas) ids.push(value.id_pengawas);
-
-        if (value.id) ids.push(value.id);
-
-        if (value.sekolah) pushFlexibleIds(ids, value.sekolah);
-        if (value.school) pushFlexibleIds(ids, value.school);
-
-        if (value.vendor) pushFlexibleIds(ids, value.vendor);
-        if (value.vendors) pushFlexibleIds(ids, value.vendors);
-        if (value.narasumber) pushFlexibleIds(ids, value.narasumber);
-        if (value.narasumbers) pushFlexibleIds(ids, value.narasumbers);
-
-        return;
-    }
-
-    ids.push(value);
-};
-
-const collectProgramSchoolIds = (program) => {
-    const ids = [];
-
-    [
-        program?.id_sekolah,
-        program?.sekolah_id,
-        program?.school_id,
-        program?.id_target_sekolah,
-        program?.target_sekolah_ids,
-        program?.sekolah_ids,
-        program?.school_ids,
-        program?.sekolah,
-        program?.school,
-        program?.sekolahs,
-        program?.schools,
-        program?.target_sekolah,
-        program?.targetSekolah,
-        program?.daftar_sekolah,
-        program?.daftarSekolah,
-        program?.program?.id_sekolah,
-        program?.program?.sekolah_id,
-        program?.program?.sekolah,
-    ].forEach((value) => pushFlexibleIds(ids, value));
-
-    return [...new Set(ids.map(String).filter(Boolean))];
-};
-
-const isProgramForLoggedSchool = (program, idSekolah) => {
-    if (!idSekolah) return false;
-
-    const schoolIds = collectProgramSchoolIds(program);
-
-    return schoolIds.some((id) => String(id) === String(idSekolah));
-};
-
-const getArray = (...values) => {
-    return values.find((value) => Array.isArray(value)) || [];
-};
-const getRequirementFile = (requirement) => {
-    return (
-        requirement?.file ||
-        requirement?.file_url ||
-        requirement?.file_path ||
-        requirement?.path ||
-        requirement?.file_mou ||
-        requirement?.dokumen ||
-        requirement?.bukti ||
-        requirement?.file_bukti ||
-        requirement?.file_upload ||
-        null
-    );
-};
-
-const getRequirementStatus = (requirement) => {
-    const currentStatus = String(requirement?.status || "").toUpperCase();
-
-    if (
-        currentStatus.includes("APPROVED") ||
-        currentStatus.includes("DISETUJUI") ||
-        currentStatus.includes("ACC")
-    ) {
-        return "APPROVED";
-    }
-
-    if (
-        currentStatus.includes("REJECTED") ||
-        currentStatus.includes("DITOLAK") ||
-        currentStatus.includes("REVISI")
-    ) {
-        return "REJECTED";
-    }
-
-    if (
-        currentStatus.includes("WAITING_HO") ||
-        currentStatus.includes("MENUNGGU_HO") ||
-        currentStatus.includes("MENUNGGU HO")
-    ) {
-        return "WAITING_HO";
-    }
-
-    if (
-        currentStatus.includes("WAITING_UPLOAD") ||
-        currentStatus.includes("PERLU_UPLOAD") ||
-        currentStatus.includes("PERLU UPLOAD")
-    ) {
-        return "WAITING_UPLOAD";
-    }
-
-    if (getRequirementFile(requirement)) return "WAITING_HO";
-
-    return "WAITING_UPLOAD";
-};
-
-const getProgramRequirements = (program) => {
-    const fases = getArray(program?.fases, program?.fase, program?.program?.fases);
-
-    return fases.flatMap((fase) => {
-        const terminList = getArray(
-            fase?.termin,
-            fase?.termins,
-            fase?.t_termin,
-            fase?.term,
-        );
-
-        const kegiatanList = getArray(
-            fase?.kegiatans,
-            fase?.kegiatan,
-            fase?.t_kegiatans,
-        );
-
-        const terminRequirements = terminList.flatMap((termin) =>
-            getArray(
-                termin?.persyaratan,
-                termin?.persyaratan_termin,
-                termin?.requirements,
-                termin?.t_persyaratan_termin,
-            ).map((item) => ({
-                ...item,
-                parentType: "termin",
-            })),
-        );
-
-        const kegiatanRequirements = kegiatanList.flatMap((kegiatan) =>
-            getArray(
-                kegiatan?.persyaratan,
-                kegiatan?.persyaratan_kegiatan,
-                kegiatan?.requirements,
-                kegiatan?.t_persyaratan_kegiatan,
-            ).map((item) => ({
-                ...item,
-                parentType: "kegiatan",
-            })),
-        );
-
-        return [...terminRequirements, ...kegiatanRequirements];
-    });
-};
-
-const getProgramProgress = (program) => {
-    const requirements = getProgramRequirements(program);
-    const total = requirements.length;
-
-    const approved = requirements.filter(
-        (item) => getRequirementStatus(item) === "APPROVED",
-    ).length;
-
-    const waitingHo = requirements.filter(
-        (item) => getRequirementStatus(item) === "WAITING_HO",
-    ).length;
-
-    const waitingUpload = requirements.filter(
-        (item) => getRequirementStatus(item) === "WAITING_UPLOAD",
-    ).length;
-
-    const rejected = requirements.filter(
-        (item) => getRequirementStatus(item) === "REJECTED",
-    ).length;
-
-    return {
-        total,
-        approved,
-        waitingHo,
-        waitingUpload,
-        rejected,
-        percentage: total ? Math.round((approved / total) * 100) : 0,
-    };
-};
-
-const getPhaseRows = (fase) => {
-    const terminList = getArray(
-        fase?.termin,
-        fase?.termins,
-        fase?.t_termin,
-        fase?.term,
-    );
-
-    const kegiatanList = getArray(
-        fase?.kegiatans,
-        fase?.kegiatan,
-        fase?.t_kegiatans,
-    );
-
-    const openingRows = terminList.map((termin) => ({
-        type: "termin",
-        requirements: getArray(
-            termin?.persyaratan,
-            termin?.persyaratan_termin,
-            termin?.requirements,
-            termin?.t_persyaratan_termin,
-        ),
-    }));
-
-    const innerRows = kegiatanList.map((kegiatan) => ({
-        type: "kegiatan",
-        requirements: getArray(
-            kegiatan?.persyaratan,
-            kegiatan?.persyaratan_kegiatan,
-            kegiatan?.requirements,
-            kegiatan?.t_persyaratan_kegiatan,
-        ),
-    }));
-
-    return {
-        openingRows,
-        innerRows,
-    };
-};
-
-const isRowApproved = (row) => {
-    if (!row?.requirements?.length) return false;
-
-    return row.requirements.every(
-        (item) => getRequirementStatus(item) === "APPROVED",
-    );
-};
-
-const isOpeningCompleted = (fase) => {
-    const { openingRows } = getPhaseRows(fase);
-
-    if (!openingRows.length) return false;
-
-    return openingRows.every((row) => isRowApproved(row));
-};
-
-const isPhaseCompleted = (fase) => {
-    const { openingRows, innerRows } = getPhaseRows(fase);
-
-    if (!openingRows.length && !innerRows.length) return false;
-
-    const openingOk =
-        openingRows.length === 0 || openingRows.every((row) => isRowApproved(row));
-
-    const innerOk =
-        innerRows.length === 0 || innerRows.every((row) => isRowApproved(row));
-
-    return openingOk && innerOk;
-};
-
-const getActivePhaseInfo = (program) => {
-    const fases = getArray(program?.fases, program?.fase, program?.program?.fases);
-
-    if (!fases.length) {
-        return {
-            label: "Belum ada fase",
-            index: 0,
-            totalPhase: 0,
-            openingDone: false,
-            completed: false,
-        };
-    }
-
-    const activeIndex = fases.findIndex((fase, index) => {
-        const previousCompleted =
-            index === 0 ||
-            fases.slice(0, index).every((item) => isPhaseCompleted(item));
-
-        if (!previousCompleted) return false;
-
-        return !isPhaseCompleted(fase);
-    });
-
-    const index = activeIndex === -1 ? fases.length - 1 : activeIndex;
-    const fase = fases[index];
-
-    return {
-        label: fase?.nama_fase || fase?.nama || `Fase ${index + 1}`,
-        index: index + 1,
-        totalPhase: fases.length,
-        openingDone: isOpeningCompleted(fase),
-        completed: isPhaseCompleted(fase),
-    };
-};
-
-const fetchMasterArray = async (urls = [], headers = {}) => {
-    for (const url of urls) {
         try {
-            const response = await fetch(`${API_BASE}${url}`, {
-                method: "GET",
-                headers,
-            });
+            setSavingJumlahSiswa(true);
 
-            const payload = await response.json().catch(() => []);
+            await axios.patch(
+                `${API_BASE_URL}/sekolah/operator/jumlah-siswa`,
+                { jumlah_siswa: nextValue },
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                },
+            );
 
-            if (!response.ok) continue;
+            setSekolah((prev) => ({
+                ...prev,
+                jumlah_siswa: nextValue,
+            }));
 
-            const data = normalizeArray(payload);
-
-            // penting: kalau endpoint sukses tapi array kosong,
-            // jangan langsung berhenti, coba endpoint berikutnya
-            if (data.length === 0) continue;
-
-            return data;
-        } catch {
-            // lanjut endpoint berikutnya
+            setJumlahSiswaDraft("");
+            setEditingJumlahSiswa(false);
+        } catch (error) {
+            console.error("Gagal update jumlah siswa:", error);
+            alert(
+                error?.response?.data?.message ||
+                "Gagal memperbarui jumlah siswa.",
+            );
+        } finally {
+            setSavingJumlahSiswa(false);
         }
-    }
-
-    return [];
-};
-
-const normalizeName = (value) => {
-    if (!value) return "";
-
-    if (Array.isArray(value)) {
-        return value.map(normalizeName).filter(Boolean).join(", ");
-    }
-
-    if (typeof value === "object") {
-        return (
-            value?.nama_vendor ||
-            value?.nama_perusahaan ||
-            value?.vendor_name ||
-            value?.company_name ||
-            value?.nama_narasumber ||
-            value?.nama_pemateri ||
-            value?.nama ||
-            value?.name ||
-            value?.nama_user ||
-            value?.nama_ho ||
-            normalizeName(value?.vendor) ||
-            normalizeName(value?.narasumber) ||
-            normalizeName(value?.user) ||
-            ""
-        );
-    }
-
-    return String(value || "").trim();
-};
-
-const getMasterIds = (item) => {
-    return [
-        item?.id_vendor,
-        item?.vendor_id,
-        item?.id_narasumber,
-        item?.narasumber_id,
-
-        item?.id_user,
-        item?.id_ao,
-        item?.id_area_officer,
-        item?.id_pengawas,
-        item?.id,
-    ]
-        .filter(Boolean)
-        .map(String);
-};
-
-const findNameByIds = (list = [], ids = []) => {
-    const cleanIds = ids.map(String).filter(Boolean);
-
-    if (cleanIds.length === 0) return "";
-
-    const found = list.find((item) => {
-        const masterIds = getMasterIds(item);
-
-        return masterIds.some((id) => cleanIds.includes(String(id)));
-    });
-
-    return normalizeName(found);
-};
-const collectPicIds = (item) => {
-    const ids = [];
-
-    [
-        item?.id_pengawas,
-        item?.pengawas_id,
-        item?.id_ao,
-        item?.ao_id,
-        item?.id_area_officer,
-        item?.area_officer_id,
-
-        item?.program?.id_pengawas,
-        item?.program?.pengawas_id,
-        item?.program?.id_ao,
-        item?.program?.ao_id,
-        item?.program?.id_area_officer,
-        item?.program?.area_officer_id,
-
-        item?.pengawas,
-        item?.ao,
-        item?.area_officer,
-        item?.areaOfficer,
-        item?.program?.pengawas,
-        item?.program?.ao,
-        item?.program?.area_officer,
-        item?.program?.areaOfficer,
-    ].forEach((value) => pushFlexibleIds(ids, value));
-
-    return [...new Set(ids.map(String).filter(Boolean))];
-};
-
-const collectVendorIds = (item) => {
-    const ids = [];
-
-    [
-        item?.id_vendor,
-        item?.vendor_id,
-        item?.vendor_ids,
-        item?.id_narasumber,
-        item?.narasumber_id,
-        item?.narasumber_ids,
-
-        item?.program?.id_vendor,
-        item?.program?.vendor_id,
-        item?.program?.vendor_ids,
-        item?.program?.id_narasumber,
-        item?.program?.narasumber_id,
-        item?.program?.narasumber_ids,
-
-        item?.vendor,
-        item?.vendors,
-        item?.narasumber,
-        item?.narasumbers,
-        item?.pemateri,
-        item?.mitra,
-
-        item?.program?.vendor,
-        item?.program?.vendors,
-        item?.program?.narasumber,
-        item?.program?.narasumbers,
-
-        item?.program_vendors,
-        item?.programVendor,
-        item?.program_vendor,
-        item?.vendor_program,
-        item?.vendorPrograms,
-        item?.t_vendor_program,
-        item?.t_vendors,
-        item?.program?.program_vendors,
-        item?.program?.vendor_program,
-    ].forEach((value) => pushFlexibleIds(ids, value));
-
-    return [...new Set(ids.map(String).filter(Boolean))];
-};
-
-const getPicName = (item, masterAoList = []) => {
-    const directName =
-        normalizeName(item?.pengawas) ||
-        normalizeName(item?.ao) ||
-        normalizeName(item?.area_officer) ||
-        normalizeName(item?.areaOfficer) ||
-        normalizeName(item?.nama_pengawas) ||
-        normalizeName(item?.nama_ao) ||
-        normalizeName(item?.nama_area_officer) ||
-        normalizeName(item?.program?.pengawas) ||
-        normalizeName(item?.program?.ao) ||
-        normalizeName(item?.program?.area_officer) ||
-        normalizeName(item?.program?.areaOfficer);
-
-    if (directName && !/^\d+$/.test(directName)) return directName;
-
-    const byId = findNameByIds(masterAoList, collectPicIds(item));
-
-    return byId || directName || "Tanpa PIC";
-};
-
-const getVendorName = (item, masterVendorList = []) => {
-    const directName =
-        normalizeName(item?.vendor) ||
-        normalizeName(item?.vendors) ||
-        normalizeName(item?.narasumber) ||
-        normalizeName(item?.narasumbers) ||
-        normalizeName(item?.pemateri) ||
-        normalizeName(item?.mitra) ||
-        normalizeName(item?.program_vendors) ||
-        normalizeName(item?.vendor_program) ||
-        normalizeName(item?.t_vendor_program) ||
-        normalizeName(item?.t_vendors) ||
-        normalizeName(item?.nama_vendor) ||
-        normalizeName(item?.vendor_name) ||
-        normalizeName(item?.nama_narasumber) ||
-        normalizeName(item?.program?.vendor) ||
-        normalizeName(item?.program?.vendors) ||
-        normalizeName(item?.program?.narasumber) ||
-        normalizeName(item?.program?.narasumbers) ||
-        normalizeName(item?.program?.program_vendors) ||
-        normalizeName(item?.program?.vendor_program);
-
-    if (directName && !/^\d+$/.test(directName)) return directName;
-
-    const byId = findNameByIds(masterVendorList, collectVendorIds(item));
-
-    return byId || directName || "Tanpa vendor";
-};
-
-const getDateValue = (...values) => {
-    return (
-        values.find(
-            (value) => value !== null && value !== undefined && value !== "",
-        ) || null
-    );
-};
-
-const getFirstPhaseDate = (item, fieldList = []) => {
-    const fases = getArray(item?.fases, item?.fase, item?.program?.fases);
-
-    for (const fase of fases) {
-        for (const field of fieldList) {
-            if (fase?.[field]) return fase[field];
-        }
-    }
-
-    return null;
-};
-
-const getLastPhaseDate = (item, fieldList = []) => {
-    const fases = getArray(item?.fases, item?.fase, item?.program?.fases);
-
-    for (let index = fases.length - 1; index >= 0; index -= 1) {
-        const fase = fases[index];
-
-        for (const field of fieldList) {
-            if (fase?.[field]) return fase[field];
-        }
-    }
-
-    return null;
-};
-
-const getProgramStartDate = (item) => {
-    return getDateValue(
-        item?.tanggal_mulai,
-        item?.tanggalMulai,
-        item?.start_date,
-        item?.startDate,
-        item?.mulai,
-        item?.periode_mulai,
-        item?.periodeMulai,
-        item?.periode?.mulai,
-        item?.periode?.tanggal_mulai,
-        item?.periode?.start_date,
-        item?.program?.tanggal_mulai,
-        item?.program?.tanggalMulai,
-        item?.program?.start_date,
-        item?.program?.mulai,
-        getFirstPhaseDate(item, [
-            "tanggal_mulai",
-            "tanggalMulai",
-            "start_date",
-            "mulai",
-        ]),
-    );
-};
-
-const getProgramEndDate = (item) => {
-    return getDateValue(
-        item?.tanggal_selesai,
-        item?.tanggalSelesai,
-        item?.tanggal_akhir,
-        item?.tanggalAkhir,
-        item?.end_date,
-        item?.endDate,
-        item?.selesai_pada,
-        item?.periode_selesai,
-        item?.periodeSelesai,
-        item?.periode_akhir,
-        item?.periodeAkhir,
-        item?.periode?.selesai,
-        item?.periode?.tanggal_selesai,
-        item?.periode?.tanggal_akhir,
-        item?.periode?.end_date,
-        item?.program?.tanggal_selesai,
-        item?.program?.tanggalSelesai,
-        item?.program?.tanggal_akhir,
-        item?.program?.end_date,
-        item?.program?.selesai,
-        getLastPhaseDate(item, [
-            "tanggal_selesai",
-            "tanggalSelesai",
-            "tanggal_akhir",
-            "end_date",
-            "selesai",
-        ]),
-    );
-};
-
-const getProgramPeriodText = (item) => {
-    const startDate = getProgramStartDate(item);
-    const endDate = getProgramEndDate(item);
-
-    if (startDate || endDate) {
-        return `${formatDate(startDate)} - ${formatDate(endDate)}`;
-    }
-
-    const tahun =
-        item?.tahun ||
-        item?.year ||
-        item?.periode?.tahun ||
-        item?.program?.tahun ||
-        item?.program?.year;
-
-    if (tahun) return `Tahun ${tahun}`;
-
-    return "Belum ada periode";
-};
-const normalizeProgram = (item, master = {}) => {
-    const masterAoList = master.masterAoList || [];
-    const masterVendorList = master.masterVendorList || [];
-
-    const progress = getProgramProgress(item);
-    const activePhase = getActivePhaseInfo(item);
-
-    const rawStatus =
-        item?.status ||
-        item?.status_program ||
-        item?.status_progress ||
-        item?.fase_status ||
-        item?.program?.status ||
-        "Berjalan";
-
-    const statusText = String(rawStatus || "Berjalan");
-    const statusLower = statusText.toLowerCase();
-
-    const isSelesai =
-        statusLower.includes("selesai") ||
-        statusLower.includes("complete") ||
-        statusLower.includes("done") ||
-        progress.percentage >= 100 ||
-        activePhase.completed ||
-        item?.is_selesai === true ||
-        item?.selesai === true;
-
-    return {
-        id_program:
-            item?.id_program ||
-            item?.id_transaksi_program ||
-            item?.id_program_sekolah ||
-            item?.id ||
-            "-",
-
-        nama:
-            item?.nama_program ||
-            item?.nama ||
-            item?.judul ||
-            item?.program?.nama_program ||
-            item?.program?.nama ||
-            "Program Sekolah",
-
-        kategori:
-            item?.jenis ||
-            item?.kategori ||
-            item?.kategori_program ||
-            item?.tipe ||
-            item?.program?.jenis ||
-            item?.program?.kategori ||
-            "Program",
-
-        fase: activePhase.label || "Monitoring Program",
-        status: isSelesai ? "Selesai" : statusText,
-        selesai: isSelesai,
-        progress: progress.percentage,
-
-        tanggal_mulai: getProgramStartDate(item),
-        tanggal_selesai: getProgramEndDate(item),
-        periode: getProgramPeriodText(item),
-
-        pic: getPicName(item, masterAoList),
-        vendor: getVendorName(item, masterVendorList),
-
-        raw: item,
     };
-};
 
-function DashboardSekolah() {
-    const navigate = useNavigate();
+    const resetFilter = () => {
+        setCategoryFilter("ALL");
+        setTypeFilter("ALL");
+        setKeyword("");
+    };
 
-    const [programs, setPrograms] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("semua");
+    const isLoading = loadingSekolah || loadingProgram || loadingJurusan;
 
-    const [page, setPage] = useState(1);
-    const itemsPerPage = 5;
-
-    useEffect(() => {
-        const fetchPrograms = async () => {
-            try {
-                setLoading(true);
-                setErrorMessage("");
-
-                const token = localStorage.getItem("token");
-
-                if (!token) {
-                    navigate("/login");
-                    return;
-                }
-
-                const decoded = jwtDecode(token);
-
-                const idSekolah = getSekolahIdFromToken(decoded);
-                const idUser = getUserIdFromToken(decoded);
-                const idRole = Number(decoded?.id_role || decoded?.role_id || 0);
-
-                if (![5, 8].includes(idRole)) {
-                    throw new Error(
-                        "Akun yang sedang login bukan akun sekolah. Silakan login menggunakan akun sekolah.",
-                    );
-                }
-
-                if (!idSekolah) {
-                    throw new Error(
-                        "ID sekolah tidak terbaca dari token. Pastikan akun sekolah sudah terhubung dengan data sekolah.",
-                    );
-                }
-
-                const headers = {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                };
-
-                const queryParams = new URLSearchParams();
-
-                if (idUser) {
-                    queryParams.set("id_user", String(idUser));
-                }
-
-                const listUrl = `${API_BASE}/program${queryParams.toString() ? `?${queryParams.toString()}` : ""
-                    }`;
-
-                const [resProgram, rawMasterAoList, masterVendorList] =
-                    await Promise.all([
-                        fetch(listUrl, {
-                            method: "GET",
-                            headers,
-                        }),
-                        fetchMasterArray(
-                            [
-                                "/users/ao",
-                                "/users?id_role=4",
-                                "/users?role=ao",
-                                "/users?role=area-officer",
-                                "/users",
-                            ],
-                            headers,
-                        ),
-                        fetchMasterArray(
-                            [
-                                "/vendor",
-                                "/vendor?kategori=AKADEMIK",
-                                "/vendor?kategori=NON_AKADEMIK",
-                                "/vendors",
-                                "/users/vendor",
-                                "/users?id_role=6",
-                                "/users?role=vendor",
-                            ],
-                            headers,
-                        ),
-                    ]);
-
-                const masterAoList = rawMasterAoList.filter((item) => {
-                    const roleText = String(item?.role || item?.nama_role || item?.jabatan || "")
-                        .toLowerCase();
-
-                    return (
-                        Number(item?.id_role) === 4 ||
-                        roleText.includes("area officer") ||
-                        roleText.includes("ao") ||
-                        roleText.includes("pengawas")
-                    );
-                });
-
-                const programPayload = await resProgram.json().catch(() => null);
-
-                if (!resProgram.ok) {
-                    throw new Error(
-                        programPayload?.message || "Gagal mengambil data program",
-                    );
-                }
-
-                const programList = normalizeArray(programPayload)
-                    .filter((program) => getProgramId(program))
-                    .filter((program) =>
-                        isProgramForLoggedSchool(program, idSekolah),
-                    );
-
-                const detailedPrograms = await Promise.all(
-                    programList.map(async (program) => {
-                        try {
-                            const programId = getProgramId(program);
-
-                            const detailRes = await fetch(
-                                `${API_BASE}/program/${programId}`,
-                                {
-                                    method: "GET",
-                                    headers,
-                                },
-                            );
-
-                            const detailPayload = await detailRes
-                                .json()
-                                .catch(() => null);
-
-                            if (!detailRes.ok) {
-                                return program;
-                            }
-
-                            const detail =
-                                detailPayload?.data || detailPayload || program;
-
-                            if (!isProgramForLoggedSchool(detail, idSekolah)) {
-                                return program;
-                            }
-
-                            return detail;
-                        } catch {
-                            return program;
-                        }
-                    }),
-                );
-
-                const normalizedData = detailedPrograms
-                    .filter((program) =>
-                        isProgramForLoggedSchool(program, idSekolah),
-                    )
-                    .map((program) =>
-                        normalizeProgram(program, {
-                            masterAoList,
-                            masterVendorList,
-                        }),
-                    )
-                    .sort((a, b) => {
-                        const dateA = new Date(
-                            a.raw?.updated_at || a.raw?.created_at || 0,
-                        );
-
-                        const dateB = new Date(
-                            b.raw?.updated_at || b.raw?.created_at || 0,
-                        );
-
-                        return dateB.getTime() - dateA.getTime();
-                    });
-
-                console.log("DASHBOARD SEKOLAH PROGRAM CHECK:", {
-                    idSekolah,
-                    masterAoCount: masterAoList.length,
-                    masterVendorCount: masterVendorList.length,
-                    rawProgramCount: normalizeArray(programPayload).length,
-                    visibleProgramCount: normalizedData.length,
-                    sample: normalizedData.slice(0, 3).map((item) => ({
-                        nama: item.nama,
-                        pic: item.pic,
-                        vendor: item.vendor,
-                        periode: item.periode,
-                        vendorIdsTerbaca: collectVendorIds(item.raw),
-                        rawVendorFields: {
-                            id_vendor: item.raw?.id_vendor,
-                            vendor_id: item.raw?.vendor_id,
-                            vendor_ids: item.raw?.vendor_ids,
-                            vendor: item.raw?.vendor,
-                            vendors: item.raw?.vendors,
-                            narasumber: item.raw?.narasumber,
-                            narasumbers: item.raw?.narasumbers,
-                            program_vendors: item.raw?.program_vendors,
-                            vendor_program: item.raw?.vendor_program,
-                            programVendor: item.raw?.programVendor,
-                        },
-                        raw: item.raw,
-                    })),
-                });
-
-                setPrograms(normalizedData);
-            } catch (error) {
-                console.error("Gagal mengambil program sekolah:", error);
-
-                setPrograms([]);
-                setErrorMessage(
-                    error?.message ||
-                    "Gagal memuat data program sekolah. Pastikan data program sudah terhubung dengan sekolah login.",
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchPrograms();
-    }, [navigate]);
-    const filteredData = useMemo(() => {
-        return programs
-            .filter((item) => {
-                if (statusFilter === "berjalan") return !item.selesai;
-                if (statusFilter === "selesai") return item.selesai;
-
-                return true;
-            })
-            .filter((item) => {
-                if (!searchTerm) return true;
-
-                const keyword = normalizeText(searchTerm);
-
-                return [
-                    item.nama,
-                    item.kategori,
-                    item.fase,
-                    item.status,
-                    item.pic,
-                    item.vendor,
-                    item.periode,
-                ]
-                    .join(" ")
-                    .toLowerCase()
-                    .includes(keyword);
-            });
-    }, [programs, searchTerm, statusFilter]);
-
-    const totalProgram = programs.length;
-    const totalBerjalan = programs.filter((item) => !item.selesai).length;
-    const totalSelesai = programs.filter((item) => item.selesai).length;
-
-    const averageProgress =
-        programs.length > 0
-            ? Math.round(
-                programs.reduce(
-                    (sum, item) => sum + Number(item.progress || 0),
-                    0,
-                ) / programs.length,
-            )
-            : 0;
-
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
-
-    const paginatedData = filteredData.slice(
-        (page - 1) * itemsPerPage,
-        page * itemsPerPage,
-    );
-
-    useEffect(() => {
-        setPage(1);
-    }, [searchTerm, statusFilter]);
-
-    useEffect(() => {
-        if (page > totalPages) {
-            setPage(totalPages);
-        }
-    }, [page, totalPages]);
-
-    const tableColumns = [
-        {
-            header: "No",
-            align: "text-center w-20",
-            render: (_, idx) => (
-                <span className="inline-flex h-8 min-w-8 items-center justify-center rounded-xl bg-slate-50 px-3 text-[11px] font-black text-slate-400">
-                    {(page - 1) * itemsPerPage + idx + 1}
-                </span>
-            ),
-        },
-        {
-            header: "Nama Program",
-            render: (row) => (
-                <div className="flex items-center gap-4 text-left">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
-                        <FolderKanban size={18} />
-                    </div>
-
-                    <div className="leading-tight">
-                        <p className="text-[13px] font-black uppercase tracking-tight text-slate-800">
-                            {row.nama}
-                        </p>
-
-                        <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-slate-300">
-                            ID Program #{row.id_program || "-"} · {row.kategori}
-                        </p>
-                    </div>
-                </div>
-            ),
-        },
-        {
-            header: "Fase / Status",
-            render: (row) => (
-                <div className="space-y-2">
-                    <p className="text-[12px] font-bold text-slate-600">
-                        {row.fase || "-"}
-                    </p>
-
-                    <span
-                        className={`inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${row.selesai
-                            ? "bg-emerald-50 text-emerald-600"
-                            : "bg-[#0AC4E0]/10 text-[#0AC4E0]"
-                            }`}
-                    >
-                        {row.selesai ? "Selesai" : "Sedang Berjalan"}
-                    </span>
-                </div>
-            ),
-        },
-        {
-            header: "PIC / Vendor",
-            render: (row) => (
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                        <UserCog size={13} className="text-[#0AC4E0]" />
-
-                        <span className="text-[12px] font-bold text-slate-600">
-                            {row.pic && row.pic !== "-" ? row.pic : "Tanpa PIC"}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Building2 size={13} className="text-slate-300" />
-
-                        <span className="text-[11px] font-semibold text-slate-400">
-                            {row.vendor && row.vendor !== "-"
-                                ? row.vendor
-                                : "Tanpa vendor"}
-                        </span>
-                    </div>
-                </div>
-            ),
-        },
-        {
-            header: "Periode",
-            align: "text-center",
-            render: (row) => (
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-50 px-4 py-2">
-                    <CalendarDays size={13} className="text-[#0AC4E0]" />
-
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                        {row.periode || "Belum ada periode"}
-                    </span>
-                </div>
-            ),
-        },
-        {
-            header: "Progress",
-            align: "text-center",
-            render: (row) => (
-                <div className="mx-auto w-[140px]">
-                    <div className="mb-2 flex items-center justify-between">
-                        <span className="text-[10px] font-black text-slate-400">
-                            Progress
-                        </span>
-
-                        <span className="text-[11px] font-black text-[#0AC4E0]">
-                            {row.progress}%
-                        </span>
-                    </div>
-
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                            className={`h-full rounded-full ${row.selesai ? "bg-emerald-500" : "bg-[#0AC4E0]"
-                                }`}
-                            style={{ width: `${row.progress}%` }}
-                        />
-                    </div>
-                </div>
-            ),
-        },
-    ];
     return (
-        <PageWrapper className="h-screen w-screen overflow-hidden bg-white !p-0 font-sans text-slate-800">
-            <div className="flex h-screen w-screen overflow-hidden">
-                <Sidebar />
+        <MasterPageShell
+            title="Overview"
+            highlight="Hub Kelembagaan"
+            subtitle="Sistem Monitoring dan Evaluasi Mutu Pendidikan Indonesia"
+        >
+            <div className="relative h-full overflow-y-auto no-scrollbar bg-slate-50 selection:bg-cyan-500 selection:text-white">
+                <div className="pointer-events-none absolute left-0 right-0 top-0 z-0 h-[520px] bg-gradient-to-b from-blue-950 via-blue-900 to-cyan-500">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.4),transparent_50%)]" />
 
-                <main className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
-                    <div className="pointer-events-none absolute right-0 top-0 h-[360px] w-[360px] rounded-full bg-[#0AC4E0]/5 blur-[110px]" />
-                    <div className="pointer-events-none absolute bottom-0 left-1/3 h-[320px] w-[320px] rounded-full bg-blue-100/20 blur-[120px]" />
+                    <svg
+                        className="absolute bottom-0 h-32 w-full translate-y-1 transform"
+                        viewBox="0 0 1440 320"
+                        preserveAspectRatio="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            fill="rgba(6,182,212,0.2)"
+                            d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,144C672,139,768,181,864,181.3C960,181,1056,139,1152,122.7C1248,107,1344,117,1392,122.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
+                        />
+                        <path
+                            fill="#f8fafc"
+                            d="M0,224L60,213.3C120,203,240,181,360,181.3C480,181,600,203,720,197.3C840,192,960,160,1080,144C1200,128,1320,128,1380,128L1440,128L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
+                        />
+                    </svg>
+                </div>
 
-                    <section className="relative z-10 flex shrink-0 items-center justify-between border-b border-slate-100 bg-white/80 px-10 py-3 backdrop-blur-xl">
-                        <div className="flex items-center gap-5">
-                            <div className="text-left leading-none">
-                                <div className="mb-1.5 flex items-center gap-2">
-                                    <div className="h-3 w-1 rounded-full bg-[#0AC4E0]" />
+                <div className="relative z-10 px-10 py-10">
+                    <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
+                                Operator Sekolah Workspace
+                            </p>
 
-                                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">
-                                        Sistem Monitoring dan Evaluasi
+                            <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+                                Dashboard Profil Sekolah
+                            </h1>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={refreshDashboard}
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-xs font-black uppercase tracking-widest text-white backdrop-blur transition hover:bg-white hover:text-slate-900"
+                        >
+                            {isLoading ? (
+                                <Loader2 className="animate-spin" size={15} />
+                            ) : (
+                                <RefreshCcw size={15} />
+                            )}
+                            Refresh
+                        </button>
+                    </div>
+
+                    <section className="mb-12 overflow-hidden rounded-[2.5rem] border border-white/20 bg-white/10 p-6 shadow-2xl shadow-blue-950/20 backdrop-blur-xl sm:p-8">
+                        <div className="flex flex-col gap-7 lg:flex-row lg:items-center">
+                            <div className="flex w-full shrink-0 flex-col items-center justify-center lg:w-40">
+                                {logoUrl ? (
+                                    <img
+                                        src={logoUrl}
+                                        alt={`Logo ${schoolName}`}
+                                        className="max-h-32 max-w-[150px] object-contain drop-shadow-[0_18px_24px_rgba(15,23,42,0.28)] sm:max-h-36 sm:max-w-[170px]"
+                                    />
+                                ) : (
+                                    <div className="flex h-28 w-28 items-center justify-center rounded-full border border-white/20 bg-white/10 text-cyan-100 shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
+                                        <School size={42} />
+                                    </div>
+                                )}
+
+                                <span className="mt-3 text-center text-[8px] font-black uppercase tracking-[0.16em] text-cyan-100/70">
+                                    Logo dikelola Admin
+                                </span>
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex items-center gap-2 rounded-full bg-cyan-400/20 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-cyan-100 ring-1 ring-cyan-300/25">
+                                        <School size={13} />
+                                        Profil Sekolah
+                                    </span>
+
+                                    <StatusPill active={active} />
+                                </div>
+
+                                <h1 className="mt-4 break-words text-3xl font-black leading-tight tracking-[-0.045em] text-white sm:text-4xl">
+                                    {schoolName}
+                                </h1>
+
+                                <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-blue-100/85">
+                                    <Mail size={16} className="shrink-0 text-cyan-300" />
+                                    <span className="truncate">
+                                        {sekolah?.email_login || user?.email || "Email belum tersedia"}
+                                    </span>
+                                </div>
+
+                                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-200/70">
+                                            NPSN
+                                        </p>
+                                        <p className="mt-1 text-sm font-black text-white">
+                                            {sekolah?.npsn || "Belum tersedia"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-200/70">
+                                            Jenjang
+                                        </p>
+                                        <p className="mt-1 text-sm font-black text-white">
+                                            {jenjang || "Belum tersedia"}
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/15 px-4 py-3">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-cyan-100/75">
+                                            Kategori Binaan
+                                        </p>
+                                        <p className="mt-1 text-sm font-black text-cyan-100">
+                                            {sekolah?.akreditasi_internal ||
+                                                sekolah?.kategori_binaan ||
+                                                sekolah?.level_binaan ||
+                                                "Dasar"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <ProgramPortfolioSummary stats={programStats} />
+
+                    <div className="mb-10">
+                        <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+                            <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                                        Data Resmi Sekolah
+                                    </p>
+                                    <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-900 sm:text-2xl">
+                                        Identitas, Wilayah, dan Kredensial
+                                    </h2>
+                                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                                        Ringkasan data utama sekolah berdasarkan master data terbaru.
                                     </p>
                                 </div>
 
-                                <h1 className="text-[26px] font-black tracking-tighter text-slate-800">
-                                    Dashboard{" "}
-                                    <span className="text-[#0AC4E0]">
-                                        Sekolah
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Status Data
                                     </span>
-                                </h1>
+                                    <StatusPill active={active} />
+                                </div>
+                            </div>
 
-                                <p className="mt-1.5 text-[12px] font-semibold text-slate-400">
-                                    Pantau program yang sedang berjalan dan yang
-                                    sudah selesai di sekolah login saat ini.
+                            <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr]">
+                                <div className="border-b border-slate-100 p-6 lg:border-b-0 lg:border-r">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0]">
+                                            <UsersRound size={18} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900">
+                                                Kapasitas Sumber Daya Manusia
+                                            </h3>
+                                            <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
+                                                Jumlah guru dan siswa berdasarkan master sekolah.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/70">
+                                        <div className="p-5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Total Pengajar
+                                            </p>
+                                            <div className="mt-2 flex items-end gap-2">
+                                                <span className="text-3xl font-black tracking-[-0.05em] text-slate-900">
+                                                    {sekolah?.jumlah_guru || 0}
+                                                </span>
+                                                <span className="pb-1 text-xs font-bold text-[#0AC4E0]">
+                                                    Guru
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="border-l border-slate-100 p-5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Siswa Aktif
+                                            </p>
+
+                                            <div className="mt-2 flex items-end gap-2">
+                                                {editingJumlahSiswa ? (
+                                                    <input
+                                                        autoFocus
+                                                        type="number"
+                                                        min="0"
+                                                        value={jumlahSiswaDraft}
+                                                        disabled={savingJumlahSiswa}
+                                                        onChange={(event) =>
+                                                            setJumlahSiswaDraft(event.target.value)
+                                                        }
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === "Enter") {
+                                                                event.preventDefault();
+                                                                handleSaveJumlahSiswa();
+                                                            }
+
+                                                            if (event.key === "Escape") {
+                                                                event.preventDefault();
+                                                                handleCancelEditJumlahSiswa();
+                                                            }
+                                                        }}
+                                                        onBlur={handleCancelEditJumlahSiswa}
+                                                        className="h-10 w-24 rounded-2xl border border-cyan-100 bg-white px-3 text-center text-3xl font-black tracking-[-0.05em] text-slate-900 outline-none transition focus:border-[#0AC4E0] focus:ring-4 focus:ring-cyan-100 disabled:cursor-wait disabled:opacity-70"
+                                                    />
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleStartEditJumlahSiswa}
+                                                        className="rounded-2xl px-2 text-3xl font-black tracking-[-0.05em] text-slate-900 transition hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+                                                        title="Klik untuk mengubah jumlah siswa"
+                                                    >
+                                                        {sekolah?.jumlah_siswa || 0}
+                                                    </button>
+                                                )}
+
+                                                <span className="pb-1 text-xs font-bold text-blue-600">
+                                                    Siswa
+                                                </span>
+                                            </div>
+
+                                            <p className="mt-2 text-[8px] font-black uppercase tracking-widest text-slate-300">
+                                                Klik angka, lalu tekan Enter
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 border-t border-slate-100 pt-5">
+                                        <h3 className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                            Wilayah dan Alamat
+                                        </h3>
+
+                                        <div className="mt-4 space-y-4">
+                                            <div className="flex items-start gap-3">
+                                                <MapPinned size={16} className="mt-0.5 shrink-0 text-blue-500" />
+                                                <div className="min-w-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                        Kabupaten/Kota
+                                                    </p>
+                                                    <p className="mt-1 text-sm font-bold text-slate-700">
+                                                        {getKabupatenText(sekolah)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-start gap-3">
+                                                <Globe size={16} className="mt-0.5 shrink-0 text-cyan-500" />
+                                                <div className="min-w-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                        Provinsi
+                                                    </p>
+                                                    <p className="mt-1 text-sm font-bold text-slate-700">
+                                                        {getProvinsiText(sekolah)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-start gap-3">
+                                                <MapPin size={16} className="mt-0.5 shrink-0 text-slate-400" />
+                                                <div className="min-w-0">
+                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                        Alamat Operasional
+                                                    </p>
+                                                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                                                        {getAddressText(sekolah)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="p-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                            <ShieldCheck size={18} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900">
+                                                Sertifikasi dan Kualifikasi Mutu
+                                            </h3>
+                                            <p className="mt-0.5 text-[11px] font-semibold text-slate-400">
+                                                Kredensial utama serta jurusan yang tersedia di sekolah.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Akreditasi Nasional
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-slate-800">
+                                                {sekolah?.akreditasi || "Belum Terakreditasi"}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Level Binaan
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-slate-800">
+                                                {sekolah?.akreditasi_internal || "Dasar"}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Tahun Binaan
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-slate-800">
+                                                {getTahunBinaan(sekolah)}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Sertifikat ISO
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-slate-800">
+                                                {sekolah?.sertifikat_iso || "Belum"}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Jumlah Jurusan
+                                            </p>
+                                            <p className="mt-1 text-sm font-black text-slate-800">
+                                                {jurusanList.length} Jurusan
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 border-t border-slate-100 pt-5">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                    Pilih Jurusan
+                                                </p>
+                                                <p className="mt-1 text-xs font-semibold text-slate-500">
+                                                    Lihat informasi jurusan yang terdaftar di sekolah.
+                                                </p>
+                                            </div>
+                                            <Layers size={18} className="shrink-0 text-violet-500" />
+                                        </div>
+
+                                        <div className="relative mt-4">
+                                            <select
+                                                value={selectedJurusanId}
+                                                onChange={(event) =>
+                                                    setSelectedJurusanId(event.target.value)
+                                                }
+                                                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-xs font-bold text-slate-700 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
+                                            >
+                                                <option value="">
+                                                    {jurusanList.length
+                                                        ? "Pilih salah satu jurusan"
+                                                        : "Belum ada data jurusan"}
+                                                </option>
+
+                                                {jurusanList.map((jurusan) => (
+                                                    <option
+                                                        key={jurusan.id_jurusan}
+                                                        value={jurusan.id_jurusan}
+                                                    >
+                                                        {jurusan.nama_jurusan}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            <ChevronDown
+                                                size={16}
+                                                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                            />
+                                        </div>
+
+                                        {selectedJurusan && (
+                                            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <h4 className="text-sm font-black text-slate-900">
+                                                        {selectedJurusan.nama_jurusan}
+                                                    </h4>
+                                                    <span
+                                                        className={`rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-widest ${isActiveValue(selectedJurusan.status)
+                                                            ? "bg-emerald-50 text-emerald-600"
+                                                            : "bg-rose-50 text-rose-600"
+                                                            }`}
+                                                    >
+                                                        {isActiveValue(selectedJurusan.status)
+                                                            ? "Aktif"
+                                                            : "Nonaktif"}
+                                                    </span>
+                                                </div>
+
+                                                <p className="mt-2 text-xs font-semibold leading-6 text-slate-500">
+                                                    {selectedJurusan.deskripsi ||
+                                                        "Belum ada deskripsi jurusan. Tambahkan deskripsi melalui Master Jurusan."}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section className="mb-10 overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-xl shadow-slate-200/40">
+                        <div className="flex flex-col gap-4 border-b border-slate-100 bg-slate-50/80 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-cyan-600">
+                                    <BarChart3 size={14} />
+                                    <span>Portfolio Program Sekolah</span>
+                                </div>
+
+                                <h2 className="mt-1 text-2xl font-black text-slate-900">
+                                    Program Akademik & Non Akademik
+                                </h2>
+
+                                <p className="mt-1 text-xs font-semibold text-slate-400">
+                                    Dashboard ini tidak menampilkan assessment.
+                                    Fokus utama halaman adalah profil sekolah dan
+                                    program yang berjalan.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                                <FilterButton
+                                    active={categoryFilter === "ALL"}
+                                    label="Semua Kategori"
+                                    onClick={() => setCategoryFilter("ALL")}
+                                    color={COLORS.cyan}
+                                />
+
+                                <FilterButton
+                                    active={categoryFilter === "AKADEMIK"}
+                                    label="Akademik"
+                                    onClick={() => setCategoryFilter("AKADEMIK")}
+                                    color={COLORS.blue}
+                                />
+
+                                <FilterButton
+                                    active={categoryFilter === "NON_AKADEMIK"}
+                                    label="Non Akademik"
+                                    onClick={() =>
+                                        setCategoryFilter("NON_AKADEMIK")
+                                    }
+                                    color={COLORS.violet}
+                                />
+
+                                <div className="mx-1 hidden h-8 w-px bg-slate-200 xl:block" />
+
+                                <FilterButton
+                                    active={typeFilter === "ALL"}
+                                    label="Semua Jenis"
+                                    onClick={() => setTypeFilter("ALL")}
+                                    color={COLORS.cyan}
+                                />
+
+                                <FilterButton
+                                    active={typeFilter === "REGULER"}
+                                    label="Reguler"
+                                    onClick={() => setTypeFilter("REGULER")}
+                                    color={COLORS.emerald}
+                                />
+
+                                <FilterButton
+                                    active={typeFilter === "PROJECT"}
+                                    label="Project"
+                                    onClick={() => setTypeFilter("PROJECT")}
+                                    color={COLORS.amber}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-5 p-6">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="relative w-full lg:max-w-md">
+                                    <Search
+                                        size={15}
+                                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                                    />
+
+                                    <input
+                                        value={keyword}
+                                        onChange={(event) =>
+                                            setKeyword(event.target.value)
+                                        }
+                                        placeholder="Cari nama program, tahun, status, AO, atau vendor..."
+                                        className="h-11 w-full rounded-2xl border border-slate-100 bg-white pl-11 pr-4 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded-full bg-slate-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        {filteredPrograms.length} program tampil
+                                    </span>
+
+                                    {(categoryFilter !== "ALL" ||
+                                        typeFilter !== "ALL" ||
+                                        keyword) && (
+                                        <button
+                                            type="button"
+                                            onClick={resetFilter}
+                                            className="rounded-full bg-red-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-red-500 transition hover:bg-red-100"
+                                        >
+                                            Reset Filter
+                                        </button>
+                                        )}
+                                </div>
+                            </div>
+
+                            <ProgramCompositionChart
+                                rows={compositionRows}
+                                total={filteredPrograms.length}
+                            />
+
+                            {filteredPrograms.length === 0 ? (
+                                <EmptyProgramState />
+                            ) : (
+                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                                    {filteredPrograms.map((program) => (
+                                        <ProgramCard
+                                            key={getProgramId(program)}
+                                            program={program}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    <div className="mt-12 flex flex-col items-start justify-between gap-4 rounded-3xl bg-slate-900 p-6 text-white sm:flex-row sm:items-center">
+                        <div className="flex items-start gap-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-400">
+                                <TrendingUp size={18} />
+                            </div>
+
+                            <div>
+                                <h4 className="text-xs font-black tracking-wide">
+                                    Pemberitahuan Sistem Pemantauan Terpadu
+                                </h4>
+
+                                <p className="mt-0.5 max-w-2xl text-[11px] font-normal leading-relaxed text-slate-400">
+                                    Dashboard operator sekolah menampilkan profil resmi
+                                    sekolah dan ringkasan program yang relevan. Informasi
+                                    teknis internal, kode sistem, serta identitas database
+                                    tidak ditampilkan kepada pengguna.
                                 </p>
                             </div>
                         </div>
-
-                        <div className="flex w-[520px] shrink-0 items-center gap-3">
-                            <div className="flex-1 rounded-[1.5rem] bg-slate-50/60 p-2.5">
-                                <Search
-                                    placeholder="Cari program, fase, PIC, atau vendor..."
-                                    value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
-                                    }
-                                    className="!rounded-[1.1rem] !border-slate-100 !bg-white !py-2.5 !pl-12 !pr-5 !text-sm focus:!bg-white focus:!ring-4 focus:!ring-[#0AC4E0]/10"
-                                />
-                            </div>
-
-                            <select
-                                value={statusFilter}
-                                onChange={(e) =>
-                                    setStatusFilter(e.target.value)
-                                }
-                                className="h-11 rounded-2xl border border-slate-100 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 outline-none transition focus:border-[#0AC4E0] focus:bg-white"
-                            >
-                                <option value="semua">Semua</option>
-                                <option value="berjalan">Berjalan</option>
-                                <option value="selesai">Selesai</option>
-                            </select>
-                        </div>
-                    </section>
-
-                    <section className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-3">
-                        <div className="mb-3 grid shrink-0 grid-cols-1 gap-4 md:grid-cols-4">
-                            <StatCard
-                                icon={<FolderKanban size={19} />}
-                                label="Total Program"
-                                value={totalProgram}
-                                description="Program milik sekolah ini"
-                            />
-
-                            <StatCard
-                                icon={<Activity size={19} />}
-                                label="Sedang Berjalan"
-                                value={totalBerjalan}
-                                description="Program aktif dipantau"
-                                variant="primary"
-                            />
-
-                            <StatCard
-                                icon={<CheckCircle2 size={19} />}
-                                label="Sudah Selesai"
-                                value={totalSelesai}
-                                description="Program telah selesai"
-                                variant="success"
-                            />
-
-                            <StatCard
-                                icon={<TrendingUp size={19} />}
-                                label="Rata-rata Progress"
-                                value={`${averageProgress}%`}
-                                description="Akumulasi progress program"
-                                variant="warning"
-                            />
-                        </div>
-
-                        <Card className="!m-0 flex min-h-0 flex-1 flex-col overflow-hidden !rounded-[2.2rem] !border !border-slate-100 !bg-white !p-0 shadow-[0_16px_55px_rgba(15,23,42,0.04)]">
-                            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-8 py-4">
-                                <div className="text-left">
-                                    <h2 className="text-[12px] font-black uppercase tracking-[0.25em] text-slate-800">
-                                        Daftar Program Sekolah
-                                    </h2>
-
-                                    <p className="mt-1.5 text-[12px] font-semibold text-slate-400">
-                                        Menampilkan {paginatedData.length} data
-                                        pada halaman ini dari total{" "}
-                                        {filteredData.length} program.
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-3 rounded-full bg-[#0AC4E0]/10 px-5 py-2.5 text-[#0AC4E0]">
-                                    <SearchIcon size={15} />
-
-                                    <span className="text-[10px] font-black uppercase tracking-[0.25em]">
-                                        Data Program
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-4">
-                                {loading ? (
-                                    <LoadingState />
-                                ) : errorMessage ? (
-                                        <ErrorState message={errorMessage} />
-                                    ) : filteredData.length > 0 ? (
-                                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.8rem] border border-slate-100 bg-white">
-                                            <div className="min-h-0 flex-1 overflow-hidden">
-                                                <Table
-                                                    columns={tableColumns}
-                                                    data={paginatedData}
-                                                />
-                                            </div>
-
-                                                <Pagination
-                                                    page={page}
-                                                    totalPages={totalPages}
-                                                    totalData={filteredData.length}
-                                                    itemsPerPage={itemsPerPage}
-                                                    onPrev={() =>
-                                                        setPage((prev) =>
-                                                            Math.max(prev - 1, 1),
-                                                        )
-                                                    }
-                                                    onNext={() =>
-                                                        setPage((prev) =>
-                                                            Math.min(
-                                                                prev + 1,
-                                                                totalPages,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        ) : (
-                                    <EmptyState />
-                                )}
-                            </div>
-                        </Card>
-                    </section>
-                </main>
-            </div>
-        </PageWrapper>
-    );
-}
-function StatCard({ icon, label, value, description, variant = "primary" }) {
-    const variantClass = {
-        primary: "bg-[#0AC4E0]/10 text-[#0AC4E0]",
-        success: "bg-emerald-50 text-emerald-600",
-        warning: "bg-orange-50 text-orange-500",
-    };
-
-    return (
-        <Card className="!m-0 !rounded-[1.8rem] !border !border-slate-100 !bg-white !px-5 !py-4 shadow-[0_12px_40px_rgba(15,23,42,0.03)]">
-            <div className="flex items-start justify-between">
-                <div className="text-left">
-                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">
-                        {label}
-                    </p>
-
-                    <h3 className="mt-2 text-[28px] font-black leading-none tracking-tighter text-slate-800">
-                        {value}
-                    </h3>
-
-                    <p className="mt-2 text-[11px] font-semibold text-slate-400">
-                        {description}
-                    </p>
-                </div>
-
-                <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl ${variantClass[variant] || variantClass.primary
-                        }`}
-                >
-                    {icon}
+                    </div>
                 </div>
             </div>
-        </Card>
+        </MasterPageShell>
     );
 }
 
-function Pagination({
-    page,
-    totalPages,
-    totalData,
-    itemsPerPage,
-    onPrev,
-    onNext,
-}) {
-    const startData = totalData === 0 ? 0 : (page - 1) * itemsPerPage + 1;
-    const endData = Math.min(page * itemsPerPage, totalData);
-
-    return (
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 bg-slate-50/60 px-6 py-3">
-            <p className="text-[11px] font-bold text-slate-400">
-                Menampilkan {startData} - {endData} dari {totalData} data
-            </p>
-
-            <div className="flex items-center gap-2">
-                <button
-                    type="button"
-                    onClick={onPrev}
-                    disabled={page === 1}
-                    className={`flex items-center gap-2 rounded-xl border px-4 py-1.5 text-[11px] font-black uppercase tracking-widest transition ${page === 1
-                        ? "cursor-not-allowed border-slate-100 bg-slate-100 text-slate-300"
-                        : "border-slate-200 bg-white text-slate-400 hover:border-[#0AC4E0] hover:text-[#0AC4E0]"
-                        }`}
-                >
-                    <ChevronLeft size={14} />
-                    Prev
-                </button>
-
-                <div className="rounded-xl bg-[#0AC4E0] px-4 py-1.5 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-[#0AC4E0]/20">
-                    {page} / {totalPages}
-                </div>
-
-                <button
-                    type="button"
-                    onClick={onNext}
-                    disabled={page === totalPages}
-                    className={`flex items-center gap-2 rounded-xl border px-4 py-1.5 text-[11px] font-black uppercase tracking-widest transition ${page === totalPages
-                        ? "cursor-not-allowed border-slate-100 bg-slate-100 text-slate-300"
-                        : "border-slate-200 bg-white text-slate-400 hover:border-[#0AC4E0] hover:text-[#0AC4E0]"
-                        }`}
-                >
-                    Next
-                    <ChevronRight size={14} />
-                </button>
-            </div>
-        </div>
-    );
-}
-
-function LoadingState() {
-    return (
-        <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-[1.8rem] bg-slate-50">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0AC4E0] border-t-transparent" />
-
-            <p className="mt-5 text-[11px] font-black uppercase tracking-[0.25em] text-slate-400">
-                Memuat Data Program Sekolah
-            </p>
-        </div>
-    );
-}
-
-function ErrorState({ message }) {
-    return (
-        <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-[1.8rem] border border-red-100 bg-red-50 px-8 text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-red-400 shadow-sm">
-                <AlertCircle size={32} />
-            </div>
-
-            <h3 className="text-sm font-black uppercase tracking-widest text-red-500">
-                Gagal Memuat Data
-            </h3>
-
-            <p className="mt-3 max-w-xl text-sm font-medium leading-relaxed text-red-400">
-                {message}
-            </p>
-        </div>
-    );
-}
-
-function EmptyState() {
-    return (
-        <div className="flex h-full min-h-[200px] flex-col items-center justify-center rounded-[1.8rem] border border-dashed border-slate-200 bg-slate-50 px-8 text-center">
-            <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-slate-300 shadow-sm">
-                <AlertCircle size={32} />
-            </div>
-
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">
-                Belum Ada Program
-            </h3>
-
-            <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-slate-400">
-                Belum ada program yang terhubung dengan sekolah yang sedang login.
-            </p>
-        </div>
-    );
-}
-
-export default DashboardSekolah;

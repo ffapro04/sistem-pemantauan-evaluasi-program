@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 export default function Label({
   text,
   htmlFor,
@@ -25,3 +25,4 @@ export default function Label({
     </label>
   );
 }
+

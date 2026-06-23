@@ -1,128 +1,247 @@
-/* eslint-disable react/prop-types */
-import React, { useState } from "react";
-import { Upload as UploadIcon, X, FileCheck, AlertCircle } from "lucide-react";
+﻿/* eslint-disable react/prop-types */
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Upload as UploadIcon,
+  X,
+  FileCheck,
+  AlertCircle,
+} from "lucide-react";
+
+const DEFAULT_MAX_SIZE = 100 * 1024 * 1024;
+
+const isAcceptedFile = (selectedFile, accept) => {
+  if (!accept) return true;
+
+  const acceptedTypes = String(accept)
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+  if (acceptedTypes.length === 0) return true;
+
+  const fileType = String(selectedFile?.type || "").toLowerCase();
+  const fileName = String(selectedFile?.name || "").toLowerCase();
+
+  return acceptedTypes.some((acceptedType) => {
+    if (acceptedType.endsWith("/*")) {
+      const category = acceptedType.replace("/*", "");
+      return fileType.startsWith(`${category}/`);
+    }
+
+    if (acceptedType.startsWith(".")) {
+      return fileName.endsWith(acceptedType);
+    }
+
+    return fileType === acceptedType;
+  });
+};
+
+const formatFileSize = (size) => {
+  if (!size) return "";
+
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+  }
+
+  return `${(size / 1024).toFixed(1)} KB`;
+};
 
 const Upload = ({
   label,
   file,
   onFileSelect,
   required = false,
+  disabled = false,
   className = "",
+  accept = ".pdf,image/*,video/*",
+  maxSize = DEFAULT_MAX_SIZE,
+  buttonText = "Pilih Dokumen",
+  helperText = "Maks. 100MB",
 }) => {
+  const inputRef = useRef(null);
+  const [internalFile, setInternalFile] = useState(
+    file instanceof File ? file : null,
+  );
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    if (file instanceof File) {
+      setInternalFile(file);
+      return;
+    }
+
+    if (file === null || file === undefined || file === "") {
+      setInternalFile(null);
+    }
+  }, [file]);
+
+  const activeFile = file instanceof File ? file : internalFile;
+  const existingFileName =
+    typeof file === "string" && file.trim()
+      ? file.split("/").pop()
+      : "";
+  const displayedFileName = activeFile?.name || existingFileName || "";
+
+  const previewUrl = useMemo(() => {
+    if (!(activeFile instanceof File)) return "";
+    if (!String(activeFile.type || "").startsWith("image/")) return "";
+
+    return URL.createObjectURL(activeFile);
+  }, [activeFile]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const validateFile = (selectedFile) => {
-    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/jpg",
-      "application/pdf", // Tambahin PDF karena tadi butuh NPWP/KTP PDF kan?
-      "video/mp4",
-      "video/quicktime",
-      "video/x-matroska",
-    ];
+    if (!selectedFile) return false;
 
-    // 1. Cek Tipe File
-    if (!allowedTypes.includes(selectedFile.type)) {
-      setError("Format gagal! Gunakan Gambar, PDF, atau Video.");
-      if (onFileSelect) onFileSelect(null);
+    if (!isAcceptedFile(selectedFile, accept)) {
+      setError("Format file tidak sesuai.");
+      setInternalFile(null);
+      onFileSelect?.(null);
       return false;
     }
 
-    // 2. Cek Ukuran File
-    if (selectedFile.size > MAX_SIZE) {
-      setError("Ukuran terlalu besar! Maksimal 100MB.");
-      if (onFileSelect) onFileSelect(null);
+    if (selectedFile.size > maxSize) {
+      setError(
+        `Ukuran file terlalu besar. Maksimal ${(maxSize / (1024 * 1024)).toFixed(0)} MB.`,
+      );
+      setInternalFile(null);
+      onFileSelect?.(null);
       return false;
     }
 
-    // Jika lolos semua
     setError(null);
-    if (onFileSelect) onFileSelect(selectedFile); // Kirim file ke Parent
+    setInternalFile(selectedFile);
+    onFileSelect?.(selectedFile);
     return true;
   };
 
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files?.[0];
+
     if (selectedFile) {
       validateFile(selectedFile);
     }
   };
 
-  const handleRemove = (e) => {
-    e.preventDefault();
-    if (onFileSelect) onFileSelect(null); // Beritahu parent kalau file dihapus
+  const handleRemove = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setInternalFile(null);
     setError(null);
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+
+    onFileSelect?.(null);
   };
 
   return (
-    <div className={`flex flex-col gap-2 w-full ${className}`}>
+    <div className={`flex w-full flex-col gap-2 ${className}`}>
       {label && (
-        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-          {label} {required && <span className="text-red-500">*</span>}
+        <label className="ml-1 text-[10px] font-black uppercase tracking-widest text-gray-400">
+          {label}
+          {required && <span className="ml-1 text-red-500">*</span>}
         </label>
       )}
 
-      <div className="relative group">
-        <label
-          className={`flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-[2rem] transition-all cursor-pointer overflow-hidden
-          ${
-            file
+      <div className="group relative">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          className={`flex h-40 w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border-2 border-dashed transition-all ${displayedFileName
               ? "border-emerald-500 bg-emerald-50/30"
               : error
-                ? "border-red-500 bg-red-50/50 animate-shake"
-                : "border-gray-200 bg-gray-50/50 hover:bg-blue-50/50 hover:border-[#1E5AA5]"
-          }`}
+              ? "border-red-500 bg-red-50/50"
+              : "border-gray-200 bg-gray-50/50 hover:border-[#0AC4E0] hover:bg-cyan-50/40"
+            } ${disabled
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-pointer"
+            }`}
         >
           <div className="flex flex-col items-center justify-center p-5 text-center">
-            {file ? (
-              <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                <div className="p-3 rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-200 mb-3">
-                  <FileCheck size={20} />
-                </div>
-                <p className="text-[9px] font-black uppercase text-emerald-600 tracking-tighter truncate max-w-[150px]">
-                  {file.name}
+            {displayedFileName ? (
+              <>
+                {previewUrl ? (
+                  <div className="mb-3 h-20 w-20 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+                    <img
+                      src={previewUrl}
+                      alt="Preview file"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="mb-3 rounded-2xl bg-emerald-500 p-3 text-white shadow-lg shadow-emerald-200">
+                    <FileCheck size={20} />
+                  </div>
+                )}
+
+                <p className="max-w-[220px] truncate text-[9px] font-black uppercase tracking-tight text-emerald-600">
+                  {displayedFileName}
                 </p>
-                <p className="text-[8px] text-emerald-400 mt-1 font-bold">
-                  READY TO UPLOAD
+
+                {activeFile?.size && (
+                  <p className="mt-1 text-[8px] font-bold text-emerald-400">
+                    {formatFileSize(activeFile.size)}
+                  </p>
+                )}
+
+                <p className="mt-1 text-[8px] font-bold uppercase text-emerald-400">
+                  Siap diunggah
                 </p>
-              </div>
+              </>
             ) : error ? (
-              <div className="flex flex-col items-center animate-in fade-in duration-300">
-                <div className="p-3 rounded-2xl bg-red-500 text-white shadow-lg mb-3">
+                <>
+                  <div className="mb-3 rounded-2xl bg-red-500 p-3 text-white shadow-lg">
                   <AlertCircle size={20} />
                 </div>
-                <p className="text-[9px] font-black uppercase text-red-600 tracking-tighter">
+
+                  <p className="text-[9px] font-black uppercase tracking-tight text-red-600">
                   {error}
                 </p>
-              </div>
+                </>
             ) : (
               <>
-                <div className="p-3 rounded-2xl bg-white text-gray-300 shadow-sm mb-3 group-hover:text-[#1E5AA5] group-hover:shadow-md transition-all">
+                    <div className="mb-3 rounded-2xl bg-white p-3 text-gray-300 shadow-sm transition-all group-hover:text-[#0AC4E0] group-hover:shadow-md">
                   <UploadIcon size={20} />
                 </div>
-                <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest group-hover:text-[#1E5AA5]">
-                  Pilih Dokumen
+
+                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 group-hover:text-[#0AC4E0]">
+                      {buttonText}
                 </p>
-                <p className="text-[7px] text-gray-300 mt-1 font-bold italic uppercase tracking-tighter">
-                  Maks. 100MB (PDF/JPG)
+
+                    <p className="mt-1 text-[7px] font-bold uppercase italic tracking-tight text-gray-300">
+                      {helperText}
                 </p>
               </>
             )}
           </div>
-          <input
-            type="file"
-            className="hidden"
-            onChange={handleFileChange}
-            accept=".pdf,image/*,video/*"
-          />
-        </label>
+        </button>
 
-        {file && (
+        <input
+          ref={inputRef}
+          type="file"
+          className="hidden"
+          disabled={disabled}
+          onChange={handleFileChange}
+          accept={accept}
+        />
+
+        {displayedFileName && !disabled && (
           <button
+            type="button"
             onClick={handleRemove}
-            className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-all z-20"
+            className="absolute -right-2 -top-2 z-20 rounded-full bg-red-500 p-1.5 text-white shadow-lg transition-all hover:bg-red-600"
+            title="Hapus file"
           >
             <X size={12} strokeWidth={3} />
           </button>
@@ -133,3 +252,4 @@ const Upload = ({
 };
 
 export default Upload;
+

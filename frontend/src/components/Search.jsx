@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import { useState, useCallback } from "react";
 import { Search as SearchIcon, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";

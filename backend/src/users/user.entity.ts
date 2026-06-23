@@ -22,10 +22,10 @@ export class User {
   @Column()
   nama: string;
 
-  @Column({ unique: true }) // Email unik untuk login
+  @Column({ unique: true })
   email: string;
 
-  @Column({ select: false }) // PENTING: Password tidak akan ikut ditarik saat query biasa (keamanan)
+  @Column({ select: false })
   password: string;
 
   @Column({ nullable: true })
@@ -35,15 +35,20 @@ export class User {
   no_telp: string;
 
   @Column({ nullable: true })
-  jenis: string; // Bisa untuk membedakan kategori user (Internal/External)
+  jenis: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  kabupaten_tugas: any[];
 
   @Column({ nullable: true })
   sub_jenis: string;
 
+  @Column({ nullable: true })
+  foto_profile: string;
+
   @Column({ default: true })
   status: boolean;
 
-  // --- RELASI KE ROLE (Admin, Sekolah, Vendor) ---
   @ManyToOne(() => Role)
   @JoinColumn({ name: 'id_role' })
   role: Role;
@@ -51,11 +56,9 @@ export class User {
   @RelationId((user: User) => user.role)
   id_role: number;
 
-  // --- RELASI KE WILAYAH (Untuk Admin Regional) ---
   @OneToMany(() => Wilayah, (wilayah) => wilayah.user)
   wilayah: Wilayah[];
 
-  // --- RELASI KE SEKOLAH (Khusus User Sekolah) ---
   @ManyToOne(() => Sekolah, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'id_sekolah' })
   sekolah: Sekolah;
@@ -63,7 +66,6 @@ export class User {
   @RelationId((user: User) => user.sekolah)
   id_sekolah: number;
 
-  // --- TIMESTAMPS ---
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 

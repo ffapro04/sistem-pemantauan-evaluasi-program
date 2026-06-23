@@ -1,1071 +1,213 @@
-/* eslint-disable react/prop-types */
-import Sidebar from "../../components/Sidebar";
-import Card from "../../components/Card";
-import Button from "../../components/Button";
-import PageWrapper from "../../components/PageWrapper";
-
-import { useNavigate, useParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+﻿/* eslint-disable no-unused-vars */
+import React, { useEffect, useState, useCallback } from "react";
+import axios from "axios";
 import { jwtDecode } from "jwt-decode";
-import { toast } from "react-toastify";
-<<<<<<< HEAD
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  ShieldCheck,
-  UserRound,
-  X,
+    ChevronLeft,
+    ChevronRight,
+    Send,
+    RefreshCw,
+    CheckCircle2,
+    ClipboardList,
 } from "lucide-react";
+import MasterPageShell from "../../components/masterCrud/MasterPageShell";
+import MasterAlert from "../../components/masterCrud/MasterAlert";
 
-const API_BASE_URL = "http://localhost:3000";
-=======
-import { Building2, MapPin, GraduationCap, Info, Mail, Award, Users } from "lucide-react";
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
-function ProfilSekolah() {
-  const navigate = useNavigate();
-  const { id } = useParams(); // Mengambil ID dari URL /sekolah/profil/:id
+export default function IsiAssessmentSekolah() {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const [user, setUser] = useState(null);
+    const [assessment, setAssessment] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [done, setDone] = useState(false);
+    const [current, setCurrent] = useState(0);
+    const [jawaban, setJawaban] = useState({});
+    const [note, setNote] = useState({ show: false, type: null, message: "" });
 
-  const [sekolah, setSekolah] = useState(null);
-  const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
-  const [submitting, setSubmitting] = useState(false);
-
-  const [isExpired, setIsExpired] = useState(false);
-  const [sisaHari, setSisaHari] = useState(0);
-=======
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-
-  const [schoolAuth, setSchoolAuth] = useState(null);
-  const [activeGuru, setActiveGuru] = useState(null);
-  const [guruModalOpen, setGuruModalOpen] = useState(false);
-
-  useEffect(() => {
-    const fetchProfil = async () => {
-      try {
+    useEffect(() => {
         const token = localStorage.getItem("token");
-<<<<<<< HEAD
+        if (token) setUser(jwtDecode(token));
+    }, []);
 
-        if (!token) {
-          navigate("/login");
-          return;
+    const fetchAssessment = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { data } = await axios.get(`${BASE_URL}/assessment/${id}`);
+            setAssessment(data);
+        } catch {
+            setNote({ show: true, type: "error", message: "Gagal memuat assessment." });
+        } finally {
+            setLoading(false);
         }
+    }, [id]);
 
-        const decoded = jwtDecode(token);
+    useEffect(() => {
+        fetchAssessment();
+    }, [fetchAssessment]);
 
-        const id_user = decoded.sub || decoded.id_user || decoded.id || 0;
-        const id_sekolah = decoded.id_sekolah || decoded.sekolah_id || 0;
+    const questions = assessment?.pertanyaan ?? assessment?.questions ?? [];
+    const totalQ = questions.length;
+    const progress = totalQ > 0 ? Math.round((Object.keys(jawaban).length / totalQ) * 100) : 0;
 
-        setSchoolAuth({
-          id_user,
-          id_sekolah,
-          email: decoded.email || decoded.email_login || "",
-          nama: decoded.nama || decoded.nama_sekolah || "Sekolah",
-        });
-
-        const res = await fetch(`${API_BASE_URL}/assessment/${id}`, {
-=======
-        if (!token) return navigate("/login");
-
-        // Logika penentuan ID: Jika di URL ga ada ID, ambil dari token login
-        let targetId = id;
-        if (!targetId || targetId === "undefined" || targetId === "null") {
-          const decoded = jwtDecode(token);
-          targetId = decoded.id_sekolah;
-        }
-
-        const res = await fetch(`http://localhost:3000/sekolah/${targetId}`, {
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
-<<<<<<< HEAD
-
-        if (!res.ok) {
-          throw new Error(data?.message || "Gagal memuat assessment");
-        }
-
-        const now = new Date();
-        const deadline = data.tanggal_selesai
-          ? new Date(data.tanggal_selesai)
-          : null;
-
-        let expiredStatus = false;
-
-        if (deadline) {
-          deadline.setHours(23, 59, 59, 999);
-
-          const diffTime = deadline - now;
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          expiredStatus = now > deadline;
-
-          setSisaHari(diffDays);
-          setIsExpired(expiredStatus);
-        } else {
-          setSisaHari(0);
-          setIsExpired(false);
-        }
-
-        setAssessment({
-          ...data,
-          questions: Array.isArray(data.questions) ? data.questions : [],
-        });
-
-        setJawaban({});
-        setActiveGuru(null);
-
-        if (!expiredStatus) {
-          setGuruModalOpen(true);
-        }
-      } catch (err) {
-        console.error(err);
-        toast.error(err.message || "Gagal mengambil data assessment");
-=======
-        if (!res.ok) throw new Error(data?.message || "Gagal memuat profil");
-
-        setSekolah(data);
-      } catch (err) {
-        console.error(err);
-        toast.error("Gagal mengambil data profil sekolah");
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-      } finally {
-        setLoading(false);
-      }
+    const handlePilih = (idPertanyaan, pilihan) => {
+        setJawaban((prev) => ({ ...prev, [idPertanyaan]: pilihan }));
     };
-<<<<<<< HEAD
 
-    fetchAssessment();
-  }, [id, navigate]);
+    const handleSubmit = async () => {
+        if (Object.keys(jawaban).length < totalQ) {
+            setNote({ show: true, type: "error", message: "Harap jawab semua pertanyaan sebelum mengirim." });
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const payload = {
+                id_user: user?.sub,
+                id_guru_assessment: user?.sub,
+                nama_pengisi: user?.nama,
+                jawaban: Object.entries(jawaban).map(([id_pertanyaan, jawaban]) => ({
+                    id_pertanyaan: Number(id_pertanyaan),
+                    jawaban,
+                })),
+            };
+            await axios.post(`${BASE_URL}/assessment/${id}/jawab`, payload);
+            setDone(true);
+        } catch {
+            setNote({ show: true, type: "error", message: "Gagal mengirim jawaban. Coba lagi." });
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
-  const handleSetGuru = (guru) => {
-    setActiveGuru(guru);
-    setGuruModalOpen(false);
-  };
-
-  const handleChangeGuru = () => {
-    setActiveGuru(null);
-    setGuruModalOpen(true);
-  };
-
-  const handleJawab = (id_pertanyaan, jawaban_dipilih) => {
-    if (isExpired) return;
-
-    setJawaban((prev) => ({
-      ...prev,
-      [id_pertanyaan]: jawaban_dipilih,
-    }));
-  };
-
-  const handleSubmit = async () => {
-    if (!assessment || isExpired) {
-      return toast.error("Periode pengisian telah berakhir.");
-    }
-
-    if (!activeGuru) {
-      setGuruModalOpen(true);
-      return toast.error("Silakan masuk sebagai guru terlebih dahulu.");
-    }
-
-    const totalSoal = assessment.questions.length;
-    const totalDijawab = Object.keys(jawaban).length;
-
-    if (totalDijawab < totalSoal) {
-      return toast.error("Harap jawab semua pertanyaan!");
-    }
-
-    try {
-      setSubmitting(true);
-
-      const token = localStorage.getItem("token");
-      const decoded = jwtDecode(token);
-
-      const id_user =
-        schoolAuth?.id_user || decoded.sub || decoded.id_user || decoded.id || 0;
-
-      const payload = {
-        id_user,
-        id_guru_assessment: activeGuru.id_guru_assessment,
-        nama_pengisi: activeGuru.nama_guru,
-        nama_guru_snapshot: activeGuru.nama_guru,
-        jawaban: Object.entries(jawaban).map(([id_pertanyaan, value]) => ({
-          id_pertanyaan: Number(id_pertanyaan),
-          jawaban: value,
-        })),
-      };
-
-      const res = await fetch(`${API_BASE_URL}/assessment/${id}/jawab`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        throw new Error(result?.message || "Gagal submit jawaban");
-      }
-
-      toast.success("Jawaban berhasil dikirim!");
-      navigate("/sekolah/dashboard");
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Gagal mengirim jawaban");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatTanggal = (tanggal) => {
-    if (!tanggal) return "-";
-
-    return new Date(tanggal).toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-=======
-
-    fetchProfil();
-  }, [id, navigate]);
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-
-  if (loading) {
-    return (
-<<<<<<< HEAD
-      <div className="flex h-screen items-center justify-center bg-white font-bold text-[#0AC4E0]">
-        Loading...
-=======
-      <div className="flex justify-center items-center h-screen font-bold text-[#1E5AA5]">
-        Loading Profil...
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-      </div>
-    );
-  }
-
-  return (
-    <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0">
-      <Sidebar />
-<<<<<<< HEAD
-
-      <main className="flex h-full flex-1 flex-col overflow-hidden px-4 pb-0 pt-6 md:px-12 md:pt-10">
-        <Card className="!m-0 flex flex-1 flex-col overflow-auto rounded-b-[2.5rem] rounded-t-[2.5rem] border-none bg-white !p-0 shadow-2xl">
-          <div className="px-8 py-8">
-            <div className="flex flex-col gap-4">
-              <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="mb-1 text-xs font-black uppercase tracking-[0.3em] text-[#0AC4E0]">
-                    Isi Assessment Sekolah
-                  </p>
-
-                  <h1 className="text-3xl font-black uppercase italic text-gray-800">
-                    {assessment?.nama ?? "Assessment"}
-                  </h1>
+    if (loading) {
+        return (
+            <MasterPageShell title="Isi Assessment" subtitle="Sistem Monitoring dan Evaluasi Program" backPath="/sekolah/assessment">
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <RefreshCw size={28} className="animate-spin text-[#0AC4E0]" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Memuat pertanyaan...</p>
                 </div>
+            </MasterPageShell>
+        );
+    }
 
-                <Button
-                  text="← Kembali"
-                  variant="ghost"
-                  onClick={() => navigate("/sekolah/dashboard")}
-                  className="!rounded-xl border border-gray-200"
-                />
-              </div>
-
-              <div
-                className={`flex items-center justify-between gap-4 rounded-2xl border p-5 ${isExpired
-                  ? "border-red-100 bg-red-50 text-red-700"
-                  : "border-emerald-100 bg-emerald-50 text-emerald-700"
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`h-3 w-3 rounded-full ${isExpired ? "bg-red-500" : "animate-pulse bg-emerald-500"
-                      }`}
-                  />
-
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-wider">
-                      Status: {isExpired ? "Selesai / Berakhir" : "Masa Pengisian"}
-                    </p>
-
-                    <p className="text-xs opacity-80">
-                      Batas: {formatTanggal(assessment?.tanggal_selesai)}
-                    </p>
-                  </div>
-                </div>
-
-                {!isExpired && (
-                  <div className="rounded-xl bg-emerald-100 px-4 py-2 text-center">
-                    <p className="text-[10px] font-bold uppercase leading-tight">
-                      Sisa Waktu
-                    </p>
-
-                    <p className="text-lg font-black leading-tight">
-                      {sisaHari} Hari
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[1.75rem] border border-cyan-100 bg-cyan-50/70 p-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#0AC4E0] shadow-sm">
-                      <UserRound size={22} />
+    if (done) {
+        return (
+            <MasterPageShell title="Isi Assessment" subtitle="Sistem Monitoring dan Evaluasi Program" backPath="/sekolah/assessment">
+                <div className="flex flex-col items-center justify-center h-full gap-5">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
+                        <CheckCircle2 size={40} className="text-emerald-500" />
                     </div>
-
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
-                        Identitas Guru Pengisi
-                      </p>
-
-                      {activeGuru ? (
-                        <>
-                          <p className="mt-1 text-lg font-black text-slate-800">
-                            {activeGuru.nama_guru}
-                          </p>
-
-                          <p className="mt-1 text-xs font-semibold text-slate-500">
-                            Mengisi menggunakan akses sekolah aktif.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="mt-1 text-lg font-black text-slate-800">
-                            Belum masuk sebagai guru
-                          </p>
-
-                          <p className="mt-1 text-xs font-semibold text-slate-500">
-                            Silakan masuk / daftar guru sebelum mengisi assessment.
-                          </p>
-                        </>
-                      )}
+                    <div className="text-center">
+                        <h3 className="text-lg font-black text-slate-800">Assessment Terkirim!</h3>
+                        <p className="mt-1 text-xs font-medium text-slate-400">Jawaban Anda telah berhasil disimpan.</p>
                     </div>
-                  </div>
-
-                  {!isExpired && (
                     <button
-                      type="button"
-                      onClick={handleChangeGuru}
-                      className="rounded-2xl bg-[#0AC4E0] px-5 py-3 text-[11px] font-black uppercase tracking-widest text-white shadow-lg shadow-cyan-200 transition hover:bg-cyan-500"
+                        onClick={() => navigate("/sekolah/assessment")}
+                        className="mt-2 rounded-full bg-[#0AC4E0] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm shadow-cyan-100 transition-all hover:bg-cyan-500 active:scale-95"
                     >
-                      {activeGuru ? "Ganti Guru" : "Masuk Guru"}
+                        Kembali ke Daftar
                     </button>
-                  )}
                 </div>
-              </div>
-
-              {assessment?.questions.map((q, index) => (
-                <div
-                  key={q.id_pertanyaan || index}
-                  className="rounded-[1.75rem] border border-gray-100 bg-white p-6 shadow-sm"
-                >
-                  <p className="mb-5 flex gap-2 font-bold text-gray-800">
-                    <span>{index + 1}.</span>
-                    <span>{q.question}</span>
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {(q.options || []).map((opt, i) => {
-                      const isSelected = jawaban[q.id_pertanyaan] === opt;
-
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          disabled={isExpired}
-                          onClick={() => handleJawab(q.id_pertanyaan, opt)}
-                          className={`w-full rounded-2xl border px-5 py-4 text-left text-sm font-bold transition-all duration-200 ${isSelected
-                            ? "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-lg"
-                            : isExpired
-                              ? "cursor-not-allowed border-gray-100 bg-gray-50 text-gray-400"
-                              : "border-gray-200 bg-white text-gray-600 hover:border-[#0AC4E0] hover:bg-cyan-50"
-                            }`}
-                        >
-                          <span className="mr-3 opacity-60">
-                            {String.fromCharCode(65 + i)}
-                          </span>
-                          {opt}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-auto px-8 pb-10">
-            <div className="flex flex-col items-center justify-between gap-4 rounded-3xl border border-dashed border-gray-200 bg-gray-50 p-6 sm:flex-row">
-              <p className="text-sm font-medium italic text-gray-500">
-                {isExpired
-                  ? "Assessment sudah ditutup."
-                  : activeGuru
-                    ? `Jawaban akan dikirim atas nama ${activeGuru.nama_guru}.`
-                    : "Masuk sebagai guru terlebih dahulu sebelum mengirim jawaban."}
-              </p>
-
-=======
-      <main className="flex-1 flex flex-col h-full overflow-hidden px-4 md:px-12 pt-6 md:pt-10 pb-0">
-        <Card className="flex-1 flex flex-col !m-0 !p-0 rounded-t-[2.5rem] rounded-b-[2.5rem] border-none shadow-2xl bg-white overflow-auto">
-          
-          {/* HEADER SECTION */}
-          <div className="px-8 py-8 border-b border-gray-50">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-blue-50 rounded-2xl text-[#1E5AA5] shadow-sm">
-                  <Building2 size={32} />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-[#1E5AA5] font-black mb-1">
-                    Profil Lembaga
-                  </p>
-                  <h1 className="text-3xl font-black text-gray-800 uppercase italic">
-                    {sekolah?.nama_sekolah ?? "Nama Sekolah"}
-                  </h1>
-                </div>
-              </div>
-              <Button
-                text="← Dashboard"
-                variant="ghost"
-                onClick={() => navigate("/sekolah/dashboard")}
-                className="!rounded-xl border border-gray-200"
-              />
-            </div>
-          </div>
-
-          <div className="px-8 py-8 space-y-6">
-            
-            {/* CARD STATUS UTAMA */}
-            <div className="p-6 bg-gradient-to-r from-[#1E5AA5] to-[#164a8a] rounded-[1.75rem] text-white shadow-lg flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest mb-1 italic">Jenjang & Akreditasi</p>
-                <h2 className="text-2xl font-black">{sekolah?.jenjang} — AKREDITASI {sekolah?.akreditasi || "-"}</h2>
-              </div>
-              <Award size={48} className="opacity-30" />
-            </div>
-
-            {/* GRID INFORMASI DETAIL */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              {/* Box NPSN */}
-              <div className="p-6 bg-white border border-gray-100 rounded-[1.75rem] shadow-sm flex items-start gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-[#1E5AA5]">
-                  <Info size={24} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">NPSN Sekolah</label>
-                  <p className="font-bold text-gray-800 text-lg">{sekolah?.npsn || "-"}</p>
-                </div>
-              </div>
-
-              {/* Box Wilayah */}
-              <div className="p-6 bg-white border border-gray-100 rounded-[1.75rem] shadow-sm flex items-start gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-[#1E5AA5]">
-                  <MapPin size={24} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Wilayah / Lokasi</label>
-                  <p className="font-bold text-gray-800 text-lg">{sekolah?.wilayah?.nama_wilayah || "-"}</p>
-                </div>
-              </div>
-
-              {/* Box SDM */}
-              <div className="p-6 bg-white border border-gray-100 rounded-[1.75rem] shadow-sm flex items-start gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-[#1E5AA5]">
-                  <Users size={24} />
-                </div>
-                <div className="flex gap-10">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Total Guru</label>
-                    <p className="font-bold text-gray-800 text-lg">{sekolah?.jumlah_guru || 0} Orang</p>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Total Siswa</label>
-                    <p className="font-bold text-gray-800 text-lg">{sekolah?.jumlah_siswa || 0} Orang</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Box Email Login */}
-              <div className="p-6 bg-white border border-gray-100 rounded-[1.75rem] shadow-sm flex items-start gap-4">
-                <div className="p-3 bg-gray-50 rounded-xl text-[#1E5AA5]">
-                  <Mail size={24} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Email Akun</label>
-                  <p className="font-bold text-gray-800 text-lg">{sekolah?.email_login || "-"}</p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* ALAMAT LENGKAP */}
-            <div className="p-6 bg-gray-50 border border-dashed border-gray-200 rounded-[1.75rem]">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block italic text-[#1E5AA5]">Alamat Lengkap Korespondensi</label>
-              <p className="text-gray-700 font-medium leading-relaxed">
-                {sekolah?.alamat || "Alamat belum tercatat di sistem."}
-              </p>
-            </div>
-
-          </div>
-
-          {/* FOOTER ACTION */}
-          <div className="px-8 pb-10 mt-auto">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-blue-50 rounded-3xl border border-blue-100">
-              <div className="flex items-center gap-3">
-                <div className={`w-3 h-3 rounded-full ${sekolah?.status ? "bg-emerald-500" : "bg-red-500"} shadow-sm`} />
-                <p className="text-sm font-black text-[#1E5AA5] uppercase tracking-widest">
-                  Status Operasional: {sekolah?.status ? "Aktif" : "Non-Aktif"}
-                </p>
-              </div>
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
-              <Button
-                text="Hubungi Admin Untuk Perubahan"
-                variant="ghost"
-                className="!text-[10px] !py-2 border border-blue-200 bg-white"
-                onClick={() => toast.info("Silakan hubungi admin wilayah untuk merubah data profil.")}
-              />
-            </div>
-          </div>
-        </Card>
-      </main>
-
-      <GuruAccessModal
-        open={guruModalOpen}
-        onClose={() => {
-          if (activeGuru || isExpired) setGuruModalOpen(false);
-        }}
-        onBack={() => navigate("/sekolah/dashboard")}
-        schoolAuth={schoolAuth}
-        onSuccess={handleSetGuru}
-      />
-    </PageWrapper>
-  );
-}
-
-<<<<<<< HEAD
-function GuruAccessModal({ open, onClose, onBack, schoolAuth, onSuccess }) {
-  const [mode, setMode] = useState("login");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [form, setForm] = useState({
-    nama_guru: "",
-    password: "",
-    confirm_password: "",
-    email_sekolah: "",
-    password_sekolah: "",
-    password_baru: "",
-    confirm_password_baru: "",
-  });
-
-  useEffect(() => {
-    if (open) {
-      setMode("login");
-      setShowPassword(false);
-      setForm({
-        nama_guru: "",
-        password: "",
-        confirm_password: "",
-        email_sekolah: schoolAuth?.email || "",
-        password_sekolah: "",
-        password_baru: "",
-        confirm_password_baru: "",
-      });
-    }
-  }, [open, schoolAuth]);
-
-  if (!open) return null;
-
-  const updateForm = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const getMessage = async (response) => {
-    const result = await response.json().catch(() => null);
-    return result?.message || "Terjadi kesalahan";
-  };
-
-  const handleLogin = async () => {
-    if (!form.nama_guru.trim() || !form.password.trim()) {
-      return toast.error("Nama guru dan password wajib diisi");
+            </MasterPageShell>
+        );
     }
 
-    try {
-      setLoading(true);
+    const q = questions[current];
 
-      const res = await fetch(`${API_BASE_URL}/assessment-guru/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id_sekolah: schoolAuth?.id_sekolah,
-          nama_guru: form.nama_guru,
-          password: form.password,
-        }),
-      });
+    return (
+        <MasterPageShell
+            title="Isi Assessment"
+            highlight={assessment?.nama ?? ""}
+            subtitle="Sistem Monitoring dan Evaluasi Program"
+            backPath="/sekolah/assessment"
+        >
+            <MasterAlert note={note} setNote={setNote} />
 
-      if (!res.ok) {
-        throw new Error(await getMessage(res));
-      }
-
-      const result = await res.json();
-
-      toast.success("Login guru berhasil");
-      onSuccess(result.guru);
-    } catch (err) {
-      toast.error(err.message || "Login guru gagal");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    if (!form.nama_guru.trim() || !form.password.trim()) {
-      return toast.error("Nama guru dan password wajib diisi");
-    }
-
-    if (form.password.length < 4) {
-      return toast.error("Password guru minimal 4 karakter");
-    }
-
-    if (form.password !== form.confirm_password) {
-      return toast.error("Konfirmasi password tidak sesuai");
-    }
-
-    try {
-      setLoading(true);
-
-      const res = await fetch(`${API_BASE_URL}/assessment-guru/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id_sekolah: schoolAuth?.id_sekolah,
-          nama_guru: form.nama_guru,
-          password: form.password,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(await getMessage(res));
-      }
-
-      const result = await res.json();
-
-      toast.success("Guru berhasil didaftarkan");
-      onSuccess(result.guru);
-    } catch (err) {
-      toast.error(err.message || "Daftar guru gagal");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = async () => {
-    if (
-      !form.nama_guru.trim() ||
-      !form.email_sekolah.trim() ||
-      !form.password_sekolah.trim() ||
-      !form.password_baru.trim()
-    ) {
-      return toast.error("Semua field reset password wajib diisi");
-    }
-
-    if (form.password_baru.length < 4) {
-      return toast.error("Password baru minimal 4 karakter");
-    }
-
-    if (form.password_baru !== form.confirm_password_baru) {
-      return toast.error("Konfirmasi password baru tidak sesuai");
-    }
-
-    try {
-      setLoading(true);
-
-      const res = await fetch(`${API_BASE_URL}/assessment-guru/reset-password`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id_sekolah: schoolAuth?.id_sekolah,
-          nama_guru: form.nama_guru,
-          email_sekolah: form.email_sekolah,
-          password_sekolah: form.password_sekolah,
-          password_baru: form.password_baru,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(await getMessage(res));
-      }
-
-      toast.success("Password guru berhasil diperbarui");
-
-      setMode("login");
-      setForm((prev) => ({
-        ...prev,
-        password: "",
-        password_sekolah: "",
-        password_baru: "",
-        confirm_password_baru: "",
-      }));
-    } catch (err) {
-      toast.error(err.message || "Reset password gagal");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const actionMap = {
-    login: {
-      title: "Masuk Sebagai Guru",
-      subtitle: "Gunakan nama dan password guru yang sudah terdaftar.",
-      buttonText: "Masuk & Mulai Isi",
-      onSubmit: handleLogin,
-    },
-    register: {
-      title: "Daftar Guru Baru",
-      subtitle: "Buat akses guru khusus untuk sekolah ini.",
-      buttonText: "Daftar & Mulai Isi",
-      onSubmit: handleRegister,
-    },
-    reset: {
-      title: "Reset Password Guru",
-      subtitle: "Validasi dengan akun sekolah untuk membuat password baru.",
-      buttonText: "Reset Password",
-      onSubmit: handleReset,
-    },
-  };
-
-  const current = actionMap[mode];
-
-  return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-md">
-      <div className="relative w-full max-w-[880px] overflow-hidden rounded-[2.2rem] bg-white shadow-[0_34px_120px_rgba(15,23,42,0.28)]">
-        <div className="absolute right-[-80px] top-[-80px] h-56 w-56 rounded-full bg-[#0AC4E0]/15 blur-3xl" />
-        <div className="absolute bottom-[-90px] left-[-90px] h-56 w-56 rounded-full bg-cyan-100/70 blur-3xl" />
-
-        <div className="relative grid min-h-[610px] grid-cols-1 lg:grid-cols-[310px_1fr]">
-          <aside className="relative hidden overflow-hidden bg-[#0AC4E0] p-7 text-white lg:block">
-            <div className="absolute inset-0 opacity-20">
-              <div className="absolute left-6 top-8 h-24 w-24 rounded-full border border-white/50" />
-              <div className="absolute right-[-30px] top-20 h-40 w-40 rounded-full border border-white/40" />
-              <div className="absolute bottom-12 left-10 h-32 w-32 rounded-full border border-white/40" />
-            </div>
-
-            <div className="relative z-10 flex h-full flex-col justify-between">
-              <div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 text-white shadow-lg">
-                  <ShieldCheck size={27} />
-                </div>
-
-                <p className="mt-7 text-[10px] font-black uppercase tracking-[0.28em] text-white/70">
-                  Akses Assessment
-                </p>
-
-                <h2 className="mt-3 text-[31px] font-black leading-tight tracking-[-0.05em]">
-                  Verifikasi Guru Pengisi
-                </h2>
-
-                <p className="mt-4 text-[13px] font-semibold leading-6 text-white/75">
-                  Setiap guru wajib masuk ulang ketika membuka assessment agar
-                  jawaban tidak tertukar dengan guru sebelumnya.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <MiniStep number="01" text="Masuk akun sekolah" />
-                <MiniStep number="02" text="Pilih identitas guru" />
-                <MiniStep number="03" text="Isi dan kirim assessment" />
-              </div>
-            </div>
-          </aside>
-
-          <section className="relative flex min-h-0 flex-col">
-            <div className="flex shrink-0 items-start justify-between gap-5 border-b border-slate-100 px-7 py-6">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
-                  Mini Login Guru
-                </p>
-
-                <h3 className="mt-2 text-[27px] font-black tracking-[-0.04em] text-slate-900">
-                  {current.title}
-                </h3>
-
-                <p className="mt-2 max-w-md text-[13px] font-semibold leading-6 text-slate-400">
-                  {current.subtitle}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-white text-slate-400 transition hover:border-red-100 hover:bg-red-50 hover:text-red-500"
-                title="Tutup"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="shrink-0 px-7 pt-5">
-              <div className="grid grid-cols-3 gap-2 rounded-[1.25rem] bg-slate-50 p-1.5">
-                <TabButton active={mode === "login"} onClick={() => setMode("login")}>
-                  Masuk
-                </TabButton>
-
-                <TabButton
-                  active={mode === "register"}
-                  onClick={() => setMode("register")}
-                >
-                  Daftar
-                </TabButton>
-
-                <TabButton active={mode === "reset"} onClick={() => setMode("reset")}>
-                  Reset
-                </TabButton>
-              </div>
-            </div>
-
-            <div className="simple-modal-scroll min-h-0 flex-1 overflow-y-auto px-7 py-6">
-              <div className="space-y-5">
-                <FormInput
-                  label="Nama Guru"
-                  icon={<UserRound size={18} />}
-                  value={form.nama_guru}
-                  onChange={(value) => updateForm("nama_guru", value)}
-                  placeholder="Contoh: Pak Ahmad"
-                />
-
-                {mode === "login" && (
-                  <FormInput
-                    label="Password Guru"
-                    icon={<Lock size={18} />}
-                    type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={(value) => updateForm("password", value)}
-                    placeholder="Masukkan password guru"
-                    rightButton={
-                      <PasswordToggle
-                        show={showPassword}
-                        onClick={() => setShowPassword((prev) => !prev)}
-                      />
-                    }
-                  />
-                )}
-
-                {mode === "register" && (
-                  <>
-                    <FormInput
-                      label="Password Guru"
-                      icon={<Lock size={18} />}
-                      type={showPassword ? "text" : "password"}
-                      value={form.password}
-                      onChange={(value) => updateForm("password", value)}
-                      placeholder="Minimal 4 karakter"
-                      rightButton={
-                        <PasswordToggle
-                          show={showPassword}
-                          onClick={() => setShowPassword((prev) => !prev)}
+            <div className="h-full overflow-y-auto no-scrollbar px-10 py-8">
+                {/* Progress */}
+                <div className="mb-8">
+                    <div className="mb-2 flex items-center justify-between">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                            Pertanyaan {current + 1} dari {totalQ}
+                        </p>
+                        <p className="text-[9px] font-black text-[#0AC4E0]">{progress}% selesai</p>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                            className="h-full rounded-full bg-[#0AC4E0] transition-all duration-500"
+                            style={{ width: `${progress}%` }}
                         />
-                      }
-                    />
+                    </div>
+                </div>
 
-                    <FormInput
-                      label="Konfirmasi Password"
-                      icon={<Lock size={18} />}
-                      type={showPassword ? "text" : "password"}
-                      value={form.confirm_password}
-                      onChange={(value) => updateForm("confirm_password", value)}
-                      placeholder="Ulangi password guru"
-                    />
-                  </>
+                {q && (
+                    <div className="mx-auto max-w-2xl">
+                        {/* Question Card */}
+                        <div className="mb-6 rounded-[1.5rem] border border-slate-100 bg-white p-8 shadow-sm">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0] mb-3">
+                                Pertanyaan {current + 1}
+                            </p>
+                            <p className="text-sm font-bold leading-relaxed text-slate-800">
+                                {q.pertanyaan ?? q.question}
+                            </p>
+                        </div>
+
+                        {/* Options */}
+                        <div className="flex flex-col gap-3 mb-8">
+                            {(q.options ?? []).map((opt, i) => {
+                                const isSelected = jawaban[q.id_pertanyaan ?? current] === opt;
+                                return (
+                                    <button
+                                        key={i}
+                                        onClick={() => handlePilih(q.id_pertanyaan ?? current, opt)}
+                                        className={`w-full rounded-2xl border px-6 py-4 text-left text-xs font-bold transition-all active:scale-[0.99] ${isSelected
+                                            ? "border-[#0AC4E0] bg-cyan-50 text-[#0AC4E0] shadow-sm shadow-cyan-100"
+                                            : "border-slate-100 bg-white text-slate-700 hover:border-cyan-200 hover:bg-slate-50"
+                                            }`}
+                                    >
+                                        <span className={`mr-3 text-[9px] font-black uppercase ${isSelected ? "text-[#0AC4E0]" : "text-slate-300"}`}>
+                                            {String.fromCharCode(65 + i)}.
+                                        </span>
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {/* Navigation */}
+                        <div className="flex items-center justify-between">
+                            <button
+                                onClick={() => setCurrent((p) => Math.max(0, p - 1))}
+                                disabled={current === 0}
+                                className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase text-slate-400 shadow-sm transition-all hover:text-slate-700 active:scale-95 disabled:opacity-30"
+                            >
+                                <ChevronLeft size={12} /> Sebelumnya
+                            </button>
+
+                            {current < totalQ - 1 ? (
+                                <button
+                                    onClick={() => setCurrent((p) => p + 1)}
+                                    className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-2.5 text-[9px] font-black uppercase text-white shadow-sm shadow-cyan-100 transition-all hover:bg-cyan-500 active:scale-95"
+                                >
+                                    Selanjutnya <ChevronRight size={12} />
+                                </button>
+                            ) : (
+                                <button
+                                        onClick={handleSubmit}
+                                        disabled={submitting}
+                                        className="flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-2.5 text-[9px] font-black uppercase text-white shadow-sm shadow-emerald-100 transition-all hover:bg-emerald-600 active:scale-95 disabled:opacity-60"
+                                    >
+                                        {submitting ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                                        Kirim Jawaban
+                                    </button>
+                            )}
+                        </div>
+                    </div>
                 )}
-
-                {mode === "reset" && (
-                  <>
-                    <FormInput
-                      label="Email Sekolah"
-                      icon={<Mail size={18} />}
-                      value={form.email_sekolah}
-                      onChange={(value) => updateForm("email_sekolah", value)}
-                      placeholder="Email login sekolah"
-                    />
-
-                    <FormInput
-                      label="Password Sekolah"
-                      icon={<Lock size={18} />}
-                      type="password"
-                      value={form.password_sekolah}
-                      onChange={(value) => updateForm("password_sekolah", value)}
-                      placeholder="Password akun sekolah"
-                    />
-
-                    <FormInput
-                      label="Password Guru Baru"
-                      icon={<Lock size={18} />}
-                      type="password"
-                      value={form.password_baru}
-                      onChange={(value) => updateForm("password_baru", value)}
-                      placeholder="Minimal 4 karakter"
-                    />
-
-                    <FormInput
-                      label="Konfirmasi Password Baru"
-                      icon={<CheckCircle2 size={18} />}
-                      type="password"
-                      value={form.confirm_password_baru}
-                      onChange={(value) =>
-                        updateForm("confirm_password_baru", value)
-                      }
-                      placeholder="Ulangi password baru"
-                    />
-                  </>
-                )}
-              </div>
             </div>
-
-            <div className="shrink-0 border-t border-slate-100 bg-white px-7 py-5">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[0.8fr_1.2fr]">
-                <button
-                  type="button"
-                  onClick={onBack}
-                  disabled={loading}
-                  className="flex h-14 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 transition hover:border-cyan-100 hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  Kembali
-                </button>
-
-                <button
-                  type="button"
-                  onClick={current.onSubmit}
-                  disabled={loading}
-                  className={`flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-[11px] font-black uppercase tracking-[0.18em] text-white transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70 ${mode === "reset"
-                    ? "bg-slate-900 hover:bg-slate-800"
-                    : "bg-[#0AC4E0] shadow-[0_16px_34px_rgba(10,196,224,0.24)] hover:bg-cyan-500"
-                    }`}
-                >
-                  {loading ? "Memproses..." : current.buttonText}
-                </button>
-              </div>
-
-              <p className="mt-4 text-center text-[11px] font-semibold leading-5 text-slate-400">
-                Akses guru tidak disimpan otomatis. Setiap membuka halaman assessment,
-                guru wajib masuk ulang.
-              </p>
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            .simple-modal-scroll::-webkit-scrollbar {
-              width: 6px;
-            }
-
-            .simple-modal-scroll::-webkit-scrollbar-track {
-              background: transparent;
-            }
-
-            .simple-modal-scroll::-webkit-scrollbar-thumb {
-              background: #CBD5E1;
-              border-radius: 999px;
-            }
-          `,
-        }}
-      />
-    </div>
-  );
+        </MasterPageShell>
+    );
 }
-
-function MiniStep({ number, text }) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white/15 px-4 py-3 backdrop-blur-sm">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[10px] font-black text-[#0AC4E0]">
-        {number}
-      </div>
-
-      <p className="text-[12px] font-bold text-white/85">{text}</p>
-    </div>
-  );
-}
-
-function TabButton({ active, onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-[1rem] px-4 py-3 text-[10px] font-black uppercase tracking-widest transition ${active
-        ? "bg-white text-[#0AC4E0] shadow-sm"
-        : "text-slate-400 hover:bg-white/70 hover:text-slate-600"
-        }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function PasswordToggle({ show, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
-    >
-      {show ? <EyeOff size={18} /> : <Eye size={18} />}
-    </button>
-  );
-}
-
-function FormInput({
-  label,
-  icon,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  rightButton = null,
-}) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
-        {label}
-      </span>
-
-      <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition focus-within:border-cyan-200 focus-within:ring-4 focus-within:ring-cyan-50">
-        <span className="text-[#0AC4E0]">{icon}</span>
-
-        <input
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className="min-w-0 flex-1 bg-transparent text-sm font-bold text-slate-700 outline-none placeholder:text-slate-300"
-        />
-
-        {rightButton}
-      </div>
-    </label>
-  );
-}
-
-export default IsiAssessmentSekolah;
-=======
-export default ProfilSekolah;
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95

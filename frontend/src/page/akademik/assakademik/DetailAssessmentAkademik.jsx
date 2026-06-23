@@ -1,4 +1,4 @@
-import DetailAssessmentPage from "../../../components/assessment/DetailAssessmentPage";
+﻿import DetailAssessmentPage from "../../../components/assessment/DetailAssessmentPage";
 
 function DetailAssessmentAkademik() {
   return (

@@ -24,10 +24,8 @@ export class Sekolah {
   @Column()
   id_wilayah: number;
 
- @ManyToOne(() => Wilayah, (wilayah) => wilayah.sekolah)
-@JoinColumn({ name: 'id_wilayah' }) // Ini mengaitkan relasi ke kolom di atas
-wilayah: Wilayah;
-
+  @Column()
+  id_kabupaten: number;
 
   @Column({ default: true })
   status: boolean;
@@ -38,6 +36,9 @@ wilayah: Wilayah;
   @Column({ nullable: true, length: 50 })
   akreditasi: string;
 
+  @Column({ nullable: true, length: 50, default: 'Dasar' })
+  akreditasi_internal: string;
+
   @Column({ default: 0 })
   jumlah_guru: number;
 
@@ -47,9 +48,17 @@ wilayah: Wilayah;
   @Column({ type: 'text', nullable: true })
   alamat: string;
 
-<<<<<<< HEAD
+  @Column({ nullable: true })
+  nama_kabupaten: string;
+
+  @Column({ nullable: true })
+  kode_kabupaten: string;
+
   @Column({ nullable: true })
   area: string;
+
+  @Column({ type: 'int', nullable: true })
+  tahun_binaan: number;
 
   @Column({ nullable: true })
   kriteria_2022: string;
@@ -66,15 +75,9 @@ wilayah: Wilayah;
   @Column({ type: 'double precision', default: 0 })
   longitude: number;
 
-=======
-  @Column({ type: 'varchar', nullable: true })
-  latitude: string | number;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  logo_url: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  longitude: string | number;
-
-  // REVISI DI SINI: Tambahkan nullable: true agar data lama tidak error
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
   @Column({ unique: true, nullable: true })
   email_login: string;
 
@@ -88,7 +91,8 @@ wilayah: Wilayah;
     createForeignKeyConstraints: false,
     onDelete: 'CASCADE',
   })
-
+  @JoinColumn({ name: 'id_wilayah' })
+  wilayah: Wilayah;
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;

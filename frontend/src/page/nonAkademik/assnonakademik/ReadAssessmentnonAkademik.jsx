@@ -1,4 +1,4 @@
-import { ReadAssessmentPage } from "../../../components/assessment";
+﻿import { ReadAssessmentPage } from "../../../components/assessment";
 
 function ReadAssessmentNonAkademik() {
   return (

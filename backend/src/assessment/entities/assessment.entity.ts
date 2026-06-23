@@ -18,7 +18,7 @@ export class Assessment {
   @Column({ nullable: true })
   dibuat_oleh: number;
 
-  @Column({ type: 'timestamp', nullable: true }) // Gunakan type timestamp agar sinkron dengan DB
+  @Column({ type: 'timestamp', nullable: true })
   created_at: Date;
 
   @Column({ type: 'timestamp', nullable: true })
@@ -38,4 +38,7 @@ export class Assessment {
 
   @Column({ default: 'non-akademik' })
   jenis: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  pilar: string;
 }

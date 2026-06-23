@@ -1,16 +1,40 @@
 /* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable prettier/prettier */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as jwt from 'jsonwebtoken';
 
 import { Assessment } from './entities/assessment.entity';
 import { AssessmentPertanyaan } from './entities/assessment-pertanyaan.entity';
 import { AssessmentJawaban } from './entities/assessment-jawaban.entity';
 import { Sekolah } from '../sekolah/entities/sekolah.entity';
 import { User } from '../users/user.entity';
+import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.entity';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
+
+function normalizeAssessmentPilar(value?: string, jenis?: string) {
+  const raw = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/-/g, '_')
+    .replace(/\s+/g, '_');
+
+  if (raw.includes('KARAKTER')) return 'KARAKTER';
+  if (raw.includes('SENI')) return 'SENI_BUDAYA';
+  if (raw.includes('KECAKAPAN') || raw.includes('HIDUP'))
+    return 'KECAKAPAN_HIDUP';
+  if (raw.includes('AKADEMIK')) return 'AKADEMIK';
+
+  const jenisRaw = String(jenis || '').toLowerCase();
+  return jenisRaw.includes('non') ? 'SENI_BUDAYA' : 'AKADEMIK';
+}
 
 @Injectable()
 export class AssessmentService {
@@ -29,6 +53,9 @@ export class AssessmentService {
 
     @InjectRepository(Sekolah)
     private sekolahRepo: Repository<Sekolah>,
+
+    @InjectRepository(AssessmentGuru)
+    private guruRepo: Repository<AssessmentGuru>,
   ) {}
 
   async create(dto: CreateAssessmentDto) {
@@ -38,6 +65,7 @@ export class AssessmentService {
       target_sekolah_ids: dto.target_sekolah_ids || [],
       tenggat: dto.tenggat ?? 7,
       jenis: dto.jenis ?? 'non-akademik',
+      pilar: normalizeAssessmentPilar(dto.pilar, dto.jenis),
       status: 'Siap Diajukan',
       aktif: true,
       sent_at: null,
@@ -58,7 +86,7 @@ export class AssessmentService {
     };
   }
 
-  async findAll(jenis?: string, id_ho?: number) {
+  async findAll(jenis?: string, id_ho?: number, pilar?: string) {
     const query = this.assessmentRepo
       .createQueryBuilder('a')
       .leftJoin('m_users', 'u', 'u.id_user = a.id_ho')
@@ -81,14 +109,23 @@ export class AssessmentService {
         'a.sent_at AS sent_at',
         'a.tenggat AS tenggat',
         'a.jenis AS jenis',
+        'a.pilar AS pilar',
+        'a.target_sekolah_ids AS target_sekolah_ids',
         'u.nama AS ho',
         "STRING_AGG(DISTINCT s.nama_sekolah, ', ') AS daftar_sekolah",
         'COUNT(DISTINCT aj.nama_pengisi) AS jumlah_pengisi',
       ])
-      .groupBy('a.id_assessment, u.nama, a.sent_at, a.tenggat, a.jenis');
+      .groupBy(
+        'a.id_assessment, u.nama, a.sent_at, a.tenggat, a.jenis, a.pilar, a.target_sekolah_ids',
+      );
 
     if (jenis) query.andWhere('a.jenis = :jenis', { jenis });
     if (id_ho) query.andWhere('a.id_ho = :id_ho', { id_ho });
+    if (pilar && pilar !== 'SEMUA') {
+      query.andWhere('a.pilar = :pilar', {
+        pilar: normalizeAssessmentPilar(pilar, jenis),
+      });
+    }
 
     return query.getRawMany();
   }
@@ -122,6 +159,11 @@ export class AssessmentService {
       aktif: assessment.aktif,
       sent_at: assessment.sent_at,
       tenggat: assessment.tenggat,
+      jenis: assessment.jenis,
+      pilar:
+        assessment.pilar ||
+        normalizeAssessmentPilar(undefined, assessment.jenis),
+      target_sekolah_ids: assessment.target_sekolah_ids || [],
       tanggal_selesai: tanggalSelesai,
       questions: pertanyaan.map((p) => ({
         id_pertanyaan: p.id_pertanyaan,
@@ -332,6 +374,7 @@ export class AssessmentService {
         'a.id_assessment AS id_assessment',
         'a.nama AS nama_assessment',
         'a.jenis AS jenis',
+        'a.pilar AS pilar',
         'COUNT(DISTINCT a.id_assessment) AS total',
       ])
       .groupBy(
@@ -342,7 +385,8 @@ export class AssessmentService {
         s.nama_sekolah,
         a.id_assessment,
         a.nama,
-        a.jenis
+        a.jenis,
+        a.pilar
         `,
       )
       .orderBy('COUNT(DISTINCT a.id_assessment)', 'DESC');
@@ -369,6 +413,7 @@ export class AssessmentService {
       assessmentId: Number(row.id_assessment),
       assessmentTitle: row.nama_assessment || 'Assessment',
       jenis: row.jenis,
+      pilar: row.pilar,
       total: Number(row.total || 1),
     }));
   }
@@ -385,6 +430,12 @@ export class AssessmentService {
     if (body.nama !== undefined) assessment.nama = body.nama;
     if (body.tenggat !== undefined) assessment.tenggat = body.tenggat;
     if (body.jenis !== undefined) assessment.jenis = body.jenis;
+    if (body.pilar !== undefined) {
+      assessment.pilar = normalizeAssessmentPilar(
+        body.pilar,
+        body.jenis || assessment.jenis,
+      );
+    }
     if (body.target_sekolah_ids !== undefined) {
       assessment.target_sekolah_ids = body.target_sekolah_ids;
     }
@@ -412,9 +463,10 @@ export class AssessmentService {
   async jawab(
     id_assessment: number,
     body: {
-      id_user: number;
+      token?: string;
+      id_user?: number;
       id_guru_assessment?: number;
-      nama_pengisi: string;
+      nama_pengisi?: string;
       nama_guru_snapshot?: string;
       jawaban: { id_pertanyaan: number; jawaban: string; skor?: number }[];
     },
@@ -427,16 +479,55 @@ export class AssessmentService {
       throw new NotFoundException('Assessment tidak ditemukan');
     }
 
-    if (!body.id_guru_assessment) {
-      throw new Error('Guru wajib login terlebih dahulu');
+    let id_guru_assessment = body.id_guru_assessment;
+    let nama_guru = body.nama_pengisi;
+
+    // Verifikasi token jika tidak ada id_guru_assessment
+    if (body.token && !id_guru_assessment) {
+      try {
+        const decoded: any = jwt.verify(
+          body.token,
+          process.env.JWT_SECRET || 'secretkey',
+        );
+
+        if (decoded.type !== 'guru-access') {
+          throw new Error('Invalid token type');
+        }
+
+        id_guru_assessment = decoded.id_guru_assessment;
+        nama_guru = decoded.nama_guru;
+      } catch (error) {
+        throw new UnauthorizedException(
+          'Token akses tidak valid atau sudah kadaluarsa',
+        );
+      }
     }
 
-    if (!body.nama_pengisi || !body.nama_pengisi.trim()) {
-      throw new Error('Nama pengisi wajib diisi');
+    if (!id_guru_assessment) {
+      throw new BadRequestException('Guru tidak teridentifikasi');
+    }
+
+    // Ambil data guru dari database
+    const guru = await this.guruRepo.findOne({
+      where: { id_guru_assessment },
+    });
+
+    if (!guru) {
+      throw new NotFoundException('Data guru tidak ditemukan');
+    }
+
+    if (!guru.is_active) {
+      throw new UnauthorizedException('Akun guru tidak aktif');
+    }
+
+    const finalNamaPengisi = nama_guru || body.nama_pengisi || guru.nama_guru;
+
+    if (!finalNamaPengisi || !finalNamaPengisi.trim()) {
+      throw new BadRequestException('Nama pengisi wajib diisi');
     }
 
     if (!Array.isArray(body.jawaban) || body.jawaban.length === 0) {
-      throw new Error('Jawaban tidak boleh kosong');
+      throw new BadRequestException('Jawaban tidak boleh kosong');
     }
 
     const pertanyaan = await this.pertanyaanRepo.find({
@@ -450,26 +541,30 @@ export class AssessmentService {
     );
 
     if (invalidQuestion) {
-      throw new Error('Terdapat jawaban untuk pertanyaan yang tidak valid');
+      throw new BadRequestException(
+        'Terdapat jawaban untuk pertanyaan yang tidak valid',
+      );
     }
 
+    // Hapus jawaban lama
     await this.jawabanRepo
       .createQueryBuilder()
       .delete()
       .from('assessment_jawaban')
       .where('id_pertanyaan IN (:...ids)', { ids: allowedQuestionIds })
       .andWhere('id_guru_assessment = :id_guru_assessment', {
-        id_guru_assessment: body.id_guru_assessment,
+        id_guru_assessment,
       })
       .execute();
 
+    // Simpan jawaban baru
     const simpanJawaban = body.jawaban.map((j) => {
       return this.jawabanRepo.save({
         id_pertanyaan: Number(j.id_pertanyaan),
-        id_user: body.id_user,
-        id_guru_assessment: body.id_guru_assessment,
-        nama_pengisi: body.nama_pengisi,
-        nama_guru_snapshot: body.nama_guru_snapshot || body.nama_pengisi,
+        id_user: body.id_user || null,
+        id_guru_assessment,
+        nama_pengisi: finalNamaPengisi,
+        nama_guru_snapshot: body.nama_guru_snapshot || finalNamaPengisi,
         jawaban: j.jawaban,
         skor: j.skor || 0,
       });
@@ -479,7 +574,7 @@ export class AssessmentService {
 
     return {
       success: true,
-      message: `Assessment berhasil dikirim oleh ${body.nama_pengisi}`,
+      message: `Assessment berhasil dikirim oleh ${finalNamaPengisi}`,
     };
   }
 
@@ -500,6 +595,8 @@ export class AssessmentService {
           'a.aktif AS aktif',
           'a.sent_at AS sent_at',
           'a.tenggat AS tenggat',
+          'a.jenis AS jenis',
+          'a.pilar AS pilar',
           'u.nama AS ho',
         ])
         .where(':id_sekolah = ANY(a.target_sekolah_ids)', {

@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+﻿/* eslint-disable react/prop-types */
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -48,7 +48,7 @@ const Pagination = ({
             Record Tracking
           </span>
           <span className="text-[11.5px] font-semibold text-gray-500 leading-none">
-            {from}–{to}
+            {from}-{to}
             <span className="text-gray-400 mx-1.5">of</span>
             <span className="text-gray-700">{totalItems}</span>
           </span>

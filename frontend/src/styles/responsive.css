@@ -1,0 +1,325 @@
+/* src/styles/responsive.css */
+
+/* =========================================================
+   GLOBAL RESPONSIVE FOUNDATION
+   Untuk semua halaman React
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Semua gambar, chart, iframe jangan melebihi layar */
+img,
+svg,
+canvas,
+iframe,
+video {
+  max-width: 100%;
+}
+
+/* Main content tidak boleh bikin horizontal overflow */
+main {
+  min-width: 0;
+}
+
+/* =========================================================
+   RESPONSIVE PAGE LAYOUT
+   ========================================================= */
+
+@media (max-width: 1024px) {
+  .page-responsive,
+  main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .h-screen {
+    min-height: 100vh;
+  }
+
+  .overflow-hidden {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+
+  main {
+    width: 100%;
+    min-width: 0;
+  }
+
+  section,
+  header,
+  footer {
+    min-width: 0;
+  }
+
+  /* Biar header halaman turun ke bawah kalau sempit */
+  header > div,
+  section > div {
+    min-width: 0;
+  }
+
+  /* Elemen flex besar otomatis wrap */
+  .flex {
+    min-width: 0;
+  }
+
+  .flex.items-center.justify-between,
+  .flex.items-start.justify-between {
+    flex-wrap: wrap;
+  }
+
+  /* Gap besar dikecilkan */
+  .gap-6 {
+    gap: 1rem !important;
+  }
+
+  .gap-5 {
+    gap: 0.875rem !important;
+  }
+
+  /* Padding besar dikecilkan */
+  .p-8 {
+    padding: 1rem !important;
+  }
+
+  .p-7 {
+    padding: 1rem !important;
+  }
+
+  .p-6 {
+    padding: 1rem !important;
+  }
+
+  .px-8 {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .py-6 {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  /* Radius besar jangan terlalu makan ruang */
+  .rounded-\[1\.75rem\],
+  .rounded-\[1\.5rem\],
+  .rounded-\[1\.45rem\],
+  .rounded-\[1\.35rem\],
+  .rounded-\[2rem\] {
+    border-radius: 1.15rem !important;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE GRID FIX
+   Memaksa grid besar jadi 1 kolom di HP
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .grid {
+    min-width: 0;
+  }
+
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6,
+  .grid-cols-7,
+  .grid-cols-8,
+  .grid-cols-9,
+  .grid-cols-10,
+  .grid-cols-11,
+  .grid-cols-12 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+
+  .md\:grid-cols-2,
+  .md\:grid-cols-3,
+  .md\:grid-cols-4,
+  .lg\:grid-cols-2,
+  .lg\:grid-cols-3,
+  .lg\:grid-cols-4,
+  .xl\:grid-cols-2,
+  .xl\:grid-cols-3,
+  .xl\:grid-cols-4,
+  .xl\:grid-cols-12 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+
+  .col-span-2,
+  .col-span-3,
+  .col-span-4,
+  .col-span-5,
+  .col-span-6,
+  .col-span-7,
+  .col-span-8,
+  .col-span-9,
+  .col-span-10,
+  .col-span-11,
+  .col-span-12,
+  .xl\:col-span-2,
+  .xl\:col-span-3,
+  .xl\:col-span-4,
+  .xl\:col-span-5,
+  .xl\:col-span-6,
+  .xl\:col-span-7,
+  .xl\:col-span-8,
+  .xl\:col-span-9,
+  .xl\:col-span-10,
+  .xl\:col-span-11,
+  .xl\:col-span-12 {
+    grid-column: span 1 / span 1 !important;
+  }
+}
+
+/* Tablet: grid besar jadi 2 kolom */
+@media (min-width: 769px) and (max-width: 1180px) {
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6,
+  .grid-cols-7,
+  .grid-cols-8,
+  .grid-cols-9,
+  .grid-cols-10,
+  .grid-cols-11,
+  .grid-cols-12 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE TABLE
+   Table tetap bisa dibaca di HP dengan horizontal scroll
+   ========================================================= */
+
+@media (max-width: 768px) {
+  table {
+    min-width: 720px;
+  }
+
+  .table-responsive,
+  .admin-table,
+  .compact-table,
+  .simple-scroll {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  thead th,
+  tbody td {
+    white-space: nowrap;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE FORM / INPUT / BUTTON
+   ========================================================= */
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea,
+  button {
+    max-width: 100%;
+  }
+
+  .min-w-\[280px\],
+  .min-w-\[300px\],
+  .min-w-\[320px\],
+  .w-60,
+  .w-72,
+  .w-80,
+  .w-96 {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE TEXT
+   Supaya heading tidak kegedean di HP
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .text-\[42px\] {
+    font-size: 30px !important;
+  }
+
+  .text-\[35px\] {
+    font-size: 26px !important;
+  }
+
+  .text-\[30px\] {
+    font-size: 24px !important;
+  }
+
+  .text-\[28px\],
+  .text-\[27px\] {
+    font-size: 23px !important;
+  }
+
+  .text-\[24px\] {
+    font-size: 20px !important;
+  }
+
+  .tracking-\[-0\.08em\],
+  .tracking-\[-0\.06em\],
+  .tracking-\[-0\.045em\] {
+    letter-spacing: -0.035em !important;
+  }
+}
+
+/* =========================================================
+   RESPONSIVE CHART
+   Untuk Recharts / dashboard chart
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .recharts-wrapper {
+    min-width: 100% !important;
+  }
+
+  .recharts-surface {
+    overflow: visible;
+  }
+
+  .recharts-legend-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    left: 0 !important;
+  }
+}
+
+/* =========================================================
+   MOBILE SAFE AREA IOS
+   Biar aman di iPhone yang ada notch
+   ========================================================= */
+
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
