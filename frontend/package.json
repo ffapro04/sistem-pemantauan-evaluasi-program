@@ -21,10 +21,7 @@
     "axios": "^1.13.6",
     "date-holidays": "^3.30.2",
     "framer-motion": "^12.38.0",
-<<<<<<< HEAD
-    "jspdf": "^4.2.1",
-=======
->>>>>>> 55395b99654a0c44898aa60d46a595d174a20e95
+
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
