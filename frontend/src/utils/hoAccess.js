@@ -162,9 +162,9 @@ export function getHoAllowedJenjang(user = {}) {
     if (subJenis.includes("sd")) return ["SD"];
     if (subJenis.includes("smp")) return ["SMP"];
 
-    // Kalau HO akademik tapi sub_jenis kosong, jangan tampilkan semua.
-    // Ini sengaja strict agar HO SMK tidak bocor melihat SD/SMP saat data profile belum lengkap.
-    if (isHoAkademik(user)) return [];
+    // Saat data profil HO belum lengkap, tetap tampilkan semua jenjang agar
+    // halaman program tidak kosong saat testing awal/seed data.
+    if (isHoAkademik(user)) return ["SD", "SMP", "SMK"];
 
     return ["SD", "SMP", "SMK"];
 }

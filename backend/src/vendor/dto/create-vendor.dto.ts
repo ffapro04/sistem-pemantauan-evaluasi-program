@@ -20,6 +20,10 @@ export class CreateVendorDto {
   @IsOptional()
   npwp_file?: string;
 
+  @IsString()
+  @IsOptional()
+  buku_rekening_file?: string;
+
   // --- DATA PENANGGUNG JAWAB ---
   @IsString()
   @IsNotEmpty()

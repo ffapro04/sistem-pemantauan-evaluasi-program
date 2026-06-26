@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
+import * as XLSX from "xlsx";
 import {
     BarChart,
     Bar,
+    Cell,
     XAxis,
     YAxis,
     Tooltip,
@@ -30,6 +32,7 @@ import {
     Building2,
     Radio,
     DatabaseZap,
+    Download,
 } from "lucide-react";
 
 import {
@@ -47,8 +50,10 @@ import {
 } from "../common";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
+import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const DEFAULT_API_BASE = "";
+const ANSWER_CHART_COLORS = ["#FF0052", "#FFD400", "#00C68D", "#0055DA"];
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -73,13 +78,46 @@ const getPilarOptions = (jenisAssessment) =>
 
 const getDefaultPilar = (jenisAssessment) => getPilarOptions(jenisAssessment)[0]?.value || "AKADEMIK";
 
+const normalizePilarValue = (value) => {
+    const text = String(value || "")
+        .trim()
+        .toUpperCase()
+        .replaceAll("-", "_")
+        .replaceAll(" ", "_");
+
+    if (text.includes("KECAKAPAN")) return "KECAKAPAN_HIDUP";
+    if (text.includes("SENI")) return "SENI_BUDAYA";
+    if (text.includes("KARAKTER")) return "KARAKTER";
+    if (text.includes("AKADEMIK")) return "AKADEMIK";
+
+    return "";
+};
+
+const getAssessmentPilarValue = (assessment, jenisAssessment) => {
+    const explicit = normalizePilarValue(
+        assessment?.pilar ||
+        assessment?.pillar ||
+        assessment?.pilar_assessment ||
+        assessment?.pilarAssessment ||
+        assessment?.pilar_program ||
+        assessment?.program?.pilar ||
+        assessment?.program?.pilar_program,
+    );
+
+    if (explicit) return explicit;
+
+    return getDefaultPilar(assessment?.jenis || jenisAssessment);
+};
+
 const getPilarLabel = (value) => {
     const options = [
         ...ASSESSMENT_PILAR_OPTIONS.akademik,
         ...ASSESSMENT_PILAR_OPTIONS["non-akademik"],
     ];
 
-    return options.find((item) => item.value === value)?.label || "Belum Dipilih";
+    const normalizedValue = normalizePilarValue(value);
+
+    return options.find((item) => item.value === normalizedValue)?.label || "Belum Dipilih";
 };
 
 const getPilarTone = (value) => {
@@ -88,7 +126,9 @@ const getPilarTone = (value) => {
         ...ASSESSMENT_PILAR_OPTIONS["non-akademik"],
     ];
 
-    return options.find((item) => item.value === value)?.tone || "border-slate-100 bg-slate-50 text-slate-500";
+    const normalizedValue = normalizePilarValue(value);
+
+    return options.find((item) => item.value === normalizedValue)?.tone || "border-slate-100 bg-slate-50 text-slate-500";
 };
 
 
@@ -289,12 +329,14 @@ const canAccessAssessmentResult = (assessmentResult, currentHo, allSchools = [])
 
 function AssessmentDetailBase({
     type = "akademik",
+    jenisAssessment = type,
     label = "Akademik",
     basePath = "/ho/assessment/akademik",
     headerEyebrow = "Assessment Dashboard",
     title = "Hasil Assessment Akademik",
     apiBase = DEFAULT_API_BASE,
 }) {
+
     const navigate = useNavigate();
     const { id } = useParams();
 
@@ -386,6 +428,8 @@ function AssessmentDetailBase({
     }, [apiBase, id, navigate, basePath]);
 
     const questions = assessment?.pertanyaan || [];
+    const resolvedJenisAssessment = assessment?.jenis || jenisAssessment || type || "akademik";
+    const assessmentPilar = getAssessmentPilarValue(assessment, resolvedJenisAssessment);
     const respondents = assessment?.pengisi || [];
     const schools = assessment?.sekolah_profile || [];
     const activeQuestion = questions[activeQuestionIndex] || null;
@@ -428,7 +472,7 @@ function AssessmentDetailBase({
         const questionId = getQuestionId(activeQuestion);
         const pilihan = getQuestionOptions(activeQuestion);
 
-        return pilihan.map((opsi) => {
+        return pilihan.map((opsi, index) => {
             const jumlah = respondents.filter((pengisi) => {
                 const jawaban = getAnswerForQuestion(pengisi, questionId);
 
@@ -444,6 +488,7 @@ function AssessmentDetailBase({
                 jawaban: opsi,
                 jumlah,
                 persentase,
+                color: ANSWER_CHART_COLORS[index % ANSWER_CHART_COLORS.length],
             };
         });
     }, [respondents, activeQuestion]);
@@ -534,6 +579,108 @@ function AssessmentDetailBase({
         );
     };
 
+    const handleExport = () => {
+        if (!assessment) {
+            toast.error("Data assessment belum siap diexport.");
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+        const totalResponden = Number(assessment.total_responden || 0);
+        const sudahMengisi = respondents.length;
+        const belumMengisi = Math.max(totalResponden - sudahMengisi, 0);
+
+        const summarySheet = XLSX.utils.aoa_to_sheet([
+            ["HASIL ASSESSMENT"],
+            ["Nama Assessment", assessment.nama_assessment || "-"],
+            ["Jenis", assessment.jenis || "-"],
+            ["Pilar", getPilarLabel(assessmentPilar) || "-"],
+            ["Total Responden", totalResponden],
+            ["Sudah Mengisi", sudahMengisi],
+            ["Belum Mengisi", belumMengisi],
+            ["Progress", `${completionRate}%`],
+            ["Deadline", assessment.deadline ? formatDate(assessment.deadline) : "-"],
+        ]);
+        summarySheet["!cols"] = [{ wch: 24 }, { wch: 52 }];
+
+        const recapRows = [
+            ["No Pertanyaan", "Pertanyaan", "Opsi Jawaban", "Jumlah", "Persentase"],
+        ];
+
+        questions.forEach((question, questionIndex) => {
+            const questionId = getQuestionId(question);
+            const pilihan = getQuestionOptions(question).slice(0, 4);
+
+            pilihan.forEach((opsi) => {
+                const jumlah = respondents.filter((pengisi) => {
+                    const jawaban = getAnswerForQuestion(pengisi, questionId);
+                    return jawaban?.jawaban === opsi;
+                }).length;
+                const persentase =
+                    respondents.length > 0
+                        ? Math.round((jumlah / respondents.length) * 100)
+                        : 0;
+
+                recapRows.push([
+                    questionIndex + 1,
+                    question.teks || question.pertanyaan || "-",
+                    opsi,
+                    jumlah,
+                    `${persentase}%`,
+                ]);
+            });
+        });
+
+        const recapSheet = XLSX.utils.aoa_to_sheet(recapRows);
+        recapSheet["!cols"] = [
+            { wch: 14 },
+            { wch: 64 },
+            { wch: 26 },
+            { wch: 12 },
+            { wch: 14 },
+        ];
+        recapSheet["!autofilter"] = { ref: `A1:E${Math.max(recapRows.length, 1)}` };
+
+        const rawRows = [
+            ["Nama Pengisi", "Sekolah", "Tanggal Mengisi", "No Pertanyaan", "Pertanyaan", "Jawaban", "Skor"],
+        ];
+
+        respondents.forEach((pengisi) => {
+            (pengisi.jawaban || []).forEach((jawaban) => {
+                const pertanyaan = questions.find(
+                    (item) => Number(getQuestionId(item)) === Number(jawaban.id_pertanyaan),
+                );
+
+                rawRows.push([
+                    pengisi.nama || "-",
+                    pengisi.sekolah || "-",
+                    pengisi.tanggal_mengisi ? formatDate(pengisi.tanggal_mengisi) : "-",
+                    pertanyaan?.nomor || "",
+                    pertanyaan?.teks || pertanyaan?.pertanyaan || "",
+                    jawaban.jawaban || "",
+                    jawaban.skor ?? "",
+                ]);
+            });
+        });
+
+        const rawSheet = XLSX.utils.aoa_to_sheet(rawRows);
+        rawSheet["!cols"] = [
+            { wch: 28 },
+            { wch: 34 },
+            { wch: 18 },
+            { wch: 14 },
+            { wch: 64 },
+            { wch: 26 },
+            { wch: 10 },
+        ];
+        rawSheet["!autofilter"] = { ref: `A1:G${Math.max(rawRows.length, 1)}` };
+
+        XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan");
+        XLSX.utils.book_append_sheet(workbook, recapSheet, "Rekap Diagram");
+        XLSX.utils.book_append_sheet(workbook, rawSheet, "Data Mentah");
+        XLSX.writeFile(workbook, `hasil-assessment-${id}.xlsx`);
+    };
+
     if (loading) {
         return (
             <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[#FBFDFF]">
@@ -620,6 +767,15 @@ function AssessmentDetailBase({
                         </div>
 
                         <div className="flex items-center gap-4">
+                            <button
+                                type="button"
+                                onClick={handleExport}
+                                className="hidden items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0] transition-all hover:bg-[#0AC4E0] hover:text-white md:flex"
+                            >
+                                <Download size={14} />
+                                Download Hasil
+                            </button>
+
                             <div className="hidden text-right lg:block">
                                 <p className="mb-1 text-[9px] font-semibold uppercase tracking-widest text-slate-400">
                                     Nama Assessment
@@ -636,7 +792,7 @@ function AssessmentDetailBase({
                                 <ShieldCheck size={14} className="text-[#0AC4E0]" />
 
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-white">
-                                    {getPilarLabel(assessment?.pilar) || label}
+                                    {getPilarLabel(assessmentPilar) || label}
                                 </span>
 
                                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0AC4E0]" />
@@ -664,7 +820,7 @@ function AssessmentDetailBase({
                                 <StatCard
                                     icon={<ShieldCheck size={18} />}
                                     label="Pilar"
-                                    value={getPilarLabel(assessment?.pilar)}
+                                    value={getPilarLabel(assessmentPilar)}
                                     desc={label}
                                     color="#64748B"
                                 />
@@ -702,10 +858,10 @@ function AssessmentDetailBase({
                             </div>
 
                             <div className="grid grid-cols-12 gap-5">
-                                <Card className="col-span-12 !m-0 flex min-h-[520px] flex-col !rounded-2xl !border !border-slate-200/80 !bg-white !p-8 shadow-sm lg:col-span-8">
-                                    <div className="mb-6 flex items-start justify-between">
+                                <Card className="col-span-12 !m-0 flex flex-col !rounded-2xl !border !border-slate-200/80 !bg-white !p-5 shadow-sm sm:!p-6">
+                                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div className="min-w-0 flex-1 pr-4">
-                                            <div className="mb-3 flex items-center gap-2">
+                                            <div className="mb-2 flex flex-wrap items-center gap-2">
                                                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-[#083344] px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#0AC4E0]">
                                                     <Radio size={9} className="animate-pulse" />
                                                     Soal{" "}
@@ -714,11 +870,11 @@ function AssessmentDetailBase({
                                                 </span>
 
                                                 <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                                    {getPilarLabel(assessment?.pilar) || label}
+                                                    {getPilarLabel(assessmentPilar) || label}
                                                 </span>
                                             </div>
 
-                                            <h2 className="line-clamp-2 text-[17px] font-bold leading-snug tracking-tight text-[#083344]">
+                                            <h2 className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[#083344] sm:text-[16px]">
                                                 {activeQuestion
                                                     ? getQuestionText(activeQuestion)
                                                     : "Belum ada pertanyaan"}
@@ -751,7 +907,7 @@ function AssessmentDetailBase({
                                         </div>
                                     </div>
 
-                                    <div className="mb-6 flex flex-wrap gap-1.5">
+                                    <div className="mb-4 flex max-h-10 flex-wrap gap-1.5 overflow-y-auto pr-1">
                                         {questions.map((_, i) => (
                                             <button
                                                 type="button"
@@ -766,8 +922,8 @@ function AssessmentDetailBase({
                                     </div>
 
                                     {questions.length > 0 ? (
-                                        <div className="flex min-h-0 flex-1 flex-col gap-8 md:flex-row">
-                                            <div className="min-h-[280px] flex-1">
+                                        <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch">
+                                            <div className="h-[220px] min-w-0 flex-1 sm:h-[240px]">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <BarChart
                                                         data={chartData}
@@ -781,8 +937,8 @@ function AssessmentDetailBase({
                                                                 x2="0"
                                                                 y2="1"
                                                             >
-                                                                <stop offset="0%" stopColor="#0AC4E0" />
-                                                                <stop offset="100%" stopColor="#0891b2" />
+                                                                <stop offset="0%" stopColor={CHART_STATUS_COLORS.info} />
+                                                                <stop offset="100%" stopColor={CHART_STATUS_COLORS.deep} />
                                                             </linearGradient>
                                                         </defs>
 
@@ -816,7 +972,7 @@ function AssessmentDetailBase({
 
                                                         <Tooltip
                                                             cursor={{
-                                                                fill: "rgba(10,196,224,0.05)",
+                                                                fill: "rgba(0,85,218,0.05)",
                                                                 radius: 8,
                                                             }}
                                                             contentStyle={{
@@ -831,13 +987,19 @@ function AssessmentDetailBase({
                                                             dataKey="jumlah"
                                                             radius={[8, 8, 0, 0]}
                                                             barSize={44}
-                                                            fill={`url(#barGrad-${type})`}
-                                                        />
+                                                        >
+                                                            {chartData.map((entry, index) => (
+                                                                <Cell
+                                                                    key={`answer-bar-${entry.jawaban}-${index}`}
+                                                                    fill={entry.color}
+                                                                />
+                                                            ))}
+                                                        </Bar>
                                                     </BarChart>
                                                 </ResponsiveContainer>
                                             </div>
 
-                                            <div className="custom-scrollbar flex w-full flex-col gap-1 overflow-y-auto pr-1 md:w-64">
+                                            <div className="custom-scrollbar flex max-h-[240px] w-full flex-col gap-1 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/50 p-3 xl:w-72">
                                                 <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
                                                     Distribusi Jawaban
                                                 </p>
@@ -848,8 +1010,12 @@ function AssessmentDetailBase({
                                                         className="group border-b border-slate-50 py-3 last:border-0"
                                                     >
                                                         <div className="mb-1.5 flex items-center justify-between">
-                                                            <span className="flex-1 truncate pr-2 text-[12px] font-semibold text-slate-600 transition-colors group-hover:text-[#0AC4E0]">
-                                                                {item.jawaban}
+                                                            <span className="flex min-w-0 flex-1 items-center gap-2 pr-2 text-[11px] font-semibold text-slate-600 transition-colors group-hover:text-[#0AC4E0]">
+                                                                <span
+                                                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                                                    style={{ backgroundColor: item.color }}
+                                                                />
+                                                                <span className="truncate">{item.jawaban}</span>
                                                             </span>
 
                                                             <div className="flex shrink-0 items-center gap-2">
@@ -865,8 +1031,11 @@ function AssessmentDetailBase({
 
                                                         <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                                                             <div
-                                                                className="h-full rounded-full bg-gradient-to-r from-[#0AC4E0] to-[#06b6d4] transition-all duration-700"
-                                                                style={{ width: `${item.persentase}%` }}
+                                                                className="h-full rounded-full transition-all duration-700"
+                                                                style={{
+                                                                    width: `${item.persentase}%`,
+                                                                    backgroundColor: item.color,
+                                                                }}
                                                             />
                                                         </div>
                                                     </div>
@@ -882,16 +1051,6 @@ function AssessmentDetailBase({
                                     )}
                                 </Card>
 
-                                <div className="col-span-12 lg:col-span-4">
-                                    <ProfileList
-                                        title="Database Sekolah"
-                                        subtitle="Institutional Hub"
-                                        countLabel="Unit"
-                                        items={schools}
-                                        metaLabel="NPSN"
-                                        badgeLabel="Akreditasi"
-                                    />
-                                </div>
                             </div>
 
                             <Card className="!m-0 flex flex-col overflow-hidden !rounded-2xl !border !border-slate-200/80 !bg-white shadow-sm">

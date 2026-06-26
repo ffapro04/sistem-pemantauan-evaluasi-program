@@ -60,6 +60,9 @@ export class Notifikasi {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any> | null;
 
+  @Column({ type: 'varchar', length: 180, nullable: true })
+  dedupe_key: string | null;
+
   @Column({ type: 'boolean', default: false })
   is_read: boolean;
 

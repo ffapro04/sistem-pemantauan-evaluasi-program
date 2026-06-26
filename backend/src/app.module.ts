@@ -33,7 +33,7 @@ import { GoogleDriveModule } from './google-drive/google-drive.module';
       password: process.env.DB_PASSWORD || 'ypamdr17',
       database: process.env.DB_DATABASE || 'sistem_monitoring_evaluasi_program',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
 
     AuthModule,

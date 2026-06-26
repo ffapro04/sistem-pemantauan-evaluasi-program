@@ -40,6 +40,7 @@ const normalizeWilayah = (item) => ({
     kode_wilayah: item?.kode_wilayah || "-",
     nama_wilayah: item?.nama_wilayah || "Kabupaten Tidak Diketahui",
     provinsi: item?.parent?.nama_wilayah || "-",
+    area_wilayah: item?.area_wilayah || "",
     tipe_wilayah: normalizeKlasifikasi(item?.tipe_wilayah),
     jenis_wilayah: item?.jenis_wilayah || "KABUPATEN",
     status: item?.status ?? true,
@@ -49,6 +50,8 @@ const normalizeWilayah = (item) => ({
     jumlah_smk: item?.jumlah_smk || 0,
     jumlah_guru: item?.jumlah_guru || 0,
     jumlah_siswa: item?.jumlah_siswa || 0,
+    latitude: item?.latitude ?? "",
+    longitude: item?.longitude ?? "",
     deskripsi: item?.deskripsi || "",
     parent: item?.parent,
 });
@@ -96,6 +99,81 @@ const getProvinceFilterItems = (auxData = {}) => {
                 label: `Provinsi ${prov.nama_wilayah}`,
             })),
     ];
+};
+
+const getProvinceOptions = (auxData = {}) => {
+    const provinces = Array.isArray(auxData?.provinsiList)
+        ? auxData.provinsiList
+        : [];
+
+    return [
+        { value: "", label: "PILIH PROVINSI" },
+        ...provinces
+            .filter(
+                (prov) =>
+                    prov.id_wilayah &&
+                    isActiveValue(prov.status) &&
+                    String(prov.jenis_wilayah || "").toUpperCase() === "PROVINSI",
+            )
+            .sort((a, b) =>
+                String(a.nama_wilayah || "").localeCompare(
+                    String(b.nama_wilayah || ""),
+                ),
+            )
+            .map((prov) => ({
+                value: String(prov.id_wilayah),
+                label: `Provinsi ${prov.nama_wilayah || ""}`.trim(),
+            })),
+    ];
+};
+
+const getSelectedProvince = (auxData = {}, provinceId) => {
+    const id = String(provinceId || "");
+    if (!id) return null;
+
+    return (auxData.provinsiList || []).find(
+        (prov) => String(prov?.id_wilayah) === id,
+    ) || null;
+};
+
+const getAreaOptions = (auxData = {}) => {
+    const areas = [...new Set(
+        getWilayahAuxList(auxData)
+            .map((row) => String(row?.area_wilayah || "").trim())
+            .filter(Boolean),
+    )].sort((a, b) => a.localeCompare(b));
+
+    return [
+        { value: "", label: "PILIH AREA" },
+        ...areas.map((area) => ({
+            value: area,
+            label: area,
+        })),
+    ];
+};
+
+const generateKabupatenCode = (auxData = {}, provinceId, currentId = null) => {
+    const province = getSelectedProvince(auxData, provinceId);
+    const provinceCode = String(province?.kode_wilayah || "").trim();
+    const baseCode = provinceCode && provinceCode !== "-" ? provinceCode : "KAB";
+    const separator = baseCode.includes(".") ? "." : "-";
+    const prefix = `${baseCode}${separator}`;
+    const rows = getWilayahAuxList(auxData).filter((row) => {
+        const parentId = row?.id_parent || row?.parent?.id_wilayah || row?.parent?.id;
+        return (
+            String(parentId || "") === String(provinceId || "") &&
+            String(row?.id_wilayah || "") !== String(currentId || "") &&
+            !isProvinsiRow(row)
+        );
+    });
+    const usedNumbers = rows
+        .map((row) => String(row?.kode_wilayah || ""))
+        .filter((code) => code.startsWith(prefix))
+        .map((code) => Number(code.slice(prefix.length).replace(/\D/g, "")))
+        .filter((number) => Number.isFinite(number));
+    const nextNumber = usedNumbers.length ? Math.max(...usedNumbers) + 1 : 1;
+
+    return `${prefix}${String(nextNumber).padStart(2, "0")}`;
 };
 
 const getWilayahAuxList = (auxData = {}) =>
@@ -271,6 +349,9 @@ export const wilayahConfig = {
         nama_wilayah: "",
         kode_wilayah: "",
         provinsi: "",
+        area_mode: "existing",
+        area_wilayah: "",
+        area_baru: "",
         tipe_wilayah: "Absolute",
         tahun_awal_binaan: "",
         jumlah_sd: 0,
@@ -278,6 +359,8 @@ export const wilayahConfig = {
         jumlah_smk: 0,
         jumlah_guru: 0,
         jumlah_siswa: 0,
+        latitude: "",
+        longitude: "",
         deskripsi: "",
         status: true,
         id_parent: null,
@@ -291,6 +374,9 @@ export const wilayahConfig = {
             nama_wilayah: payload?.nama_wilayah || "",
             kode_wilayah: payload?.kode_wilayah || "",
             provinsi: payload?.parent?.nama_wilayah || "",
+            area_mode: payload?.area_wilayah ? "existing" : "new",
+            area_wilayah: payload?.area_wilayah || "",
+            area_baru: "",
             tipe_wilayah: payload?.tipe_wilayah || "Absolute",
             tahun_awal_binaan: payload?.tahun_awal_binaan || "",
             jumlah_sd: payload?.jumlah_sd || 0,
@@ -298,28 +384,73 @@ export const wilayahConfig = {
             jumlah_smk: payload?.jumlah_smk || 0,
             jumlah_guru: payload?.jumlah_guru || 0,
             jumlah_siswa: payload?.jumlah_siswa || 0,
+            latitude: payload?.latitude ?? "",
+            longitude: payload?.longitude ?? "",
             deskripsi: payload?.deskripsi || "",
             status: payload?.status ?? true,
             id_parent: payload?.id_parent || payload?.parent?.id_wilayah || null,
         };
     },
 
-    searchKeys: ["nama_wilayah", "kode_wilayah", "provinsi", "tipe_wilayah", "deskripsi"],
+    onFieldChange: ({ field, value, next, auxData, mode }) => {
+        if (field === "id_parent") {
+            const province = getSelectedProvince(auxData, value);
+            return {
+                ...next,
+                id_parent: value || null,
+                provinsi: province?.nama_wilayah || "",
+                kode_wilayah:
+                    mode === "edit" && next.kode_wilayah
+                        ? next.kode_wilayah
+                        : generateKabupatenCode(auxData, value, next.id_wilayah),
+            };
+        }
+
+        if (field === "nama_wilayah" && !next.kode_wilayah && next.id_parent) {
+            return {
+                ...next,
+                kode_wilayah: generateKabupatenCode(auxData, next.id_parent, next.id_wilayah),
+            };
+        }
+
+        if (field === "area_mode") {
+            return {
+                ...next,
+                area_wilayah: value === "new" ? "" : next.area_wilayah,
+                area_baru: value === "existing" ? "" : next.area_baru,
+            };
+        }
+
+        return next;
+    },
+
+    searchKeys: ["nama_wilayah", "kode_wilayah", "provinsi", "area_wilayah", "tipe_wilayah", "deskripsi"],
 
     filters: [
         {
-            name: "cakupan",
-            label: "CAKUPAN",
+            name: "semua",
+            label: "SEMUA",
             defaultValue: "all",
-            icon: School,
+            icon: Database,
             width: "w-56",
             items: [
-                { value: "all", label: "SEMUA WILAYAH" },
-                { value: "ypamdr", label: "WILAYAH YPA-MDR" },
+                { value: "all", label: "SEMUA KABUPATEN/KOTA" },
             ],
-            predicate: (row, value, { auxData }) => {
+            predicate: () => true,
+        },
+        {
+            name: "area",
+            label: "AREA",
+            defaultValue: "all",
+            icon: Layers,
+            width: "w-52",
+            items: ({ auxData }) => [
+                { value: "all", label: "SEMUA AREA" },
+                ...getAreaOptions(auxData).filter((item) => item.value),
+            ],
+            predicate: (row, value) => {
                 if (value === "all") return true;
-                return isWilayahYpamdr(row, auxData);
+                return String(row.area_wilayah || "") === String(value);
             },
         },
         {
@@ -354,23 +485,6 @@ export const wilayahConfig = {
             predicate: (row, value) => {
                 if (value === "all") return true;
                 return normalizeKlasifikasi(row.tipe_wilayah) === value;
-            },
-        },
-        {
-            name: "status",
-            label: "STATUS",
-            defaultValue: "all",
-            icon: CheckCircle,
-            width: "w-52",
-            items: [
-                { value: "all", label: "SEMUA STATUS" },
-                { value: "active", label: "AKTIF" },
-                { value: "inactive", label: "NONAKTIF" },
-            ],
-            predicate: (row, value) => {
-                if (value === "all") return true;
-                const active = isActiveValue(row.status);
-                return value === "active" ? active : !active;
             },
         },
     ],
@@ -416,6 +530,15 @@ export const wilayahConfig = {
                         {row.parent?.nama_wilayah || "-"}
                     </p>
                 </div>
+            ),
+        },
+        {
+            header: "Area",
+            align: "text-left w-[10%]",
+            render: (row) => (
+                <span className="rounded-lg border border-[#0AC4E0]/10 bg-[#0AC4E0]/5 px-2 py-0.5 text-[8px] font-black uppercase tracking-tight text-[#0AC4E0]">
+                    {row.area_wilayah || "-"}
+                </span>
             ),
         },
         {
@@ -485,20 +608,54 @@ export const wilayahConfig = {
                     placeholder: "Masukkan nama kabupaten/kota",
                 },
                 {
+                    name: "id_parent",
+                    label: "Provinsi",
+                    type: "select",
+                    icon: MapPin,
+                    required: true,
+                    options: ({ auxData }) => getProvinceOptions(auxData),
+                    help: "Pilih provinsi induk untuk kabupaten/kota.",
+                },
+                {
+                    name: "area_mode",
+                    label: "Pengaturan Area",
+                    type: "select",
+                    icon: Layers,
+                    required: true,
+                    options: [
+                        { value: "existing", label: "PILIH AREA YANG SUDAH ADA" },
+                        { value: "new", label: "BUAT AREA BARU" },
+                    ],
+                    help: "Kabupaten bisa dipindahkan ke area lain kapan saja melalui edit data.",
+                },
+                {
+                    name: "area_wilayah",
+                    label: "Area",
+                    type: "select",
+                    icon: Layers,
+                    required: ({ formData }) => formData.area_mode !== "new",
+                    hidden: ({ formData }) => formData.area_mode === "new",
+                    options: ({ auxData }) => getAreaOptions(auxData),
+                    help: "Pilih area penugasan untuk kabupaten/kota ini.",
+                },
+                {
+                    name: "area_baru",
+                    label: "Nama Area Baru",
+                    type: "text",
+                    icon: Layers,
+                    required: ({ formData }) => formData.area_mode === "new",
+                    hidden: ({ formData }) => formData.area_mode !== "new",
+                    placeholder: "Contoh: Area VII",
+                    help: "Area baru otomatis tersedia untuk kabupaten berikutnya.",
+                },
+                {
                     name: "kode_wilayah",
                     label: "Kode Wilayah",
                     type: "text",
                     icon: Database,
                     disabled: true,
-                    help: "Kode wilayah otomatis dari sistem",
-                },
-                {
-                    name: "provinsi",
-                    label: "Provinsi",
-                    type: "text",
-                    icon: MapPin,
-                    disabled: true,
-                    help: "Provinsi ditentukan dari induk wilayah",
+                    placeholder: "Otomatis setelah provinsi dipilih",
+                    help: "Kode otomatis mengikuti kode provinsi dan urutan kabupaten/kota.",
                 },
                 {
                     name: "tipe_wilayah",
@@ -511,6 +668,22 @@ export const wilayahConfig = {
                         { value: "Independent", label: "INDEPENDENT" },
                     ],
                     help: "Absolute = binaan utama, Independent = mandiri/non-binaan",
+                },
+                {
+                    name: "latitude",
+                    label: "Latitude Marker",
+                    type: "number",
+                    icon: MapPin,
+                    placeholder: "Contoh: -7.884611",
+                    help: "Opsional. Isi agar marker wilayah tampil lebih akurat di peta.",
+                },
+                {
+                    name: "longitude",
+                    label: "Longitude Marker",
+                    type: "number",
+                    icon: MapPin,
+                    placeholder: "Contoh: 110.334111",
+                    help: "Opsional. Isi agar marker wilayah tampil lebih akurat di peta.",
                 },
             ],
         },
@@ -599,13 +772,40 @@ export const wilayahConfig = {
         if (!formData.nama_wilayah?.trim()) {
             return "Nama kabupaten/kota wajib diisi.";
         }
+        if (!formData.id_parent) {
+            return "Provinsi wajib dipilih.";
+        }
+        if (formData.area_mode === "new" && !formData.area_baru?.trim()) {
+            return "Nama area baru wajib diisi.";
+        }
+        if (formData.area_mode !== "new" && !formData.area_wilayah) {
+            return "Area wajib dipilih.";
+        }
+        const hasLatitude = formData.latitude !== "" && formData.latitude !== null && formData.latitude !== undefined;
+        const hasLongitude = formData.longitude !== "" && formData.longitude !== null && formData.longitude !== undefined;
+
+        if (hasLatitude !== hasLongitude) {
+            return "Latitude dan longitude harus diisi berpasangan.";
+        }
+        if (hasLatitude && (!Number.isFinite(Number(formData.latitude)) || !Number.isFinite(Number(formData.longitude)))) {
+            return "Latitude dan longitude harus berupa angka.";
+        }
         return true;
     },
 
-    buildPayload: ({ formData }) => {
+    buildPayload: ({ formData, auxData }) => {
+        const kodeWilayah =
+            formData.kode_wilayah ||
+            generateKabupatenCode(auxData, formData.id_parent, formData.id_wilayah);
+        const areaWilayah =
+            formData.area_mode === "new"
+                ? formData.area_baru?.trim()
+                : formData.area_wilayah;
+
         return {
             nama_wilayah: formData.nama_wilayah,
-            kode_wilayah: formData.kode_wilayah,
+            kode_wilayah: kodeWilayah,
+            area_wilayah: areaWilayah || null,
             tipe_wilayah: formData.tipe_wilayah,
             jenis_wilayah: "KABUPATEN",
             tahun_awal_binaan: formData.tahun_awal_binaan
@@ -613,7 +813,15 @@ export const wilayahConfig = {
                 : null,
             deskripsi: formData.deskripsi || "",
             status: formData.status ?? true,
-            id_parent: formData.id_parent,
+            id_parent: formData.id_parent ? Number(formData.id_parent) : null,
+            latitude:
+                formData.latitude !== "" && formData.latitude !== null && formData.latitude !== undefined
+                    ? Number(formData.latitude)
+                    : undefined,
+            longitude:
+                formData.longitude !== "" && formData.longitude !== null && formData.longitude !== undefined
+                    ? Number(formData.longitude)
+                    : undefined,
         };
     },
     formTitle: {
@@ -633,7 +841,10 @@ export const wilayahConfig = {
         { label: "Nama Kabupaten", key: "nama_wilayah" },
         { label: "Kode Wilayah", key: "kode_wilayah" },
         { label: "Provinsi", key: "provinsi" },
+        { label: "Area", key: "area_wilayah" },
         { label: "Klasifikasi", key: "tipe_wilayah" },
+        { label: "Latitude", key: "latitude" },
+        { label: "Longitude", key: "longitude" },
         { label: "Tahun Binaan", key: "tahun_awal_binaan" },
         { label: "Jumlah SD", key: "jumlah_sd" },
         { label: "Jumlah SMP", key: "jumlah_smp" },
@@ -686,10 +897,28 @@ export const wilayahConfig = {
                         icon: MapPin,
                     },
                     {
+                        label: "Area",
+                        key: "area_wilayah",
+                        icon: Layers,
+                        format: (value) => value || "Belum ditentukan",
+                    },
+                    {
                         label: "Klasifikasi",
                         key: "tipe_wilayah",
                         icon: Globe2,
                         format: (value) => normalizeKlasifikasi(value),
+                    },
+                    {
+                        label: "Latitude Marker",
+                        key: "latitude",
+                        icon: MapPin,
+                        format: (value) => value || "Belum ditentukan",
+                    },
+                    {
+                        label: "Longitude Marker",
+                        key: "longitude",
+                        icon: MapPin,
+                        format: (value) => value || "Belum ditentukan",
                     },
                 ],
             },

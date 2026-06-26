@@ -7,6 +7,7 @@ import {
     AlertTriangle,
     ArrowLeft,
     BriefcaseBusiness,
+    Calendar,
     CheckCircle2,
     CheckSquare,
     ChevronRight,
@@ -19,6 +20,7 @@ import {
     MessageSquare,
     RefreshCcw,
     Send,
+    Star,
     UploadCloud,
     UserCheck,
     X,
@@ -97,6 +99,39 @@ function normalizeArray(payload) {
 
 function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
+}
+
+function normalizeMeetings(kegiatan = {}) {
+    return getArray(
+        kegiatan.pertemuan,
+        kegiatan.meetings,
+        kegiatan.t_kegiatan_pertemuan,
+    ).map((item, index) => ({
+        id: item.id_pertemuan || item.id || index,
+        title:
+            item.nama_pertemuan ||
+            item.nama ||
+            item.title ||
+            `Pertemuan ${index + 1}`,
+        description: item.deskripsi || item.description || "",
+        startDate: item.tanggal_mulai || item.start_date || null,
+        endDate: item.tanggal_selesai || item.end_date || null,
+    }));
+}
+
+function getRatingStats(kegiatan = {}) {
+    const ratings = getArray(kegiatan.ratings, kegiatan.rating_items);
+    const total = ratings.length;
+    const average = total
+        ? ratings.reduce((sum, item) => sum + Number(item.rating || 0), 0) / total
+        : Number(kegiatan.guru_rating || 0);
+
+    return {
+        total,
+        average: average ? Number(average.toFixed(2)) : 0,
+        guruCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "GURU").length,
+        vendorCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "VENDOR").length,
+    };
 }
 
 async function safeJson(response) {
@@ -279,6 +314,17 @@ function StatusBadge({ status }) {
         >
             {STATUS_LABEL[status] || status}
         </span>
+    );
+}
+
+function MiniStat({ label, value }) {
+    return (
+        <div className="rounded-xl bg-white px-3 py-2 text-center">
+            <p className="text-[14px] font-black text-slate-900">{value}</p>
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                {label}
+            </p>
+        </div>
     );
 }
 
@@ -781,6 +827,8 @@ function VendorProgramDetailPage({
                     kegiatan.requirements,
                     kegiatan.t_persyaratan_kegiatan,
                 );
+                const meetings = normalizeMeetings(kegiatan);
+                const ratingStats = getRatingStats(kegiatan);
 
                 const parentTitle =
                     kegiatan.nama_kegiatans ||
@@ -818,6 +866,8 @@ function VendorProgramDetailPage({
 
                     statusKegiatan: kegiatan.status_kegiatan || "LOCKED",
                     guruRating: kegiatan.guru_rating || null,
+                    meetings,
+                    ratingStats,
                     commentCount: Array.isArray(kegiatan.comments) ? kegiatan.comments.length : 0,
                     tanggalMulai: kegiatan.tanggal_mulai || null,
                     tanggalSelesai: kegiatan.tanggal_selesai || null,
@@ -2280,6 +2330,19 @@ function VendorExecutionTablePanel({
                                                         <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-400">
                                                             {row.description || "-"}
                                                         </p>
+
+                                                        {row.type === "kegiatan" && (
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                                    <Calendar size={11} />
+                                                                    {(row.meetings || []).length} Pertemuan
+                                                                </span>
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                                                    <Star size={11} />
+                                                                    {row.ratingStats?.average || 0}/5 · {row.ratingStats?.total || 0}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -2462,6 +2525,54 @@ function VendorSelectedRowPanel({
                         />
                     </div>
                 </div>
+
+                {selectedRow.type === "kegiatan" && (
+                    <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/40 p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                    Pertemuan
+                                </p>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                    {(selectedRow.meetings || []).length} item
+                                </span>
+                            </div>
+                            {(selectedRow.meetings || []).length === 0 ? (
+                                <p className="text-[11px] font-semibold leading-relaxed text-slate-400">
+                                    Belum ada detail pertemuan pada aktivitas ini.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {selectedRow.meetings.map((meeting, index) => (
+                                        <div key={`${meeting.id}-${index}`} className="rounded-xl border border-cyan-100 bg-white px-3 py-2">
+                                            <p className="text-[11px] font-black text-slate-800">{meeting.title}</p>
+                                            <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                {meeting.startDate || "-"} s/d {meeting.endDate || "-"}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50/50 p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                    Rating Aktivitas
+                                </p>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                    <Star size={11} />
+                                    {selectedRow.ratingStats?.average || 0}/5
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <MiniStat label="Total" value={selectedRow.ratingStats?.total || 0} />
+                                <MiniStat label="Guru" value={selectedRow.ratingStats?.guruCount || 0} />
+                                <MiniStat label="Vendor" value={selectedRow.ratingStats?.vendorCount || 0} />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="p-5">

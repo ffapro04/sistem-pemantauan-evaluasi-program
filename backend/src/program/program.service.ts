@@ -6,6 +6,8 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,10 +20,17 @@ import { PersyaratanTermin } from './entities/persyaratan-termin.entity';
 import { PersyaratanKegiatan } from './entities/persyaratan-kegiatan.entity';
 import { DokumenProgram } from './entities/dokumen-program.entity';
 import { KegiatanComment } from './entities/kegiatan-comment.entity';
+import { KegiatanPertemuan } from './entities/kegiatan-pertemuan.entity';
+import { KegiatanRating } from './entities/kegiatan-rating.entity';
 import { CreateProgramDto } from './dto/create-program.dto';
+import { NotifikasiService } from '../notifikasi/notifikasi.service';
+import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
 
 @Injectable()
-export class ProgramService {
+export class ProgramService implements OnModuleInit, OnModuleDestroy {
+  private reminderTimer: NodeJS.Timeout | null = null;
+  private lastReminderRunDate: string | null = null;
+
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
@@ -46,8 +55,36 @@ export class ProgramService {
 
     @InjectRepository(KegiatanComment)
     private readonly kegiatanCommentRepo: Repository<KegiatanComment>,
+
+    @InjectRepository(KegiatanPertemuan)
+    private readonly kegiatanPertemuanRepo: Repository<KegiatanPertemuan>,
+
+    @InjectRepository(KegiatanRating)
+    private readonly kegiatanRatingRepo: Repository<KegiatanRating>,
     private readonly googleDriveService: GoogleDriveService,
+    private readonly notifikasiService: NotifikasiService,
   ) {}
+
+  onModuleInit() {
+    this.reminderTimer = setInterval(() => {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+
+      if (now.getHours() !== 7 || this.lastReminderRunDate === today) return;
+
+      this.lastReminderRunDate = today;
+      this.createDeadlineReminders().catch((error) => {
+        console.error('PROGRAM_DEADLINE_REMINDER_ERROR:', error);
+      });
+    }, 60 * 60 * 1000);
+  }
+
+  onModuleDestroy() {
+    if (this.reminderTimer) {
+      clearInterval(this.reminderTimer);
+      this.reminderTimer = null;
+    }
+  }
 
   private toNumber(value: any, fallback: any = null) {
     const parsed = Number(value);
@@ -207,6 +244,290 @@ export class ProgramService {
       driveFile?.drive_file_id ||
       fallbackName
     );
+  }
+
+  private async getProgramNotificationTargets(program: Program) {
+    const userIds = new Set<number>();
+    const guruIds = new Set<number>();
+
+    const sekolahIds = this.toArray(program?.sekolah_ids).length
+      ? this.toArray(program.sekolah_ids)
+      : program?.id_sekolah
+        ? [Number(program.id_sekolah)]
+        : [];
+
+    const aoIds = this.toArray(program?.ao_ids).length
+      ? this.toArray(program.ao_ids)
+      : program?.id_pengawas
+        ? [Number(program.id_pengawas)]
+        : [];
+
+    const vendorIds = this.toArray(program?.vendor_ids).length
+      ? this.toArray(program.vendor_ids)
+      : this.toArray(program?.id_vendor);
+
+    if (program?.dibuat_oleh) userIds.add(Number(program.dibuat_oleh));
+    aoIds.forEach((id) => id && userIds.add(Number(id)));
+
+    if (vendorIds.length > 0) {
+      const vendors = await this.programRepo.manager.query(
+        `
+          SELECT id_user
+          FROM m_vendor
+          WHERE id_vendor = ANY($1::int[])
+            AND id_user IS NOT NULL
+        `,
+        [vendorIds],
+      );
+
+      vendors.forEach((row: any) => {
+        if (row.id_user) userIds.add(Number(row.id_user));
+      });
+    }
+
+    if (sekolahIds.length > 0) {
+      const schoolUsers = await this.programRepo.manager.query(
+        `
+          SELECT id_user
+          FROM m_users
+          WHERE id_sekolah = ANY($1::int[])
+            AND status = true
+            AND (id_role IN (5, 9) OR LOWER(COALESCE(jabatan, '')) LIKE '%kepala%')
+        `,
+        [sekolahIds],
+      );
+
+      schoolUsers.forEach((row: any) => {
+        if (row.id_user) userIds.add(Number(row.id_user));
+      });
+
+      const gurus = await this.programRepo.manager.query(
+        `
+          SELECT id_guru_assessment
+          FROM assessment_guru
+          WHERE id_sekolah = ANY($1::int[])
+            AND is_active = true
+        `,
+        [sekolahIds],
+      );
+
+      gurus.forEach((row: any) => {
+        if (row.id_guru_assessment) {
+          guruIds.add(Number(row.id_guru_assessment));
+        }
+      });
+    }
+
+    return {
+      userIds: Array.from(userIds).filter(Boolean),
+      guruIds: Array.from(guruIds).filter(Boolean),
+    };
+  }
+
+  private async getProgramByKegiatan(id_kegiatans: number) {
+    const rows = await this.programRepo.manager.query(
+      `
+        SELECT p.*
+        FROM t_program p
+        JOIN t_fase f ON f.id_program = p.id_program
+        JOIN t_kegiatans k ON k.id_fase = f.id_fase
+        WHERE k.id_kegiatans = $1
+        LIMIT 1
+      `,
+      [id_kegiatans],
+    );
+
+    return rows?.[0] || null;
+  }
+
+  private async notifyActivityRatingRequest(kegiatan: Kegiatans) {
+    const program = await this.getProgramByKegiatan(kegiatan.id_kegiatans);
+    if (!program) return;
+
+    const targets = await this.getProgramNotificationTargets(program);
+    const targetUrlSekolah = `/sekolah/program`;
+    const targetUrlVendor = `/vendor/program/detail/${program.id_program}`;
+
+    const rows = [
+      ...targets.guruIds.map((idGuru) => ({
+        recipientType: NotificationRecipientType.GURU_ASSESSMENT,
+        recipientId: idGuru,
+        judul: 'Rating aktivitas program',
+        pesan: `Aktivitas "${kegiatan.nama_kegiatans}" sudah selesai. Silakan beri rating dan feedback.`,
+        tipe: 'PROGRAM_RATING',
+        targetUrl: targetUrlSekolah,
+        metadata: {
+          id_program: program.id_program,
+          id_kegiatans: kegiatan.id_kegiatans,
+        },
+        dedupeKey: `program-rating:guru:${kegiatan.id_kegiatans}:${idGuru}`,
+      })),
+      ...targets.userIds.map((idUser) => ({
+        recipientType: NotificationRecipientType.USER,
+        recipientId: idUser,
+        legacyUserId: idUser,
+        judul: 'Aktivitas program selesai',
+        pesan: `Aktivitas "${kegiatan.nama_kegiatans}" pada program "${program.nama_program}" sudah selesai.`,
+        tipe: 'PROGRAM_ACTIVITY_DONE',
+        targetUrl: targetUrlVendor,
+        metadata: {
+          id_program: program.id_program,
+          id_kegiatans: kegiatan.id_kegiatans,
+        },
+        dedupeKey: `program-rating:user:${kegiatan.id_kegiatans}:${idUser}`,
+      })),
+    ];
+
+    await this.notifikasiService.createMany(rows);
+  }
+
+  private getTomorrowDateString() {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().slice(0, 10);
+  }
+
+  async createDeadlineReminders(date = this.getTomorrowDateString()) {
+    const activityRows = await this.programRepo.manager.query(
+      `
+        SELECT
+          p.*,
+          k.id_kegiatans,
+          k.nama_kegiatans,
+          k.tanggal_selesai
+        FROM t_program p
+        JOIN t_fase f ON f.id_program = p.id_program
+        JOIN t_kegiatans k ON k.id_fase = f.id_fase
+        WHERE k.tanggal_selesai = $1::date
+          AND EXISTS (
+            SELECT 1
+            FROM t_persyaratan_kegiatan pk
+            WHERE pk.id_kegiatans = k.id_kegiatans
+              AND COALESCE(pk.status, 'WAITING_UPLOAD') <> 'APPROVED'
+          )
+      `,
+      [date],
+    );
+
+    const openingRows = await this.programRepo.manager.query(
+      `
+        SELECT DISTINCT
+          p.*,
+          f.id_fase,
+          f.nama_fase,
+          first_kegiatan.tanggal_mulai
+        FROM t_program p
+        JOIN t_fase f ON f.id_program = p.id_program
+        JOIN LATERAL (
+          SELECT k.tanggal_mulai
+          FROM t_kegiatans k
+          WHERE k.id_fase = f.id_fase
+          ORDER BY k.urutan ASC, k.id_kegiatans ASC
+          LIMIT 1
+        ) first_kegiatan ON true
+        WHERE first_kegiatan.tanggal_mulai = $1::date
+          AND EXISTS (
+            SELECT 1
+            FROM t_termin t
+            JOIN t_persyaratan_termin pt ON pt.id_termin = t.id_termin
+            WHERE t.id_fase = f.id_fase
+              AND COALESCE(pt.status, 'WAITING_UPLOAD') <> 'APPROVED'
+          )
+      `,
+      [date],
+    );
+
+    const rows: any[] = [];
+
+    for (const item of activityRows) {
+      const targets = await this.getProgramNotificationTargets(item);
+      const targetUrl = `/vendor/program/detail/${item.id_program}`;
+
+      targets.userIds.forEach((idUser) => {
+        rows.push({
+          recipientType: NotificationRecipientType.USER,
+          recipientId: idUser,
+          legacyUserId: idUser,
+          judul: 'Reminder tenggat aktivitas',
+          pesan: `Besok adalah tenggat aktivitas "${item.nama_kegiatans}" pada program "${item.nama_program}". Pastikan bukti sudah lengkap.`,
+          tipe: 'PROGRAM_ACTIVITY_DEADLINE',
+          targetUrl,
+          metadata: {
+            id_program: item.id_program,
+            id_kegiatans: item.id_kegiatans,
+            due_date: date,
+          },
+          dedupeKey: `program-deadline:activity:${item.id_kegiatans}:${idUser}:${date}`,
+        });
+      });
+
+      targets.guruIds.forEach((idGuru) => {
+        rows.push({
+          recipientType: NotificationRecipientType.GURU_ASSESSMENT,
+          recipientId: idGuru,
+          judul: 'Reminder aktivitas program',
+          pesan: `Besok adalah tenggat aktivitas "${item.nama_kegiatans}". Pantau program sekolah Anda.`,
+          tipe: 'PROGRAM_ACTIVITY_DEADLINE',
+          targetUrl: '/sekolah/program',
+          metadata: {
+            id_program: item.id_program,
+            id_kegiatans: item.id_kegiatans,
+            due_date: date,
+          },
+          dedupeKey: `program-deadline:activity-guru:${item.id_kegiatans}:${idGuru}:${date}`,
+        });
+      });
+    }
+
+    for (const item of openingRows) {
+      const targets = await this.getProgramNotificationTargets(item);
+
+      targets.userIds.forEach((idUser) => {
+        rows.push({
+          recipientType: NotificationRecipientType.USER,
+          recipientId: idUser,
+          legacyUserId: idUser,
+          judul: 'Reminder administrasi pembuka',
+          pesan: `Administrasi pembuka periode "${item.nama_fase}" pada program "${item.nama_program}" belum lengkap. Aktivitas dimulai besok.`,
+          tipe: 'PROGRAM_OPENING_DEADLINE',
+          targetUrl: `/ho/program/akademik/detail/${item.id_program}`,
+          metadata: {
+            id_program: item.id_program,
+            id_fase: item.id_fase,
+            due_date: date,
+          },
+          dedupeKey: `program-deadline:opening:${item.id_fase}:${idUser}:${date}`,
+        });
+      });
+
+      targets.guruIds.forEach((idGuru) => {
+        rows.push({
+          recipientType: NotificationRecipientType.GURU_ASSESSMENT,
+          recipientId: idGuru,
+          judul: 'Reminder administrasi program',
+          pesan: `Administrasi pembuka periode "${item.nama_fase}" belum lengkap. Aktivitas program sekolah dimulai besok.`,
+          tipe: 'PROGRAM_OPENING_DEADLINE',
+          targetUrl: '/sekolah/program',
+          metadata: {
+            id_program: item.id_program,
+            id_fase: item.id_fase,
+            due_date: date,
+          },
+          dedupeKey: `program-deadline:opening-guru:${item.id_fase}:${idGuru}:${date}`,
+        });
+      });
+    }
+
+    const created = await this.notifikasiService.createMany(rows);
+
+    return {
+      date,
+      scanned: {
+        activityDeadline: activityRows.length,
+        openingDeadline: openingRows.length,
+      },
+      created: created.length,
+    };
   }
 
   async create(
@@ -408,6 +729,39 @@ export class ProgramService {
             kegiatan,
           );
 
+          const pertemuanList = Array.isArray(kegData.pertemuan)
+            ? kegData.pertemuan
+            : [];
+
+          for (
+            let pertemuanIndex = 0;
+            pertemuanIndex < pertemuanList.length;
+            pertemuanIndex++
+          ) {
+            const pertemuanData = pertemuanList[pertemuanIndex];
+            if (!pertemuanData?.nama_pertemuan?.trim()) continue;
+
+            await queryRunner.manager.save(
+              KegiatanPertemuan,
+              this.kegiatanPertemuanRepo.create({
+                id_kegiatans: savedKegiatan.id_kegiatans,
+                nama_pertemuan: pertemuanData.nama_pertemuan.trim(),
+                deskripsi: pertemuanData.deskripsi || null,
+                tanggal_mulai: pertemuanData.tanggal_mulai
+                  ? new Date(pertemuanData.tanggal_mulai)
+                  : null,
+                tanggal_selesai: pertemuanData.tanggal_selesai
+                  ? new Date(pertemuanData.tanggal_selesai)
+                  : null,
+                urutan: this.toNumber(
+                  pertemuanData.urutan,
+                  pertemuanIndex + 1,
+                ),
+                status: pertemuanData.status || 'PLANNED',
+              }),
+            );
+          }
+
           const persyaratanKegiatan = Array.isArray(kegData.persyaratan)
             ? kegData.persyaratan
             : [];
@@ -485,8 +839,10 @@ export class ProgramService {
         'fases.termin.persyaratan',
         'fases.termin.chats',
         'fases.kegiatans',
+        'fases.kegiatans.pertemuan',
         'fases.kegiatans.persyaratan',
         'fases.kegiatans.comments',
+        'fases.kegiatans.ratings',
         'fases.kegiatans.termin',
         'fases.kegiatans.termin.chats',
       ],
@@ -504,6 +860,128 @@ export class ProgramService {
         },
       },
     });
+  }
+
+  async getRatingSummary(id_program: number) {
+    const program = await this.programRepo.findOne({
+      where: { id_program },
+    });
+
+    if (!program) {
+      throw new NotFoundException('Program tidak ditemukan');
+    }
+
+    const sekolahIds = this.toArray(program.sekolah_ids).length
+      ? this.toArray(program.sekolah_ids)
+      : program.id_sekolah
+        ? [Number(program.id_sekolah)]
+        : [];
+
+    const activities = await this.programRepo.manager.query(
+      `
+        SELECT k.id_kegiatans, k.nama_kegiatans, k.status_kegiatan
+        FROM t_kegiatans k
+        JOIN t_fase f ON f.id_fase = k.id_fase
+        WHERE f.id_program = $1
+        ORDER BY f.urutan ASC, k.urutan ASC, k.id_kegiatans ASC
+      `,
+      [id_program],
+    );
+
+    const approvedActivities = activities.filter(
+      (item: any) => String(item.status_kegiatan || '').toUpperCase() === 'APPROVED',
+    );
+
+    const ratingRows = await this.programRepo.manager.query(
+      `
+        SELECT
+          kr.*,
+          k.nama_kegiatans
+        FROM t_kegiatan_rating kr
+        JOIN t_kegiatans k ON k.id_kegiatans = kr.id_kegiatans
+        JOIN t_fase f ON f.id_fase = k.id_fase
+        WHERE f.id_program = $1
+      `,
+      [id_program],
+    );
+
+    const expectedGuruRows = sekolahIds.length
+      ? await this.programRepo.manager.query(
+          `
+            SELECT id_guru_assessment
+            FROM assessment_guru
+            WHERE id_sekolah = ANY($1::int[])
+              AND is_active = true
+          `,
+          [sekolahIds],
+        )
+      : [];
+
+    const expectedGuruCount = expectedGuruRows.length;
+    const guruRatings = ratingRows.filter(
+      (item: any) => String(item.rater_type || '').toUpperCase() === 'GURU',
+    );
+    const vendorRatings = ratingRows.filter(
+      (item: any) => String(item.rater_type || '').toUpperCase() === 'VENDOR',
+    );
+
+    const averageRating = ratingRows.length
+      ? ratingRows.reduce(
+          (total: number, item: any) => total + Number(item.rating || 0),
+          0,
+        ) / ratingRows.length
+      : 0;
+
+    const expectedGuruRatingSlots =
+      expectedGuruCount * approvedActivities.length;
+
+    const activityBreakdown = approvedActivities.map((activity: any) => {
+      const activityRatings = ratingRows.filter(
+        (item: any) =>
+          Number(item.id_kegiatans) === Number(activity.id_kegiatans),
+      );
+      const activityGuruRatings = activityRatings.filter(
+        (item: any) => String(item.rater_type || '').toUpperCase() === 'GURU',
+      );
+      const activityAverage = activityRatings.length
+        ? activityRatings.reduce(
+            (total: number, item: any) => total + Number(item.rating || 0),
+            0,
+          ) / activityRatings.length
+        : 0;
+
+      return {
+        id_kegiatans: activity.id_kegiatans,
+        nama_kegiatans: activity.nama_kegiatans,
+        average_rating: Number(activityAverage.toFixed(2)),
+        total_rating: activityRatings.length,
+        guru_rating_count: activityGuruRatings.length,
+        expected_guru_count: expectedGuruCount,
+        missing_guru_rating: Math.max(
+          expectedGuruCount - activityGuruRatings.length,
+          0,
+        ),
+      };
+    });
+
+    return {
+      id_program,
+      average_rating: Number(averageRating.toFixed(2)),
+      total_rating: ratingRows.length,
+      guru_rating_count: guruRatings.length,
+      vendor_rating_count: vendorRatings.length,
+      expected_guru_count: expectedGuruCount,
+      approved_activity_count: approvedActivities.length,
+      expected_guru_rating_slots: expectedGuruRatingSlots,
+      missing_guru_rating: Math.max(
+        expectedGuruRatingSlots - guruRatings.length,
+        0,
+      ),
+      participation_percentage: expectedGuruRatingSlots
+        ? Math.round((guruRatings.length / expectedGuruRatingSlots) * 100)
+        : 0,
+      activities: activityBreakdown,
+    };
   }
 
   async uploadPersyaratanTermin(
@@ -1106,6 +1584,7 @@ export class ProgramService {
       kegiatan.status_kegiatan = 'APPROVED';
       kegiatan.approved_at = new Date();
       await this.kegiatansRepo.save(kegiatan);
+      await this.notifyActivityRatingRequest(kegiatan);
 
       const siblings = await this.kegiatansRepo.find({
         where: { id_fase: kegiatan.id_fase },
@@ -1299,30 +1778,81 @@ export class ProgramService {
       throw new BadRequestException('Rating harus antara 1 sampai 5');
     }
 
+    const raterType = String(
+      body.rater_type || (body.id_vendor ? 'VENDOR' : 'GURU'),
+    ).toUpperCase();
+    const idGuruAssessment = body.id_guru_assessment
+      ? Number(body.id_guru_assessment)
+      : null;
+    const idVendor = body.id_vendor ? Number(body.id_vendor) : null;
+    const idSekolah = body.id_sekolah ? Number(body.id_sekolah) : null;
+
+    let existingRating: KegiatanRating = null;
+
+    if (idGuruAssessment) {
+      existingRating = await this.kegiatanRatingRepo.findOne({
+        where: { id_kegiatans: id_kegiatan, id_guru_assessment: idGuruAssessment },
+      });
+    } else if (idVendor) {
+      existingRating = await this.kegiatanRatingRepo.findOne({
+        where: { id_kegiatans: id_kegiatan, id_vendor: idVendor },
+      });
+    } else {
+      existingRating = await this.kegiatanRatingRepo.findOne({
+        where: { id_kegiatans: id_kegiatan, id_user },
+      });
+    }
+
+    const savedRating = await this.kegiatanRatingRepo.save(
+      this.kegiatanRatingRepo.create({
+        ...(existingRating || {}),
+        id_kegiatans: id_kegiatan,
+        rater_type: raterType,
+        id_user,
+        id_guru_assessment: idGuruAssessment,
+        id_vendor: idVendor,
+        id_sekolah: idSekolah,
+        rating,
+        komentar: body.comment?.trim() || body.komentar?.trim() || null,
+      }),
+    );
+
     kegiatan.guru_rating = rating;
-    kegiatan.guru_comment = body.comment?.trim() || null;
+    kegiatan.guru_comment = body.comment?.trim() || body.komentar?.trim() || null;
     kegiatan.guru_rated_by = id_user;
     kegiatan.guru_rated_at = new Date();
     await this.kegiatansRepo.save(kegiatan);
 
-    if (body.comment?.trim()) {
+    if (body.comment?.trim() || body.komentar?.trim()) {
       await this.kegiatanCommentRepo.save(
         this.kegiatanCommentRepo.create({
           id_kegiatan,
           id_user,
           nama_user,
-          role_user: 'Guru Assessment',
-          comment_text: body.comment.trim(),
-          comment_type: 'GURU_RATING',
+          role_user: raterType === 'VENDOR' ? 'Vendor' : 'Guru Assessment',
+          comment_text: body.comment?.trim() || body.komentar?.trim(),
+          comment_type: raterType === 'VENDOR' ? 'VENDOR_RATING' : 'GURU_RATING',
         }),
       );
     }
 
+    const ratings = await this.kegiatanRatingRepo.find({
+      where: { id_kegiatans: id_kegiatan },
+    });
+    const average =
+      ratings.length > 0
+        ? ratings.reduce((total, item) => total + Number(item.rating || 0), 0) /
+          ratings.length
+        : rating;
+
     return {
-      message: 'Rating guru berhasil disimpan',
+      message: 'Rating aktivitas berhasil disimpan',
       data: {
+        id_rating: savedRating.id_rating,
         rating,
-        comment: body.comment,
+        average_rating: Number(average.toFixed(2)),
+        total_rating: ratings.length,
+        comment: body.comment || body.komentar,
       },
     };
   }

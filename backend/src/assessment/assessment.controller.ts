@@ -7,7 +7,9 @@ import {
   Patch,
   Param,
   Query,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AssessmentService } from './assessment.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
@@ -56,6 +58,23 @@ export class AssessmentController {
   @Get(':id/hasil')
   getHasilAssessment(@Param('id') id: string) {
     return this.assessmentService.getHasilAssessment(+id);
+  }
+
+  @Get(':id/hasil/export')
+  async exportHasilAssessment(@Param('id') id: string, @Res() res: Response) {
+    const file = await this.assessmentService.exportHasilAssessmentCsv(+id);
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.filename}"`,
+    );
+    return res.send(file.content);
+  }
+
+  @Post(':id/hasil/import')
+  importHasilAssessment(@Param('id') id: string, @Body() body: any) {
+    return this.assessmentService.importHasilAssessment(+id, body);
   }
 
   @Get(':id')

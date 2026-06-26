@@ -60,7 +60,7 @@ function DashboardNonAkademik() {
       scopeLabel="Cakupan SD, SMP & SMK"
       primaryEndpoint={`${API_BASE_URL}/sekolah`}
       programEndpoint={`${API_BASE_URL}/program`}
-      assessmentEndpoint={`${API_BASE_URL}/assessment`}
+      assessmentEndpoint={`${API_BASE_URL}/assessment?jenis=non-akademik`}
       primaryDataKey="Sekolah"
       mapTitle="Sebaran Sekolah Seni Budaya & Kecakapan Hidup"
       mapSubtitle="Peta sekolah yang terkait program atau assessment Seni Budaya dan Kecakapan Hidup"

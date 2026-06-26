@@ -107,6 +107,41 @@ function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
 }
 
+function normalizeMeetings(kegiatan = {}) {
+    return getArray(
+        kegiatan.pertemuan,
+        kegiatan.meetings,
+        kegiatan.t_kegiatan_pertemuan,
+    ).map((item, index) => ({
+        id: item.id_pertemuan || item.id || index,
+        title:
+            item.nama_pertemuan ||
+            item.nama ||
+            item.title ||
+            `Pertemuan ${index + 1}`,
+        description: item.deskripsi || item.description || "",
+        startDate: item.tanggal_mulai || item.start_date || null,
+        endDate: item.tanggal_selesai || item.end_date || null,
+        status: item.status || "PLANNED",
+    }));
+}
+
+function getRatingStats(kegiatan = {}) {
+    const ratings = getArray(kegiatan.ratings, kegiatan.rating_items);
+    const total = ratings.length;
+    const average = total
+        ? ratings.reduce((sum, item) => sum + Number(item.rating || 0), 0) / total
+        : Number(kegiatan.guru_rating || 0);
+
+    return {
+        ratings,
+        total,
+        average: average ? Number(average.toFixed(2)) : 0,
+        guruCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "GURU").length,
+        vendorCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "VENDOR").length,
+    };
+}
+
 async function safeJson(response) {
     try {
         return await response.json();
@@ -567,6 +602,17 @@ function StatusBadge({ status }) {
     );
 }
 
+function MiniStat({ label, value }) {
+    return (
+        <div className="rounded-xl bg-white px-3 py-2 text-center">
+            <p className="text-[14px] font-black text-slate-900">{value}</p>
+            <p className="mt-0.5 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                {label}
+            </p>
+        </div>
+    );
+}
+
 function DetailProgramPage({
     kategori = "AKADEMIK",
     titleHighlight = "Akademik",
@@ -584,6 +630,7 @@ function DetailProgramPage({
     const [masterHos, setMasterHos] = useState([]);
     const [masterAos, setMasterAos] = useState([]);
     const [masterVendor, setMasterVendor] = useState([]);
+    const [ratingSummary, setRatingSummary] = useState(null);
 
     const [activePhase, setActivePhase] = useState(0);
     const [selectedRow, setSelectedRow] = useState(null);
@@ -659,7 +706,7 @@ function DetailProgramPage({
 
             const currentHoId = getCurrentUserIdFromToken();
 
-            const [resProgram, resSekolah, resHo, resAo, resVendor, resCurrentHo] =
+            const [resProgram, resSekolah, resHo, resAo, resVendor, resCurrentHo, resRatingSummary] =
                 await Promise.all([
                     fetch(`${API_BASE_URL}/program/${id}`, { headers }),
                     fetch(`${API_BASE_URL}/sekolah`, { headers }),
@@ -669,6 +716,7 @@ function DetailProgramPage({
                     currentHoId
                         ? fetch(`${API_BASE_URL}/users/${currentHoId}`, { headers })
                         : Promise.resolve(null),
+                    fetch(`${API_BASE_URL}/program/${id}/rating-summary`, { headers }),
                 ]);
 
             const dataProgram = await safeJson(resProgram);
@@ -677,6 +725,7 @@ function DetailProgramPage({
             const dataAo = await safeJson(resAo);
             const dataVendor = await safeJson(resVendor);
             const dataCurrentHo = resCurrentHo ? await safeJson(resCurrentHo) : null;
+            const dataRatingSummary = await safeJson(resRatingSummary);
 
             if (!resProgram.ok) {
                 throw new Error(dataProgram?.message || "Gagal memuat detail program");
@@ -743,6 +792,7 @@ function DetailProgramPage({
             setMasterHos(normalizedHo);
             setMasterAos(normalizedAo);
             setMasterVendor(normalizeArray(dataVendor));
+            setRatingSummary(resRatingSummary?.ok ? dataRatingSummary : null);
             setMonitoringRows(buildMonitoringRows(detail));
             setActivePhase(0);
             setSelectedRow(null);
@@ -1064,6 +1114,8 @@ function DetailProgramPage({
                     kegiatan.requirements,
                     kegiatan.t_persyaratan_kegiatan,
                 );
+                const meetings = normalizeMeetings(kegiatan);
+                const ratingStats = getRatingStats(kegiatan);
 
                 const parentTitle =
                     kegiatan.nama_kegiatans ||
@@ -1105,6 +1157,8 @@ function DetailProgramPage({
                     statusKegiatan: kegiatan.status_kegiatan || "LOCKED",
                     guruRating: kegiatan.guru_rating || null,
                     guruComment: kegiatan.guru_comment || null,
+                    meetings,
+                    ratingStats,
                     commentCount: Array.isArray(kegiatan.comments) ? kegiatan.comments.length : 0,
                     tanggalMulai: kegiatan.tanggal_mulai || null,
                     tanggalSelesai: kegiatan.tanggal_selesai || null,
@@ -2198,6 +2252,7 @@ function DetailProgramPage({
                                 progress={progress}
                                 assessment={assessment}
                                 assessmentChartData={assessmentChartData}
+                                ratingSummary={ratingSummary}
                             />
                         </aside>
 
@@ -2554,6 +2609,7 @@ function ProgramSummaryPanel({
     progress,
     assessment,
     assessmentChartData,
+    ratingSummary,
 }) {
     return (
         <div className="sticky top-0 rounded-[1.8rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
@@ -2621,6 +2677,55 @@ function ProgramSummaryPanel({
                     className="text-rose-600"
                 />
             </div>
+
+            {ratingSummary && (
+                <div className="mb-5 rounded-[1.4rem] border border-amber-100 bg-amber-50/60 p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                            <p className="text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                Rating Blueprint
+                            </p>
+                            <h3 className="mt-1 text-[14px] font-black text-slate-900">
+                                Average Program
+                            </h3>
+                            <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-700/70">
+                                Rata-rata dari rating yang sudah masuk.
+                            </p>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-3 text-center">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                Bintang
+                            </p>
+                            <p className="mt-1 text-[22px] font-black leading-none text-amber-600">
+                                {ratingSummary.average_rating || 0}/5
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <SummaryMetric
+                            label="Total Rating"
+                            value={ratingSummary.total_rating || 0}
+                            className="text-amber-600"
+                        />
+                        <SummaryMetric
+                            label="Partisipasi"
+                            value={`${ratingSummary.participation_percentage || 0}%`}
+                            className="text-[#0AC4E0]"
+                        />
+                        <SummaryMetric
+                            label="Guru Rating"
+                            value={ratingSummary.guru_rating_count || 0}
+                            className="text-emerald-600"
+                        />
+                        <SummaryMetric
+                            label="Belum Rating"
+                            value={ratingSummary.missing_guru_rating || 0}
+                            className="text-rose-600"
+                        />
+                    </div>
+                </div>
+            )}
 
             {assessment && (
                 <div className="mb-5 rounded-[1.4rem] border border-cyan-100 bg-cyan-50/70 p-4">
@@ -3022,6 +3127,20 @@ function ExecutionTablePanel({
                                                         <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-400">
                                                             {row.description || "-"}
                                                         </p>
+
+                                                        {row.type === "kegiatan" && (
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                                    <Calendar size={11} />
+                                                                    {(row.meetings || []).length} Pertemuan
+                                                                </span>
+
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                                                    <Star size={11} />
+                                                                    {row.ratingStats?.average || 0}/5 · {row.ratingStats?.total || 0} rating
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -3102,9 +3221,15 @@ function ExecutionTablePanel({
                                                             title="Rating Guru"
                                                         >
                                                             {row.guruRating ? (
-                                                                <span>{"â­".repeat(row.guruRating)}</span>
+                                                                <span className="inline-flex items-center gap-1">
+                                                                    <Star size={12} fill="currentColor" />
+                                                                    {row.guruRating}/5
+                                                                </span>
                                                             ) : (
-                                                                <span>â­ Rating</span>
+                                                                <span className="inline-flex items-center gap-1">
+                                                                    <Star size={12} />
+                                                                    Rating
+                                                                </span>
                                                             )}
                                                         </button>
                                                     )}
@@ -3202,6 +3327,67 @@ function SelectedRowDetailPanel({
                         />
                     </div>
                 </div>
+
+                {selectedRow.type === "kegiatan" && (
+                    <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/40 p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                    Pertemuan
+                                </p>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                    {(selectedRow.meetings || []).length} item
+                                </span>
+                            </div>
+
+                            {(selectedRow.meetings || []).length === 0 ? (
+                                <p className="text-[11px] font-semibold leading-relaxed text-slate-400">
+                                    Belum ada detail pertemuan pada aktivitas ini.
+                                </p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {selectedRow.meetings.map((meeting, index) => (
+                                        <div key={`${meeting.id}-${index}`} className="rounded-xl border border-cyan-100 bg-white px-3 py-2">
+                                            <p className="text-[11px] font-black text-slate-800">
+                                                {meeting.title}
+                                            </p>
+                                            <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                {meeting.startDate || "-"} s/d {meeting.endDate || "-"}
+                                            </p>
+                                            {meeting.description && (
+                                                <p className="mt-1 text-[10px] font-semibold leading-relaxed text-slate-400">
+                                                    {meeting.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rounded-[1.25rem] border border-amber-100 bg-amber-50/50 p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                    Rating Aktivitas
+                                </p>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                    <Star size={11} />
+                                    {selectedRow.ratingStats?.average || 0}/5
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                <MiniStat label="Total" value={selectedRow.ratingStats?.total || 0} />
+                                <MiniStat label="Guru" value={selectedRow.ratingStats?.guruCount || 0} />
+                                <MiniStat label="Vendor" value={selectedRow.ratingStats?.vendorCount || 0} />
+                            </div>
+
+                            <p className="mt-3 text-[10px] font-semibold leading-relaxed text-amber-700/70">
+                                Average dihitung dari user yang sudah memberi rating. User yang belum rating tetap bisa dipakai sebagai bahan evaluasi partisipasi.
+                            </p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="p-5">
@@ -3432,8 +3618,9 @@ function GuruRatingModal({ open, row, ratingValue, setRatingValue, ratingComment
                 <div className="border-b border-slate-100 px-6 py-5">
                     <div className="flex items-start justify-between gap-3">
                         <div>
-                            <p className="text-[8px] font-black uppercase tracking-widest text-amber-500">
-                                â­ Rating Kegiatan
+                            <p className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-amber-500">
+                                <Star size={12} fill="currentColor" />
+                                Rating Kegiatan
                             </p>
                             <h3 className="mt-1 text-[20px] font-black text-slate-900 leading-tight">
                                 {row?.title || "Kegiatan"}
@@ -3465,7 +3652,15 @@ function GuruRatingModal({ open, row, ratingValue, setRatingValue, ratingComment
                                         : "border-slate-100 bg-slate-50 opacity-30 hover:opacity-60"
                                         }`}
                                 >
-                                    â­
+                                    <Star
+                                        size={28}
+                                        fill={ratingValue >= star ? "currentColor" : "none"}
+                                        className={
+                                            ratingValue >= star
+                                                ? "text-amber-400"
+                                                : "text-slate-300"
+                                        }
+                                    />
                                 </button>
                             ))}
                         </div>

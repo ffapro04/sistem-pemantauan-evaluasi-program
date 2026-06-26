@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { CreateSekolahDto } from './dto/create-sekolah.dto';
 import { Sekolah } from './entities/sekolah.entity';
+import { Wilayah } from '../wilayah/entities/wilayah.entity';
 import INDONESIA from '../data/indonesiaProvinces'; // Kamus script data lu jirr
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 
@@ -26,6 +27,35 @@ export class SekolahService {
 
     private readonly notifikasiService: NotifikasiService,
   ) {}
+
+  private async resolveKabupatenWilayah(manager: any, wilayahIdRaw: any) {
+    const wilayahId = Number(wilayahIdRaw);
+
+    if (!Number.isFinite(wilayahId) || wilayahId <= 0) {
+      throw new BadRequestException('Kabupaten/kota sekolah wajib dipilih.');
+    }
+
+    const wilayah = await manager.findOne(Wilayah, {
+      where: { id_wilayah: wilayahId },
+      relations: ['parent'],
+    });
+
+    if (!wilayah) {
+      throw new BadRequestException('Kabupaten/kota tidak ditemukan pada Master Wilayah.');
+    }
+
+    const jenis = String(wilayah.jenis_wilayah || '').toUpperCase();
+
+    if (jenis === 'PROVINSI') {
+      throw new BadRequestException('Sekolah harus memilih kabupaten/kota, bukan provinsi.');
+    }
+
+    if (wilayah.status === false) {
+      throw new BadRequestException('Kabupaten/kota yang dipilih sedang nonaktif.');
+    }
+
+    return wilayah;
+  }
   // =========================================================
   // HELPER ROLE SEKOLAH
   // =========================================================
@@ -219,24 +249,22 @@ export class SekolahService {
       const idKabupatenRaw =
         createSekolahDto.id_kabupaten || createSekolahDto.id_wilayah;
 
-      const idProvinsiRaw =
-        createSekolahDto.id_provinsi_asal || createSekolahDto.id_wilayah;
+      const kabupatenWilayah = await this.resolveKabupatenWilayah(
+        queryRunner.manager,
+        idKabupatenRaw,
+      );
 
       const sekolah = queryRunner.manager.create(Sekolah, {
         npsn: createSekolahDto.npsn,
         nama_sekolah: createSekolahDto.nama_sekolah,
         jenjang: createSekolahDto.jenjang,
 
-        id_wilayah: createSekolahDto.id_wilayah
-          ? Number(createSekolahDto.id_wilayah)
-          : 0,
+        id_wilayah: kabupatenWilayah.id_wilayah,
 
-        id_kabupaten: createSekolahDto.id_kabupaten
-          ? Number(createSekolahDto.id_kabupaten)
-          : 0,
+        id_kabupaten: kabupatenWilayah.id_wilayah,
 
-        nama_kabupaten: createSekolahDto.nama_kabupaten || null,
-        kode_kabupaten: createSekolahDto.kode_kabupaten || null,
+        nama_kabupaten: kabupatenWilayah.nama_wilayah || null,
+        kode_kabupaten: kabupatenWilayah.kode_wilayah || null,
 
         jumlah_guru: Number(createSekolahDto.jumlah_guru) || 0,
         jumlah_siswa: Number(createSekolahDto.jumlah_siswa) || 0,
@@ -265,7 +293,7 @@ export class SekolahService {
             ? Number(createSekolahDto.longitude)
             : 0,
 
-        area: createSekolahDto.area || null,
+        area: kabupatenWilayah.area_wilayah || createSekolahDto.area || null,
         sertifikat_iso: createSekolahDto.sertifikat_iso || 'Belum',
         adiwiyata: createSekolahDto.adiwiyata || 'Belum',
 
@@ -449,10 +477,16 @@ export class SekolahService {
       throw new NotFoundException(`Sekolah dengan ID ${id} tidak ditemukan`);
     }
 
-    const idWilayahRaw = updateSekolahDto.id_wilayah;
-
     const idKabupatenRaw =
-      updateSekolahDto.id_kabupaten || updateSekolahDto.id_wilayah;
+      updateSekolahDto.id_kabupaten ||
+      updateSekolahDto.id_wilayah ||
+      sekolah.id_kabupaten ||
+      sekolah.id_wilayah;
+
+    const kabupatenWilayah = await this.resolveKabupatenWilayah(
+      this.sekolahRepo.manager,
+      idKabupatenRaw,
+    );
 
     const dataUpdate: any = {
       nama_sekolah:
@@ -503,23 +537,13 @@ export class SekolahService {
           : sekolah.password_login,
 
       id_wilayah:
-        idWilayahRaw !== undefined && idWilayahRaw !== ''
-          ? Number(idWilayahRaw)
-          : sekolah.id_wilayah,
+        kabupatenWilayah.id_wilayah,
 
-      id_kabupaten: idKabupatenRaw
-        ? Number(idKabupatenRaw)
-        : sekolah.id_kabupaten,
+      id_kabupaten: kabupatenWilayah.id_wilayah,
 
-      nama_kabupaten:
-        updateSekolahDto.nama_kabupaten !== undefined
-          ? updateSekolahDto.nama_kabupaten
-          : sekolah.nama_kabupaten,
+      nama_kabupaten: kabupatenWilayah.nama_wilayah || sekolah.nama_kabupaten,
 
-      kode_kabupaten:
-        updateSekolahDto.kode_kabupaten !== undefined
-          ? updateSekolahDto.kode_kabupaten
-          : sekolah.kode_kabupaten,
+      kode_kabupaten: kabupatenWilayah.kode_wilayah || sekolah.kode_kabupaten,
 
       jumlah_guru:
         updateSekolahDto.jumlah_guru !== undefined
@@ -544,9 +568,8 @@ export class SekolahService {
           : sekolah.longitude,
 
       area:
-        updateSekolahDto.area !== undefined
-          ? updateSekolahDto.area
-          : sekolah.area,
+        kabupatenWilayah.area_wilayah ||
+        (updateSekolahDto.area !== undefined ? updateSekolahDto.area : sekolah.area),
 
       sertifikat_iso:
         updateSekolahDto.sertifikat_iso !== undefined

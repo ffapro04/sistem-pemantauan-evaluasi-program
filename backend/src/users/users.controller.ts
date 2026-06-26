@@ -100,6 +100,52 @@ export class UsersController {
     return this.usersService.getUsersByRole('PENGURUS');
   }
 
+  @Get('kepala-sekolah')
+  @UseGuards(JwtAuthGuard)
+  findAllKepalaSekolah(@Req() req: any) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.findAllKepalaSekolah(currentUser);
+  }
+
+  @Get('kepala-sekolah/sekolah/:id_sekolah')
+  @UseGuards(JwtAuthGuard)
+  findKepalaSekolahBySekolah(
+    @Req() req: any,
+    @Param('id_sekolah', ParseIntPipe) idSekolah: number,
+  ) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.findKepalaSekolahBySekolah(currentUser, idSekolah);
+  }
+
+  @Post('kepala-sekolah')
+  @UseGuards(JwtAuthGuard)
+  createKepalaSekolah(@Req() req: any, @Body() body: any) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.createKepalaSekolah(currentUser, body);
+  }
+
+  @Patch('kepala-sekolah/:id')
+  @UseGuards(JwtAuthGuard)
+  updateKepalaSekolah(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+  ) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.updateKepalaSekolah(currentUser, id, body);
+  }
+
+  @Patch('kepala-sekolah/:id/reset-password')
+  @UseGuards(JwtAuthGuard)
+  resetPasswordKepalaSekolah(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+  ) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.resetPasswordKepalaSekolah(currentUser, id, body);
+  }
+
   @Post()
   @UseInterceptors(userPhotoInterceptor)
   create(@Body() body: any, @UploadedFile() file?: Express.Multer.File) {

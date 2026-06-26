@@ -18,54 +18,77 @@ const resolveConfigValue = (value, context, fallback = undefined) => {
 const MultiSelectCards = ({ field, value, options, onChange }) => {
     const [searchTerm, setSearchTerm] = useState("");
 
-    // Support single select atau multi select
     const isSingleSelect = field.singleSelect === true;
 
-    // Normalize value untuk single select
     const selectedValues = isSingleSelect
-        ? (value ? [value] : [])
-        : (Array.isArray(value) ? value : []);
+        ? value
+            ? [value]
+            : []
+        : Array.isArray(value)
+            ? value
+            : [];
 
     const isSelected = (optionValue) => {
         if (isSingleSelect) {
             return String(selectedValues[0] || "") === String(optionValue);
         }
+
         return selectedValues.some((item) => String(item) === String(optionValue));
     };
 
-    const filteredOptions = useMemo(() => {
-        const search = searchTerm.toLowerCase();
-        console.log("searchTerm:", search, "options:", options?.length);
+    const search = String(searchTerm || "").trim().toLowerCase();
+    const minSearchLength = Number(field.minSearchLength || 0);
 
-        return (options || []).filter((option) => {
+    const shouldWaitSearch =
+        field.searchOnly === true &&
+        search.length < minSearchLength;
+
+    const filteredOptions = useMemo(() => {
+        const sourceOptions = Array.isArray(options) ? options : [];
+
+        const selectedOnly = sourceOptions.filter((option) =>
+            selectedValues.some((item) => String(item) === String(option.value)),
+        );
+
+        if (shouldWaitSearch) {
+            return selectedOnly;
+        }
+
+        return sourceOptions.filter((option) => {
+            if (!search) return true;
+
             return (
-                option.label?.toLowerCase().includes(search) ||
-                option.description?.toLowerCase().includes(search) ||
-                option.meta?.toLowerCase().includes(search) ||
-                option.nama_kabupaten?.toLowerCase().includes(search)
+                String(option.label || "").toLowerCase().includes(search) ||
+                String(option.description || "").toLowerCase().includes(search) ||
+                String(option.meta || "").toLowerCase().includes(search) ||
+                String(option.nama_kabupaten || "").toLowerCase().includes(search) ||
+                String(option.value || "").toLowerCase().includes(search)
             );
         });
-    }, [options, searchTerm]);
+    }, [options, search, shouldWaitSearch, selectedValues]);
 
     const toggleValue = (optionValue) => {
         if (isSingleSelect) {
-            // Single select: jika sama, unselect; jika beda, ganti
             const isSame = String(selectedValues[0] || "") === String(optionValue);
             onChange(field.name, isSame ? "" : optionValue);
-        } else {
-            // Multi select: toggle seperti biasa
-            const exists = selectedValues.some(
-                (item) => String(item) === String(optionValue),
-            );
-            const nextValue = exists
-                ? selectedValues.filter((item) => String(item) !== String(optionValue))
-                : [...selectedValues, optionValue];
-            onChange(field.name, nextValue);
+            return;
         }
+
+        const exists = selectedValues.some(
+            (item) => String(item) === String(optionValue),
+        );
+
+        const nextValue = exists
+            ? selectedValues.filter((item) => String(item) !== String(optionValue))
+            : [...selectedValues, optionValue];
+
+        onChange(field.name, nextValue);
     };
 
     const selectedCount = isSingleSelect
-        ? (selectedValues[0] ? 1 : 0)
+        ? selectedValues[0]
+            ? 1
+            : 0
         : selectedValues.length;
 
     return (
@@ -88,10 +111,10 @@ const MultiSelectCards = ({ field, value, options, onChange }) => {
             <div className="rounded-2xl border border-slate-100 bg-white p-3">
                 <div className="mb-3 flex items-center justify-between">
                     <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                        {isSingleSelect ? "Terpilih" : "Terpilih"}
+                        Terpilih
                     </span>
                     <span className="rounded-lg bg-[#0AC4E0]/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                        {selectedCount} {isSingleSelect ? "Kabupaten" : "Data"}
+                        {selectedCount} {isSingleSelect ? "Data" : "Data"}
                     </span>
                 </div>
 
@@ -99,7 +122,14 @@ const MultiSelectCards = ({ field, value, options, onChange }) => {
                     className={`no-scrollbar grid gap-2 overflow-y-auto ${field.gridClassName || "grid-cols-1"}`}
                     style={{ maxHeight: field.maxHeight || 260 }}
                 >
-                    {filteredOptions.length > 0 ? (
+                    {shouldWaitSearch && filteredOptions.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                {field.searchEmptyText ||
+                                    `Ketik minimal ${minSearchLength} huruf untuk mencari data.`}
+                            </p>
+                        </div>
+                    ) : filteredOptions.length > 0 ? (
                         filteredOptions.map((option) => {
                             const selected = isSelected(option.value);
                             const OptionIcon = option.icon;
@@ -138,11 +168,13 @@ const MultiSelectCards = ({ field, value, options, onChange }) => {
                                         >
                                             {option.label}
                                         </p>
+
                                         {option.description && (
                                             <p className="mt-1 text-[9px] font-bold leading-relaxed text-slate-400">
                                                 {option.description}
                                             </p>
                                         )}
+
                                         {option.meta && (
                                             <p className="mt-2 text-[8px] font-black uppercase tracking-widest text-slate-300">
                                                 {option.meta}
@@ -185,6 +217,12 @@ export default function MasterField({
     const hidden = resolveConfigValue(field.hidden, context, false);
     const disabled = resolveConfigValue(field.disabled, context, false);
     const required = resolveConfigValue(field.required, context, false);
+    const requiredOnCreate = resolveConfigValue(field.requiredOnCreate, context, false);
+    const requiredOnEdit = resolveConfigValue(field.requiredOnEdit, context, false);
+    const effectiveRequired =
+        required ||
+        (mode === "create" && requiredOnCreate) ||
+        (mode === "edit" && requiredOnEdit);
     const options = resolveConfigValue(field.options, context, []);
 
     if (hidden) return null;
@@ -194,12 +232,16 @@ export default function MasterField({
     const inputClass =
         field.className ||
         "w-full !rounded-xl !bg-white !py-3 !pl-10 !text-[11px] font-bold";
+    const passwordPlaceholder =
+        field.type === "password" && mode === "edit"
+            ? field.editPlaceholder || "••••••••"
+            : field.placeholder || "";
 
     return (
         <div className={field.wrapperClassName || "space-y-2"}>
             <Label
                 text={field.label}
-                required={required}
+                required={effectiveRequired}
                 className={
                     field.labelClassName ||
                     "!ml-1 !text-[9px] !font-black !uppercase !tracking-widest !text-gray-400"
@@ -272,7 +314,8 @@ export default function MasterField({
                             value={value || ""}
                             disabled={disabled}
                             onChange={(e) => onChange(field.name, e.target.value)}
-                            placeholder={field.placeholder || ""}
+                        placeholder={passwordPlaceholder}
+                        autoComplete={field.type === "password" ? "new-password" : undefined}
                             className={`${inputClass} ${Icon ? "!pl-10" : ""} ${field.type === "password" ? "!pr-12" : ""
                                 }`}
                         />

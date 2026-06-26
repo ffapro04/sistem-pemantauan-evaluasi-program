@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import * as XLSX from "xlsx";
 import {
     Search,
     Plus,
@@ -18,6 +19,7 @@ import {
     Power,
     PowerOff,
     Loader2,
+    Upload,
 } from "lucide-react";
 
 import Sidebar from "../Sidebar";
@@ -169,6 +171,19 @@ const normalizeAssessment = (item) => ({
         item?.total_pengisi ??
         item?.sudah_mengisi ??
         0,
+    jumlah_guru_target:
+        item?.jumlah_guru_target ??
+        item?.total_guru_target ??
+        item?.total_responden ??
+        0,
+    belum_mengisi:
+        item?.belum_mengisi ??
+        item?.guru_belum_mengisi ??
+        0,
+    persentase_pengisian:
+        item?.persentase_pengisian ??
+        item?.participation_percentage ??
+        0,
     raw: item,
 });
 
@@ -209,6 +224,94 @@ const getAssessmentSchoolIds = (assessment) => {
     ];
 
     return [...new Set(ids.map(String))];
+};
+
+const IMPORT_META_KEYS = new Set([
+    "nama",
+    "nama_pengisi",
+    "nama_guru",
+    "guru",
+    "id_guru",
+    "id_guru_assessment",
+    "id_user",
+    "sekolah",
+    "nama_sekolah",
+    "pertanyaan",
+    "question",
+    "soal",
+    "jawaban",
+    "answer",
+    "skor",
+    "score",
+]);
+
+const getCell = (row, keys) => {
+    const map = Object.entries(row || {}).reduce((acc, [key, value]) => {
+        acc[String(key).trim().toLowerCase()] = value;
+        return acc;
+    }, {});
+
+    for (const key of keys) {
+        const value = map[String(key).toLowerCase()];
+        if (value !== undefined && value !== null && String(value).trim()) {
+            return String(value).trim();
+        }
+    }
+
+    return "";
+};
+
+const parseImportedResultRows = (rows = []) => {
+    const grouped = new Map();
+
+    rows.forEach((row, index) => {
+        const nama =
+            getCell(row, ["nama_pengisi", "nama_guru", "nama", "guru"]) ||
+            `Pengisi ${index + 1}`;
+        const idGuru = getCell(row, ["id_guru_assessment", "id_guru"]);
+        const idUser = getCell(row, ["id_user"]);
+        const key = idGuru || `${nama}-${index}`;
+
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                nama_pengisi: nama,
+                nama_guru: nama,
+                id_guru_assessment: idGuru || null,
+                id_user: idUser || null,
+                answers: [],
+            });
+        }
+
+        const target = grouped.get(key);
+        const longQuestion = getCell(row, ["pertanyaan", "question", "soal"]);
+        const longAnswer = getCell(row, ["jawaban", "answer"]);
+        const longScore = getCell(row, ["skor", "score"]);
+
+        if (longQuestion && longAnswer) {
+            target.answers.push({
+                pertanyaan: longQuestion,
+                jawaban: longAnswer,
+                skor: Number(longScore || 0),
+            });
+            return;
+        }
+
+        Object.entries(row || {}).forEach(([rawKey, value]) => {
+            const keyName = String(rawKey || "").trim();
+            const lowerKey = keyName.toLowerCase();
+            if (!keyName || IMPORT_META_KEYS.has(lowerKey)) return;
+            if (value === undefined || value === null || !String(value).trim()) return;
+
+            target.answers.push({
+                pertanyaan: keyName,
+                key: lowerKey,
+                jawaban: String(value).trim(),
+                skor: 0,
+            });
+        });
+    });
+
+    return Array.from(grouped.values()).filter((row) => row.answers.length > 0);
 };
 
 const canHoAccessAssessmentRow = (assessment, currentHo, schoolList = []) => {
@@ -264,7 +367,6 @@ function ReadAssessmentPage({
             const query = new URLSearchParams();
 
             query.set("jenis", jenisAssessment);
-            if (idHo) query.set("id_ho", idHo);
 
             const [resAssessment, resSchools, resHo] = await Promise.all([
                 fetch(`${API_BASE}/assessment?${query.toString()}`, {
@@ -425,6 +527,58 @@ function ReadAssessmentPage({
             toast.error(error.message || "Gagal mengubah status aktif");
         } finally {
             setRowLoading(id, false);
+        }
+    };
+
+    const handleImportResult = async (assessmentId, event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) return;
+
+        const fileName = String(file.name || "").toLowerCase();
+        if (fileName.endsWith(".png")) {
+            toast.error("File PNG tidak didukung untuk import hasil assessment.");
+            return;
+        }
+
+        try {
+            setRowLoading(assessmentId, true);
+
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: "array" });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const excelRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+            const rows = parseImportedResultRows(excelRows);
+
+            if (rows.length === 0) {
+                toast.error("Tidak ada hasil valid yang terbaca dari file.");
+                return;
+            }
+
+            const token = getToken();
+            const response = await fetch(`${API_BASE}/assessment/${assessmentId}/hasil/import`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ rows }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload?.message || "Gagal import hasil assessment");
+            }
+
+            toast.success(payload?.message || "Hasil assessment berhasil diimport");
+            await fetchData();
+        } catch (error) {
+            console.error("Gagal import hasil assessment:", error);
+            toast.error(error.message || "Gagal import hasil assessment");
+        } finally {
+            setRowLoading(assessmentId, false);
         }
     };
 
@@ -721,18 +875,26 @@ function ReadAssessmentPage({
 
                                                 <td className="px-5 py-5 text-center">
                                                     <p className="text-[12px] font-black text-slate-700">
-                                                        {row.jumlah_pengisi} Guru
+                                                        {row.jumlah_pengisi}/{row.jumlah_guru_target || 0} Guru
+                                                    </p>
+                                                    <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-amber-500">
+                                                        {row.belum_mengisi || 0} belum isi
                                                     </p>
 
                                                     <div className="mx-auto mt-2 h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
                                                         <div
                                                             className="h-full bg-[#0AC4E0]"
                                                             style={{
-                                                                width:
-                                                                    Number(row.jumlah_pengisi) > 0 ? "100%" : "0%",
+                                                                width: `${Math.min(
+                                                                    Number(row.persentase_pengisian || 0),
+                                                                    100,
+                                                                )}%`,
                                                             }}
                                                         />
                                                     </div>
+                                                    <p className="mt-1 text-[9px] font-black text-slate-400">
+                                                        {row.persentase_pengisian || 0}%
+                                                    </p>
                                                 </td>
 
                                                 <td className="px-5 py-5 text-center">
@@ -777,6 +939,20 @@ function ReadAssessmentPage({
                                                         >
                                                             <Edit3 size={14} />
                                                         </button>
+
+                                                        <label
+                                                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
+                                                            title="Import hasil Excel/CSV"
+                                                        >
+                                                            <Upload size={14} />
+                                                            <input
+                                                                type="file"
+                                                                accept=".xlsx,.xls,.csv,.tsv,.txt,.ods"
+                                                                className="hidden"
+                                                                disabled={actionLoading[row.id]}
+                                                                onChange={(event) => handleImportResult(row.id, event)}
+                                                            />
+                                                        </label>
 
                                                         {!row.sent_at && (
                                                             <button

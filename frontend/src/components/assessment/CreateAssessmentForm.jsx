@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import * as XLSX from "xlsx";
 import {
     ArrowLeft,
     Save,
@@ -16,6 +17,8 @@ import {
     CheckCircle2,
     Loader2,
     Clock,
+    Upload,
+    Download,
 } from "lucide-react";
 
 import Sidebar from "../Sidebar";
@@ -120,6 +123,152 @@ const normalizeSchool = (item) => ({
     ),
     status: item?.status ?? true,
 });
+
+const getFirstValue = (row, keys) => {
+    const lowerMap = Object.entries(row || {}).reduce((acc, [key, value]) => {
+        acc[String(key).trim().toLowerCase()] = value;
+        acc[String(key).trim().toLowerCase().replaceAll(" ", "_")] = value;
+        return acc;
+    }, {});
+
+    for (const key of keys) {
+        const value = lowerMap[String(key).toLowerCase()];
+        if (value !== undefined && value !== null && String(value).trim()) {
+            return String(value).trim();
+        }
+    }
+
+    return "";
+};
+
+const QUESTION_HEADER_ALIASES = [
+    "pertanyaan",
+    "question",
+    "soal",
+    "perilaku",
+    "indikator",
+    "teks",
+    "text",
+];
+
+const DEFAULT_SCORE_OPTIONS = [
+    "4 - Sangat Baik",
+    "3 - Baik",
+    "2 - Cukup",
+    "1 - Kurang",
+];
+
+const findQuestionHeaderIndex = (rows = []) =>
+    rows.findIndex((row = []) =>
+        row.some((cell) =>
+            QUESTION_HEADER_ALIASES.includes(
+                String(cell || "")
+                    .trim()
+                    .toLowerCase()
+                    .replaceAll(" ", "_"),
+            ),
+        ),
+    );
+
+const worksheetToFlexibleRows = (sheet) => {
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const headerIndex = findQuestionHeaderIndex(matrix);
+
+    if (headerIndex >= 0) {
+        return XLSX.utils.sheet_to_json(sheet, {
+            defval: "",
+            range: headerIndex,
+        });
+    }
+
+    return XLSX.utils.sheet_to_json(sheet, { defval: "" });
+};
+
+const normalizeImportedQuestions = (rows = []) => {
+    return rows
+        .map((row) => {
+            const question = getFirstValue(row, [
+                "pertanyaan",
+                "question",
+                "soal",
+                "perilaku",
+                "indikator",
+                "teks",
+                "text",
+            ]);
+            const options = [
+                getFirstValue(row, ["opsi1", "opsi_1", "opsi_a", "pilihan1", "pilihan_1", "pilihan_a", "a"]),
+                getFirstValue(row, ["opsi2", "opsi_2", "opsi_b", "pilihan2", "pilihan_2", "pilihan_b", "b"]),
+                getFirstValue(row, ["opsi3", "opsi_3", "opsi_c", "pilihan3", "pilihan_3", "pilihan_c", "c"]),
+                getFirstValue(row, ["opsi4", "opsi_4", "opsi_d", "pilihan4", "pilihan_4", "pilihan_d", "d"]),
+            ].filter(Boolean).slice(0, 4);
+            const type = getFirstValue(row, ["tipe", "jenis", "type", "jenis_soal"]);
+            const scoreLike = String(type || "").toLowerCase().includes("skor") ||
+                String(type || "").toLowerCase().includes("skala");
+
+            return {
+                question,
+                options: options.length >= 2 ? options : scoreLike ? DEFAULT_SCORE_OPTIONS : ["Ya", "Tidak"],
+            };
+        })
+        .filter((item) => item.question);
+};
+
+const downloadQuestionTemplate = () => {
+    const workbook = XLSX.utils.book_new();
+    const templateRows = [
+        ["TEMPLATE IMPORT SOAL ASSESSMENT"],
+        ["Isi langsung pada tabel di bawah. Kolom Pertanyaan wajib diisi. Opsi jawaban maksimal 4."],
+        [],
+        ["Komponen", "No", "Pertanyaan", "Tipe", "Opsi 1", "Opsi 2", "Opsi 3", "Opsi 4", "Catatan"],
+        ["Akademik - Guru", 1, "Bagaimana kualitas proses pembelajaran yang dilaksanakan?", "Pilihan", "Sangat Baik", "Baik", "Cukup", "Kurang", "Contoh, boleh diganti"],
+        ["Karakter - Sekolah", 2, "Apakah program pembiasaan karakter berjalan konsisten?", "Pilihan", "Sangat Setuju", "Setuju", "Kurang Setuju", "Tidak Setuju", "Contoh, boleh diganti"],
+        ["", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+    ];
+    const templateSheet = XLSX.utils.aoa_to_sheet(templateRows);
+
+    templateSheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+    ];
+    templateSheet["!cols"] = [
+        { wch: 24 },
+        { wch: 8 },
+        { wch: 58 },
+        { wch: 14 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 22 },
+        { wch: 28 },
+    ];
+    templateSheet["!autofilter"] = { ref: "A4:I11" };
+
+    const styledCells = {
+        A1: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "0055DA" } }, alignment: { horizontal: "center" } },
+        A2: { font: { bold: true, color: { rgb: "360185" } }, fill: { fgColor: { rgb: "FFD400" } } },
+    };
+    Object.entries(styledCells).forEach(([cell, style]) => {
+        if (templateSheet[cell]) templateSheet[cell].s = style;
+    });
+    for (let col = 0; col <= 8; col += 1) {
+        const cell = XLSX.utils.encode_cell({ r: 3, c: col });
+        if (templateSheet[cell]) {
+            templateSheet[cell].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "0055DA" } },
+                alignment: { horizontal: "center" },
+            };
+        }
+    }
+
+    XLSX.utils.book_append_sheet(workbook, templateSheet, "Template Soal");
+    XLSX.writeFile(workbook, "template-import-soal-assessment.xlsx");
+};
 
 function CreateAssessmentForm({
     jenisAssessment = "akademik",
@@ -356,6 +505,50 @@ function CreateAssessmentForm({
                 };
             }),
         }));
+    };
+
+    const handleImportQuestions = async (event) => {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+
+        if (!file) return;
+
+        const fileName = String(file.name || "").toLowerCase();
+
+        if (fileName.endsWith(".png")) {
+            toast.error("File PNG tidak didukung untuk import soal.");
+            return;
+        }
+
+        try {
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: "array" });
+            const firstSheetName = workbook.SheetNames[0];
+
+            if (!firstSheetName) {
+                toast.error("Sheet tidak ditemukan pada file.");
+                return;
+            }
+
+            const sheet = workbook.Sheets["Template Soal"] || workbook.Sheets[firstSheetName];
+            const rows = worksheetToFlexibleRows(sheet);
+            const questions = normalizeImportedQuestions(rows);
+
+            if (questions.length === 0) {
+                toast.error("Tidak ada soal terbaca. Gunakan kolom pertanyaan dan opsi1-opsi4.");
+                return;
+            }
+
+            setFormData((prev) => ({
+                ...prev,
+                questions,
+            }));
+
+            toast.success(`${questions.length} soal berhasil diimport.`);
+        } catch (error) {
+            console.error("Gagal import soal assessment:", error);
+            toast.error("Gagal membaca file. Gunakan Excel/CSV dengan kolom pertanyaan dan opsi.");
+        }
     };
 
     const validateForm = () => {
@@ -684,6 +877,23 @@ function CreateAssessmentForm({
                                             onClick={addQuestion}
                                             className="!rounded-full !bg-[#0AC4E0] !px-5 !py-2 !text-[9px] font-black !uppercase !text-white"
                                         />
+                                        <Button
+                                            type="button"
+                                            text="Template"
+                                            icon={<Download size={14} />}
+                                            onClick={downloadQuestionTemplate}
+                                            className="!rounded-full !border !border-slate-200 !bg-white !px-5 !py-2 !text-[9px] font-black !uppercase !text-slate-500 hover:!border-cyan-100 hover:!bg-cyan-50 hover:!text-[#0AC4E0]"
+                                        />
+                                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-5 py-2 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0] transition-all hover:bg-[#0AC4E0] hover:text-white">
+                                            <Upload size={14} />
+                                            Import Soal
+                                            <input
+                                                type="file"
+                                                accept=".xlsx,.xls,.csv,.tsv,.txt,.ods"
+                                                className="hidden"
+                                                onChange={handleImportQuestions}
+                                            />
+                                        </label>
                                     </div>
 
                                     <div className="space-y-4">

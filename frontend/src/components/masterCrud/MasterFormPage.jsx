@@ -23,6 +23,7 @@ import MasterField from "./MasterField";
 
 import {
     buildApiUrl,
+    buildFreshApiUrl,
     getTokenHeader,
     getArrayPayload,
 } from "./masterCrudUtils";
@@ -271,7 +272,7 @@ export default function MasterFormPage({ config, mode = "create" }) {
 
         for (const aux of config.auxiliary || []) {
             try {
-                const response = await axios.get(buildApiUrl(aux.endpoint), {
+                const response = await axios.get(buildFreshApiUrl(aux.endpoint), {
                     headers: getTokenHeader(),
                 });
 
@@ -318,7 +319,7 @@ export default function MasterFormPage({ config, mode = "create" }) {
                 }
 
                 try {
-                    const response = await axios.get(buildApiUrl(endpoint), {
+                    const response = await axios.get(buildFreshApiUrl(endpoint), {
                         headers: getTokenHeader(),
                     });
 
@@ -361,7 +362,7 @@ export default function MasterFormPage({ config, mode = "create" }) {
                         ? config.api.detail(id)
                         : config.api?.detail;
 
-                const response = await axios.get(buildApiUrl(detailEndpoint), {
+                const response = await axios.get(buildFreshApiUrl(detailEndpoint), {
                     headers: getTokenHeader(),
                 });
 

@@ -19,6 +19,7 @@ import MasterAlert from "./MasterAlert";
 
 import {
     buildApiUrl,
+    buildFreshApiUrl,
     getTokenHeader,
     getArrayPayload,
     getNestedValue,
@@ -226,7 +227,7 @@ export default function MasterDetailPage({ config }) {
 
         for (const aux of config.auxiliary || []) {
             try {
-                const response = await axios.get(buildApiUrl(aux.endpoint), {
+                const response = await axios.get(buildFreshApiUrl(aux.endpoint), {
                     headers: getTokenHeader(),
                 });
 
@@ -260,7 +261,7 @@ export default function MasterDetailPage({ config }) {
                         ? config.api.detail(id)
                         : config.api?.detail;
 
-                const response = await axios.get(buildApiUrl(endpoint), {
+                const response = await axios.get(buildFreshApiUrl(endpoint), {
                     headers: getTokenHeader(),
                 });
 

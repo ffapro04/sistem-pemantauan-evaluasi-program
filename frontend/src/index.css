@@ -921,6 +921,15 @@ div {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: auto;
+}
+
+table th,
+table td {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 .responsive-overflow-x,
@@ -1019,7 +1028,7 @@ article:has(> table) {
   }
 
   table {
-    min-width: 720px;
+    min-width: max-content;
   }
 
   [class*="justify-end"],
@@ -1070,6 +1079,6 @@ article:has(> table) {
   }
 
   table {
-    min-width: 680px;
+    min-width: max-content;
   }
 }

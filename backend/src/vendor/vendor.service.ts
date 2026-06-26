@@ -1,5 +1,6 @@
 /* eslint-disable prettier/prettier */
 import {
+  BadRequestException,
   HttpException,
   Injectable,
   InternalServerErrorException,
@@ -30,8 +31,47 @@ export class VendorService {
     return files?.[fieldName]?.[0]?.filename;
   }
 
+  private toNumber(value: any, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  private average(values: number[]) {
+    const validValues = values.filter((value) => Number.isFinite(value));
+    if (validValues.length === 0) return 0;
+
+    return (
+      validValues.reduce((total, value) => total + value, 0) /
+      validValues.length
+    );
+  }
+
+  private getVendorGrade(score: number) {
+    if (score >= 90) return 'Sangat Baik';
+    if (score >= 75) return 'Baik';
+    if (score >= 60) return 'Perlu Perhatian';
+    return 'Berisiko';
+  }
+
   async create(createVendorDto: CreateVendorDto, files?: VendorDocumentFiles) {
     try {
+      const npwpFile =
+        this.getUploadedFilename(files, 'npwp_file') ||
+        createVendorDto.npwp_file ||
+        null;
+      const bukuRekeningFile =
+        this.getUploadedFilename(files, 'buku_rekening_file') ||
+        createVendorDto.buku_rekening_file ||
+        null;
+
+      if (!npwpFile) {
+        throw new BadRequestException('Dokumen NPWP wajib diunggah.');
+      }
+
+      if (!bukuRekeningFile) {
+        throw new BadRequestException('Buku Rekening wajib diunggah.');
+      }
+
       const userBaru = await this.usersService.create({
         nama: createVendorDto.pj_1,
         email: createVendorDto.email,
@@ -53,10 +93,9 @@ export class VendorService {
         status: 'Bermitra',
         user: userBaru,
 
-        npwp_file:
-          this.getUploadedFilename(files, 'npwp_file') ||
-          createVendorDto.npwp_file ||
-          null,
+        npwp_file: npwpFile,
+
+        buku_rekening_file: bukuRekeningFile,
 
         ktp_pj_file:
           this.getUploadedFilename(files, 'ktp_pj_file') ||
@@ -107,6 +146,247 @@ export class VendorService {
     }
 
     return vendor;
+  }
+
+  async getManagementSummary() {
+    const manager = this.vendorRepo.manager;
+
+    const vendors = await this.vendorRepo.find({
+      relations: ['user'],
+      order: {
+        nama_vendor: 'ASC',
+      },
+    });
+
+    const rows = await Promise.all(
+      vendors.map(async (vendor) => {
+        const vendorId = Number(vendor.id_vendor);
+
+        const programs = await manager.query(
+          `
+            SELECT
+              p.id_program,
+              p.nama_program,
+              p.kategori,
+              p.pilar_program,
+              p.tahun,
+              p.status_program,
+              COALESCE(p.harga_vendor, 0)::numeric AS harga_vendor,
+              COUNT(DISTINCT k.id_kegiatans)::int AS total_kegiatan,
+              COUNT(DISTINCT pk.id_persyaratan)::int AS total_bukti_kegiatan,
+              COUNT(DISTINCT pt.id_persyaratan)::int AS total_bukti_administrasi,
+              COUNT(DISTINCT CASE
+                WHEN pk.status = 'APPROVED' THEN pk.id_persyaratan
+              END)::int AS kegiatan_approved,
+              COUNT(DISTINCT CASE
+                WHEN pt.status = 'APPROVED' THEN pt.id_persyaratan
+              END)::int AS administrasi_approved,
+              COUNT(DISTINCT CASE
+                WHEN pk.status = 'REJECTED'
+                  OR pk.ao_rejected_at IS NOT NULL
+                  OR pk.rejected_at IS NOT NULL
+                THEN pk.id_persyaratan
+              END)::int AS kegiatan_rejected,
+              COUNT(DISTINCT CASE
+                WHEN pt.status = 'REJECTED'
+                  OR pt.ao_rejected_at IS NOT NULL
+                  OR pt.rejected_at IS NOT NULL
+                THEN pt.id_persyaratan
+              END)::int AS administrasi_rejected,
+              COUNT(DISTINCT CASE
+                WHEN pk.uploaded_at IS NOT NULL
+                  AND k.tanggal_selesai IS NOT NULL
+                  AND pk.uploaded_at::date > k.tanggal_selesai::date
+                THEN pk.id_persyaratan
+              END)::int AS kegiatan_late,
+              COUNT(DISTINCT CASE
+                WHEN pt.uploaded_at IS NOT NULL
+                  AND first_kegiatan.tanggal_mulai IS NOT NULL
+                  AND pt.uploaded_at::date > first_kegiatan.tanggal_mulai::date
+                THEN pt.id_persyaratan
+              END)::int AS administrasi_late,
+              COALESCE(AVG(kr.rating), 0)::numeric AS average_rating,
+              COUNT(DISTINCT kr.id_rating)::int AS total_rating
+            FROM t_program p
+            LEFT JOIN t_fase f ON f.id_program = p.id_program
+            LEFT JOIN t_kegiatans k ON k.id_fase = f.id_fase
+            LEFT JOIN t_persyaratan_kegiatan pk ON pk.id_kegiatans = k.id_kegiatans
+            LEFT JOIN t_termin t ON t.id_fase = f.id_fase
+            LEFT JOIN t_persyaratan_termin pt ON pt.id_termin = t.id_termin
+            LEFT JOIN LATERAL (
+              SELECT k2.tanggal_mulai
+              FROM t_kegiatans k2
+              WHERE k2.id_fase = f.id_fase
+              ORDER BY k2.tanggal_mulai ASC NULLS LAST, k2.id_kegiatans ASC
+              LIMIT 1
+            ) first_kegiatan ON TRUE
+            LEFT JOIN t_kegiatan_rating kr ON kr.id_kegiatans = k.id_kegiatans
+            WHERE $1 = ANY(COALESCE(p.vendor_ids, p.id_vendor, '{}'::int[]))
+            GROUP BY
+              p.id_program,
+              p.nama_program,
+              p.kategori,
+              p.pilar_program,
+              p.tahun,
+              p.status_program,
+              p.harga_vendor
+            ORDER BY p.tahun DESC NULLS LAST, p.id_program DESC
+          `,
+          [vendorId],
+        );
+
+        const programCount = programs.length;
+        const totalBudget = programs.reduce(
+          (total: number, program: any) =>
+            total + this.toNumber(program.harga_vendor, 0),
+          0,
+        );
+        const totalEvidence = programs.reduce(
+          (total: number, program: any) =>
+            total +
+            this.toNumber(program.total_bukti_kegiatan, 0) +
+            this.toNumber(program.total_bukti_administrasi, 0),
+          0,
+        );
+        const approvedEvidence = programs.reduce(
+          (total: number, program: any) =>
+            total +
+            this.toNumber(program.kegiatan_approved, 0) +
+            this.toNumber(program.administrasi_approved, 0),
+          0,
+        );
+        const rejectedEvidence = programs.reduce(
+          (total: number, program: any) =>
+            total +
+            this.toNumber(program.kegiatan_rejected, 0) +
+            this.toNumber(program.administrasi_rejected, 0),
+          0,
+        );
+        const lateEvidence = programs.reduce(
+          (total: number, program: any) =>
+            total +
+            this.toNumber(program.kegiatan_late, 0) +
+            this.toNumber(program.administrasi_late, 0),
+          0,
+        );
+        const totalRating = programs.reduce(
+          (total: number, program: any) =>
+            total + this.toNumber(program.total_rating, 0),
+          0,
+        );
+        const averageRating = this.average(
+          programs
+            .filter((program: any) => this.toNumber(program.total_rating, 0) > 0)
+            .map((program: any) => this.toNumber(program.average_rating, 0)),
+        );
+
+        const completionScore =
+          totalEvidence > 0 ? (approvedEvidence / totalEvidence) * 100 : 100;
+        const rejectionPenalty =
+          totalEvidence > 0 ? (rejectedEvidence / totalEvidence) * 28 : 0;
+        const latePenalty =
+          totalEvidence > 0 ? (lateEvidence / totalEvidence) * 22 : 0;
+        const ratingScore =
+          totalRating > 0 ? (averageRating / 5) * 100 : completionScore;
+        const rawScore =
+          completionScore * 0.45 + ratingScore * 0.35 + 20 -
+          rejectionPenalty -
+          latePenalty;
+        const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+
+        if (vendor.user) {
+          delete (vendor.user as any).password;
+        }
+
+        return {
+          id_vendor: vendor.id_vendor,
+          nama_vendor: vendor.nama_vendor,
+          no_register: vendor.no_register,
+          pilar: vendor.pilar,
+          status: vendor.status,
+          pj_1: vendor.pj_1,
+          telp_pj_1: vendor.telp_pj_1,
+          user: vendor.user,
+          total_program: programCount,
+          total_budget: totalBudget,
+          total_evidence: totalEvidence,
+          approved_evidence: approvedEvidence,
+          rejected_evidence: rejectedEvidence,
+          late_evidence: lateEvidence,
+          average_rating: Number(averageRating.toFixed(2)),
+          total_rating: totalRating,
+          performance_score: score,
+          performance_label: this.getVendorGrade(score),
+          programs: programs.map((program: any) => {
+            const programEvidence =
+              this.toNumber(program.total_bukti_kegiatan, 0) +
+              this.toNumber(program.total_bukti_administrasi, 0);
+            const programApproved =
+              this.toNumber(program.kegiatan_approved, 0) +
+              this.toNumber(program.administrasi_approved, 0);
+            const programRejected =
+              this.toNumber(program.kegiatan_rejected, 0) +
+              this.toNumber(program.administrasi_rejected, 0);
+            const programLate =
+              this.toNumber(program.kegiatan_late, 0) +
+              this.toNumber(program.administrasi_late, 0);
+
+            return {
+              id_program: program.id_program,
+              nama_program: program.nama_program,
+              kategori: program.kategori,
+              pilar_program: program.pilar_program,
+              tahun: program.tahun,
+              status_program: program.status_program,
+              budget: this.toNumber(program.harga_vendor, 0),
+              total_kegiatan: this.toNumber(program.total_kegiatan, 0),
+              total_evidence: programEvidence,
+              approved_evidence: programApproved,
+              rejected_evidence: programRejected,
+              late_evidence: programLate,
+              completion_percentage:
+                programEvidence > 0
+                  ? Math.round((programApproved / programEvidence) * 100)
+                  : 0,
+              average_rating: Number(
+                this.toNumber(program.average_rating, 0).toFixed(2),
+              ),
+              total_rating: this.toNumber(program.total_rating, 0),
+            };
+          }),
+        };
+      }),
+    );
+
+    const summary = {
+      total_vendor: rows.length,
+      active_vendor: rows.filter((row) =>
+        String(row.status || '').toLowerCase().includes('bermitra'),
+      ).length,
+      total_program: rows.reduce(
+        (total, row) => total + this.toNumber(row.total_program, 0),
+        0,
+      ),
+      total_budget: rows.reduce(
+        (total, row) => total + this.toNumber(row.total_budget, 0),
+        0,
+      ),
+      average_score: Number(
+        this.average(rows.map((row) => row.performance_score)).toFixed(2),
+      ),
+      average_rating: Number(
+        this.average(
+          rows
+            .filter((row) => row.total_rating > 0)
+            .map((row) => row.average_rating),
+        ).toFixed(2),
+      ),
+    };
+
+    return {
+      summary,
+      data: rows,
+    };
   }
 
   async update(
@@ -166,6 +446,11 @@ export class VendorService {
 
       const npwpFilename = this.getUploadedFilename(files, 'npwp_file');
 
+      const bukuRekeningFilename = this.getUploadedFilename(
+        files,
+        'buku_rekening_file',
+      );
+
       const ktpFilename = this.getUploadedFilename(files, 'ktp_pj_file');
 
       const aktaFilename = this.getUploadedFilename(files, 'akta_notaris_file');
@@ -174,6 +459,15 @@ export class VendorService {
         vendor.npwp_file = npwpFilename;
       } else if (data.npwp_file !== undefined && data.npwp_file !== '') {
         vendor.npwp_file = data.npwp_file;
+      }
+
+      if (bukuRekeningFilename) {
+        vendor.buku_rekening_file = bukuRekeningFilename;
+      } else if (
+        data.buku_rekening_file !== undefined &&
+        data.buku_rekening_file !== ''
+      ) {
+        vendor.buku_rekening_file = data.buku_rekening_file;
       }
 
       if (ktpFilename) {

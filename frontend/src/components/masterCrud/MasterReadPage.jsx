@@ -30,6 +30,7 @@ import MasterPageShell from "./MasterPageShell";
 import MasterStatusSwitch from "./MasterStatusSwitch";
 import {
     buildApiUrl,
+    buildFreshApiUrl,
     getTokenHeader,
     getArrayPayload,
     normalizeText,
@@ -379,7 +380,7 @@ export default function MasterReadPage({ config }) {
 
             for (const endpoint of endpoints) {
                 try {
-                    const response = await axios.get(buildApiUrl(endpoint), {
+                    const response = await axios.get(buildFreshApiUrl(endpoint), {
                         headers: getTokenHeader(),
                     });
 
@@ -405,7 +406,7 @@ export default function MasterReadPage({ config }) {
 
             for (const aux of config.auxiliary || []) {
                 try {
-                    const response = await axios.get(buildApiUrl(aux.endpoint), {
+                    const response = await axios.get(buildFreshApiUrl(aux.endpoint), {
                         headers: getTokenHeader(),
                     });
 
@@ -986,7 +987,8 @@ export default function MasterReadPage({ config }) {
         border-collapse: separate;
         border-spacing: 0;
         width: 100%;
-        table-layout: fixed;
+        min-width: max(980px, 100%);
+        table-layout: auto;
       }
 
       .master-read-table thead th {
@@ -1007,7 +1009,11 @@ export default function MasterReadPage({ config }) {
         position: sticky;
         top: 0;
         z-index: 10;
-        white-space: normal !important;
+        min-width: 108px !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+        hyphens: none !important;
       }
 
       .master-read-table thead th:first-child {
@@ -1029,6 +1035,10 @@ export default function MasterReadPage({ config }) {
         border-bottom: 1px solid #F1F5F9 !important;
         vertical-align: middle !important;
         background: #ffffff !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+        hyphens: none !important;
       }
 
       .master-read-table tbody tr:last-child td {
@@ -1053,6 +1063,10 @@ export default function MasterReadPage({ config }) {
 
       .master-read-table tbody td p {
         line-height: 1.25 !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        overflow-wrap: normal !important;
+        hyphens: none !important;
       }
 
       .master-read-table tbody td p[class*="text-[11px]"] {

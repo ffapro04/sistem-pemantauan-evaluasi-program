@@ -73,6 +73,74 @@ export class WilayahService {
     }).length;
   }
 
+  private toCoordinate(value: unknown) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  private isIndonesiaCoordinate(latitude: unknown, longitude: unknown) {
+    const lat = this.toCoordinate(latitude);
+    const lng = this.toCoordinate(longitude);
+
+    if (lat === null || lng === null) return false;
+    if (lat === 0 && lng === 0) return false;
+
+    return lat >= -12 && lat <= 7.5 && lng >= 94 && lng <= 142;
+  }
+
+  private getAverageSchoolCoordinate(wilayah: Wilayah) {
+    const points = (wilayah.sekolah || [])
+      .map((sekolah) => ({
+        latitude: this.toCoordinate(sekolah.latitude),
+        longitude: this.toCoordinate(sekolah.longitude),
+      }))
+      .filter((point) =>
+        this.isIndonesiaCoordinate(point.latitude, point.longitude),
+      );
+
+    if (points.length === 0) return null;
+
+    return {
+      latitude:
+        points.reduce((total, point) => total + Number(point.latitude), 0) /
+        points.length,
+      longitude:
+        points.reduce((total, point) => total + Number(point.longitude), 0) /
+        points.length,
+    };
+  }
+
+  private applyBestAvailableCoordinate(wilayah: Wilayah, provinceRef?: any) {
+    if (this.isIndonesiaCoordinate(wilayah.latitude, wilayah.longitude)) {
+      return;
+    }
+
+    const averageSchoolCoordinate = this.getAverageSchoolCoordinate(wilayah);
+    if (averageSchoolCoordinate) {
+      wilayah.latitude = averageSchoolCoordinate.latitude;
+      wilayah.longitude = averageSchoolCoordinate.longitude;
+      return;
+    }
+
+    if (
+      this.isIndonesiaCoordinate(
+        wilayah.parent?.latitude,
+        wilayah.parent?.longitude,
+      )
+    ) {
+      wilayah.latitude = wilayah.parent.latitude;
+      wilayah.longitude = wilayah.parent.longitude;
+      return;
+    }
+
+    if (
+      this.isIndonesiaCoordinate(provinceRef?.latitude, provinceRef?.longitude)
+    ) {
+      wilayah.latitude = provinceRef.latitude;
+      wilayah.longitude = provinceRef.longitude;
+    }
+  }
+
   private enrichWilayahStats(wilayah: Wilayah) {
     const provinceRef = this.findProvinceReference(
       wilayah.nama_wilayah || wilayah.kode_wilayah,
@@ -89,6 +157,7 @@ export class WilayahService {
     wilayah.letak_astronomis =
       wilayah.letak_astronomis || provinceRef?.letakAstronomis || null;
     wilayah.bounds = wilayah.bounds || provinceRef?.bounds || null;
+    this.applyBestAvailableCoordinate(wilayah, provinceRef);
 
     wilayah.jumlah_sd = this.countJenjang(wilayah, 'SD');
     wilayah.jumlah_smp = this.countJenjang(wilayah, 'SMP');
@@ -272,9 +341,11 @@ export class WilayahService {
   }
 
   async create(dto: CreateWilayahDto): Promise<Wilayah> {
-    const provinceRef = this.findProvinceReference(
-      dto.nama_wilayah || dto.kode_wilayah,
-    );
+    const requestedJenis = String(dto.jenis_wilayah || '').toUpperCase();
+    const isKabupaten = requestedJenis === 'KABUPATEN' || !!dto.id_parent;
+    const provinceRef = isKabupaten
+      ? null
+      : this.findProvinceReference(dto.nama_wilayah || dto.kode_wilayah);
 
     const namaWilayah = String(
       provinceRef?.name || dto.nama_wilayah || '',
@@ -298,13 +369,14 @@ export class WilayahService {
       kode_wilayah: dto.kode_wilayah || provinceRef?.code || null,
       nama_wilayah: namaWilayah,
       tipe_wilayah: klasifikasi,
-      jenis_wilayah: 'PROVINSI',
+      jenis_wilayah: isKabupaten ? 'KABUPATEN' : 'PROVINSI',
+      area_wilayah: dto.area_wilayah || null,
 
       deskripsi: dto.deskripsi || '',
       alamat_lengkap: dto.alamat_lengkap || '',
       status: dto.status ?? true,
       tahun_awal_binaan: dto.tahun_awal_binaan || null,
-      id_parent: null,
+      id_parent: isKabupaten ? dto.id_parent || null : null,
 
       latitude: dto.latitude ?? provinceRef?.latitude ?? null,
       longitude: dto.longitude ?? provinceRef?.longitude ?? null,
@@ -365,11 +437,12 @@ export class WilayahService {
       nama_wilayah: nextNamaWilayah,
       tipe_wilayah: klasifikasi,
       jenis_wilayah: existing.jenis_wilayah,
+      area_wilayah: dto.area_wilayah ?? existing.area_wilayah,
       deskripsi: dto.deskripsi ?? existing.deskripsi,
       alamat_lengkap: dto.alamat_lengkap ?? existing.alamat_lengkap,
       status: dto.status ?? existing.status,
       tahun_awal_binaan: dto.tahun_awal_binaan ?? existing.tahun_awal_binaan,
-      id_parent: existing.id_parent,
+      id_parent: dto.id_parent ?? existing.id_parent,
       latitude: dto.latitude ?? provinceRef?.latitude ?? existing.latitude,
       longitude: dto.longitude ?? provinceRef?.longitude ?? existing.longitude,
       luas_wilayah:

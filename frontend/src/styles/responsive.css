@@ -323,3 +323,234 @@ main {
     padding-right: env(safe-area-inset-right);
   }
 }
+
+/* =========================================================
+   FINAL RESPONSIVE HARDENING
+   Lapisan paling akhir untuk menjaga semua halaman tetap rapi
+   di mobile, tablet, laptop kecil, dan desktop besar.
+   ========================================================= */
+
+:root {
+  --app-safe-x: clamp(0.75rem, 2.2vw, 1.5rem);
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+}
+
+body {
+  overflow-x: clip;
+}
+
+#root,
+#root > * {
+  min-width: 0;
+}
+
+img,
+picture,
+video,
+canvas,
+svg,
+iframe {
+  max-width: 100%;
+}
+
+pre,
+code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.min-h-screen,
+.h-screen {
+  min-height: 100dvh;
+}
+
+.max-h-screen,
+.h-screen {
+  max-height: none;
+}
+
+@media (max-width: 1024px) {
+  [class*="max-w-[1500px]"],
+  [class*="max-w-[1560px]"],
+  [class*="max-w-[1600px]"],
+  [class*="max-w-[1700px]"] {
+    max-width: 100% !important;
+  }
+
+  [class*="lg:grid-cols-["],
+  [class*="xl:grid-cols-["],
+  [class*="2xl:grid-cols-["] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  main,
+  .page-responsive {
+    width: 100%;
+    min-width: 0;
+    padding-left: var(--app-safe-x) !important;
+    padding-right: var(--app-safe-x) !important;
+  }
+
+  .Toastify__toast-container {
+    left: var(--app-safe-x) !important;
+    right: var(--app-safe-x) !important;
+    width: auto !important;
+  }
+
+  [class*="h-screen"],
+  [class*="max-h-[100vh"],
+  [class*="max-h-[92vh"],
+  [class*="max-h-[90vh"] {
+    height: auto !important;
+    min-height: 100dvh;
+    max-height: none !important;
+  }
+
+  [class*="w-screen"] {
+    width: 100% !important;
+  }
+
+  [class*="min-w-[1040px]"],
+  [class*="min-w-[1080px]"],
+  [class*="min-w-[1180px]"],
+  [class*="min-w-[1280px]"] {
+    min-width: 860px !important;
+  }
+
+  div:has(> table),
+  .overflow-x-auto,
+  .simple-scroll,
+  .agenda-scroll,
+  .custom-scrollbar {
+    max-width: 100%;
+  }
+
+  table th,
+  table td {
+    vertical-align: top;
+  }
+
+  .fc {
+    min-width: 0;
+  }
+
+  .fc .fc-daygrid-day-frame {
+    min-height: 54px !important;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    font-size: 9px !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .fc .fc-daygrid-day-number {
+    font-size: 10px !important;
+    padding: 4px 6px !important;
+  }
+
+  [class*="fixed"][class*="max-w-"],
+  [class*="absolute"][class*="max-w-"] {
+    max-width: calc(100vw - (var(--app-safe-x) * 2)) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --app-safe-x: 0.75rem;
+  }
+
+  [class*="gap-5"],
+  [class*="gap-6"],
+  [class*="gap-7"],
+  [class*="gap-8"] {
+    gap: 0.75rem !important;
+  }
+
+  [class*="p-5"],
+  [class*="p-6"],
+  [class*="p-7"],
+  [class*="p-8"] {
+    padding: 0.85rem !important;
+  }
+
+  [class*="text-[58px]"],
+  [class*="text-[54px]"],
+  [class*="text-[50px]"],
+  [class*="text-[46px]"] {
+    font-size: 2rem !important;
+    line-height: 1.05 !important;
+  }
+
+  [class*="min-w-[860px]"] {
+    min-width: 760px !important;
+  }
+}
+
+/* =========================================================
+   FINAL TABLE RESPONSIVE SAFETY
+   Tabel tetap jelas saat layar kecil: konten tabel yang melebar
+   digeser horizontal, bukan saling menabrak.
+   ========================================================= */
+
+div:has(> table),
+section:has(> table),
+article:has(> table),
+.table-responsive,
+.responsive-table,
+.overflow-x-auto,
+.simple-scroll,
+.agenda-scroll,
+.custom-scrollbar {
+  max-width: 100%;
+}
+
+div:has(> table),
+section:has(> table),
+article:has(> table),
+.table-responsive,
+.responsive-table {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  table-layout: auto;
+}
+
+table th,
+table td {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  hyphens: none;
+  vertical-align: top;
+}
+
+@media (max-width: 768px) {
+  table {
+    min-width: max-content;
+  }
+
+  table td p,
+  table td span,
+  table td div {
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+}

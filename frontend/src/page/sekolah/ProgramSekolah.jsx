@@ -111,6 +111,44 @@ function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
 }
 
+function getGuruAssessmentId(user = {}) {
+    return (
+        user?.id_guru_assessment ||
+        user?.guru_assessment_id ||
+        user?.id_guru ||
+        user?.sub ||
+        user?.id ||
+        null
+    );
+}
+
+function normalizeMeetings(activity = {}) {
+    return getArray(
+        activity.pertemuan,
+        activity.meetings,
+        activity.t_kegiatan_pertemuan,
+    ).map((item, index) => ({
+        id: item.id_pertemuan || item.id || index,
+        title: item.nama_pertemuan || item.nama || `Pertemuan ${index + 1}`,
+        description: item.deskripsi || item.description || "",
+        startDate: item.tanggal_mulai || item.start_date || null,
+        endDate: item.tanggal_selesai || item.end_date || null,
+    }));
+}
+
+function getRatingStats(activity = {}) {
+    const ratings = getArray(activity.ratings, activity.rating_items);
+    const total = ratings.length;
+    const average = total
+        ? ratings.reduce((sum, item) => sum + Number(item.rating || 0), 0) / total
+        : Number(activity.guru_rating || 0);
+
+    return {
+        total,
+        average: average ? Number(average.toFixed(2)) : 0,
+    };
+}
+
 function formatDate(value) {
     if (!value) return "-";
 
@@ -673,6 +711,9 @@ export default function ProgramSekolah() {
                 {
                     rating: ratingValue,
                     comment: ratingComment,
+                    rater_type: "GURU",
+                    id_guru_assessment: getGuruAssessmentId(user),
+                    id_sekolah: user?.id_sekolah || ratingModal?.id_sekolah || selectedProgram?.id_sekolah,
                 },
                 { headers: { Authorization: `Bearer ${token}` } },
             );
@@ -1121,6 +1162,8 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
 
     const approvedCount = requirements.filter((item) => getRequirementStatus(item) === "APPROVED").length;
     const commentCount = Array.isArray(activity.comments) ? activity.comments.length : 0;
+    const meetings = normalizeMeetings(activity);
+    const ratingStats = getRatingStats(activity);
 
     return (
         <div className={`rounded-[1.35rem] border p-5 transition ${!unlocked ? "border-slate-100 bg-slate-50 opacity-70" : approved ? "border-emerald-100 bg-emerald-50/40" : "border-slate-100 bg-white shadow-sm"}`}>
@@ -1153,6 +1196,17 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
                         <p className="mt-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                             {approvedCount}/{requirements.length} bukti disetujui
                         </p>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                <Calendar size={11} />
+                                {meetings.length} Pertemuan
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                <Star size={11} />
+                                {ratingStats.average || 0}/5 · {ratingStats.total || 0} rating
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -1185,6 +1239,31 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
                     </div>
                 )}
             </div>
+
+            {meetings.length > 0 && unlocked && (
+                <div className="mt-4 rounded-[1.2rem] border border-cyan-100 bg-cyan-50/40 px-4 py-3">
+                    <p className="mb-2 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                        Jadwal Pertemuan
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                        {meetings.map((meeting, meetingIndex) => (
+                            <div key={`${meeting.id}-${meetingIndex}`} className="rounded-xl border border-cyan-100 bg-white px-3 py-2">
+                                <p className="text-[11px] font-black text-slate-800">
+                                    {meeting.title}
+                                </p>
+                                <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    {formatDate(meeting.startDate)} - {formatDate(meeting.endDate)}
+                                </p>
+                                {meeting.description && (
+                                    <p className="mt-1 text-[10px] font-semibold leading-relaxed text-slate-400">
+                                        {meeting.description}
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {requirements.length > 0 && unlocked && (
                 <div className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 md:grid-cols-2">

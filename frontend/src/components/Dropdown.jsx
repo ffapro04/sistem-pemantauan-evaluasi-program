@@ -5,11 +5,13 @@ import { createPortal } from "react-dom";
 
 export default function Dropdown({
   label,
+  placeholder,
   items = [],
   value,
   onChange,
   disabled = false,
   width = "w-full",
+  usePortal = true,
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
@@ -33,7 +35,7 @@ export default function Dropdown({
 
   // Logika Kalkulasi Posisi (Portal)
   useEffect(() => {
-    if (!open) return;
+    if (!open || !usePortal) return;
     const update = () => {
       if (!ref.current) return;
       const rect = ref.current.getBoundingClientRect();
@@ -52,7 +54,7 @@ export default function Dropdown({
       window.removeEventListener("scroll", update, true);
       window.removeEventListener("resize", update);
     };
-  }, [open]);
+  }, [open, usePortal]);
 
   const handleToggle = (e) => {
     e.preventDefault();
@@ -61,7 +63,30 @@ export default function Dropdown({
   };
 
   const selectedItem = items.find((item) => item.value === value);
-  const displayLabel = selectedItem ? selectedItem.label : label || "Pilih...";
+  const displayLabel = selectedItem ? selectedItem.label : placeholder || label || "Pilih...";
+
+  const menuContent = (
+    <>
+      {items.length > 0 ? (
+        items.map((item, index) => (
+          <DropdownItem
+            key={index}
+            label={item.label}
+            active={item.value === value}
+            onClick={(e) => {
+              e.preventDefault();
+              onChange?.(item.value);
+              setOpen(false);
+            }}
+          />
+        ))
+      ) : (
+        <div className="px-4 py-3 text-[10px] font-bold text-gray-400 text-center uppercase tracking-widest">
+          Kosong
+        </div>
+      )}
+    </>
+  );
 
   return (
     <div ref={ref} className={`relative ${width}`}>
@@ -93,7 +118,7 @@ export default function Dropdown({
         />
       </button>
 
-      {open &&
+      {open && usePortal &&
         createPortal(
           <div
             ref={dropdownRef}
@@ -104,27 +129,19 @@ export default function Dropdown({
               width: `${position.width}px`,
             }}
           >
-            {items.length > 0 ? (
-              items.map((item, index) => (
-                <DropdownItem
-                  key={index}
-                  label={item.label}
-                  active={item.value === value}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onChange?.(item.value);
-                    setOpen(false);
-                  }}
-                />
-              ))
-            ) : (
-              <div className="px-4 py-3 text-[10px] font-bold text-gray-400 text-center uppercase tracking-widest">
-                Kosong
-              </div>
-            )}
+            {menuContent}
           </div>,
           document.body,
         )}
+
+      {open && !usePortal && (
+        <div
+          ref={dropdownRef}
+          className="absolute left-0 top-[calc(100%+8px)] z-50 w-full max-h-[280px] overflow-y-auto rounded-2xl border border-gray-100 bg-white p-1.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] custom-scrollbar"
+        >
+          {menuContent}
+        </div>
+      )}
     </div>
   );
 }

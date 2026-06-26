@@ -109,6 +109,16 @@ export class ProgramController {
     return this.programService.findBySekolah(+id_sekolah);
   }
 
+  @Post('reminders/run')
+  runDeadlineReminders(@Query('date') date?: string) {
+    return this.programService.createDeadlineReminders(date);
+  }
+
+  @Get(':id/rating-summary')
+  ratingSummary(@Param('id') id: string) {
+    return this.programService.getRatingSummary(+id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.programService.findOne(+id);

@@ -16,6 +16,7 @@ import {
     School,
     Search,
     Tag,
+    WalletCards,
 } from "lucide-react";
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
@@ -112,6 +113,14 @@ function formatDate(value) {
         month: "short",
         year: "numeric",
     });
+}
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat("id-ID", {
+        style: "currency",
+        currency: "IDR",
+        maximumFractionDigits: 0,
+    }).format(Number(value || 0));
 }
 
 function normalizeText(value) {
@@ -627,11 +636,20 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
         const selesai = enrichedPrograms.filter(
             (item) => normalizeText(item.__status) === "selesai",
         ).length;
+        const totalBudget = enrichedPrograms.reduce(
+            (total, item) => total + Number(item.harga_vendor || item.budget || 0),
+            0,
+        );
+        const progress = enrichedPrograms.length
+            ? Math.round((selesai / enrichedPrograms.length) * 100)
+            : 0;
         return {
             total: enrichedPrograms.length,
             project,
             reguler,
             selesai,
+            totalBudget,
+            progress,
         };
     }, [enrichedPrograms]);
 
@@ -686,7 +704,7 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                 </header>
 
                 <section className="simple-scroll flex-1 overflow-y-auto px-7 py-6">
-                    <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
                         <StatCard
                             label="Total Program"
                             value={summary.total}
@@ -709,6 +727,18 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                             label="Selesai"
                             value={summary.selesai}
                             helper="Status program selesai"
+                            icon={<CheckCircle2 size={19} />}
+                        />
+                        <StatCard
+                            label="Budget Vendor"
+                            value={formatCurrency(summary.totalBudget)}
+                            helper="Akumulasi nilai MOU"
+                            icon={<WalletCards size={19} />}
+                        />
+                        <StatCard
+                            label="Progress"
+                            value={`${summary.progress}%`}
+                            helper="Selesai dibanding total"
                             icon={<CheckCircle2 size={19} />}
                         />
                     </div>

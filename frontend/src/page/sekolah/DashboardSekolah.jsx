@@ -46,32 +46,24 @@ import {
     YAxis,
 } from "recharts";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
+import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 const COLORS = {
-    cyan: "#0AC4E0",
-    blue: "#2563EB",
-    sky: "#38BDF8",
-    violet: "#8B5CF6",
-    pink: "#EC4899",
-    amber: "#F59E0B",
-    emerald: "#10B981",
-    orange: "#F97316",
-    red: "#EF4444",
-    slate: "#64748B",
+    cyan: CHART_STATUS_COLORS.info,
+    blue: CHART_STATUS_COLORS.info,
+    sky: CHART_STATUS_COLORS.info,
+    violet: CHART_STATUS_COLORS.deep,
+    pink: CHART_STATUS_COLORS.purple,
+    amber: CHART_STATUS_COLORS.warning,
+    emerald: CHART_STATUS_COLORS.success,
+    orange: CHART_STATUS_COLORS.orange,
+    red: CHART_STATUS_COLORS.danger,
+    slate: CHART_STATUS_COLORS.deep,
 };
 
-const CHART_COLORS = [
-    "#0AC4E0",
-    "#2563EB",
-    "#8B5CF6",
-    "#EC4899",
-    "#F59E0B",
-    "#10B981",
-    "#F97316",
-    "#64748B",
-];
+const CHART_COLORS = CHART_PALETTE;
 
 const normalizeArray = (payload) => {
     if (Array.isArray(payload)) return payload;
@@ -224,6 +216,10 @@ const getProgramTitle = (program) => {
 
 const getProgramCategory = (program) => {
     const value = normalizeValue(
+        program?.pilar_program ||
+        program?.pilarProgram ||
+        program?.sub_kategori ||
+        program?.kategori_program ||
         program?.kategori ||
         program?.category ||
         program?.jenis ||
@@ -231,11 +227,18 @@ const getProgramCategory = (program) => {
         "",
     );
 
-    if (value.includes("NON_AKADEMIK") || value.includes("NONAKADEMIK")) {
+    if (
+        value.includes("NON_AKADEMIK") ||
+        value.includes("NONAKADEMIK") ||
+        value.includes("SENI") ||
+        value.includes("BUDAYA") ||
+        value.includes("KECAKAPAN") ||
+        value.includes("HIDUP")
+    ) {
         return "NON_AKADEMIK";
     }
 
-    if (value.includes("AKADEMIK")) return "AKADEMIK";
+    if (value.includes("AKADEMIK") || value.includes("KARAKTER")) return "AKADEMIK";
 
     return "LAINNYA";
 };
@@ -1104,6 +1107,9 @@ export default function DashboardSekolah() {
                 normalizeSearch(
                     [
                         getProgramTitle(program),
+                        program?.pilar_program,
+                        program?.sub_kategori,
+                        program?.kategori_program,
                         program?.kategori,
                         program?.jenis_program,
                         program?.tahun,

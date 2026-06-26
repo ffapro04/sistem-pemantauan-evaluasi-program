@@ -7,6 +7,7 @@ import { jwtDecode } from "jwt-decode";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   LayoutDashboard,
+  BarChart3,
   CalendarDays,
   UsersRound,
   Building2,
@@ -54,6 +55,7 @@ const roleNameMap = {
   7: "Kepala Dinas",
   8: "Guru Assessment",
   9: "Operator Sekolah",
+  10: "Kepala Sekolah",
 };
 
 const getInitial = (value) => {
@@ -124,6 +126,19 @@ const isOperatorSekolahUser = (user = {}) => {
     jabatan.includes("operator")
   );
 };
+
+const isKepalaSekolahUser = (user = {}) => {
+  const idRole = Number(user?.id_role || user?.role_id || 0);
+  const role = String(user?.role || user?.nama_role || "").toLowerCase();
+  const jabatan = String(user?.jabatan || "").toLowerCase();
+
+  return (
+    idRole === 10 ||
+    role.includes("kepala sekolah") ||
+    jabatan.includes("kepala sekolah")
+  );
+};
+
 const getUserJenjang = (user = {}) => {
   return String(
     user?.jenjang ||
@@ -154,7 +169,9 @@ const getRoleMenus = (idRole, hoUser) => {
         { label: "Data Wilayah", path: "/admin/wilayah", icon: MapPin },
         { label: "Data Sekolah", path: "/admin/sekolah", icon: School },
         { label: "Data Operator Sekolah", path: "/admin/operator-sekolah", icon: GraduationCap },
+        { label: "Data Kepala Sekolah", path: "/admin/kepala-sekolah", icon: ShieldCheck },
         { label: "Data Vendor", path: "/admin/vendor", icon: BriefcaseBusiness },
+        { label: "Manajemen Vendor", path: "/admin/manajemen-vendor", icon: BarChart3 },
         { label: "Data Kepala Dinas", path: "/admin/kadin", icon: Landmark },
       ],
     },
@@ -166,6 +183,7 @@ const getRoleMenus = (idRole, hoUser) => {
       items: [
         { label: "Dashboard", path: "/pengurus/dashboard", icon: LayoutDashboard },
         { label: "Agenda", path: "/pengurus/agenda", icon: CalendarDays },
+        { label: "Manajemen Vendor", path: "/pengurus/manajemen-vendor", icon: BriefcaseBusiness },
       ],
     },
   ];
@@ -201,6 +219,11 @@ const getRoleMenus = (idRole, hoUser) => {
               label: "Daftar Program",
               path: "/ho/daftar-program/non-akademik", // â† Kunci ke non-akademik
               icon: ClipboardList,
+            },
+            {
+              label: "Manajemen Vendor",
+              path: "/ho/manajemen-vendor",
+              icon: BriefcaseBusiness,
             },
             {
               label: "Buat Program Non Akademik",
@@ -246,6 +269,11 @@ const getRoleMenus = (idRole, hoUser) => {
             label: "Daftar Program",
             path: "/ho/daftar-program/akademik", // â† Kunci ke akademik
             icon: ClipboardList,
+          },
+          {
+            label: "Manajemen Vendor",
+            path: "/ho/manajemen-vendor",
+            icon: BriefcaseBusiness,
           },
           {
             label: "Buat Program Akademik",
@@ -315,6 +343,19 @@ const getRoleMenus = (idRole, hoUser) => {
           label: "Berita Acara",
           path: "/sekolah/berita-acara",
           icon: Newspaper,
+        },
+      ],
+    },
+  ];
+
+  const kepalaSekolahMenus = [
+    {
+      label: "Ikhtisar",
+      items: [
+        {
+          label: "Dashboard Kepala Sekolah",
+          path: "/kepala-sekolah/dashboard",
+          icon: LayoutDashboard,
         },
       ],
     },
@@ -413,6 +454,7 @@ const getRoleMenus = (idRole, hoUser) => {
   if (Number(idRole) === 2) return pengurusMenus;
   if (Number(idRole) === 3) return hoMenus;
   if (Number(idRole) === 4) return aoMenus;
+  if (isKepalaSekolahUser(hoUser) || Number(idRole) === 10) return kepalaSekolahMenus;
   if (isOperator) return operatorSekolahMenus;
   if (Number(idRole) === 5) return sekolahMenus;
   if (Number(idRole) === 6) return vendorMenus;
@@ -423,6 +465,7 @@ const getRoleMenus = (idRole, hoUser) => {
 };
 
 const getMenuTitle = (user = {}) => {
+  if (isKepalaSekolahUser(user)) return "Menu Kepala Sekolah";
   if (isOperatorSekolahUser(user)) return "Menu Operator Sekolah";
 
   const idRole = Number(user?.id_role);
@@ -436,11 +479,13 @@ const getMenuTitle = (user = {}) => {
   if (idRole === 7) return "Menu Kepala Dinas";
   if (idRole === 8) return "Menu Guru";
   if (idRole === 9) return "Menu Operator Sekolah";
+  if (idRole === 10) return "Menu Kepala Sekolah";
 
   return "Menu Sistem";
 };
 
 const getRoleLabel = (user = {}) => {
+  if (isKepalaSekolahUser(user)) return "Kepala Sekolah";
   if (isOperatorSekolahUser(user)) return "Operator Sekolah";
 
   const idRole = Number(user?.id_role);
@@ -1015,89 +1060,86 @@ const NotchNavigation = ({
   brandSubtitle = "Dashboard",
 }) => {
   const avatarUrl = getUserAvatarUrl(user);
+  const menuItems = menuGroups.flatMap((group) => group.items || []);
 
   return (
     <>
-      {/* Notch yang menempel di tengah atas */}
-      <div className="fixed left-3 right-3 top-3 z-[250] lg:left-1/2 lg:right-auto lg:top-0 lg:w-[680px] lg:-translate-x-1/2">
-        {/* Badan Notch */}
-        <div className="relative mx-auto h-[58px] overflow-hidden rounded-[1.6rem] bg-black/80 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)] lg:h-[52px] lg:rounded-b-[2rem] lg:rounded-t-none">
-          {/* Highlight atas */}
-          <div className="absolute inset-x-0 top-0 h-px bg-white/20" />
+      <div className="fixed left-2 right-2 top-3 z-[9999] sm:left-4 sm:right-4 lg:left-1/2 lg:right-auto lg:top-2 lg:w-[min(1120px,calc(100vw-2rem))] lg:-translate-x-1/2">
+        <div className="relative mx-auto overflow-hidden rounded-[1.55rem] border border-cyan-100/80 bg-white/92 p-2 text-slate-800 shadow-[0_22px_70px_rgba(15,23,42,0.14)] backdrop-blur-2xl lg:rounded-[1.9rem]">
+          <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#0AC4E0]/35 to-transparent" />
+          <div className="pointer-events-none absolute -left-20 top-0 h-24 w-48 rounded-full bg-[#0AC4E0]/12 blur-3xl" />
 
-          {/* Konten Notch */}
-          <div className="flex h-full items-center justify-between gap-2 px-3 sm:px-4 lg:px-8">
-            {/* Kiri: Logo + Brand */}
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] text-white shadow-[0_6px_16px_rgba(10,196,224,0.3)]">
+          <div className="relative flex items-center gap-2">
+            <div className="flex min-w-0 shrink-0 items-center gap-2 rounded-[1.15rem] bg-cyan-50/70 px-2 py-2 ring-1 ring-cyan-100 sm:px-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] text-white shadow-[0_8px_18px_rgba(10,196,224,0.28)]">
                 <Home size={16} />
               </div>
-              <div className="hidden min-[430px]:block">
-                <p className="text-[11px] font-black text-white leading-none tracking-tight">{brandTitle}</p>
-                <p className="text-[8px] font-bold text-white/40 uppercase tracking-wider mt-0.5">{brandSubtitle}</p>
+              <div className="hidden min-w-0 sm:block">
+                <p className="max-w-[150px] truncate text-[11px] font-black leading-none tracking-tight text-slate-950 lg:max-w-[190px]">{brandTitle}</p>
+                <p className="mt-1 max-w-[150px] truncate text-[8px] font-bold uppercase tracking-wider text-slate-400 lg:max-w-[190px]">{brandSubtitle}</p>
               </div>
             </div>
 
-            {/* Tengah: Menu Items */}
-            <div className="no-scrollbar flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto px-1">
-              {menuGroups.map((group) =>
-                group.items.map((item) => {
-                  const Icon = item.icon || LayoutDashboard;
-                  const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-                  return (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className={`relative flex shrink-0 items-center gap-2 rounded-[1rem] px-3 py-2 text-[12px] font-bold transition-all duration-300 sm:px-4 lg:gap-2.5 lg:px-5 lg:text-[13px] ${isActive
-                        ? "bg-white text-slate-900 shadow-[0_8px_20px_rgba(255,255,255,0.15)]"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
-                        }`}
-                    >
-                      <Icon size={16} className={isActive ? "text-[#0AC4E0]" : ""} />
-                      <span className="hidden sm:inline">{item.label}</span>
-                    </NavLink>
-                  );
-                })
-              )}
-            </div>
+            <nav className="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-[1.15rem] bg-slate-50/80 p-1 ring-1 ring-slate-100">
+              {menuItems.map((item) => {
+                const Icon = item.icon || LayoutDashboard;
+                const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    title={item.label}
+                    className={`group relative isolate flex h-11 shrink-0 items-center gap-2.5 overflow-hidden rounded-[0.95rem] px-3 text-[12px] font-black transition-all duration-200 sm:px-4 lg:px-5 ${isActive
+                      ? "text-slate-950 shadow-[0_12px_28px_rgba(10,196,224,0.18)]"
+                      : "text-slate-500 hover:bg-white hover:text-slate-900"
+                      }`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="notch-menu-water"
+                        className="absolute inset-0 -z-10 overflow-hidden rounded-[0.95rem] bg-cyan-50"
+                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                      >
+                        <span className="absolute -left-5 top-1/2 h-12 w-12 -translate-y-1/2 rounded-full bg-[#0AC4E0]/28 blur-xl" />
+                        <span className="absolute right-1 top-1 h-8 w-12 rounded-full bg-sky-200/70 blur-lg" />
+                        <span className="absolute inset-x-3 bottom-0 h-px bg-gradient-to-r from-transparent via-[#0AC4E0] to-transparent" />
+                      </motion.span>
+                    )}
+                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all ${isActive ? "bg-white text-[#0AC4E0] shadow-sm" : "bg-white text-slate-400 ring-1 ring-slate-100 group-hover:text-[#0AC4E0]"}`}>
+                      <Icon size={15} />
+                    </span>
+                    <span className="whitespace-nowrap leading-none">{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </nav>
 
-            {/* Kanan: User + Logout */}
-            <div className="flex items-center gap-2.5">
-              {/* Jam kecil */}
-              <div className="hidden lg:flex items-center gap-1.5 text-white/40 text-[10px] font-bold">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-[1.15rem] bg-slate-50/80 p-1.5 ring-1 ring-slate-100">
+              <div className="hidden items-center gap-1.5 rounded-full px-2 text-[10px] font-bold text-slate-400 xl:flex">
                 <Clock3 size={12} className="text-[#0AC4E0]" />
                 <span>{now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
-
-              {/* Separator */}
-              <div className="hidden h-5 w-px bg-white/10 sm:block" />
-
-              {/* Notifikasi */}
               <button
                 type="button"
                 onClick={onNotificationClick}
-                className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition-all hover:bg-white/10 hover:text-white active:scale-95"
+                className="relative flex h-8 w-8 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-400 transition-all hover:border-cyan-100 hover:text-[#0AC4E0] active:scale-95"
                 title="Notifikasi"
               >
                 <Bell size={14} />
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-black bg-[#0AC4E0] px-1 text-[7px] font-black text-white shadow-lg shadow-[#0AC4E0]/40">
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-[#0AC4E0] px-1 text-[7px] font-black text-white shadow-lg shadow-[#0AC4E0]/40">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </button>
-
-              {/* Pengaturan Akun */}
               <button
                 type="button"
                 onClick={onSettingsClick}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/60 transition-all hover:bg-white/10 hover:text-white active:scale-95"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-400 transition-all hover:border-cyan-100 hover:text-[#0AC4E0] active:scale-95"
                 title="Pengaturan akun"
               >
                 <Settings size={14} />
               </button>
-
-              {/* User Avatar */}
               <button
                 type="button"
                 onClick={onProfileClick}
@@ -1119,12 +1161,10 @@ const NotchNavigation = ({
                   )}
                 </div>
               </button>
-
-              {/* Logout */}
               <button
                 type="button"
                 onClick={onLogout}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40 transition-all hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 active:scale-95"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-100 bg-white text-slate-400 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500 active:scale-95"
                 title="Keluar"
               >
                 <LogOut size={13} />
@@ -1187,44 +1227,53 @@ const Sidebar = () => {
         return;
       }
 
+      let decoded;
+
       try {
-        const decoded = jwtDecode(token);
-        const idRole =
-          decoded.id_role !== undefined ? Number(decoded.id_role) : null;
-        const idUser = Number(
-          decoded.id_user ||
-          decoded.user_id ||
-          decoded.sub ||
-          decoded.id ||
-          0,
-        );
-        const idSekolah = getSekolahIdFromToken(decoded);
+        decoded = jwtDecode(token);
+      } catch (error) {
+        localStorage.clear();
+        navigate("/login");
+        return;
+      }
 
-        const baseUser = {
-          id_user: idUser || null,
-          nama: decoded.nama ?? decoded.nama_guru ?? decoded.email ?? "User",
-          email: decoded.email ?? decoded.email_guru ?? "",
-          jabatan: decoded.jabatan ?? decoded.jenis_guru ?? "",
-          id_role: idRole,
-          role: decoded.nama_role ?? decoded.role ?? roleNameMap[idRole] ?? "-",
-          jenis: decoded.jenis ?? null,
-          id_sekolah: idSekolah,
-          jenjang:
-            decoded.jenjang ||
-            decoded.sekolah?.jenjang ||
-            decoded.school?.jenjang ||
-            "",
-          foto_profile: decoded.foto_profile || "",
-          logo_url: decoded.logo_url || "",
-        };
+      const idRole =
+        decoded.id_role !== undefined ? Number(decoded.id_role) : null;
+      const idUser = Number(
+        decoded.id_user ||
+        decoded.user_id ||
+        decoded.sub ||
+        decoded.id ||
+        0,
+      );
+      const idSekolah = getSekolahIdFromToken(decoded);
 
-        if (isMounted) setUser(baseUser);
+      const baseUser = {
+        id_user: idUser || null,
+        nama: decoded.nama ?? decoded.nama_guru ?? decoded.email ?? "User",
+        email: decoded.email ?? decoded.email_guru ?? "",
+        jabatan: decoded.jabatan ?? decoded.jenis_guru ?? "",
+        id_role: idRole,
+        role: decoded.nama_role ?? decoded.role ?? roleNameMap[idRole] ?? "-",
+        jenis: decoded.jenis ?? null,
+        id_sekolah: idSekolah,
+        jenjang:
+          decoded.jenjang ||
+          decoded.sekolah?.jenjang ||
+          decoded.school?.jenjang ||
+          "",
+        foto_profile: decoded.foto_profile || "",
+        logo_url: decoded.logo_url || "",
+      };
 
-        /*
-         * Ambil profil user terbaru dari database.
-         * Ini penting karena JWT lama biasanya belum membawa foto_profile.
-         */
-        if (idUser && Number(idRole) !== 8) {
+      if (isMounted) setUser(baseUser);
+
+      /*
+       * Ambil profil user terbaru dari database.
+       * Jika request ini gagal saat refresh, sesi tetap dipertahankan memakai data token.
+       */
+      if (idUser && Number(idRole) !== 8) {
+        try {
           const userResponse = await fetch(`${API_BASE_URL}/users/${idUser}`, {
             method: "GET",
             headers: { Authorization: `Bearer ${token}` },
@@ -1258,9 +1307,13 @@ const Sidebar = () => {
                 prev.id_sekolah,
             }));
           }
+        } catch (error) {
+          console.warn("Profil user belum bisa dimuat:", error);
         }
+      }
 
-        if ([5, 9].includes(Number(idRole)) && idSekolah) {
+      if (([5, 9, 10].includes(Number(idRole)) || isKepalaSekolahUser(baseUser)) && idSekolah) {
+        try {
           const response = await fetch(`${API_BASE_URL}/sekolah/${idSekolah}`, {
             method: "GET",
             headers: { Authorization: `Bearer ${token}` },
@@ -1285,10 +1338,9 @@ const Sidebar = () => {
               sekolah: sekolahData || prev.sekolah,
             }));
           }
+        } catch (error) {
+          console.warn("Profil sekolah belum bisa dimuat:", error);
         }
-      } catch (error) {
-        localStorage.clear();
-        navigate("/login");
       }
     };
 
@@ -1452,25 +1504,31 @@ const Sidebar = () => {
     );
   };
 
-  // ===== ROLE DENGAN NAVIGASI NOTCH: PENGURUS, AO, DAN KEPALA DINAS =====
-  if ([2, 4, 7].includes(Number(user.id_role))) {
+  // ===== ROLE DENGAN NAVIGASI NOTCH: PENGURUS, AO, KEPALA DINAS, DAN KEPALA SEKOLAH =====
+  if ([2, 4, 7, 10].includes(Number(user.id_role)) || isKepalaSekolahUser(user)) {
     const currentRoleId = Number(user.id_role);
+    const isKepsek = currentRoleId === 10 || isKepalaSekolahUser(user);
 
     const notchBrand =
-      currentRoleId === 7
+      isKepsek
         ? {
-          title: "Kepala Dinas",
-          subtitle: "Wilayah",
+          title: "Kepala Sekolah",
+          subtitle: "Dashboard Sekolah",
         }
-        : currentRoleId === 4
+        : currentRoleId === 7
           ? {
-            title: "Area Officer",
-            subtitle: "Monitoring Wilayah",
+            title: "Kepala Dinas",
+            subtitle: "Wilayah",
           }
-          : {
-            title: "Pengurus",
-            subtitle: "Dashboard",
-          };
+          : currentRoleId === 4
+            ? {
+              title: "Area Officer",
+              subtitle: "Monitoring Wilayah",
+            }
+            : {
+              title: "Pengurus",
+              subtitle: "Dashboard",
+            };
 
     return (
       <>
@@ -1553,7 +1611,9 @@ const Sidebar = () => {
         )}
       </AnimatePresence>
 
-      <aside className={`fixed inset-y-0 left-0 z-[220] flex h-dvh w-[min(300px,86vw)] shrink-0 flex-col overflow-hidden rounded-r-[2rem] border-r border-slate-100 bg-white px-4 py-5 font-inter text-slate-800 shadow-[14px_0_45px_rgba(15,23,42,0.16)] transition-transform duration-300 ease-out lg:sticky lg:z-[80] lg:h-screen lg:w-[280px] lg:translate-x-0 lg:shadow-[14px_0_45px_rgba(15,23,42,0.06)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <div className="hidden w-[280px] shrink-0 lg:block" aria-hidden="true" />
+
+      <aside className={`fixed inset-y-0 left-0 z-[220] flex h-dvh w-[min(300px,86vw)] shrink-0 flex-col overflow-hidden rounded-r-[2rem] border-r border-slate-100 bg-white px-4 py-5 font-inter text-slate-800 shadow-[14px_0_45px_rgba(15,23,42,0.16)] transition-transform duration-300 ease-out lg:z-[80] lg:h-screen lg:w-[280px] lg:translate-x-0 lg:shadow-[14px_0_45px_rgba(15,23,42,0.06)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div>

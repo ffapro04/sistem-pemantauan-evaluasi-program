@@ -31,6 +31,7 @@ import {
 
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
+import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_FALLBACK = "";
 const ITEMS_PER_PAGE = 5;
@@ -38,29 +39,29 @@ const ITEMS_PER_PAGE = 5;
 const PILLAR_META = {
     AKADEMIK: {
         label: "Akademik",
-        color: "#334155",
-        soft: "#F1F5F9",
+        color: CHART_STATUS_COLORS.success,
+        soft: "#ECFDF5",
         group: "AKADEMIK",
         chartKey: "akademik",
     },
     KARAKTER: {
         label: "Karakter",
-        color: "#64748B",
-        soft: "#F1F5F9",
+        color: CHART_STATUS_COLORS.warning,
+        soft: "#FFFBEB",
         group: "AKADEMIK",
         chartKey: "karakter",
     },
     SENI_BUDAYA: {
         label: "Seni Budaya",
-        color: "#C39A72",
-        soft: "#F8EFE7",
+        color: CHART_STATUS_COLORS.danger,
+        soft: "#FFF1F2",
         group: "NON_AKADEMIK",
         chartKey: "seniBudaya",
     },
     KECAKAPAN_HIDUP: {
         label: "Kecakapan Hidup",
-        color: "#7A4E2D",
-        soft: "#F4ECE6",
+        color: CHART_STATUS_COLORS.orange,
+        soft: "#FFF7ED",
         group: "NON_AKADEMIK",
         chartKey: "kecakapanHidup",
     },

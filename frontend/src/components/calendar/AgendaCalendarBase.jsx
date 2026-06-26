@@ -39,8 +39,18 @@ import {
 
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
+import Dropdown from "../Dropdown";
+import astraLogo from "../../assets/img/logo-astra.png";
+import satuIndonesiaLogo from "../../assets/img/satu_indonesia.png";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+
+const AGENDA_LOGO_PATHS = {
+    astra: astraLogo,
+    satuIndonesia: satuIndonesiaLogo,
+};
+
+const AGENDA_TABLE_PAGE_SIZE = 10;
 
 const MONTH_NAMES = [
     "Januari",
@@ -70,6 +80,10 @@ const DEFAULT_COE_FORM = {
     endTime: "09:00",
     location: "",
     description: "",
+    pilar: "",
+    activityType: "",
+    meetingLink: "",
+    jenjang_targets: [],
     participants: [],
 };
 
@@ -80,6 +94,21 @@ const DEFAULT_TYPE_VISIBILITY = {
     showCOE: true,
     showHoliday: true,
 };
+
+const PILAR_OPTIONS = [
+    { label: "Akademik", value: "AKADEMIK", bidang: "AKADEMIK" },
+    { label: "Karakter", value: "KARAKTER", bidang: "AKADEMIK" },
+    { label: "Seni Budaya", value: "SENI_BUDAYA", bidang: "NON_AKADEMIK" },
+    { label: "Kecakapan Hidup", value: "KECAKAPAN_HIDUP", bidang: "NON_AKADEMIK" },
+];
+
+const JENJANG_OPTIONS = ["SD", "SMP", "SMK"];
+
+const COE_ACTIVITY_TYPES = [
+    { label: "Indoor", value: "INDOOR" },
+    { label: "Outdoor", value: "OUTDOOR" },
+    { label: "Via Daring", value: "DARING" },
+];
 
 function normalizeArray(payload) {
     if (Array.isArray(payload)) return payload;
@@ -164,6 +193,85 @@ function normalizeBidang(value) {
     if (text.includes("AKADEMIK")) return "AKADEMIK";
 
     return text || "";
+}
+
+function normalizePilar(value) {
+    const text = String(value || "")
+        .trim()
+        .toUpperCase()
+        .replaceAll("-", "_")
+        .replaceAll(" ", "_");
+
+    if (text.includes("KECAKAPAN")) return "KECAKAPAN_HIDUP";
+    if (text.includes("SENI")) return "SENI_BUDAYA";
+    if (text.includes("KARAKTER")) return "KARAKTER";
+    if (text.includes("AKADEMIK")) return "AKADEMIK";
+
+    return "";
+}
+
+function getPilarLabel(value) {
+    const pilar = normalizePilar(value);
+    return PILAR_OPTIONS.find((item) => item.value === pilar)?.label || "Semua Pilar";
+}
+
+function normalizeActivityType(value) {
+    const text = String(value || "")
+        .trim()
+        .toUpperCase()
+        .replaceAll("-", "_")
+        .replaceAll(" ", "_");
+
+    if (text.includes("OUT")) return "OUTDOOR";
+    if (text.includes("DAR") || text.includes("ONLINE") || text.includes("VIA")) return "DARING";
+    if (text.includes("IN")) return "INDOOR";
+
+    return "";
+}
+
+function getActivityTypeLabel(value) {
+    const type = normalizeActivityType(value);
+    return COE_ACTIVITY_TYPES.find((item) => item.value === type)?.label || "Tipe belum diisi";
+}
+
+function normalizeExternalUrl(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text)) return text;
+    return `https://${text}`;
+}
+
+function getAllowedPilarOptions(user = {}, lockedBidang = "", scope = "") {
+    const roleId = getRoleId(user);
+    const userJenis = normalizeBidang(user?.jenis || lockedBidang);
+    const normalizedScope = String(scope || "").toUpperCase();
+
+    if (roleId === 3 || normalizedScope === "HO") {
+        const targetBidang = userJenis || normalizeBidang(lockedBidang);
+        if (targetBidang) {
+            return PILAR_OPTIONS.filter((item) => item.bidang === targetBidang);
+        }
+    }
+
+    return PILAR_OPTIONS;
+}
+
+function getAllowedJenjangOptions(user = {}, scope = "") {
+    const roleId = getRoleId(user);
+    const normalizedScope = String(scope || "").toUpperCase();
+    const subJenis = String(user?.sub_jenis || user?.subJenis || "").toUpperCase();
+    const userJenjang = String(user?.sekolah?.jenjang || user?.jenjang || "").toUpperCase();
+
+    if (roleId === 3 || normalizedScope === "HO") {
+        if (subJenis.includes("SMK")) return ["SMK"];
+        if (subJenis.includes("SD") && subJenis.includes("SMP")) return ["SD", "SMP"];
+        if (subJenis.includes("SMP")) return ["SMP"];
+        if (subJenis.includes("SD")) return ["SD"];
+    }
+
+    if (["SEKOLAH"].includes(normalizedScope) && userJenjang) return [userJenjang];
+
+    return JENJANG_OPTIONS;
 }
 
 function getBidangText(value) {
@@ -343,6 +451,16 @@ function getProgramCategory(program, lockedBidang) {
     );
 }
 
+function getProgramPilar(program, lockedBidang) {
+    return normalizePilar(
+        program?.pilar_program ||
+        program?.pilarProgram ||
+        program?.pilar ||
+        program?.kategori_pilar ||
+        getProgramCategory(program, lockedBidang),
+    );
+}
+
 function getAssessmentCategory(assessment, lockedBidang) {
     return normalizeBidang(
         assessment?.jenis ||
@@ -351,6 +469,15 @@ function getAssessmentCategory(assessment, lockedBidang) {
         assessment?.category ||
         lockedBidang ||
         "",
+    );
+}
+
+function getAssessmentPilar(assessment, lockedBidang) {
+    return normalizePilar(
+        assessment?.pilar ||
+        assessment?.pilar_assessment ||
+        assessment?.pilar_program ||
+        getAssessmentCategory(assessment, lockedBidang),
     );
 }
 
@@ -478,7 +605,8 @@ function slugText(value) {
 
 function mapIndonesiaHolidaysToEvents(displayYear) {
     const holidayEngine = new Holidays("ID");
-    const targetYears = [displayYear - 1, displayYear, displayYear + 1];
+    const targetYears = [displayYear - 1, displayYear, displayYear + 1]
+        .filter((year) => year >= 2024 && year <= 2030);
 
     const rows = targetYears.flatMap((year) => {
         try {
@@ -535,6 +663,7 @@ function mapProgramsToEvents(programs, options = {}) {
         const programName = getProgramName(program);
         const category = getProgramCategory(program, lockedBidang);
         const categoryLabel = getBidangText(category);
+        const pilar = getProgramPilar(program, lockedBidang);
         const path =
             typeof buildProgramPath === "function"
                 ? buildProgramPath(program)
@@ -549,6 +678,7 @@ function mapProgramsToEvents(programs, options = {}) {
             startTime: normalizeTime(program?.jam_mulai || program?.start_time),
             endTime: normalizeTime(program?.jam_selesai || program?.end_time),
             categoryLabel,
+            pilar,
             description:
                 program?.deskripsi ||
                 program?.description ||
@@ -579,6 +709,7 @@ function mapProgramsToEvents(programs, options = {}) {
                 startTime: normalizeTime(fase?.jam_mulai || fase?.start_time),
                 endTime: normalizeTime(fase?.jam_selesai || fase?.end_time),
                 categoryLabel: "Fase Program",
+                pilar,
                 description:
                     fase?.deskripsi ||
                     fase?.description ||
@@ -603,6 +734,7 @@ function mapAssessmentsToEvents(assessments, options = {}) {
     return assessments.map((assessment, index) => {
         const category = getAssessmentCategory(assessment, lockedBidang);
         const categoryLabel = getBidangText(category);
+        const pilar = getAssessmentPilar(assessment, lockedBidang);
         const path =
             typeof buildAssessmentPath === "function"
                 ? buildAssessmentPath(assessment)
@@ -617,6 +749,7 @@ function mapAssessmentsToEvents(assessments, options = {}) {
             startTime: normalizeTime(assessment?.jam_mulai || assessment?.start_time),
             endTime: normalizeTime(assessment?.jam_selesai || assessment?.end_time),
             categoryLabel,
+            pilar,
             description:
                 assessment?.deskripsi ||
                 assessment?.description ||
@@ -644,6 +777,10 @@ function mapCoeToEvents(agendas) {
         categoryLabel: "COE",
         description: agenda.description || agenda.status_note || "",
         location: agenda.location || "",
+        pilar: normalizePilar(agenda.pilar),
+        activityType: normalizeActivityType(agenda.activity_type || agenda.activityType),
+        meetingLink: agenda.meeting_link || agenda.meetingLink || agenda.zoom_link || "",
+        jenjangTargets: Array.isArray(agenda.jenjang_targets) ? agenda.jenjang_targets : [],
         phase: agenda.status || "SCHEDULED",
         status: agenda.status || "SCHEDULED",
         dbStatus: agenda.status || "SCHEDULED",
@@ -791,12 +928,20 @@ function shouldKeepProgramByRole(program, user, roleScope) {
     return true;
 }
 
-function SummaryCard({ label, value, helper, icon }) {
+function SummaryCard({ label, value, helper, icon, active = false, onClick }) {
     return (
-        <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+        <button
+            type={onClick ? "button" : "button"}
+            onClick={onClick}
+            disabled={!onClick}
+            className={`group rounded-2xl border p-5 text-left shadow-sm transition-all ${active
+                ? "border-[#0AC4E0] bg-cyan-50 shadow-[0_16px_40px_rgba(10,196,224,0.12)]"
+                : "border-slate-100 bg-white hover:border-cyan-100 hover:bg-cyan-50/35"
+                } ${onClick ? "cursor-pointer" : "cursor-default"}`}
+        >
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                    <p className={`text-[10px] font-black uppercase tracking-[0.2em] ${active ? "text-[#0AC4E0]" : "text-slate-400"}`}>
                         {label}
                     </p>
                     <h3 className="mt-2 text-[30px] font-black leading-none tracking-[-0.05em] text-slate-800">
@@ -809,10 +954,69 @@ function SummaryCard({ label, value, helper, icon }) {
                     )}
                 </div>
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-2xl transition ${active ? "bg-[#0AC4E0] text-white" : "bg-cyan-50 text-[#0AC4E0] group-hover:bg-white"}`}>
                     {icon}
                 </div>
             </div>
+        </button>
+    );
+}
+
+function FilterGroup({ title, children, tone = "cyan" }) {
+    const toneClass = tone === "amber" ? "text-amber-500" : tone === "dark" ? "text-slate-500" : "text-[#0AC4E0]";
+
+    return (
+        <div className="rounded-2xl border border-slate-100 bg-white/90 p-3 shadow-sm">
+            <p className={`mb-2 text-[9px] font-black uppercase tracking-[0.2em] ${toneClass}`}>
+                {title}
+            </p>
+            <div className="flex flex-wrap gap-2">{children}</div>
+        </div>
+    );
+}
+
+function FilterButton({ active, children, onClick, tone = "cyan" }) {
+    const activeClass =
+        tone === "amber"
+            ? "border-amber-500 bg-amber-500 text-white shadow-[0_10px_24px_rgba(245,158,11,0.18)]"
+            : tone === "dark"
+                ? "border-slate-800 bg-slate-800 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]"
+                : "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-[0_10px_24px_rgba(10,196,224,0.18)]";
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`rounded-xl border px-3.5 py-2 text-[10px] font-black uppercase tracking-wide transition ${active
+                ? activeClass
+                : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:bg-cyan-50 hover:text-slate-800"
+                }`}
+        >
+            {children}
+        </button>
+    );
+}
+
+function AgendaFilterSelect({ label, value, onChange, options, tone = "cyan" }) {
+    const accentClass =
+        tone === "amber"
+            ? "text-amber-500"
+            : tone === "dark"
+                ? "text-slate-500"
+                : "text-[#0AC4E0]";
+
+    return (
+        <div className="group min-w-[154px] flex-1 rounded-2xl border border-slate-100 bg-white px-3 py-2 shadow-sm transition hover:border-cyan-100 hover:shadow-md">
+            <span className={`mb-1 block text-[8px] font-black uppercase tracking-[0.2em] ${accentClass}`}>
+                {label}
+            </span>
+            <Dropdown
+                value={value}
+                items={options}
+                onChange={onChange}
+                placeholder="Pilih..."
+                usePortal={false}
+            />
         </div>
     );
 }
@@ -857,6 +1061,18 @@ function EventList({ events, onOpen, canManageCOE, onEditCOE, onDoneCOE, onDelet
                             <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-slate-500">
                                 {isCOE ? getStatusLabel(status) : event.categoryLabel}
                             </span>
+
+                            {isCOE && event.pilar && (
+                                <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-cyan-700">
+                                    {getPilarLabel(event.pilar)}
+                                </span>
+                            )}
+
+                            {isCOE && event.activityType && (
+                                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-amber-700">
+                                    {getActivityTypeLabel(event.activityType)}
+                                </span>
+                            )}
                         </div>
 
                         <div className="flex items-start justify-between gap-3">
@@ -887,6 +1103,18 @@ function EventList({ events, onOpen, canManageCOE, onEditCOE, onDoneCOE, onDelet
                                             <AlertTriangle size={13} />
                                             Jadwal sudah lewat dan belum selesai.
                                         </p>
+                                    )}
+
+                                    {isCOE && event.meetingLink && (
+                                        <a
+                                            href={normalizeExternalUrl(event.meetingLink)}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-cyan-50 px-3 py-2 text-[11px] font-black text-[#0AC4E0] transition hover:bg-cyan-100"
+                                        >
+                                            <MapPin size={13} />
+                                            Buka link meeting
+                                        </a>
                                     )}
                                 </div>
                             </div>
@@ -950,6 +1178,154 @@ function EventList({ events, onOpen, canManageCOE, onEditCOE, onDoneCOE, onDelet
     );
 }
 
+function AgendaLogoSlot({ src, label, align = "left" }) {
+    return (
+        <div className={`flex min-h-[72px] items-center ${align === "right" ? "justify-end text-right" : "justify-start text-left"}`}>
+            <div className="relative flex min-w-[190px] items-center justify-center px-1">
+                <img
+                    src={src}
+                    alt={label}
+                    className="max-h-16 max-w-[180px] object-contain"
+                    onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        event.currentTarget.nextElementSibling?.classList.remove("hidden");
+                    }}
+                />
+                <span className="hidden text-[9px] font-black uppercase tracking-[0.18em] text-slate-300">
+                    Slot {label}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function getEventJenjangLabel(event) {
+    const targets = Array.isArray(event?.jenjangTargets)
+        ? event.jenjangTargets
+        : Array.isArray(event?.raw?.jenjang_targets)
+            ? event.raw.jenjang_targets
+            : [];
+
+    const directValue =
+        event?.jenjang ||
+        event?.raw?.jenjang ||
+        event?.raw?.target_jenjang ||
+        event?.raw?.sekolah?.jenjang ||
+        event?.raw?.program?.jenjang;
+
+    if (targets.length) return targets.join(", ");
+    if (directValue) return String(directValue).toUpperCase();
+
+    return "Semua Jenjang";
+}
+
+function AgendaDaySection({
+    title,
+    events,
+    total,
+    emptyText,
+    type = "program",
+    onOpen,
+    canManageCOE = false,
+    onEditCOE,
+    onDoneCOE,
+    onDeleteCOE,
+}) {
+    return (
+        <section className="min-w-0">
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+                <h3 className="text-[12px] font-black uppercase tracking-[0.18em] text-slate-800">
+                    {title}
+                </h3>
+                <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black text-[#0AC4E0]">
+                    {total}
+                </span>
+            </div>
+
+            {events.length ? (
+                <div className="agenda-scroll max-h-[102px] space-y-2 overflow-y-auto pr-2">
+                    {events.map((event) => {
+                        const isCOE = event.type === "COE";
+                        const isHoliday = event.type === "HOLIDAY";
+                        const metaParts = isHoliday
+                            ? [event.description || "Hari libur nasional"]
+                            : [
+                                isCOE ? getPilarLabel(event.pilar) : event.categoryLabel || getPilarLabel(event.pilar),
+                                getEventJenjangLabel(event),
+                                isCOE ? getActivityTypeLabel(event.activityType) : null,
+                            ].filter(Boolean);
+
+                        return (
+                            <div key={event.id} className="border-b border-slate-100 pb-2.5 last:border-b-0">
+                                <button
+                                    type="button"
+                                    onClick={() => onOpen?.(event)}
+                                    disabled={!event.path}
+                                    className={`block w-full text-left text-[12px] font-black leading-5 text-slate-800 ${event.path ? "hover:text-[#0AC4E0]" : "cursor-default"}`}
+                                >
+                                    {event.title}
+                                </button>
+                                <p className="mt-0.5 text-[10px] font-semibold leading-4 text-slate-500">
+                                    ({metaParts.join(" · ")})
+                                </p>
+
+                                {isCOE && event.meetingLink && (
+                                    <a
+                                        href={normalizeExternalUrl(event.meetingLink)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-1 inline-flex text-[10px] font-black text-[#0AC4E0] underline decoration-cyan-300 underline-offset-2"
+                                    >
+                                        Buka link Zoom / meeting
+                                    </a>
+                                )}
+
+                                {isCOE && canManageCOE && (
+                                    <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] font-black text-slate-500">
+                                        <button
+                                            type="button"
+                                            onClick={() => onEditCOE?.(event)}
+                                            className="underline decoration-slate-300 underline-offset-2 hover:text-[#0AC4E0]"
+                                        >
+                                            Edit
+                                        </button>
+                                        {!["SELESAI", "DIBATALKAN"].includes(getEventStatus(event)) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onDoneCOE?.(event)}
+                                                className="underline decoration-slate-300 underline-offset-2 hover:text-emerald-600"
+                                            >
+                                                Selesai
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => onDeleteCOE?.(event)}
+                                            className="underline decoration-slate-300 underline-offset-2 hover:text-rose-600"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    {total > events.length && (
+                        <p className="pt-1 text-[10px] font-bold text-white/65">
+                            +{total - events.length} agenda lainnya di tanggal ini.
+                        </p>
+                    )}
+                </div>
+            ) : (
+                <p className="text-[11px] font-semibold leading-5 text-slate-400">
+                    {emptyText}
+                </p>
+            )}
+        </section>
+    );
+}
+
 function COEFormModal({
     open,
     mode,
@@ -959,6 +1335,8 @@ function COEFormModal({
     onSubmit,
     mentionOptions = [],
     mentionLoading = false,
+    pilarOptions = PILAR_OPTIONS,
+    jenjangOptions = JENJANG_OPTIONS,
 }) {
     const [mentionQuery, setMentionQuery] = useState("");
 
@@ -977,6 +1355,9 @@ function COEFormModal({
 
     const selectedParticipants = Array.isArray(formData.participants)
         ? formData.participants
+        : [];
+    const selectedJenjangs = Array.isArray(formData.jenjang_targets)
+        ? formData.jenjang_targets
         : [];
     const selectedKeys = new Set(selectedParticipants.map(getMentionKey));
     const keyword = mentionQuery.trim().toLowerCase();
@@ -1010,6 +1391,19 @@ function COEFormModal({
         setField(
             "participants",
             selectedParticipants.filter((row) => getMentionKey(row) !== key),
+        );
+    };
+
+    const toggleListValue = (key, value) => {
+        const rows = Array.isArray(formData[key]) ? formData[key] : [];
+        const normalizedValue = String(value);
+        const exists = rows.map(String).includes(normalizedValue);
+
+        setField(
+            key,
+            exists
+                ? rows.filter((item) => String(item) !== normalizedValue)
+                : [...rows, value],
         );
     };
 
@@ -1096,6 +1490,81 @@ function COEFormModal({
                             placeholder="Opsional"
                             className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
                         />
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Link Zoom / Meeting
+                        </label>
+                        <input
+                            value={formData.meetingLink || ""}
+                            onChange={(event) => setField("meetingLink", event.target.value)}
+                            placeholder="Contoh: https://zoom.us/j/..."
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                        />
+                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                            Dipakai untuk COE Via Daring. Link akan tampil di detail agenda dan bisa langsung dibuka.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Pilar COE
+                        </label>
+                        <select
+                            value={formData.pilar || ""}
+                            onChange={(event) => setField("pilar", event.target.value)}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                        >
+                            <option value="">Semua Pilar</option>
+                            {pilarOptions.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Tipe Pelaksanaan
+                        </label>
+                        <select
+                            value={formData.activityType || ""}
+                            onChange={(event) => setField("activityType", event.target.value)}
+                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                        >
+                            <option value="">Semua tipe / belum ditentukan</option>
+                            {COE_ACTIVITY_TYPES.map((item) => (
+                                <option key={item.value} value={item.value}>
+                                    {item.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            Jenjang Target
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            {jenjangOptions.map((item) => (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => toggleListValue("jenjang_targets", item)}
+                                    className={`rounded-xl border px-4 py-2 text-[10px] font-black uppercase tracking-wide transition ${selectedJenjangs.includes(item)
+                                        ? "border-[#0AC4E0] bg-[#0AC4E0] text-white"
+                                        : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:bg-cyan-50"
+                                        }`}
+                                >
+                                    {item}
+                                </button>
+                            ))}
+                            <span className="self-center text-[10px] font-bold text-slate-300">
+                                Kosong berarti semua jenjang yang diizinkan.
+                            </span>
+                        </div>
                     </div>
 
                     <div className="md:col-span-2">
@@ -1265,7 +1734,12 @@ export default function AgendaCalendarBase({
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeFilter, setActiveFilter] = useState(initialFilter);
+    const [activePilar, setActivePilar] = useState("SEMUA");
+    const [activeJenjang, setActiveJenjang] = useState("SEMUA");
+    const [activeActivityType, setActiveActivityType] = useState("SEMUA");
     const [searchKeyword, setSearchKeyword] = useState("");
+    const [tableSearchKeyword, setTableSearchKeyword] = useState("");
+    const [tablePage, setTablePage] = useState(1);
 
     const [showCOEModal, setShowCOEModal] = useState(false);
     const [editingCOE, setEditingCOE] = useState(null);
@@ -1278,18 +1752,25 @@ export default function AgendaCalendarBase({
     const bidang = lockedBidang ? normalizeBidang(lockedBidang) : "";
     const bidangLabel = getBidangText(bidang);
     const displayYear = displayDate.getFullYear();
+    const allowedPilarOptions = useMemo(
+        () => getAllowedPilarOptions(currentUser, bidang, scope),
+        [currentUser, bidang, scope],
+    );
+    const allowedJenjangOptions = useMemo(
+        () => getAllowedJenjangOptions(currentUser, scope),
+        [currentUser, scope],
+    );
 
     const filterOptions = useMemo(() => {
         const rows = [{ label: "Semua", value: "SEMUA" }];
 
         if (showProgram) rows.push({ label: "Program", value: "PROGRAM" });
-        if (showProgram && showFase) rows.push({ label: "Fase", value: "FASE" });
         if (showAssessment) rows.push({ label: "Assessment", value: "ASSESSMENT" });
         if (showCOE) rows.push({ label: "COE", value: "COE" });
         if (showHoliday) rows.push({ label: "Tanggal Merah", value: "HOLIDAY" });
 
         return rows;
-    }, [showProgram, showFase, showAssessment, showCOE, showHoliday]);
+    }, [showProgram, showAssessment, showCOE, showHoliday]);
 
     const getAuthHeaders = () => {
         const token = localStorage.getItem("token");
@@ -1529,7 +2010,9 @@ export default function AgendaCalendarBase({
     }, [scope, bidang]);
 
     useEffect(() => {
-        if (canManageCOE) fetchMentionOptions();
+        if (canManageCOE) {
+            fetchMentionOptions();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canManageCOE]);
 
@@ -1538,11 +2021,11 @@ export default function AgendaCalendarBase({
 
         return mapProgramsToEvents(programs, {
             lockedBidang: bidang,
-            showFase,
+            showFase: false,
             roleScope: scope,
             buildProgramPath,
         });
-    }, [programs, bidang, showProgram, showFase, scope, buildProgramPath]);
+    }, [programs, bidang, showProgram, scope, buildProgramPath]);
 
     const assessmentEvents = useMemo(() => {
         if (!showAssessment) return [];
@@ -1612,10 +2095,30 @@ export default function AgendaCalendarBase({
             const matchFilter =
                 activeFilter === "SEMUA" || event.type === activeFilter;
 
+            const matchPilar =
+                activePilar === "SEMUA" ||
+                event.type === "HOLIDAY" ||
+                normalizePilar(event.pilar || event.raw?.pilar) === activePilar;
+
+            const coeJenjangs = Array.isArray(event.jenjangTargets)
+                ? event.jenjangTargets.map((item) => String(item).toUpperCase())
+                : [];
+            const matchJenjang =
+                activeJenjang === "SEMUA" ||
+                event.type !== "COE" ||
+                coeJenjangs.length === 0 ||
+                coeJenjangs.includes(activeJenjang);
+
+            const matchActivityType =
+                activeActivityType === "SEMUA" ||
+                event.type !== "COE" ||
+                normalizeActivityType(event.activityType || event.raw?.activity_type) === activeActivityType;
+
             const matchSearch = [
                 event.title,
                 event.type,
                 event.categoryLabel,
+                getPilarLabel(event.pilar),
                 event.phase,
                 event.description,
                 event.location,
@@ -1625,9 +2128,9 @@ export default function AgendaCalendarBase({
                 .toLowerCase()
                 .includes(keyword);
 
-            return matchFilter && matchSearch;
+            return matchFilter && matchPilar && matchJenjang && matchActivityType && matchSearch;
         });
-    }, [allEvents, activeFilter, searchKeyword]);
+    }, [allEvents, activeFilter, activePilar, activeJenjang, activeActivityType, searchKeyword]);
 
     const eventMap = useMemo(() => {
         return filteredEvents.reduce((result, event) => {
@@ -1638,6 +2141,12 @@ export default function AgendaCalendarBase({
     }, [filteredEvents]);
 
     const fullCalendarEvents = useMemo(() => {
+        const dateCounts = filteredEvents.reduce((result, event) => {
+            result[event.date] = (result[event.date] || 0) + 1;
+            return result;
+        }, {});
+        const dateIndexes = {};
+
         return filteredEvents.map((event) => {
             const status = getEventStatus(event);
             const start = event.startTime
@@ -1646,6 +2155,9 @@ export default function AgendaCalendarBase({
             const end = event.endTime
                 ? `${event.date}T${event.endTime}:00`
                 : undefined;
+            const dateIndex = dateIndexes[event.date] || 0;
+
+            dateIndexes[event.date] = dateIndex + 1;
 
             return {
                 id: event.id,
@@ -1656,12 +2168,16 @@ export default function AgendaCalendarBase({
                 classNames: [
                     `fc-type-${String(event.type).toLowerCase()}`,
                     `fc-status-${String(status).toLowerCase().replaceAll("_", "-")}`,
+                    event.pilar ? `fc-pilar-${String(event.pilar).toLowerCase().replaceAll("_", "-")}` : "",
+                    event.activityType ? `fc-coe-${String(event.activityType).toLowerCase()}` : "",
                 ],
                 extendedProps: {
                     originalEvent: event,
                     type: event.type,
                     status,
                     categoryLabel: event.categoryLabel,
+                    eventCount: dateCounts[event.date] || 0,
+                    isFirstEventOfDate: dateIndex === 0,
                 },
             };
         });
@@ -1678,6 +2194,21 @@ export default function AgendaCalendarBase({
             holiday: allEvents.filter((event) => event.type === "HOLIDAY").length,
         };
     }, [allEvents]);
+
+    const hasActiveAdvancedFilter =
+        activeFilter !== "SEMUA" ||
+        activePilar !== "SEMUA" ||
+        activeJenjang !== "SEMUA" ||
+        activeActivityType !== "SEMUA" ||
+        searchKeyword.trim();
+
+    const resetFilters = () => {
+        setActiveFilter("SEMUA");
+        setActivePilar("SEMUA");
+        setActiveJenjang("SEMUA");
+        setActiveActivityType("SEMUA");
+        setSearchKeyword("");
+    };
 
     const getCalendarApi = () => calendarRef.current?.getApi?.();
 
@@ -1762,6 +2293,14 @@ export default function AgendaCalendarBase({
             endTime: event.endTime || "09:00",
             location: event.location || "",
             description: event.description || "",
+            pilar: normalizePilar(event.pilar || event.raw?.pilar),
+            activityType: normalizeActivityType(event.activityType || event.raw?.activity_type),
+            meetingLink: event.meetingLink || event.raw?.meeting_link || event.raw?.zoom_link || "",
+            jenjang_targets: Array.isArray(event.jenjangTargets)
+                ? event.jenjangTargets
+                : Array.isArray(event.raw?.jenjang_targets)
+                    ? event.raw.jenjang_targets
+                    : [],
             participants: normalizeAgendaParticipants(event.raw || event),
         });
         setShowCOEModal(true);
@@ -1774,6 +2313,12 @@ export default function AgendaCalendarBase({
         end_time: coeForm.endTime || null,
         location: coeForm.location.trim() || null,
         description: coeForm.description.trim() || null,
+        pilar: coeForm.pilar || null,
+        activity_type: coeForm.activityType || null,
+        meeting_link: coeForm.meetingLink?.trim() || null,
+        jenjang_targets: Array.isArray(coeForm.jenjang_targets)
+            ? coeForm.jenjang_targets
+            : [],
         visibility_scope: "TARGETED",
         participants: (coeForm.participants || []).map((item) => ({
             participant_type: item.participant_type,
@@ -1796,6 +2341,11 @@ export default function AgendaCalendarBase({
 
         if (!Array.isArray(coeForm.participants) || coeForm.participants.length === 0) {
             toast.error("Minimal pilih satu peserta COE");
+            return;
+        }
+
+        if (normalizeActivityType(coeForm.activityType) === "DARING" && !String(coeForm.meetingLink || "").trim()) {
+            toast.error("Link Zoom / meeting wajib diisi untuk COE Via Daring");
             return;
         }
 
@@ -1822,6 +2372,11 @@ export default function AgendaCalendarBase({
 
             setSelectedDateKey(payload.agenda_date);
             setDisplayDate(toLocalDate(payload.agenda_date));
+            setActiveFilter("COE");
+            setActivePilar(payload.pilar || "SEMUA");
+            setActiveJenjang("SEMUA");
+            setActiveActivityType(payload.activity_type || "SEMUA");
+            setSearchKeyword("");
             setShowCOEModal(false);
             setEditingCOE(null);
 
@@ -1899,6 +2454,63 @@ export default function AgendaCalendarBase({
         }
     };
 
+    const selectedProgramAssessmentAll = selectedEvents.filter((event) =>
+        ["PROGRAM", "ASSESSMENT"].includes(event.type),
+    );
+    const selectedCOEAll = selectedEvents.filter((event) => event.type === "COE");
+    const selectedHolidayAll = selectedEvents.filter((event) => event.type === "HOLIDAY");
+    const selectedProgramAssessmentEvents = selectedProgramAssessmentAll.slice(0, 10);
+    const selectedCOEEvents = selectedCOEAll.slice(0, 10);
+    const selectedHolidayEvents = selectedHolidayAll.slice(0, 10);
+    const tableEvents = useMemo(() => {
+        const keyword = tableSearchKeyword.toLowerCase().trim();
+
+        if (!keyword) return selectedEvents;
+
+        return selectedEvents.filter((event) =>
+            [
+                event.title,
+                event.type,
+                event.categoryLabel,
+                getPilarLabel(event.pilar),
+                getEventJenjangLabel(event),
+                getActivityTypeLabel(event.activityType),
+                event.location,
+                event.description,
+                getStatusLabel(getEventStatus(event)),
+                formatReadableDate(event.date),
+            ]
+                .join(" ")
+                .toLowerCase()
+                .includes(keyword),
+        );
+    }, [selectedEvents, tableSearchKeyword]);
+    const tableTotalPages = Math.max(
+        1,
+        Math.ceil(tableEvents.length / AGENDA_TABLE_PAGE_SIZE),
+    );
+    const safeTablePage = Math.min(tablePage, tableTotalPages);
+    const tableStartIndex = (safeTablePage - 1) * AGENDA_TABLE_PAGE_SIZE;
+    const paginatedTableEvents = tableEvents.slice(
+        tableStartIndex,
+        tableStartIndex + AGENDA_TABLE_PAGE_SIZE,
+    );
+    const tableFrom = tableEvents.length ? tableStartIndex + 1 : 0;
+    const tableTo = Math.min(
+        tableStartIndex + paginatedTableEvents.length,
+        tableEvents.length,
+    );
+
+    useEffect(() => {
+        setTablePage(1);
+    }, [tableSearchKeyword, activeFilter, activePilar, activeJenjang, activeActivityType, searchKeyword]);
+
+    useEffect(() => {
+        if (tablePage > tableTotalPages) {
+            setTablePage(tableTotalPages);
+        }
+    }, [tablePage, tableTotalPages]);
+
     if (loading) {
         return (
             <PageWrapper className="flex h-screen overflow-hidden bg-white !p-0">
@@ -1947,13 +2559,17 @@ export default function AgendaCalendarBase({
                 }
 
                 .fc .fc-scrollgrid {
-                    border-radius: 14px;
+                    border-radius: 18px;
                     overflow: hidden;
                 }
 
+                .fc .fc-daygrid-day-frame {
+                    min-height: 62px;
+                }
+
                 .fc .fc-col-header-cell {
-                    background: #F8FAFC;
-                    padding: 11px 0;
+                    background: #FFFFFF;
+                    padding: 7px 0;
                 }
 
                 .fc .fc-col-header-cell-cushion {
@@ -1967,15 +2583,15 @@ export default function AgendaCalendarBase({
 
                 .fc .fc-day-sun .fc-col-header-cell-cushion,
                 .fc .fc-red-day .fc-daygrid-day-number {
-                    color: #E11D48;
+                    color: #DC2626;
                     font-weight: 900;
                 }
 
                 .fc .fc-daygrid-day-number {
                     color: #334155;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 900;
-                    padding: 10px;
+                    padding: 5px 7px;
                     text-decoration: none;
                 }
 
@@ -1991,14 +2607,38 @@ export default function AgendaCalendarBase({
                     background: rgba(10, 196, 224, 0.035);
                 }
 
+                .fc .fc-selected-day {
+                    background: linear-gradient(180deg, rgba(10,196,224,0.10), rgba(255,255,255,0));
+                    box-shadow: inset 0 0 0 2px rgba(10,196,224,0.24);
+                }
+
+                .fc .fc-holiday-day {
+                    background: #FFE4E6;
+                }
+
+                .fc .fc-holiday-day .fc-daygrid-day-number {
+                    background: #DC2626;
+                    color: #FFFFFF;
+                    border-radius: 999px;
+                    margin: 4px;
+                    padding: 4px 8px;
+                }
+
                 .fc .fc-event {
-                    border-radius: 10px;
+                    border-radius: 9px;
                     border-width: 1px;
-                    border-left-width: 4px;
+                    border-left-width: 3px;
                     cursor: pointer;
                     overflow: hidden;
                     box-shadow: none;
-                    margin-bottom: 3px;
+                    margin-bottom: 2px;
+                    transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+                }
+
+                .fc .fc-event:hover {
+                    filter: saturate(1.08);
+                    transform: translateY(-1px);
+                    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.09);
                 }
 
                 .fc .fc-event-main {
@@ -2017,6 +2657,34 @@ export default function AgendaCalendarBase({
                     border-color: #C7D2FE;
                     border-left-color: #6366F1;
                     color: #3730A3;
+                }
+
+                .fc .fc-pilar-akademik {
+                    background: #ECFEFF;
+                    border-color: #A5F3FC;
+                    border-left-color: #06B6D4;
+                    color: #155E75;
+                }
+
+                .fc .fc-pilar-karakter {
+                    background: #EEF2FF;
+                    border-color: #C7D2FE;
+                    border-left-color: #6366F1;
+                    color: #3730A3;
+                }
+
+                .fc .fc-pilar-seni-budaya {
+                    background: #FDF4FF;
+                    border-color: #F5D0FE;
+                    border-left-color: #C026D3;
+                    color: #86198F;
+                }
+
+                .fc .fc-pilar-kecakapan-hidup {
+                    background: #ECFDF5;
+                    border-color: #BBF7D0;
+                    border-left-color: #10B981;
+                    color: #047857;
                 }
 
                 .fc .fc-type-assessment {
@@ -2063,8 +2731,28 @@ export default function AgendaCalendarBase({
                 }
 
                 .fc .fc-more-link {
+                    display: inline-flex;
+                    margin-top: 2px;
+                    border-radius: 999px;
+                    background: #E0F7FB;
+                    padding: 3px 8px;
                     color: #0891B2;
-                    font-size: 10px;
+                    font-size: 9px;
+                    font-weight: 900;
+                    text-decoration: none;
+                }
+
+                .fc .fc-popover {
+                    border: 1px solid #E2E8F0;
+                    border-radius: 18px;
+                    overflow: hidden;
+                    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+                }
+
+                .fc .fc-popover-header {
+                    background: #F8FAFC;
+                    padding: 10px 12px;
+                    font-size: 11px;
                     font-weight: 900;
                 }
             `}</style>
@@ -2072,67 +2760,142 @@ export default function AgendaCalendarBase({
             <PageWrapper className="flex h-screen overflow-hidden bg-slate-100 !p-0 font-sans text-slate-700">
                 <Sidebar />
 
-                <main className="agenda-scroll h-screen flex-1 overflow-y-auto p-6">
-                    <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5">
-                        <section className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-                            <header className="flex flex-col gap-5 border-b border-slate-100 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="flex min-w-0 items-start gap-4">
-                                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-sm">
-                                        <CalendarDays size={24} />
-                                    </div>
+                <main className="agenda-scroll h-screen flex-1 overflow-y-auto bg-white p-2 sm:p-3 lg:p-4">
+                    <div className="flex w-full flex-col gap-4">
+                        <section className="flex h-[calc(100vh-2rem)] min-w-0 flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+                            <div className="relative shrink-0 border-b border-slate-100 bg-white px-5 py-3 sm:px-8 lg:px-10">
+                                <div className="grid items-start gap-4 md:grid-cols-[1fr_auto_1fr]">
+                                    <AgendaLogoSlot src={AGENDA_LOGO_PATHS.astra} label="Astra" />
 
-                                    <div className="min-w-0">
-                                        <div className="mb-2 flex flex-wrap gap-2">
-                                            <span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
-                                                Agenda Calendar
-                                            </span>
-
-                                            {bidang && (
-                                                <span className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                                    {bidangLabel}
-                                                </span>
-                                            )}
-
-                                            <span className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                                {scope}
-                                            </span>
-                                        </div>
-
-                                        <h1 className="text-[24px] font-black tracking-tight text-slate-800">
-                                            {title}
-                                        </h1>
-
-                                        <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-5 text-slate-400">
-                                            {subtitle}
+                                    <div className="text-center">
+                                        <p className="text-[15px] font-black leading-none text-slate-700">
+                                            {MONTH_NAMES[displayDate.getMonth()]}
+                                        </p>
+                                        <p className="mt-1 text-[36px] font-black leading-none text-[#1d2e5c] sm:text-[44px]">
+                                            {displayDate.getFullYear()}
+                                        </p>
+                                        <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
+                                            {formatReadableDate(selectedDateKey)}
                                         </p>
                                     </div>
+
+                                    <AgendaLogoSlot src={AGENDA_LOGO_PATHS.satuIndonesia} label="Satu Indonesia" align="right" />
                                 </div>
+                            </div>
 
-                                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                                    <div className="relative flex h-10 min-w-[300px] items-center">
-                                        <Search
-                                            size={15}
-                                            className="absolute left-3.5 text-[#0AC4E0]"
-                                        />
+                            <div className="shrink-0 border-b border-slate-100 bg-white px-4 py-3 sm:px-6 lg:px-8">
+                                <div className="flex flex-wrap items-end gap-2">
+                                    <div className="mr-auto min-w-[220px]">
+                                        <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
+                                            Filter Agenda
+                                        </p>
+                                        <h1 className="mt-1 text-[17px] font-black leading-tight text-slate-900">
+                                            {title}
+                                        </h1>
+                                        <p className="mt-0.5 text-[10px] font-semibold leading-4 text-slate-400">
+                                            {bidang ? bidangLabel : scope} · {filteredEvents.length} dari {allEvents.length} agenda
+                                        </p>
+                                    </div>
 
+                                    <div className="relative h-[58px] min-w-[210px] flex-1">
+                                        <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                                            Cari
+                                        </span>
+                                        <Search size={15} className="absolute bottom-3 left-3.5 text-[#0AC4E0]" />
                                         <input
                                             value={searchKeyword}
-                                            onChange={(event) =>
-                                                setSearchKeyword(event.target.value)
-                                            }
+                                            onChange={(event) => setSearchKeyword(event.target.value)}
                                             placeholder="Cari agenda..."
-                                            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                                            className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
                                         />
                                     </div>
+
+                                    <div className="grid h-[58px] min-w-[230px] grid-cols-[38px_minmax(100px,1fr)_38px] items-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handlePrevious}
+                                            className="flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                                            title="Bulan sebelumnya"
+                                        >
+                                            <ChevronLeft size={15} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleToday}
+                                            className="h-9 rounded-xl bg-[#0AC4E0] px-4 text-[9px] font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-cyan-500"
+                                        >
+                                            Hari Ini
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleNext}
+                                            className="flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                                            title="Bulan berikutnya"
+                                        >
+                                            <ChevronRight size={15} />
+                                        </button>
+                                    </div>
+
+                                    <AgendaFilterSelect
+                                        label="Masa"
+                                        value={viewMode}
+                                        onChange={handleChangeView}
+                                        options={VIEW_MODES}
+                                        tone="dark"
+                                    />
+
+                                    <AgendaFilterSelect
+                                        label="Jenis Agenda"
+                                        value={activeFilter}
+                                        onChange={setActiveFilter}
+                                        options={filterOptions}
+                                    />
+
+                                    <AgendaFilterSelect
+                                        label="Pilar"
+                                        value={activePilar}
+                                        onChange={setActivePilar}
+                                        options={[
+                                            { label: "Semua", value: "SEMUA" },
+                                            ...allowedPilarOptions,
+                                        ]}
+                                    />
+
+                                    <AgendaFilterSelect
+                                        label="Jenjang"
+                                        value={activeJenjang}
+                                        onChange={setActiveJenjang}
+                                        options={[
+                                            { label: "Semua", value: "SEMUA" },
+                                            ...allowedJenjangOptions.map((item) => ({
+                                                label: item,
+                                                value: item,
+                                            })),
+                                        ]}
+                                        tone="dark"
+                                    />
+
+                                    {showCOE && (
+                                        <AgendaFilterSelect
+                                            label="Tipe COE"
+                                            value={activeActivityType}
+                                            onChange={setActiveActivityType}
+                                            options={[
+                                                { label: "Semua", value: "SEMUA" },
+                                                ...COE_ACTIVITY_TYPES,
+                                            ]}
+                                            tone="amber"
+                                        />
+                                    )}
 
                                     {canManageCOE && (
                                         <button
                                             type="button"
                                             onClick={openCreateCOE}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-4 text-[10px] font-black uppercase tracking-wide text-[#0AC4E0] transition hover:bg-cyan-100 active:scale-95"
+                                            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-cyan-500 active:scale-95"
                                         >
-                                            <Plus size={14} />
-                                            Add COE
+                                            <Plus size={13} />
+                                            Buat COE
                                         </button>
                                     )}
 
@@ -2140,276 +2903,283 @@ export default function AgendaCalendarBase({
                                         type="button"
                                         onClick={fetchCalendarData}
                                         disabled={refreshing}
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-cyan-500 active:scale-95 disabled:opacity-60"
+                                        className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-3 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0] transition hover:bg-cyan-100 disabled:opacity-60"
                                     >
-                                        <RefreshCw
-                                            size={14}
-                                            className={refreshing ? "animate-spin" : ""}
-                                        />
+                                        <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
                                         Refresh
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={resetFilters}
+                                        disabled={!hasActiveAdvancedFilter}
+                                        className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[9px] font-black uppercase tracking-wide text-slate-500 transition hover:border-rose-100 hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Reset
+                                    </button>
                                 </div>
-                            </header>
+                            </div>
 
-                            <section className="grid grid-cols-1 gap-4 bg-slate-50/50 p-5 sm:grid-cols-2 xl:grid-cols-5">
-                                {showProgram && (
-                                    <SummaryCard
-                                        label="Program"
-                                        value={stats.program}
-                                        helper="Program utama"
-                                        icon={<Layers3 size={18} />}
-                                    />
-                                )}
+                            <div className="min-h-0 flex-1 p-2 sm:p-3 lg:p-4">
+                                <div className="h-full min-h-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white">
+                                    <FullCalendar
+                                        ref={calendarRef}
+                                        plugins={[
+                                            dayGridPlugin,
+                                            timeGridPlugin,
+                                            interactionPlugin,
+                                            listPlugin,
+                                        ]}
+                                        locale={idLocale}
+                                        initialView="dayGridMonth"
+                                        firstDay={0}
+                                        height="100%"
+                                        nowIndicator
+                                        selectable
+                                        showNonCurrentDates={false}
+                                        fixedWeekCount={false}
+                                        dayMaxEvents={2}
+                                        eventOrder="type,start,title"
+                                        moreLinkClick="popover"
+                                        headerToolbar={false}
+                                        events={fullCalendarEvents}
+                                        datesSet={handleCalendarDatesSet}
+                                        dateClick={(info) => {
+                                            setSelectedDateKey(info.dateStr);
+                                        }}
+                                        eventClick={(info) => {
+                                            const originalEvent = info.event.extendedProps.originalEvent;
 
-                                {showProgram && showFase && (
-                                    <SummaryCard
-                                        label="Fase"
-                                        value={stats.fase}
-                                        helper="Fase program"
-                                        icon={<Sparkles size={18} />}
-                                    />
-                                )}
+                                            if (originalEvent?.date) {
+                                                setSelectedDateKey(originalEvent.date);
+                                            }
 
-                                {showAssessment && (
-                                    <SummaryCard
-                                        label="Assessment"
-                                        value={stats.assessment}
-                                        helper="Agenda assessment"
-                                        icon={<FileCheck2 size={18} />}
-                                    />
-                                )}
+                                            info.jsEvent?.preventDefault?.();
+                                        }}
+                                        dayCellClassNames={(arg) => {
+                                            const dateKey = formatDateKey(arg.date);
+                                            const isSunday = arg.date.getDay() === 0;
+                                            const isHoliday = holidayDateSet.has(dateKey);
+                                            const classes = [];
 
-                                {showCOE && (
-                                    <SummaryCard
-                                        label="COE"
-                                        value={stats.coe}
-                                        helper={canManageCOE ? "Kelola admin" : "Dari admin"}
-                                        icon={<CalendarDays size={18} />}
-                                    />
-                                )}
+                                            if (isSunday || isHoliday) classes.push("fc-red-day", "fc-holiday-day");
+                                            if (dateKey === selectedDateKey) classes.push("fc-selected-day");
 
-                                {showHoliday && (
-                                    <SummaryCard
-                                        label="Tanggal Merah"
-                                        value={stats.holiday}
-                                        helper="Hari besar nasional"
-                                        icon={<Flag size={18} />}
-                                    />
-                                )}
-                            </section>
+                                            return classes;
+                                        }}
+                                        eventContent={(arg) => {
+                                            const count = arg.event.extendedProps.eventCount || 0;
+                                            const isFirstEventOfDate = arg.event.extendedProps.isFirstEventOfDate;
 
-                            <section className="border-t border-slate-100 px-6 py-4">
-                                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        {filterOptions.map((item) => (
-                                            <button
-                                                key={item.value}
-                                                type="button"
-                                                onClick={() => setActiveFilter(item.value)}
-                                                className={`rounded-xl border px-4 py-2 text-[10px] font-black uppercase tracking-wide transition ${activeFilter === item.value
-                                                    ? "border-[#0AC4E0] bg-[#0AC4E0] text-white"
-                                                    : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:bg-cyan-50 hover:text-[#0AC4E0]"
-                                                    }`}
-                                            >
-                                                {item.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                            if (!isFirstEventOfDate) return null;
 
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={handlePrevious}
-                                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                                        >
-                                            <ChevronLeft size={16} />
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleToday}
-                                            className="h-9 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 hover:bg-slate-50"
-                                        >
-                                            Today
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={handleNext}
-                                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-                                        >
-                                            <ChevronRight size={16} />
-                                        </button>
-
-                                        <div className="ml-0 flex rounded-xl border border-slate-200 bg-white p-1 xl:ml-3">
-                                            {VIEW_MODES.map((item) => (
-                                                <button
-                                                    key={item.value}
-                                                    type="button"
-                                                    onClick={() => handleChangeView(item.value)}
-                                                    className={`h-8 rounded-lg px-4 text-[10px] font-black uppercase tracking-wide transition ${viewMode === item.value
-                                                        ? "bg-[#0AC4E0] text-white"
-                                                        : "text-slate-500 hover:bg-cyan-50 hover:text-[#0AC4E0]"
-                                                        }`}
+                                            return (
+                                                <div
+                                                    className="mx-auto my-0.5 inline-flex min-w-7 items-center justify-center rounded-full bg-current px-2 py-1 text-[9px] font-black leading-none"
+                                                    title={`${count} agenda`}
+                                                    aria-label={`${count} agenda`}
                                                 >
-                                                    {item.label}
-                                                </button>
+                                                    <span className="text-white">{count}</span>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                        </section>
+
+                        <section className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5 lg:p-6">
+                            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
+                                        Detail Agenda
+                                    </p>
+                                    <h2 className="mt-1 text-[22px] font-black text-slate-900">
+                                        Tabel Agenda Tanggal Terpilih
+                                    </h2>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                        {formatReadableDate(selectedDateKey)} · menampilkan {tableFrom}-{tableTo} dari {tableEvents.length} agenda.
+                                    </p>
+                                </div>
+
+                                <div className="relative h-11 w-full lg:w-[420px]">
+                                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
+                                    <input
+                                        value={tableSearchKeyword}
+                                        onChange={(event) => setTableSearchKeyword(event.target.value)}
+                                        placeholder="Cari di tabel agenda..."
+                                        className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="agenda-scroll overflow-x-auto rounded-2xl border border-slate-100">
+                                <table className="w-full min-w-[1040px] border-collapse text-left">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            {[
+                                                "Nama Agenda",
+                                                "Tanggal",
+                                                "Jenis",
+                                                "Pilar",
+                                                "Jenjang",
+                                                "Waktu",
+                                                "Lokasi",
+                                                ...(canManageCOE ? ["Action"] : []),
+                                            ].map((column) => (
+                                                <th
+                                                    key={column}
+                                                    className="border-b border-slate-100 px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400"
+                                                >
+                                                    {column}
+                                                </th>
                                             ))}
-                                        </div>
-                                    </div>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedTableEvents.length ? (
+                                            paginatedTableEvents.map((event) => {
+                                                const isCOE = event.type === "COE";
+                                                const isHoliday = event.type === "HOLIDAY";
+                                                const status = getEventStatus(event);
+                                                const visual = getEventVisual(event);
+
+                                                return (
+                                                    <tr key={event.id} className="transition hover:bg-cyan-50/30">
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
+                                                            <p className="max-w-[280px] text-[12px] font-black leading-5 text-slate-800">
+                                                                {event.title}
+                                                            </p>
+                                                            {event.description && (
+                                                                <p className="mt-1 line-clamp-2 max-w-[280px] text-[10px] font-semibold leading-4 text-slate-400">
+                                                                    {event.description}
+                                                                </p>
+                                                            )}
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-black text-slate-800">
+                                                            {formatReadableDate(event.date)}
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
+                                                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${visual.badge}`}>
+                                                                {visual.label}
+                                                            </span>
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                            {isHoliday ? "-" : getPilarLabel(event.pilar)}
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                            {isHoliday ? "-" : getEventJenjangLabel(event)}
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                            {event.startTime || event.endTime
+                                                                ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+                                                                : "Sepanjang hari"}
+                                                            {isCOE && (
+                                                                <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-amber-600">
+                                                                    {getActivityTypeLabel(event.activityType)}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                            {event.location || "-"}
+                                                            {isCOE && event.meetingLink && (
+                                                                <a
+                                                                    href={normalizeExternalUrl(event.meetingLink)}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
+                                                                >
+                                                                    Buka meeting
+                                                                </a>
+                                                            )}
+                                                        </td>
+                                                        {canManageCOE && (
+                                                            <td className="border-b border-slate-50 px-4 py-3 align-top">
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {event.path && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleOpenEvent(event)}
+                                                                            className="rounded-lg bg-[#0AC4E0] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-white"
+                                                                        >
+                                                                            Detail
+                                                                        </button>
+                                                                    )}
+                                                                    {isCOE && (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openEditCOE(event)}
+                                                                            className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-600"
+                                                                        >
+                                                                            Edit
+                                                                        </button>
+                                                                        {!["SELESAI", "DIBATALKAN"].includes(status) && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleDoneCOE(event)}
+                                                                                className="rounded-lg bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-emerald-600"
+                                                                            >
+                                                                                Selesai
+                                                                            </button>
+                                                                        )}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteCOE(event)}
+                                                                            className="rounded-lg bg-rose-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-rose-600"
+                                                                        >
+                                                                            Hapus
+                                                                        </button>
+                                                                    </>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                );
+                                            })
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={canManageCOE ? 8 : 7} className="px-4 py-12 text-center">
+                                                    <p className="text-[12px] font-black text-slate-700">
+                                                        Agenda tidak ditemukan
+                                                    </p>
+                                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                                        Ubah filter kalender atau kata kunci pencarian tabel.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    Halaman {safeTablePage} dari {tableTotalPages} · Maksimal {AGENDA_TABLE_PAGE_SIZE} data per halaman
+                                </p>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTablePage((page) => Math.max(1, page - 1))}
+                                        disabled={safeTablePage <= 1}
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        <ChevronLeft size={14} />
+                                        Prev
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTablePage((page) => Math.min(tableTotalPages, page + 1))}
+                                        disabled={safeTablePage >= tableTotalPages}
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        Next
+                                        <ChevronRight size={14} />
+                                    </button>
                                 </div>
-                            </section>
-
-                            <section className="px-6 py-5">
-                                <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                    <div>
-                                        <h2 className="text-[18px] font-black text-slate-800">
-                                            {MONTH_NAMES[displayDate.getMonth()]}{" "}
-                                            {displayDate.getFullYear()}
-                                        </h2>
-
-                                        <p className="mt-1 text-[11px] font-bold text-slate-400">
-                                            Pilih tanggal untuk membaca detail event di sisi kanan.
-                                        </p>
-                                    </div>
-
-                                    <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-slate-500">
-                                        {showProgram && (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-2.5 w-2.5 rounded-full bg-[#0AC4E0]" />
-                                                Program
-                                            </span>
-                                        )}
-
-                                        {showProgram && showFase && (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
-                                                Fase
-                                            </span>
-                                        )}
-
-                                        {showAssessment && (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-2.5 w-2.5 rounded-full bg-slate-500" />
-                                                Assessment
-                                            </span>
-                                        )}
-
-                                        {showCOE && (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                                                COE
-                                            </span>
-                                        )}
-
-                                        {showHoliday && (
-                                            <span className="flex items-center gap-2">
-                                                <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-                                                Tanggal Merah
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_380px]">
-                                    <div className="min-w-0">
-                                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
-                                            <FullCalendar
-                                                ref={calendarRef}
-                                                plugins={[
-                                                    dayGridPlugin,
-                                                    timeGridPlugin,
-                                                    interactionPlugin,
-                                                    listPlugin,
-                                                ]}
-                                                locale={idLocale}
-                                                initialView="dayGridMonth"
-                                                firstDay={1}
-                                                height="auto"
-                                                nowIndicator
-                                                selectable
-                                                dayMaxEvents={4}
-                                                moreLinkClick="popover"
-                                                headerToolbar={false}
-                                                events={fullCalendarEvents}
-                                                datesSet={handleCalendarDatesSet}
-                                                dateClick={(info) => {
-                                                    setSelectedDateKey(info.dateStr);
-                                                }}
-                                                eventClick={(info) => {
-                                                    const originalEvent =
-                                                        info.event.extendedProps.originalEvent;
-
-                                                    if (originalEvent?.date) {
-                                                        setSelectedDateKey(originalEvent.date);
-                                                    }
-
-                                                    info.jsEvent?.preventDefault?.();
-                                                }}
-                                                dayCellClassNames={(arg) => {
-                                                    const dateKey = formatDateKey(arg.date);
-                                                    const isSunday = arg.date.getDay() === 0;
-                                                    const isHoliday = holidayDateSet.has(dateKey);
-
-                                                    return isSunday || isHoliday
-                                                        ? ["fc-red-day"]
-                                                        : [];
-                                                }}
-                                                eventContent={(arg) => {
-                                                    const originalEvent =
-                                                        arg.event.extendedProps.originalEvent;
-                                                    const status =
-                                                        arg.event.extendedProps.status;
-                                                    const type = arg.event.extendedProps.type;
-                                                    const label =
-                                                        type === "COE" || type === "HOLIDAY"
-                                                            ? getStatusLabel(status)
-                                                            : originalEvent?.categoryLabel || type;
-
-                                                    return (
-                                                        <div className="min-w-0 px-2 py-1">
-                                                            <div className="truncate text-[8px] font-black uppercase tracking-wider opacity-70">
-                                                                {label}
-                                                            </div>
-                                                            <div className="mt-0.5 truncate text-[10px] font-black leading-4">
-                                                                {arg.event.title}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <aside className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                                        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                                            <div>
-                                                <h3 className="text-[15px] font-black text-slate-800">
-                                                    Detail Tanggal
-                                                </h3>
-                                                <p className="mt-0.5 text-[10px] font-bold text-slate-400">
-                                                    {formatReadableDate(selectedDateKey)}
-                                                </p>
-                                            </div>
-
-                                            <span className="rounded-full bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                                {selectedEvents.length} event
-                                            </span>
-                                        </div>
-
-                                        <div className="agenda-scroll max-h-[650px] overflow-y-auto p-5 pr-3">
-                                            <EventList
-                                                events={selectedEvents}
-                                                onOpen={handleOpenEvent}
-                                                canManageCOE={canManageCOE}
-                                                onEditCOE={openEditCOE}
-                                                onDoneCOE={handleDoneCOE}
-                                                onDeleteCOE={handleDeleteCOE}
-                                            />
-                                        </div>
-                                    </aside>
-                                </div>
-                            </section>
+                            </div>
                         </section>
                     </div>
                 </main>
@@ -2428,6 +3198,8 @@ export default function AgendaCalendarBase({
                     onSubmit={handleSaveCOE}
                     mentionOptions={mentionOptions}
                     mentionLoading={mentionLoading}
+                    pilarOptions={allowedPilarOptions}
+                    jenjangOptions={allowedJenjangOptions}
                 />
             )}
         </>
