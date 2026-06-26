@@ -45,6 +45,7 @@ const ROLE_OPTIONS = [
   { value: "sistem", label: "Head Office" },
   { value: "sistem", label: "Area Officer" },
   { value: "sistem", label: "Sekolah" },
+  { value: "sistem", label: "Kepala Sekolah" },
   { value: "sistem", label: "Vendor" },
   { value: "sistem", label: "Kepala Dinas" },
   { value: "sistem", label: "Operator Sekolah" },
@@ -73,7 +74,17 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
     case "Area Officer":
       return idRole === 4 || role.includes("area officer");
     case "Sekolah":
-      return idRole === 5 && !jabatan.includes("operator");
+      return (
+        idRole === 5 &&
+        !jabatan.includes("operator") &&
+        !jabatan.includes("kepala sekolah")
+      );
+    case "Kepala Sekolah":
+      return (
+        idRole === 10 ||
+        role.includes("kepala sekolah") ||
+        jabatan.includes("kepala sekolah")
+      );
     case "Vendor":
       return idRole === 6 || role === "vendor";
     case "Kepala Dinas":
@@ -132,6 +143,15 @@ const getRedirectPath = (decoded) => {
   // Area Officer
   if (idRole === 4 || role.includes("area officer")) {
     return "/ao/dashboard";
+  }
+
+  // Operator Sekolah
+  if (
+    idRole === 10 ||
+    role.includes("kepala sekolah") ||
+    jabatan.includes("kepala sekolah")
+  ) {
+    return "/kepala-sekolah/dashboard";
   }
 
   // Operator Sekolah

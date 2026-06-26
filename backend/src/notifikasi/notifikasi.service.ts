@@ -24,6 +24,7 @@ type LegacyCreateNotificationPayload = {
   target_url?: string;
   id_agenda?: number;
   metadata?: Record<string, any>;
+  dedupe_key?: string;
 };
 
 export type CreateNotificationRow = {
@@ -36,6 +37,7 @@ export type CreateNotificationRow = {
   targetUrl?: string | null;
   idAgenda?: number | null;
   metadata?: Record<string, any> | null;
+  dedupeKey?: string | null;
 };
 
 @Injectable()
@@ -123,8 +125,17 @@ export class NotifikasiService {
       target_url: payload.target_url || null,
       id_agenda: payload.id_agenda || null,
       metadata: payload.metadata || null,
+      dedupe_key: payload.dedupe_key || null,
       is_read: false,
     });
+
+    if (payload.dedupe_key) {
+      const existing = await this.notifikasiRepo.findOne({
+        where: { dedupe_key: payload.dedupe_key },
+      });
+
+      if (existing) return existing;
+    }
 
     return this.notifikasiRepo.save(notifikasi);
   }
@@ -136,7 +147,27 @@ export class NotifikasiService {
       ? manager.getRepository(Notifikasi)
       : this.notifikasiRepo;
 
-    const entities = rows.map((row) => {
+    const dedupeKeys = rows
+      .map((row) => row.dedupeKey)
+      .filter((key): key is string => Boolean(key));
+
+    const existingKeys = new Set<string>();
+
+    if (dedupeKeys.length > 0) {
+      const existingRows = await repository
+        .createQueryBuilder('notifikasi')
+        .select('notifikasi.dedupe_key', 'dedupe_key')
+        .where('notifikasi.dedupe_key IN (:...dedupeKeys)', { dedupeKeys })
+        .getRawMany<{ dedupe_key: string }>();
+
+      existingRows.forEach((row) => {
+        if (row.dedupe_key) existingKeys.add(row.dedupe_key);
+      });
+    }
+
+    const entities = rows
+      .filter((row) => !row.dedupeKey || !existingKeys.has(row.dedupeKey))
+      .map((row) => {
       const recipientId = Number(row.recipientId || 0);
 
       if (!recipientId) {
@@ -157,9 +188,12 @@ export class NotifikasiService {
         target_url: row.targetUrl || null,
         id_agenda: row.idAgenda || null,
         metadata: row.metadata || null,
+        dedupe_key: row.dedupeKey || null,
         is_read: false,
       });
     });
+
+    if (!entities.length) return [];
 
     return repository.save(entities);
   }
@@ -279,6 +313,7 @@ export class NotifikasiService {
         tipe: payload.tipe,
         targetUrl: payload.targetUrl || null,
         metadata: payload.metadata || null,
+        dedupeKey: payload.metadata?.dedupeKey || null,
       })),
       manager,
     );

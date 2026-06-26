@@ -107,6 +107,35 @@ function getIdentity(req: any, authHeader?: string): AgendaAuthIdentity {
     id,
     roleId,
     roleName,
+    jenis: tokenPayload?.jenis ?? guardUser?.jenis ?? null,
+    subJenis:
+      tokenPayload?.sub_jenis ??
+      tokenPayload?.subJenis ??
+      guardUser?.sub_jenis ??
+      null,
+    idSekolah:
+      tokenPayload?.id_sekolah ??
+      guardUser?.id_sekolah ??
+      guardUser?.sekolah?.id_sekolah ??
+      null,
+    jenjang:
+      tokenPayload?.sekolah?.jenjang ??
+      tokenPayload?.jenjang ??
+      guardUser?.sekolah?.jenjang ??
+      guardUser?.jenjang ??
+      null,
+    wilayahIds: [
+      tokenPayload?.id_wilayah,
+      guardUser?.id_wilayah,
+      ...(Array.isArray(tokenPayload?.wilayahs)
+        ? tokenPayload.wilayahs.map((item: any) => item?.id_wilayah)
+        : []),
+      ...(Array.isArray(guardUser?.wilayahs)
+        ? guardUser.wilayahs.map((item: any) => item?.id_wilayah)
+        : []),
+    ]
+      .map((item) => Number(item || 0))
+      .filter((item, index, rows) => item > 0 && rows.indexOf(item) === index),
     recipientType: isGuruAssessment
       ? AdminAgendaParticipantType.GURU_ASSESSMENT
       : AdminAgendaParticipantType.USER,

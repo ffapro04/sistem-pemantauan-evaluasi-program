@@ -25,6 +25,9 @@ export class Vendor {
   npwp_file: string;
 
   @Column({ nullable: true })
+  buku_rekening_file: string;
+
+  @Column({ nullable: true })
   pj_1: string;
 
   @Column({ nullable: true })

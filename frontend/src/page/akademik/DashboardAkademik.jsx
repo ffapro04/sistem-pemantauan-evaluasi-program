@@ -105,7 +105,7 @@ function DashboardAkademik() {
       scopeLabel={scope.scopeLabel}
       primaryEndpoint={`${API_BASE_URL}/sekolah`}
       programEndpoint={`${API_BASE_URL}/program`}
-      assessmentEndpoint={`${API_BASE_URL}/assessment`}
+      assessmentEndpoint={`${API_BASE_URL}/assessment?jenis=akademik`}
       primaryDataKey="Sekolah"
       mapTitle={scope.mapTitle}
       mapSubtitle={scope.mapSubtitle}

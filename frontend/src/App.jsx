@@ -83,6 +83,10 @@ import ReadVendor from "./page/admin/kelolamaster/mastervendor/ReadVendor";
 import CreateVendor from "./page/admin/kelolamaster/mastervendor/CreateVendor";
 import EditVendor from "./page/admin/kelolamaster/mastervendor/EditVendor";
 import DetailVendor from "./page/admin/kelolamaster/mastervendor/DetailVendor";
+import ManajemenVendor from "./page/admin/vendor/ManajemenVendor";
+
+// MASTER KEPALA SEKOLAH
+import ReadKepalaSekolah from "./page/admin/kelolamaster/masterkepalasekolah/ReadKepalaSekolah";
 
 // MASTER KEPALA DINAS
 import ReadKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas";
@@ -100,12 +104,15 @@ import IsiAssessmentSekolah from "./page/sekolah/IsiAssessmentSekolah";
 import ProgramSekolah from "./page/sekolah/ProgramSekolah";
 import DaftarGuru from "./page/sekolah/DaftarGuru";
 import BeritaAcara from "./page/sekolah/BeritaAcara";
+import DashboardKepalaSekolah from "./page/kepalasekolah/DashboardKepalaSekolah";
 
 // DATA GURU
 import DataGuru from "./page/sekolah/DataGuru";
 import CreateGuru from "./page/sekolah/CreateGuru";
 import EditGuru from "./page/sekolah/EditGuru";
 import DetailGuru from "./page/sekolah/DetailGuru";
+import CreateKepalaSekolah from "./page/sekolah/CreateKepalaSekolah";
+import EditKepalaSekolah from "./page/sekolah/EditKepalaSekolah";
 
 // DATA KELAS
 import DataKelas from "./page/sekolah/DataKelas";
@@ -253,11 +260,15 @@ function App() {
           element={<EditOperatorSekolah />}
         />
 
+        {/* ADMIN - MASTER KEPALA SEKOLAH */}
+        <Route path="/admin/kepala-sekolah" element={<ReadKepalaSekolah />} />
+
         {/* ADMIN - MASTER VENDOR */}
         <Route path="/admin/vendor" element={<ReadVendor />} />
         <Route path="/admin/vendor/create" element={<CreateVendor />} />
         <Route path="/admin/vendor/detail/:id" element={<DetailVendor />} />
         <Route path="/admin/vendor/edit/:id" element={<EditVendor />} />
+        <Route path="/admin/manajemen-vendor" element={<ManajemenVendor />} />
 
         {/* ADMIN - MASTER KEPALA DINAS */}
         <Route path="/admin/kadin" element={<ReadKepalaDinas />} />
@@ -299,11 +310,17 @@ function App() {
           <Route path="guru/create" element={<CreateGuru />} />
           <Route path="guru/edit/:id" element={<EditGuru />} />
           <Route path="guru/detail/:id" element={<DetailGuru />} />
+          <Route path="guru/kepala-sekolah/create" element={<CreateKepalaSekolah />} />
+          <Route path="guru/kepala-sekolah/edit/:id" element={<EditKepalaSekolah />} />
         </Route>
+
+        {/* KEPALA SEKOLAH */}
+        <Route path="/kepala-sekolah/dashboard" element={<DashboardKepalaSekolah />} />
 
         {/* PENGURUS DASHBOARD */}
         <Route path="/pengurus/dashboard" element={<DashboardPengurus />} />
         <Route path="/pengurus/agenda" element={<AgendaPengurus />} />
+        <Route path="/pengurus/manajemen-vendor" element={<ManajemenVendor />} />
 
         {/* MODUL KEPALA DINAS - CANONICAL ROUTE */}
         <Route path="/kepala-dinas/dashboard" element={<DashboardKepalaDinas />} />
@@ -344,6 +361,7 @@ function App() {
 
         {/* HO - DAFTAR PROGRAM */}
         <Route path="/ho/daftar-program" element={<DaftarProgramPage />} />
+        <Route path="/ho/manajemen-vendor" element={<ManajemenVendor />} />
         <Route
           path="/ho/daftar-program/akademik"
           element={<DaftarProgramPage lockedBidang="AKADEMIK" />}

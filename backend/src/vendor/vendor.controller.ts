@@ -22,6 +22,7 @@ import { UpdateVendorDto } from './dto/update-vendor.dto';
 
 export type VendorDocumentFiles = {
   npwp_file?: Express.Multer.File[];
+  buku_rekening_file?: Express.Multer.File[];
   ktp_pj_file?: Express.Multer.File[];
   akta_notaris_file?: Express.Multer.File[];
 };
@@ -39,6 +40,10 @@ const ensureVendorUploadDirectory = () => {
 const getDocumentPrefix = (fieldName: string) => {
   if (fieldName === 'npwp_file') {
     return 'NPWP';
+  }
+
+  if (fieldName === 'buku_rekening_file') {
+    return 'BUKU-REKENING';
   }
 
   if (fieldName === 'ktp_pj_file') {
@@ -102,6 +107,10 @@ const vendorDocumentInterceptor = FileFieldsInterceptor(
       maxCount: 1,
     },
     {
+      name: 'buku_rekening_file',
+      maxCount: 1,
+    },
+    {
       name: 'ktp_pj_file',
       maxCount: 1,
     },
@@ -135,6 +144,11 @@ export class VendorController {
   @Get()
   findAll() {
     return this.vendorService.findAll();
+  }
+
+  @Get('management/summary')
+  getManagementSummary() {
+    return this.vendorService.getManagementSummary();
   }
 
   @Get(':id')

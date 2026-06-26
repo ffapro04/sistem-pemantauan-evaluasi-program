@@ -717,7 +717,14 @@ function EditProgramForm({
                 .map(normalizeAo)
                 .sort((a, b) => a.label.localeCompare(b.label));
 
-            const vendors = normalizeArray(dataVendor)
+            const targetCategory = normalizeCategory(kategori);
+            const filteredVendorData = normalizeArray(dataVendor).filter((item) => {
+                const vendorCategory = normalizeCategory(item?.kategori || item?.kategori_vendor || item?.jenis || item?.pilar || "");
+                if (!vendorCategory) return false;
+                return vendorCategory === targetCategory;
+            });
+
+            const vendors = filteredVendorData
                 .filter((item) => item?.id_vendor || item?.id)
                 .filter((item) => item?.status === undefined || isActiveValue(item.status))
                 .map(normalizeVendor)

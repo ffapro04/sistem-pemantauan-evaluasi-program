@@ -31,6 +31,9 @@ export class Wilayah {
   jenis_wilayah: string;
 
   @Column({ nullable: true })
+  area_wilayah: string;
+
+  @Column({ nullable: true })
   deskripsi: string;
 
   @Column({ type: 'text', nullable: true })

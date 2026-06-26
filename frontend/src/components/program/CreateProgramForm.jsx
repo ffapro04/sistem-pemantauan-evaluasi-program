@@ -429,6 +429,15 @@ function createDefaultRequirement(name = "") {
     return { nama: name, tipe: "upload", deskripsi: "" };
 }
 
+function createDefaultPertemuan(kegiatanNumber = 1, pertemuanNumber = 1) {
+    return {
+        nama_pertemuan: `Pertemuan ${pertemuanNumber} - Aktivitas ${kegiatanNumber}`,
+        deskripsi: "",
+        tanggal_mulai: "",
+        tanggal_selesai: "",
+    };
+}
+
 function getMonthPeriodName(dateValue = "") {
     if (!dateValue) return "";
     try {
@@ -460,6 +469,7 @@ function createDefaultKegiatan(periodNumber = 1, kegiatanNumber = 1) {
         deskripsi: "",
         tanggal_mulai: "",
         tanggal_selesai: "",
+        pertemuan: [createDefaultPertemuan(kegiatanNumber, 1)],
         persyaratan: [
             createDefaultRequirement("Bukti mulai kegiatan"),
             createDefaultRequirement("Bukti dokumentasi kegiatan"),
@@ -482,7 +492,9 @@ function createDefaultFase(periodNumber = 1, defaultFaseName = "") {
 // =========================================================================
 // VALIDATORS
 // =========================================================================
-function validateFase(fase) {
+function validateFase(fase, kategori = "AKADEMIK") {
+    const isNonAkademik = normalizeCategory(kategori) === "NON_AKADEMIK";
+
     if (!String(fase?.nama_fase || "").trim()) {
         return "Nama periode/bulan wajib diisi.";
     }
@@ -518,6 +530,23 @@ function validateFase(fase) {
             new Date(kegiatan.tanggal_mulai) > new Date(kegiatan.tanggal_selesai)
         ) {
             return "Tanggal selesai aktivitas tidak boleh lebih awal dari tanggal mulai.";
+        }
+        if (isNonAkademik) {
+            if (!kegiatan?.pertemuan?.length) {
+                return "Aktivitas non-akademik wajib memiliki minimal satu pertemuan.";
+            }
+            for (const pertemuan of kegiatan.pertemuan) {
+                if (!String(pertemuan?.nama_pertemuan || "").trim()) {
+                    return "Nama pertemuan wajib diisi.";
+                }
+                if (
+                    pertemuan?.tanggal_mulai &&
+                    pertemuan?.tanggal_selesai &&
+                    new Date(pertemuan.tanggal_mulai) > new Date(pertemuan.tanggal_selesai)
+                ) {
+                    return "Tanggal selesai pertemuan tidak boleh lebih awal dari tanggal mulai.";
+                }
+            }
         }
         if (!kegiatan?.persyaratan?.length) {
             return "Aktivitas wajib memiliki minimal satu bukti upload.";
@@ -731,23 +760,19 @@ function CreateProgramForm({
                 .map(normalizeAo)
                 .sort((a, b) => a.label.localeCompare(b.label));
 
-            // Proses Vendor.
-            // Kalau filter kategori menghasilkan kosong, jangan kosongkan dropdown.
-            // Fallback ke semua vendor aktif agar edit/create tetap bisa jalan sambil data kategori vendor dirapikan.
-            const vendorSourceList = filteredVendorList.length > 0 ? filteredVendorList : rawVendorList;
-            if (filteredVendorList.length === 0 && rawVendorList.length > 0) {
-                console.warn("âš ï¸ Filter kategori vendor kosong, fallback menampilkan semua vendor aktif", {
-                    kategori,
-                    totalVendor: rawVendorList.length,
-                });
-            }
-
-            const vendorList = vendorSourceList
+            const vendorList = filteredVendorList
                 .filter((item) => item?.id_vendor || getVendorId(item))
                 .filter((item) => isActiveValue(item?.status))
                 .map((item, i) => normalizeVendor(item, i))
                 .filter((item) => item.label && item.value)
                 .sort((a, b) => a.label.localeCompare(b.label));
+
+            if (filteredVendorList.length === 0 && rawVendorList.length > 0) {
+                console.warn(`⚠️ Filter kategori vendor [${kategori}] tidak ditemukan, dropdown vendor akan kosong`, {
+                    kategori,
+                    totalVendor: rawVendorList.length,
+                });
+            }
 
             console.log(`âœ… Final: ${sekolahList.length} sekolah, ${aoList.length} AO, ${vendorList.length} vendor`);
 
@@ -908,7 +933,7 @@ function CreateProgramForm({
         }
         if (stepKey === "workflow") {
             for (const fase of fases) {
-                const error = validateFase(fase);
+                const error = validateFase(fase, kategori);
                 if (error) {
                     toast.error(error);
                     return false;
@@ -956,6 +981,13 @@ function CreateProgramForm({
                 urutan: kegiatanIndex + 1,
                 tanggal_mulai: kegiatan.tanggal_mulai || "",
                 tanggal_selesai: kegiatan.tanggal_selesai || "",
+                pertemuan: (kegiatan.pertemuan || []).map((pertemuan, pertemuanIndex) => ({
+                    nama_pertemuan: pertemuan.nama_pertemuan,
+                    deskripsi: pertemuan.deskripsi || "",
+                    urutan: pertemuanIndex + 1,
+                    tanggal_mulai: pertemuan.tanggal_mulai || "",
+                    tanggal_selesai: pertemuan.tanggal_selesai || "",
+                })),
                 persyaratan: (kegiatan.persyaratan || []).map((syarat, syaratIndex) => ({
                     nama: syarat.nama,
                     tipe: syarat.tipe || "upload",
@@ -1139,7 +1171,7 @@ function CreateProgramForm({
             formData.selectedAOs.length > 0 &&
             formData.selectedVendors.length > 0 &&
             formData.fileFinal,
-        workflow: fases.every((fase) => !validateFase(fase)),
+        workflow: fases.every((fase) => !validateFase(fase, kategori)),
         review: false,
     };
 
@@ -1266,6 +1298,7 @@ function CreateProgramForm({
                                 setFases={setFases}
                                 activeFaseIndex={activeFaseIndex}
                                 setActiveFaseIndex={setActiveFaseIndex}
+                                kategori={kategori}
                             />
                         )}
                         {activeStep === "review" && (
@@ -1380,227 +1413,221 @@ function IdentitasTimStep({
     addSelectedItem, removeSelectedItem, handleMouUpload, hoUser, programPlaceholder, title,
 }) {
     return (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {/* Kartu 1: Identitas Program + Periode */}
+        <div className="mx-auto w-full max-w-7xl">
             <SectionCard
                 icon={<Building2 size={16} />}
                 title="Data Program & Periode"
-                desc="Nama program, tahun, jenis program, dan rentang pelaksanaan."
+                desc="Nama program, periode, tim pelaksana, MOU, dan anggaran."
+                className="!p-5"
             >
-                <FormField label="Nama Program">
-                    <Input
-                        value={formData.namaProgram}
-                        onChange={(e) => updateForm("namaProgram", e.target.value)}
-                        placeholder={programPlaceholder}
-                        className="form-input"
-                    />
-                </FormField>
-
-                <FormField label="Pilar Program">
-                    <div className="grid grid-cols-2 gap-1.5">
-                        {pilarProgramOptions.map((pilar) => (
-                            <button
-                                key={pilar.value}
-                                type="button"
-                                onClick={() => updateForm("pilarProgram", pilar.value)}
-                                className={`rounded-lg border px-3 py-2 text-[9px] font-black uppercase tracking-widest transition ${formData.pilarProgram === pilar.value
-                                    ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
-                                    : "border-slate-100 bg-slate-50 text-slate-400 hover:border-[#0AC4E0]/30 hover:text-slate-600"
-                                    }`}
-                            >
-                                {pilar.label}
-                            </button>
-                        ))}
-                    </div>
-                </FormField>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <FormField label="Tahun Anggaran">
-                        <Input
-                            value={formData.tahun}
-                            onChange={(e) => updateForm("tahun", e.target.value)}
-                            className="form-input"
-                        />
-                    </FormField>
-
-                    <FormField label="Jenis Program">
-                        <div className="flex gap-1.5">
-                            {["PROJECT", "REGULER"].map((jenis) => (
-                                <button
-                                    key={jenis}
-                                    type="button"
-                                    onClick={() => updateForm("jenisProgram", jenis)}
-                                    className={`flex-1 rounded-lg border px-2 py-2 text-[9px] font-black uppercase tracking-widest transition ${formData.jenisProgram === jenis
-                                        ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
-                                        : "border-slate-100 bg-slate-50 text-slate-400"
-                                        }`}
-                                >
-                                    {jenis === "PROJECT" ? "Project" : "Reguler"}
-                                </button>
-                            ))}
-                        </div>
-                    </FormField>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <FormField label="Tanggal Mulai Program">
-                        <Input
-                            type="date"
-                            value={formData.tanggalMulaiProgram}
-                            onChange={(e) => updateForm("tanggalMulaiProgram", e.target.value)}
-                            className="form-input"
-                        />
-                    </FormField>
-                    <FormField label="Tanggal Selesai Program">
-                        <Input
-                            type="date"
-                            value={formData.tanggalSelesaiProgram}
-                            onChange={(e) => updateForm("tanggalSelesaiProgram", e.target.value)}
-                            className="form-input"
-                        />
-                    </FormField>
-                </div>
-
-                {formData.tanggalMulaiProgram && formData.tanggalSelesaiProgram && (
-                    <div className="rounded-lg border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                            <CalendarDays size={13} className="text-[#0AC4E0]" />
-                            <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">Periode Program</p>
-                        </div>
-                        <p className="mt-1 text-[11px] font-bold text-slate-700">
-                            {getMonthPeriodName(formData.tanggalMulaiProgram)} sampai {getMonthPeriodName(formData.tanggalSelesaiProgram)}
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.05fr_1fr]">
+                    <div className="space-y-4">
+                        <p className="border-b border-slate-100 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
+                            Data Program
                         </p>
-                    </div>
-                )}
 
-                <FormField label="Head Office">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-[12px] font-bold text-slate-600">
-                        {hoUser.nama}
-                    </div>
-                </FormField>
+                        <FormField label="Nama Program">
+                            <Input
+                                value={formData.namaProgram}
+                                onChange={(e) => updateForm("namaProgram", e.target.value)}
+                                placeholder={programPlaceholder}
+                                className="form-input"
+                            />
+                        </FormField>
 
-                <FormField label="Status Awal">
-                    <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-amber-600">
-                        Approval
-                    </div>
-                </FormField>
-            </SectionCard>
+                        <FormField label="Pilar Program">
+                            <div className="grid grid-cols-2 gap-2">
+                                {pilarProgramOptions.map((pilar) => (
+                                    <button
+                                        key={pilar.value}
+                                        type="button"
+                                        onClick={() => updateForm("pilarProgram", pilar.value)}
+                                        className={`rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-widest transition ${formData.pilarProgram === pilar.value
+                                            ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
+                                            : "border-slate-100 bg-slate-50 text-slate-400 hover:border-[#0AC4E0]/30 hover:text-slate-600"
+                                            }`}
+                                    >
+                                        {pilar.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </FormField>
 
-            {/* Kartu 2: Sekolah Sasaran */}
-            <SectionCard
-                icon={<Building2 size={16} />}
-                title="Sekolah Sasaran"
-                desc="Pilih sekolah penerima program."
-            >
-                <FormField label="Tambah Sekolah">
-                    <div className="relative z-10 overflow-visible">
-                        <Dropdown
-                            items={sekolahOptions}
-                            placeholder="Tambah sekolah sasaran"
-                            onChange={(value) => addSelectedItem("selectedSekolahs", sekolahOptions, value)}
-                        />
-                    </div>
-                    <SelectedChips
-                        items={formData.selectedSekolahs}
-                        onRemove={(value) => removeSelectedItem("selectedSekolahs", value)}
-                        variant="cyan"
-                    />
-                </FormField>
-            </SectionCard>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <FormField label="Tahun Anggaran">
+                                <Input
+                                    value={formData.tahun}
+                                    onChange={(e) => updateForm("tahun", e.target.value)}
+                                    className="form-input"
+                                />
+                            </FormField>
 
-            {/* Kartu 3: Area Officer */}
-            <SectionCard
-                icon={<UserCheck size={16} />}
-                title="Area Officer"
-                desc="AO hanya muncul jika wilayah/provinsi sesuai dengan sekolah sasaran."
-            >
-                <FormField label="Pilih Area Officer">
-                    <div className="relative z-10 overflow-visible">
-                        <Dropdown
-                            items={filteredAoOptions}
-                            placeholder={
-                                formData.selectedSekolahs.length === 0
-                                    ? "Pilih sekolah dulu"
-                                    : filteredAoOptions.length === 0
-                                        ? "Tidak ada AO"
-                                        : "Tambah AO"
-                            }
-                            onChange={(value) => addSelectedItem("selectedAOs", filteredAoOptions, value)}
-                        />
+                            <FormField label="Jenis Program">
+                                <div className="flex gap-2">
+                                    {["PROJECT", "REGULER"].map((jenis) => (
+                                        <button
+                                            key={jenis}
+                                            type="button"
+                                            onClick={() => updateForm("jenisProgram", jenis)}
+                                            className={`flex-1 rounded-xl border px-2 py-2.5 text-[10px] font-black uppercase tracking-widest transition ${formData.jenisProgram === jenis
+                                                ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
+                                                : "border-slate-100 bg-slate-50 text-slate-400"
+                                                }`}
+                                        >
+                                            {jenis === "PROJECT" ? "Project" : "Reguler"}
+                                        </button>
+                                    ))}
+                                </div>
+                            </FormField>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <FormField label="Tanggal Mulai Program">
+                                <Input
+                                    type="date"
+                                    value={formData.tanggalMulaiProgram}
+                                    onChange={(e) => updateForm("tanggalMulaiProgram", e.target.value)}
+                                    className="form-input"
+                                />
+                            </FormField>
+                            <FormField label="Tanggal Selesai Program">
+                                <Input
+                                    type="date"
+                                    value={formData.tanggalSelesaiProgram}
+                                    onChange={(e) => updateForm("tanggalSelesaiProgram", e.target.value)}
+                                    className="form-input"
+                                />
+                            </FormField>
+                        </div>
+
+                        {formData.tanggalMulaiProgram && formData.tanggalSelesaiProgram && (
+                            <div className="rounded-xl border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                    <CalendarDays size={13} className="text-[#0AC4E0]" />
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">Periode Program</p>
+                                </div>
+                                <p className="mt-1 text-[11px] font-bold text-slate-700">
+                                    {getMonthPeriodName(formData.tanggalMulaiProgram)} sampai {getMonthPeriodName(formData.tanggalSelesaiProgram)}
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <FormField label="Head Office">
+                                <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-[12px] font-bold text-slate-600">
+                                    {hoUser.nama}
+                                </div>
+                            </FormField>
+
+                            <FormField label="Status Awal">
+                                <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-amber-600">
+                                    Approval
+                                </div>
+                            </FormField>
+                        </div>
                     </div>
-                    <SelectedChips
-                        items={formData.selectedAOs}
-                        onRemove={(value) => removeSelectedItem("selectedAOs", value)}
-                    />
-                    {formData.selectedSekolahs.length > 0 && filteredAoOptions.length === 0 && (
-                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-bold leading-relaxed text-amber-700">
-                            Belum ada AO yang memiliki wilayah sama dengan sekolah sasaran.
+
+                    <div className="space-y-4">
+                        <p className="border-b border-slate-100 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
+                            Tim Pelaksana
                         </p>
-                    )}
-                </FormField>
-            </SectionCard>
 
-            {/* Kartu 4: Vendor / Narasumber */}
-            <SectionCard
-                icon={<UserCheck size={16} />}
-                title={`Vendor / Narasumber ${title}`}
-                desc="Narasumber pelaksana aktivitas program."
-            >
-                <FormField label="Pilih Vendor / Narasumber">
-                    <div className="relative z-10 overflow-visible">
-                        <Dropdown
-                            items={vendorOptions}
-                            placeholder="Tambah vendor / narasumber"
-                            onChange={(value) => addSelectedItem("selectedVendors", vendorOptions, value)}
-                        />
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            <FormField label="Sekolah Sasaran">
+                                <div className="relative z-30">
+                                    <Dropdown
+                                        items={sekolahOptions}
+                                        placeholder="Pilih sekolah"
+                                        usePortal={false}
+                                        onChange={(value) => addSelectedItem("selectedSekolahs", sekolahOptions, value)}
+                                    />
+                                </div>
+                                <SelectedChips
+                                    items={formData.selectedSekolahs}
+                                    onRemove={(value) => removeSelectedItem("selectedSekolahs", value)}
+                                    variant="cyan"
+                                />
+                            </FormField>
+
+                            <FormField label="Area Officer">
+                                <div className="relative z-20">
+                                    <Dropdown
+                                        items={filteredAoOptions}
+                                        usePortal={false}
+                                        placeholder={
+                                            formData.selectedSekolahs.length === 0
+                                                ? "Pilih sekolah dulu"
+                                                : filteredAoOptions.length === 0
+                                                    ? "Tidak ada AO"
+                                                    : "Pilih AO"
+                                        }
+                                        onChange={(value) => addSelectedItem("selectedAOs", filteredAoOptions, value)}
+                                    />
+                                </div>
+                                <SelectedChips
+                                    items={formData.selectedAOs}
+                                    onRemove={(value) => removeSelectedItem("selectedAOs", value)}
+                                />
+                                {formData.selectedSekolahs.length > 0 && filteredAoOptions.length === 0 && (
+                                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-bold leading-relaxed text-amber-700">
+                                        Belum ada AO yang memiliki wilayah sama dengan sekolah sasaran.
+                                    </p>
+                                )}
+                            </FormField>
+                        </div>
+
+                        <FormField label={`Vendor / Narasumber ${title}`}>
+                            <div className="relative z-10">
+                                <Dropdown
+                                    items={vendorOptions}
+                                    placeholder="Pilih vendor / narasumber"
+                                    usePortal={false}
+                                    onChange={(value) => addSelectedItem("selectedVendors", vendorOptions, value)}
+                                />
+                            </div>
+                            <SelectedChips
+                                items={formData.selectedVendors}
+                                onRemove={(value) => removeSelectedItem("selectedVendors", value)}
+                                variant="cyan"
+                            />
+                        </FormField>
+
+                        <p className="border-b border-slate-100 pb-2 pt-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
+                            Legalitas & Anggaran
+                        </p>
+
+                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            <FormField label="Nomor MOU">
+                                <Input
+                                    value={formData.nomorMou}
+                                    onChange={(e) => updateForm("nomorMou", e.target.value)}
+                                    placeholder="088/MOU/..."
+                                    className="form-input"
+                                />
+                            </FormField>
+                            <FormField label="Anggaran Vendor">
+                                <div className="relative">
+                                    <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <Input
+                                        value={formatRupiah(formData.hargaVendor)}
+                                        onChange={(e) => updateForm("hargaVendor", cleanNumber(e.target.value))}
+                                        placeholder="Rp 0"
+                                        className="form-input !pl-9"
+                                    />
+                                </div>
+                            </FormField>
+                        </div>
+
+                        <FormField label="Dokumen MOU">
+                            <FileDropzone
+                                label="Upload File MOU"
+                                fileName={formData.fileName}
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={handleMouUpload}
+                            />
+                        </FormField>
                     </div>
-                    <SelectedChips
-                        items={formData.selectedVendors}
-                        onRemove={(value) => removeSelectedItem("selectedVendors", value)}
-                        variant="cyan"
-                    />
-                </FormField>
-            </SectionCard>
-
-            {/* Kartu 5: Legalitas & Anggaran */}
-            <SectionCard
-                icon={<DollarSign size={16} />}
-                title="Legalitas & Anggaran"
-                desc="Nomor MOU dan nilai anggaran vendor."
-            >
-                <FormField label="Nomor MOU">
-                    <Input
-                        value={formData.nomorMou}
-                        onChange={(e) => updateForm("nomorMou", e.target.value)}
-                        placeholder="088/MOU/..."
-                        className="form-input"
-                    />
-                </FormField>
-                <FormField label="Anggaran Vendor">
-                    <div className="relative">
-                        <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <Input
-                            value={formatRupiah(formData.hargaVendor)}
-                            onChange={(e) => updateForm("hargaVendor", cleanNumber(e.target.value))}
-                            placeholder="Rp 0"
-                            className="form-input !pl-9"
-                        />
-                    </div>
-                </FormField>
-            </SectionCard>
-
-            {/* Kartu 6: Dokumen MOU */}
-            <SectionCard
-                icon={<UploadCloud size={16} />}
-                title="Dokumen MOU"
-                desc="Upload file MOU program."
-            >
-                <FileDropzone
-                    label="Upload File MOU"
-                    fileName={formData.fileName}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={handleMouUpload}
-                />
+                </div>
             </SectionCard>
         </div>
     );
@@ -1614,8 +1641,10 @@ function WorkflowFaseStep({
     setFases,
     activeFaseIndex,
     setActiveFaseIndex,
+    kategori,
 }) {
     const activePeriod = fases[activeFaseIndex] || fases[0];
+    const isNonAkademik = normalizeCategory(kategori) === "NON_AKADEMIK";
 
     const updatePeriod = (field, value) => {
         setFases((prev) =>
@@ -1626,7 +1655,7 @@ function WorkflowFaseStep({
     };
 
     const addPeriod = () => {
-        const error = validateFase(activePeriod);
+        const error = validateFase(activePeriod, kategori);
         if (error) {
             toast.error(error);
             return;
@@ -1761,6 +1790,74 @@ function WorkflowFaseStep({
         );
     };
 
+    const updatePertemuan = (aktivitasIndex, pertemuanIndex, field, value) => {
+        setFases((prev) =>
+            prev.map((period, i) => {
+                if (i !== activeFaseIndex) return period;
+                return {
+                    ...period,
+                    kegiatans: period.kegiatans.map((aktivitas, idx) => {
+                        if (idx !== aktivitasIndex) return aktivitas;
+                        const pertemuan = aktivitas.pertemuan?.length
+                            ? aktivitas.pertemuan
+                            : [createDefaultPertemuan(aktivitasIndex + 1, 1)];
+                        return {
+                            ...aktivitas,
+                            pertemuan: pertemuan.map((item, pidx) =>
+                                pidx === pertemuanIndex ? { ...item, [field]: value } : item
+                            ),
+                        };
+                    }),
+                };
+            })
+        );
+    };
+
+    const addPertemuan = (aktivitasIndex) => {
+        setFases((prev) =>
+            prev.map((period, i) => {
+                if (i !== activeFaseIndex) return period;
+                return {
+                    ...period,
+                    kegiatans: period.kegiatans.map((aktivitas, idx) => {
+                        if (idx !== aktivitasIndex) return aktivitas;
+                        const current = aktivitas.pertemuan || [];
+                        return {
+                            ...aktivitas,
+                            pertemuan: [
+                                ...current,
+                                createDefaultPertemuan(aktivitasIndex + 1, current.length + 1),
+                            ],
+                        };
+                    }),
+                };
+            })
+        );
+    };
+
+    const removePertemuan = (aktivitasIndex, pertemuanIndex) => {
+        const pertemuan = activePeriod.kegiatans[aktivitasIndex]?.pertemuan || [];
+        if (pertemuan.length <= 1) {
+            toast.error("Minimal satu pertemuan per aktivitas non-akademik.");
+            return;
+        }
+        setFases((prev) =>
+            prev.map((period, i) => {
+                if (i !== activeFaseIndex) return period;
+                return {
+                    ...period,
+                    kegiatans: period.kegiatans.map((aktivitas, idx) => {
+                        if (idx !== aktivitasIndex) return aktivitas;
+                        return {
+                            ...aktivitas,
+                            pertemuan: (aktivitas.pertemuan || []).filter((_, pidx) => pidx !== pertemuanIndex),
+                        };
+                    }),
+                };
+            })
+        );
+    };
+
     const updateAktivitasUpload = (aktivitasIndex, uploadIndex, field, value) => {
         setFases((prev) =>
             prev.map((period, i) => {
@@ -1828,7 +1925,7 @@ function WorkflowFaseStep({
         <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 rounded-[1.2rem] border border-slate-100 bg-slate-50 p-2">
                 {fases.map((period, index) => {
-                    const error = validateFase(period);
+                    const error = validateFase(period, kategori);
                     const active = activeFaseIndex === index;
                     return (
                         <button
@@ -1865,13 +1962,14 @@ function WorkflowFaseStep({
                         icon={<CalendarDays size={16} />}
                         title={`Periode / Bulan ${activeFaseIndex + 1}`}
                         desc="Gunakan bulan atau rentang waktu sebagai pengganti fase."
+                        className="!p-5"
                     >
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <FormField label="Nama Periode / Bulan">
                                 <Input
                                     value={activePeriod.nama_fase}
                                     onChange={(e) => updatePeriod("nama_fase", e.target.value)}
-                                    placeholder="Contoh: Juni 2026"
+                                    placeholder=""
                                     className="form-input"
                                 />
                             </FormField>
@@ -1879,7 +1977,7 @@ function WorkflowFaseStep({
                                 <Input
                                     value={activePeriod.deskripsi}
                                     onChange={(e) => updatePeriod("deskripsi", e.target.value)}
-                                    placeholder="Contoh: Fokus sosialisasi dan persiapan awal"
+                                    placeholder=""
                                     className="form-input"
                                 />
                             </FormField>
@@ -1900,18 +1998,19 @@ function WorkflowFaseStep({
                         icon={<UploadCloud size={16} />}
                         title="Administrasi Pembuka Periode"
                         desc="Narasumber wajib upload bukti administratif sebelum aktivitas periode ini terbuka."
+                        className="!p-5"
                     >
                         <FormField label="Instruksi Administrasi Pembuka">
                             <Input
                                 value={activeAdmin?.deskripsi || ""}
                                 onChange={(e) => updateAdmin("deskripsi", e.target.value)}
-                                placeholder="Contoh: Upload bukti pembayaran, surat tugas, atau dokumen pembuka periode."
+                                placeholder=""
                                 className="form-input"
                             />
                         </FormField>
                         <div className="space-y-2">
                             {(activeAdmin?.persyaratan || []).map((upload, uploadIndex) => (
-                                <div key={uploadIndex} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                                <div key={uploadIndex} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
                                     <div className="mb-2 flex items-center justify-between">
                                         <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
                                             Bukti Administratif {uploadIndex + 1}
@@ -1931,7 +2030,7 @@ function WorkflowFaseStep({
                                             <Input
                                                 value={upload.nama}
                                                 onChange={(e) => updateAdminUpload(uploadIndex, "nama", e.target.value)}
-                                                placeholder="Contoh: Bukti pembayaran periode"
+                                                placeholder=""
                                                 className="form-input !text-[11px]"
                                             />
                                         </FormField>
@@ -1939,7 +2038,7 @@ function WorkflowFaseStep({
                                             <Input
                                                 value={upload.deskripsi}
                                                 onChange={(e) => updateAdminUpload(uploadIndex, "deskripsi", e.target.value)}
-                                                placeholder="Instruksi upload..."
+                                                placeholder=""
                                                 className="form-input !text-[11px]"
                                             />
                                         </FormField>
@@ -1960,18 +2059,19 @@ function WorkflowFaseStep({
                     <SectionCard
                         icon={<Layers3 size={16} />}
                         title="Aktivitas Kegiatan"
-                        desc="Aktivitas berjalan berdasarkan tanggal mulai dan tanggal selesai, bukan fase."
+                        desc="Atur aktivitas, tenggat, dan bukti yang wajib diunggah."
+                        className="!p-5"
                     >
                         <div className="space-y-3">
                             {(activePeriod.kegiatans || []).map((aktivitas, aktivitasIndex) => (
-                                <div key={aktivitasIndex} className="rounded-xl border border-slate-100 bg-white p-3 shadow-sm">
+                                <div key={aktivitasIndex} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                                     <div className="mb-3 flex items-center justify-between">
                                         <div>
                                             <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
                                                 Aktivitas {aktivitasIndex + 1}
                                             </p>
                                             <p className="mt-0.5 text-[8px] font-bold text-slate-400">
-                                                Narasumber upload bukti â†’ AO review â†’ HO keputusan
+                                                Bukti aktivitas, review AO, dan keputusan HO
                                             </p>
                                         </div>
                                         {activePeriod.kegiatans.length > 1 && (
@@ -1989,7 +2089,7 @@ function WorkflowFaseStep({
                                             <Input
                                                 value={aktivitas.nama_kegiatans}
                                                 onChange={(e) => updateAktivitas(aktivitasIndex, "nama_kegiatans", e.target.value)}
-                                                placeholder="Contoh: Sosialisasi Program"
+                                                placeholder=""
                                                 className="form-input !text-[11px]"
                                             />
                                         </FormField>
@@ -1997,7 +2097,7 @@ function WorkflowFaseStep({
                                             <Input
                                                 value={aktivitas.deskripsi}
                                                 onChange={(e) => updateAktivitas(aktivitasIndex, "deskripsi", e.target.value)}
-                                                placeholder="Deskripsi aktivitas..."
+                                                placeholder=""
                                                 className="form-input !text-[11px]"
                                             />
                                         </FormField>
@@ -2018,21 +2118,86 @@ function WorkflowFaseStep({
                                             />
                                         </FormField>
                                     </div>
+
+                                    {isNonAkademik && (
+                                        <div className="mb-3 rounded-2xl border border-cyan-100 bg-cyan-50/40 p-3">
+                                            <div className="mb-2 flex items-center justify-between gap-2">
+                                                <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                    Pertemuan Aktivitas
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addPertemuan(aktivitasIndex)}
+                                                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0] ring-1 ring-cyan-100"
+                                                >
+                                                    <Plus size={10} />
+                                                    Pertemuan
+                                                </button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {(aktivitas.pertemuan || [createDefaultPertemuan(aktivitasIndex + 1, 1)]).map((pertemuan, pertemuanIndex) => (
+                                                    <div key={pertemuanIndex} className="rounded-xl border border-cyan-100 bg-white p-3">
+                                                        <div className="mb-2 flex items-center justify-between gap-2">
+                                                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                                                Pertemuan {pertemuanIndex + 1}
+                                                            </span>
+                                                            {(aktivitas.pertemuan || []).length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removePertemuan(aktivitasIndex, pertemuanIndex)}
+                                                                    className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-500"
+                                                                >
+                                                                    <Trash2 size={11} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                                            <Input
+                                                                value={pertemuan.nama_pertemuan}
+                                                                onChange={(e) => updatePertemuan(aktivitasIndex, pertemuanIndex, "nama_pertemuan", e.target.value)}
+                                                                placeholder=""
+                                                                className="form-input !py-1.5 !text-[10px]"
+                                                            />
+                                                            <Input
+                                                                value={pertemuan.deskripsi}
+                                                                onChange={(e) => updatePertemuan(aktivitasIndex, pertemuanIndex, "deskripsi", e.target.value)}
+                                                                placeholder=""
+                                                                className="form-input !py-1.5 !text-[10px]"
+                                                            />
+                                                            <Input
+                                                                type="date"
+                                                                value={pertemuan.tanggal_mulai || ""}
+                                                                onChange={(e) => updatePertemuan(aktivitasIndex, pertemuanIndex, "tanggal_mulai", e.target.value)}
+                                                                className="form-input !py-1.5 !text-[10px]"
+                                                            />
+                                                            <Input
+                                                                type="date"
+                                                                value={pertemuan.tanggal_selesai || ""}
+                                                                onChange={(e) => updatePertemuan(aktivitasIndex, pertemuanIndex, "tanggal_selesai", e.target.value)}
+                                                                className="form-input !py-1.5 !text-[10px]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="space-y-2">
                                         <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Bukti Aktivitas</p>
                                         {(aktivitas.persyaratan || []).map((upload, uploadIndex) => (
-                                            <div key={uploadIndex} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2">
+                                            <div key={uploadIndex} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
                                                 <div className="grid flex-1 grid-cols-1 gap-2 md:grid-cols-2">
                                                     <Input
                                                         value={upload.nama}
                                                         onChange={(e) => updateAktivitasUpload(aktivitasIndex, uploadIndex, "nama", e.target.value)}
-                                                        placeholder="Contoh: Bukti dokumentasi kegiatan"
+                                                        placeholder=""
                                                         className="form-input !py-1.5 !text-[10px]"
                                                     />
                                                     <Input
                                                         value={upload.deskripsi}
                                                         onChange={(e) => updateAktivitasUpload(aktivitasIndex, uploadIndex, "deskripsi", e.target.value)}
-                                                        placeholder="Instruksi upload..."
+                                                        placeholder=""
                                                         className="form-input !py-1.5 !text-[10px]"
                                                     />
                                                 </div>
@@ -2075,7 +2240,7 @@ function WorkflowFaseStep({
                         <p className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Ringkasan Periode</p>
                         <div className="space-y-2">
                             {fases.map((period, index) => {
-                                const error = validateFase(period);
+                                const error = validateFase(period, kategori);
                                 return (
                                     <button
                                         key={index}
@@ -2110,10 +2275,9 @@ function WorkflowFaseStep({
                     <div className="rounded-[1.2rem] border border-slate-100 bg-white p-3 shadow-sm">
                         <p className="mb-2 text-[8px] font-black uppercase tracking-widest text-slate-400">Pola Monitoring</p>
                         <div className="space-y-1.5 text-[9px] font-semibold leading-relaxed text-slate-500">
-                            <p>"- Periode/bulan menggantikan konsep fase.</p>
-                            <p>"- Administrasi pembuka harus di-review AO dan di-ACC HO.</p>
-                            <p>"- Aktivitas terbuka setelah administrasi periode disetujui.</p>
-                            <p>"- Bukti aktivitas melewati alur Narasumber â†’ AO â†’ HO.</p>
+                            <p>Administrasi pembuka direview AO dan diputuskan HO.</p>
+                            <p>Aktivitas terbuka setelah administrasi periode disetujui.</p>
+                            <p>Bukti aktivitas melewati alur Narasumber, AO, lalu HO.</p>
                         </div>
                     </div>
                 </aside>
@@ -2245,9 +2409,9 @@ function ReviewStep({ title, formData, hoUser, fases }) {
 // =========================================================================
 // SHARED UI COMPONENTS
 // =========================================================================
-function SectionCard({ icon, title, desc, children }) {
+function SectionCard({ icon, title, desc, children, className = "" }) {
     return (
-        <div className="rounded-[1.2rem] border border-slate-100 bg-white p-4 shadow-sm">
+        <div className={`rounded-[1.2rem] border border-slate-100 bg-white p-4 shadow-sm ${className}`}>
             <div className="mb-3 flex items-center gap-2.5">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">{icon}</div>
                 <div>

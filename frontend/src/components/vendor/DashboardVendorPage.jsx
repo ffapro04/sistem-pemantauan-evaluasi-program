@@ -615,7 +615,9 @@ function DashboardVendorPage({
                         String(vendor.id_vendor),
                     ),
                 )
-                : [];
+                : dataProgram.filter(
+                    (program) => getProgramVendorIds(program).length > 0,
+                );
 
             const detailedPrograms = await Promise.all(
                 vendorPrograms.map(async (program) => {

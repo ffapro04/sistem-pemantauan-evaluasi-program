@@ -11,6 +11,7 @@ import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.enti
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { User } from '../users/user.entity';
+import { Wilayah } from '../wilayah/entities/wilayah.entity';
 import { CreateAdminAgendaDto } from './dto/create-admin-agenda.dto';
 import { UpdateAdminAgendaStatusDto } from './dto/update-admin-agenda-status.dto';
 import { UpdateAdminAgendaDto } from './dto/update-admin-agenda.dto';
@@ -28,6 +29,11 @@ export type AgendaAuthIdentity = {
   id: number;
   roleId: number;
   roleName: string;
+  jenis?: string | null;
+  subJenis?: string | null;
+  idSekolah?: number | null;
+  jenjang?: string | null;
+  wilayahIds?: number[];
   recipientType:
     | AdminAgendaParticipantType.USER
     | AdminAgendaParticipantType.GURU_ASSESSMENT;
@@ -72,6 +78,9 @@ export class AdminAgendaService {
     @InjectRepository(AssessmentGuru)
     private readonly guruRepository: Repository<AssessmentGuru>,
 
+    @InjectRepository(Wilayah)
+    private readonly wilayahRepository: Repository<Wilayah>,
+
     private readonly notifikasiService: NotifikasiService,
   ) {}
 
@@ -99,6 +108,151 @@ export class AdminAgendaService {
   private normalizeTime(value: any) {
     const text = this.cleanText(value);
     return text ? text.slice(0, 8) : null;
+  }
+
+  private normalizePilar(value: any) {
+    const text = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+
+    if (text.includes('KECAKAPAN')) return 'KECAKAPAN_HIDUP';
+    if (text.includes('SENI')) return 'SENI_BUDAYA';
+    if (text.includes('KARAKTER')) return 'KARAKTER';
+    if (text.includes('AKADEMIK')) return 'AKADEMIK';
+
+    return null;
+  }
+
+  private normalizeActivityType(value: any) {
+    const text = String(value || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]+/g, '_');
+
+    if (text.includes('OUT')) return 'OUTDOOR';
+    if (text.includes('DAR') || text.includes('ONLINE') || text.includes('VIA')) {
+      return 'DARING';
+    }
+    if (text.includes('IN')) return 'INDOOR';
+
+    return null;
+  }
+
+  private normalizeTextList(value: any) {
+    const rows = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : [];
+
+    return [
+      ...new Set(
+        rows
+          .map((item) => String(item || '').trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    ];
+  }
+
+  private normalizeNumberList(value: any) {
+    const rows = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+        ? value.split(',')
+        : [];
+
+    return [
+      ...new Set(
+        rows.map((item) => Number(item || 0)).filter((item) => item > 0),
+      ),
+    ];
+  }
+
+  private getAllowedPillars(identity: AgendaAuthIdentity) {
+    const roleId = Number(identity?.roleId || 0);
+    const jenis = String(identity?.jenis || '').toLowerCase();
+
+    if (roleId === 3) {
+      return jenis.includes('non')
+        ? ['SENI_BUDAYA', 'KECAKAPAN_HIDUP']
+        : ['AKADEMIK', 'KARAKTER'];
+    }
+
+    return ['AKADEMIK', 'KARAKTER', 'SENI_BUDAYA', 'KECAKAPAN_HIDUP'];
+  }
+
+  private getAllowedJenjang(identity: AgendaAuthIdentity) {
+    const roleId = Number(identity?.roleId || 0);
+    const subJenis = String(identity?.subJenis || '').toUpperCase();
+    const jenjang = String(identity?.jenjang || '').toUpperCase();
+
+    if (roleId === 3) {
+      if (subJenis.includes('SMK')) return ['SMK'];
+      if (subJenis.includes('SD') && subJenis.includes('SMP')) return ['SD', 'SMP'];
+      if (subJenis.includes('SMP')) return ['SMP'];
+      if (subJenis.includes('SD')) return ['SD'];
+    }
+
+    if ([5, 8, 9, 10].includes(roleId) && jenjang) {
+      return [jenjang];
+    }
+
+    return ['SD', 'SMP', 'SMK'];
+  }
+
+  private async getAccessibleWilayahIds(identity: AgendaAuthIdentity) {
+    const baseIds = this.normalizeNumberList(identity?.wilayahIds || []);
+
+    if (Number(identity?.roleId || 0) !== 7 || !baseIds.length) {
+      return baseIds;
+    }
+
+    const childRows = await this.wilayahRepository.find({
+      where: { id_parent: In(baseIds) as any },
+    });
+
+    return [
+      ...new Set([
+        ...baseIds,
+        ...childRows.map((item) => Number(item.id_wilayah)).filter(Boolean),
+      ]),
+    ];
+  }
+
+  private agendaMatchesIdentity(
+    agenda: AdminAgenda,
+    identity: AgendaAuthIdentity,
+    accessibleWilayahIds?: number[],
+  ) {
+    if (this.isAdmin(identity) || Number(identity?.roleId) === 2) return true;
+
+    const pilar = this.normalizePilar((agenda as any).pilar);
+    const allowedPillars = this.getAllowedPillars(identity);
+    if (pilar && !allowedPillars.includes(pilar)) return false;
+
+    const agendaJenjangs = this.normalizeTextList((agenda as any).jenjang_targets);
+    const allowedJenjangs = this.getAllowedJenjang(identity);
+    if (
+      agendaJenjangs.length &&
+      !agendaJenjangs.some((item) => allowedJenjangs.includes(item))
+    ) {
+      return false;
+    }
+
+    const agendaWilayahIds = this.normalizeNumberList((agenda as any).wilayah_targets);
+    const userWilayahIds = this.normalizeNumberList(
+      accessibleWilayahIds || identity?.wilayahIds || [],
+    );
+    if (
+      [4, 7].includes(Number(identity?.roleId || 0)) &&
+      agendaWilayahIds.length &&
+      !agendaWilayahIds.some((item) => userWilayahIds.includes(item))
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private participantKey(type: AdminAgendaParticipantType, id: number) {
@@ -135,7 +289,9 @@ export class AdminAgendaService {
       case 9:
         return `/sekolah/agenda${query}`;
       case 6:
-        return `/vendor/agenda${query}`;
+      return `/vendor/agenda${query}`;
+      case 10:
+        return `/kepala-sekolah/dashboard${query}`;
       default:
         return `/`;
     }
@@ -409,18 +565,24 @@ export class AdminAgendaService {
       .addOrderBy('agenda.start_time', 'ASC')
       .addOrderBy('agenda.created_at', 'DESC');
 
-    // Selain Admin, COE hanya boleh terlihat jika akun tersebut di-mention.
-    if (!this.isAdmin(identity)) {
-      query.andWhere(
-        'participant.participant_type = :participantType AND participant.participant_id = :participantId',
-        {
-          participantType: identity.recipientType,
-          participantId: identity.id,
-        },
-      );
-    }
+    const rows = await query.getMany();
 
-    return query.getMany();
+    if (this.isAdmin(identity)) return rows;
+
+    const accessibleWilayahIds = await this.getAccessibleWilayahIds(identity);
+
+    return rows.filter((agenda) => {
+      const mentioned = (agenda.participants || []).some(
+        (participant) =>
+          participant.participant_type === identity.recipientType &&
+          Number(participant.participant_id) === Number(identity.id),
+      );
+
+      return (
+        mentioned ||
+        this.agendaMatchesIdentity(agenda, identity, accessibleWilayahIds)
+      );
+    });
   }
 
   async findOne(id: number, identity: AgendaAuthIdentity) {
@@ -466,8 +628,13 @@ export class AdminAgendaService {
         agenda_date: dto.agenda_date,
         start_time: this.normalizeTime(dto.start_time),
         end_time: this.normalizeTime(dto.end_time),
-        location: this.cleanText(dto.location),
-        status: dto.status || AdminAgendaStatus.SCHEDULED,
+          location: this.cleanText(dto.location),
+          pilar: this.normalizePilar(dto.pilar),
+          activity_type: this.normalizeActivityType(dto.activity_type),
+          meeting_link: this.cleanText(dto.meeting_link),
+          jenjang_targets: this.normalizeTextList(dto.jenjang_targets),
+          wilayah_targets: this.normalizeNumberList(dto.wilayah_targets),
+          status: dto.status || AdminAgendaStatus.SCHEDULED,
         visibility_scope: AdminAgendaVisibilityScope.TARGETED,
         status_note: this.cleanText(dto.status_note),
         created_by: identity.id,
@@ -567,6 +734,26 @@ export class AdminAgendaService {
 
       if (dto.location !== undefined) {
         agenda.location = this.cleanText(dto.location);
+      }
+
+      if (dto.pilar !== undefined) {
+        agenda.pilar = this.normalizePilar(dto.pilar);
+      }
+
+      if (dto.activity_type !== undefined) {
+        agenda.activity_type = this.normalizeActivityType(dto.activity_type);
+      }
+
+      if (dto.meeting_link !== undefined) {
+        agenda.meeting_link = this.cleanText(dto.meeting_link);
+      }
+
+      if (dto.jenjang_targets !== undefined) {
+        agenda.jenjang_targets = this.normalizeTextList(dto.jenjang_targets);
+      }
+
+      if (dto.wilayah_targets !== undefined) {
+        agenda.wilayah_targets = this.normalizeNumberList(dto.wilayah_targets);
       }
 
       if (dto.status_note !== undefined) {

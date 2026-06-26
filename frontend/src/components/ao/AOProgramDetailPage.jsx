@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
     ArrowLeft,
+    Calendar,
     RefreshCcw,
     FileText,
     FolderOpen,
@@ -16,6 +17,7 @@ import {
     Eye,
     Lock,
     MessageSquare,
+    Star,
     UserCheck,
 } from "lucide-react";
 
@@ -51,6 +53,39 @@ const STATUS_LABEL = {
 
 function safeArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
+}
+
+function normalizeMeetings(kegiatan = {}) {
+    return safeArray(
+        kegiatan.pertemuan,
+        kegiatan.meetings,
+        kegiatan.t_kegiatan_pertemuan,
+    ).map((item, index) => ({
+        id: item.id_pertemuan || item.id || index,
+        title:
+            item.nama_pertemuan ||
+            item.nama ||
+            item.title ||
+            `Pertemuan ${index + 1}`,
+        description: item.deskripsi || item.description || "",
+        startDate: item.tanggal_mulai || item.start_date || null,
+        endDate: item.tanggal_selesai || item.end_date || null,
+    }));
+}
+
+function getRatingStats(kegiatan = {}) {
+    const ratings = safeArray(kegiatan.ratings, kegiatan.rating_items);
+    const total = ratings.length;
+    const average = total
+        ? ratings.reduce((sum, item) => sum + Number(item.rating || 0), 0) / total
+        : Number(kegiatan.guru_rating || 0);
+
+    return {
+        total,
+        average: average ? Number(average.toFixed(2)) : 0,
+        guruCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "GURU").length,
+        vendorCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "VENDOR").length,
+    };
 }
 
 async function safeJson(response) {
@@ -269,6 +304,8 @@ function AOProgramDetailPage({
                     kegiatan?.requirements,
                     kegiatan?.t_persyaratan_kegiatan,
                 );
+                const meetings = normalizeMeetings(kegiatan);
+                const ratingStats = getRatingStats(kegiatan);
 
                 return {
                     id: `kegiatan-${kegiatan?.id_kegiatans || kegiatanIndex}`,
@@ -291,6 +328,8 @@ function AOProgramDetailPage({
                         "Bukti pelaksanaan aktivitas yang perlu direview AO.",
                     tanggalMulai: kegiatan?.tanggal_mulai || null,
                     tanggalSelesai: kegiatan?.tanggal_selesai || null,
+                    meetings,
+                    ratingStats,
                     requirements,
                 };
             });
@@ -641,6 +680,19 @@ function AOProgramDetailPage({
                                                     <p className="mt-2 text-[10px] font-bold text-slate-400">
                                                         Tanggal: {row.tanggalMulai || "-"} s/d {row.tanggalSelesai || "-"}
                                                     </p>
+                                                )}
+
+                                                {row.type === "kegiatan" && (
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                            <Calendar size={11} />
+                                                            {(row.meetings || []).length} Pertemuan
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                                            <Star size={11} />
+                                                            {row.ratingStats?.average || 0}/5 · {row.ratingStats?.total || 0} rating
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
 

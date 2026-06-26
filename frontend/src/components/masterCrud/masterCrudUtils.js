@@ -8,11 +8,19 @@ export const buildApiUrl = (endpoint) => {
     return `${API_BASE_URL}${endpoint}`;
 };
 
+export const buildFreshApiUrl = (endpoint) => {
+    const url = buildApiUrl(endpoint);
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}_ts=${Date.now()}`;
+};
+
 export const getTokenHeader = () => {
     const token = localStorage.getItem("token");
 
     return {
         Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
     };
 };
 

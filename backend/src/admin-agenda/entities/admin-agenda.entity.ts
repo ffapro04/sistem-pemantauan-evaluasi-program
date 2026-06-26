@@ -47,6 +47,21 @@ export class AdminAgenda {
   @Column({ type: 'varchar', length: 180, nullable: true })
   location: string | null;
 
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  pilar: string | null;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  activity_type: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  meeting_link: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  jenjang_targets: string[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  wilayah_targets: number[] | null;
+
   @Column({
     type: 'enum',
     enum: AdminAgendaStatus,

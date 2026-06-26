@@ -26,6 +26,7 @@ const ROLE_LABELS = {
     7: "Kepala Dinas",
     8: "Guru Assessment",
     9: "Operator Sekolah",
+    10: "Kepala Sekolah",
 };
 
 const ROLE_IDS = {
@@ -38,6 +39,7 @@ const ROLE_IDS = {
     KEPALA_DINAS: 7,
     GURU_ASSESSMENT: 8,
     OPERATOR_SEKOLAH: 9,
+    KEPALA_SEKOLAH: 10,
 };
 
 const PENGURUS_POSITION_ORDER = {
@@ -130,14 +132,36 @@ function getRoleId(user = {}) {
     return Number(user?.id_role || user?.role_id || user?.role?.id_role || 0);
 }
 
+function safeText(value, fallback = "-") {
+    if (value === null || value === undefined || value === "") return fallback;
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        return String(value);
+    }
+
+    if (typeof value === "object") {
+        return (
+            value.nama_role ||
+            value.nama ||
+            value.label ||
+            value.name ||
+            value.deskripsi ||
+            fallback
+        );
+    }
+
+    return fallback;
+}
+
 function getRoleLabel(user = {}) {
     const roleId = getRoleId(user);
-    return (
+
+    return safeText(
         ROLE_LABELS[roleId] ||
-        user?.role ||
-        user?.nama_role ||
         user?.role?.nama_role ||
-        "User"
+        user?.nama_role ||
+        user?.role,
+        "User",
     );
 }
 
@@ -146,23 +170,26 @@ function getUserId(user = {}) {
 }
 
 function getUserName(user = {}) {
-    return user?.nama || user?.name || user?.username || user?.nama_lengkap || "User";
+    return safeText(user?.nama || user?.name || user?.username || user?.nama_lengkap, "User");
 }
 
 function getUserEmail(user = {}) {
-    return user?.email || user?.email_login || user?.email_user || "-";
+    return safeText(user?.email || user?.email_login || user?.email_user, "-");
 }
 
 function getJabatan(user = {}) {
-    return user?.jabatan || user?.position || user?.nama_jabatan || getRoleLabel(user);
+    return safeText(
+        user?.jabatan || user?.position || user?.nama_jabatan || getRoleLabel(user),
+        getRoleLabel(user),
+    );
 }
 
 function getJenis(user = {}) {
-    return user?.jenis || user?.type || user?.kategori || "";
+    return safeText(user?.jenis || user?.type || user?.kategori || "", "");
 }
 
 function getSubJenis(user = {}) {
-    return (
+    return safeText(
         user?.sub_jenis ||
         user?.subJenis ||
         user?.subjenis ||
@@ -172,16 +199,29 @@ function getSubJenis(user = {}) {
         user?.fokusBidang ||
         user?.pilar_program ||
         user?.pilarProgram ||
-        ""
+        "",
+        "",
     );
 }
 
 function getJenisLabel(user = {}) {
+    if (getRoleId(user) === ROLE_IDS.KEPALA_SEKOLAH) return "Akun Sekolah";
+
     const value = getJenis(user);
     return value ? titleCase(value) : "Jenis belum ditentukan";
 }
 
 function getSubJenisLabel(user = {}) {
+    if (getRoleId(user) === ROLE_IDS.KEPALA_SEKOLAH) {
+        return safeText(
+            user?.sekolah?.nama_sekolah ||
+            user?.school?.nama_sekolah ||
+            user?.nama_sekolah ||
+            "Kepala Sekolah",
+            "Kepala Sekolah",
+        );
+    }
+
     const value = getSubJenis(user);
     return value ? titleCase(value) : "Sub jenis belum ditentukan";
 }

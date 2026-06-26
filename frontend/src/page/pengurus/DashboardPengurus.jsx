@@ -41,6 +41,8 @@ import "leaflet/dist/leaflet.css";
 
 import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
+import Dropdown from "../../components/Dropdown";
+import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const INDONESIA_CENTER = [-2.5, 118];
@@ -48,22 +50,22 @@ const INDONESIA_ZOOM = 5;
 const ROWS_PER_PAGE = 5;
 
 const COLORS = {
-    cyan: "#0AC4E0",
-    cyanDark: "#0891B2",
+    cyan: CHART_STATUS_COLORS.info,
+    cyanDark: CHART_STATUS_COLORS.deep,
     navy: "#0F172A",
     slate: "#334155",
     grey: "#94A3B8",
-    coksu: "#F59E73",
-    brown: "#B96A42",
-    green: "#10B981",
-    emerald: "#10B981",
-    amber: "#F59E0B",
-    orange: "#F97316",
-    violet: "#8B5CF6",
-    rose: "#F43F5E",
-    red: "#EF4444",
-    blue: "#3B82F6",
-    sky: "#0EA5E9",
+    coksu: CHART_STATUS_COLORS.orange,
+    brown: CHART_STATUS_COLORS.deep,
+    green: CHART_STATUS_COLORS.success,
+    emerald: CHART_STATUS_COLORS.success,
+    amber: CHART_STATUS_COLORS.warning,
+    orange: CHART_STATUS_COLORS.orange,
+    violet: CHART_STATUS_COLORS.deep,
+    rose: CHART_STATUS_COLORS.pink,
+    red: CHART_STATUS_COLORS.danger,
+    blue: CHART_STATUS_COLORS.info,
+    sky: CHART_STATUS_COLORS.info,
     white: "#FFFFFF",
 };
 
@@ -233,9 +235,19 @@ async function safeJson(response) {
 
 async function fetchFirst(endpointList, headers = {}) {
     for (const endpoint of endpointList) {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 12000);
+
         try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                headers,
+            const url = new URL(`${API_BASE_URL}${endpoint}`, window.location.origin);
+            url.searchParams.set("_ts", Date.now().toString());
+            const response = await fetch(url.toString(), {
+                headers: {
+                    ...headers,
+                    "Cache-Control": "no-store",
+                    Pragma: "no-cache",
+                },
+                signal: controller.signal,
             });
 
             if (!response.ok) continue;
@@ -243,6 +255,8 @@ async function fetchFirst(endpointList, headers = {}) {
             return await safeJson(response);
         } catch {
             // mencoba endpoint berikutnya
+        } finally {
+            window.clearTimeout(timeout);
         }
     }
 
@@ -345,6 +359,16 @@ function getRegionType(region) {
     if (raw.includes("KAB") || raw.includes("KOTA")) return "KABUPATEN";
 
     return getParentId(region) ? "KABUPATEN" : "PROVINSI";
+}
+
+function getRegionArea(region) {
+    return safeText(
+        region?.area_wilayah,
+        region?.areaWilayah,
+        region?.nama_area,
+        region?.area_binaan,
+        region?.area,
+    );
 }
 
 function parseBounds(boundsValue) {
@@ -644,6 +668,10 @@ function enrichSchools(schools, regionIndex) {
     return schools.map((school) => {
         const district = resolveSchoolDistrict(school, regionIndex);
         const province = resolveSchoolProvince(school, district, regionIndex);
+        const coordinate =
+            getSchoolCoordinate(school) ||
+            getRegionCoordinate(district) ||
+            getRegionCoordinate(province);
 
         return {
             ...school,
@@ -655,7 +683,13 @@ function enrichSchools(schools, regionIndex) {
             __provinceName: province
                 ? getRegionName(province)
                 : safeText(school?.nama_provinsi, school?.provinsi),
-            __coordinate: getSchoolCoordinate(school),
+            __areaName: getRegionArea(district) || safeText(
+                school?.area_wilayah,
+                school?.areaWilayah,
+                school?.area_binaan,
+                school?.area,
+            ),
+            __coordinate: coordinate,
         };
     });
 }
@@ -2006,6 +2040,7 @@ export default function DashboardPengurus() {
     const [refreshing, setRefreshing] = useState(false);
 
     const [programSearch, setProgramSearch] = useState("");
+    const [programArea, setProgramArea] = useState("ALL");
     const [programPillar, setProgramPillar] = useState("ALL");
     const [programType, setProgramType] = useState("ALL");
     const [programStatus, setProgramStatus] = useState("ALL");
@@ -2019,8 +2054,15 @@ export default function DashboardPengurus() {
         try {
             const token = localStorage.getItem("token");
             const headers = token
-                ? { Authorization: `Bearer ${token}` }
-                : {};
+                ? {
+                    Authorization: `Bearer ${token}`,
+                    "Cache-Control": "no-store",
+                    Pragma: "no-cache",
+                }
+                : {
+                    "Cache-Control": "no-store",
+                    Pragma: "no-cache",
+                };
 
             const [
                 wilayahTreePayload,
@@ -2057,9 +2099,10 @@ export default function DashboardPengurus() {
             setPrograms(normalizeArray(programPayload));
         } catch (error) {
             console.error("Dashboard Pengurus Error:", error);
-            window.alert(
-                error?.message || "Gagal memuat Dashboard Pengurus",
-            );
+            setRegions([]);
+            setSchools([]);
+            setVendors([]);
+            setPrograms([]);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -2139,14 +2182,64 @@ export default function DashboardPengurus() {
                         ),
                     ].join(", ")
                     : safeText(program?.nama_kabupaten),
+                __areaNames: relatedSchools.length
+                    ? [
+                        ...new Set(
+                            relatedSchools
+                                .map((school) => school.__areaName)
+                                .filter(Boolean),
+                        ),
+                    ].join(", ")
+                    : safeText(
+                        program?.area_wilayah,
+                        program?.areaWilayah,
+                        program?.area_binaan,
+                        program?.area,
+                    ),
             };
         });
     }, [programs, schoolMap]);
+
+    const programAreaOptions = useMemo(() => {
+        const areas = [
+            ...new Set(
+                enrichedPrograms
+                    .flatMap((program) =>
+                        String(program.__areaNames || "")
+                            .split(",")
+                            .map((area) => area.trim())
+                            .filter(Boolean),
+                    ),
+            ),
+        ].sort((a, b) => a.localeCompare(b));
+
+        return [
+            { value: "ALL", label: "Semua Area Binaan" },
+            ...areas.map((area) => ({
+                value: area,
+                label: area,
+            })),
+        ];
+    }, [enrichedPrograms]);
+
+    useEffect(() => {
+        const exists = programAreaOptions.some(
+            (item) => String(item.value) === String(programArea),
+        );
+        if (!exists) setProgramArea("ALL");
+    }, [programArea, programAreaOptions]);
 
     const filteredPrograms = useMemo(() => {
         const keyword = normalizeText(programSearch);
 
         return enrichedPrograms
+            .filter((program) => {
+                if (programArea === "ALL") return true;
+                return String(program.__areaNames || "")
+                    .split(",")
+                    .map((area) => area.trim())
+                    .some((area) => area === programArea);
+            })
             .filter(
                 (program) =>
                     programPillar === "ALL" ||
@@ -2171,7 +2264,7 @@ export default function DashboardPengurus() {
                     `${flattenSearchValue(program)} ${getProgramName(
                         program,
                     )} ${program.__schoolNames} ${program.__districtNames} ${program.__provinceNames
-                    } ${PILLAR_META[program.__pillar]?.label || ""}`,
+                    } ${program.__areaNames} ${PILLAR_META[program.__pillar]?.label || ""}`,
                 ).includes(keyword);
             })
             .sort(
@@ -2181,6 +2274,7 @@ export default function DashboardPengurus() {
             );
     }, [
         enrichedPrograms,
+        programArea,
         programPillar,
         programSearch,
         programStatus,
@@ -2352,7 +2446,7 @@ export default function DashboardPengurus() {
                         title="Portofolio Program Empat Pilar"
                         subtitle="Komposisi program dibagi menjadi Akademik, Karakter, Seni Budaya, dan Kecakapan Hidup. Seluruh filter memengaruhi diagram dan daftar program."
                         filters={
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
                                 <div className="relative xl:col-span-2">
                                     <Search
                                         size={14}
@@ -2367,6 +2461,14 @@ export default function DashboardPengurus() {
                                         className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-11 pr-4 text-[11px] font-bold text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
                                     />
                                 </div>
+
+                                <Dropdown
+                                    value={programArea}
+                                    items={programAreaOptions}
+                                    onChange={setProgramArea}
+                                    placeholder="Semua Area Binaan"
+                                    width="w-full"
+                                />
 
                                 <select
                                     value={programPillar}
@@ -2564,7 +2666,7 @@ export default function DashboardPengurus() {
                                         program,
                                     )} ${program.__schoolNames} ${program.__districtNames
                                     } ${program.__provinceNames} ${PILLAR_META[program.__pillar]?.label || ""
-                                    } ${program.__type} ${program.__status}`
+                                    } ${program.__areaNames} ${program.__type} ${program.__status}`
                                 }
                                 columns={[
                                     {
@@ -2611,6 +2713,9 @@ export default function DashboardPengurus() {
                                                 <p className="mt-1 max-w-[260px] text-[9px] font-bold leading-4 text-slate-400">
                                                     {program.__districtNames} ·{" "}
                                                     {program.__provinceNames}
+                                                </p>
+                                                <p className="mt-1 max-w-[260px] text-[9px] font-black uppercase tracking-wider text-[#0AC4E0]">
+                                                    {program.__areaNames || "Area belum ditentukan"}
                                                 </p>
                                             </div>
                                         ),

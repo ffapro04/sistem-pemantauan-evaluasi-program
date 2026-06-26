@@ -33,7 +33,7 @@ import { GoogleDriveModule } from './google-drive/google-drive.module';
       password: process.env.DB_PASSWORD || 'gesa123',
       database: process.env.DB_DATABASE || 'postgres',
       autoLoadEntities: true,
-      synchronize: true,
+      synchronize: false,
     }),
 
     AuthModule,

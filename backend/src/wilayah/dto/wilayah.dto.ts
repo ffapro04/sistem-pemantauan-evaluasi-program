@@ -27,6 +27,10 @@ export class CreateWilayahDto {
   @IsString()
   jenis_wilayah?: string;
 
+  @IsOptional()
+  @IsString()
+  area_wilayah?: string;
+
   // Biar aman kalau frontend lama/baru masih kirim keterangan.
   // Ini tidak disimpan sebagai kolom, hanya dipakai buat normalisasi.
   @IsOptional()
@@ -91,15 +95,15 @@ export class CreateWilayahDto {
   @IsNumber()
   jumlah_siswa?: number;
 
-  @IsNotEmpty()
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  latitude: number;
+  latitude?: number;
 
-  @IsNotEmpty()
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  longitude: number;
+  longitude?: number;
 
   @IsOptional()
   @Type(() => Number)

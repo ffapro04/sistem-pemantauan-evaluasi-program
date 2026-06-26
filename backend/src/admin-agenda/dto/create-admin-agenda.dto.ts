@@ -12,6 +12,7 @@ import {
   Matches,
   MaxLength,
   ValidateNested,
+  IsIn,
 } from 'class-validator';
 import {
   AdminAgendaStatus,
@@ -53,6 +54,28 @@ export class CreateAdminAgendaDto {
   @IsString()
   @MaxLength(180)
   location?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['AKADEMIK', 'KARAKTER', 'SENI_BUDAYA', 'KECAKAPAN_HIDUP'])
+  pilar?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['INDOOR', 'OUTDOOR', 'DARING'])
+  activity_type?: string | null;
+
+  @IsOptional()
+  @IsString()
+  meeting_link?: string | null;
+
+  @IsOptional()
+  @IsArray()
+  jenjang_targets?: string[] | null;
+
+  @IsOptional()
+  @IsArray()
+  wilayah_targets?: number[] | null;
 
   @IsOptional()
   @IsEnum(AdminAgendaStatus)

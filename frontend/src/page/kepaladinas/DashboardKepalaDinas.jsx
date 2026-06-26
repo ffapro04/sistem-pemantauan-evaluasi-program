@@ -61,32 +61,24 @@ import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
 import Input from "../../components/Input";
 import Button from "../../components/Button";
+import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
 const COLORS = {
-    cyan: "#0AC4E0",
-    blue: "#2563EB",
-    sky: "#38BDF8",
-    violet: "#8B5CF6",
-    pink: "#EC4899",
-    amber: "#F59E0B",
-    emerald: "#10B981",
-    orange: "#F97316",
-    red: "#EF4444",
-    slate: "#64748B",
+    cyan: CHART_STATUS_COLORS.info,
+    blue: CHART_STATUS_COLORS.info,
+    sky: CHART_STATUS_COLORS.info,
+    violet: CHART_STATUS_COLORS.deep,
+    pink: CHART_STATUS_COLORS.purple,
+    amber: CHART_STATUS_COLORS.warning,
+    emerald: CHART_STATUS_COLORS.success,
+    orange: CHART_STATUS_COLORS.orange,
+    red: CHART_STATUS_COLORS.danger,
+    slate: CHART_STATUS_COLORS.deep,
 };
 
-const CHART_COLORS = [
-    "#0AC4E0",
-    "#2563EB",
-    "#8B5CF6",
-    "#EC4899",
-    "#F59E0B",
-    "#10B981",
-    "#F97316",
-    "#64748B",
-];
+const CHART_COLORS = CHART_PALETTE;
 
 const FILTER_KATEGORI = [
     { label: "Semua", value: "SEMUA" },
@@ -4866,6 +4858,13 @@ export default function DashboardKepalaDinas() {
                     background: rgba(10, 196, 224, 0.35);
                     border-radius: 999px;
                 }
+
+                .leaflet-container,
+                .leaflet-pane,
+                .leaflet-top,
+                .leaflet-bottom {
+                    z-index: 0 !important;
+                }
             `}</style>
 
             <PageWrapper className="flex min-h-screen w-full bg-slate-50 !p-0">
@@ -4874,7 +4873,7 @@ export default function DashboardKepalaDinas() {
                 <main className="kadin-scroll h-screen flex-1 overflow-y-auto bg-slate-50">
                     <header className="relative overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-500 px-8 py-9 text-white lg:px-10">
                         <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-                        <div className="relative mx-auto max-w-[1500px]">
+                        <div className="relative w-full">
                             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100">
@@ -4944,7 +4943,7 @@ export default function DashboardKepalaDinas() {
                         </div>
                     </header>
 
-                    <div className="mx-auto max-w-[1500px] px-8 py-9 lg:px-10">
+                    <div className="w-full px-5 py-7 sm:px-6 lg:px-8">
                         {loadError && (
                             <div className="mb-8 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-5 text-red-600">
                                 <AlertTriangle className="mt-0.5 shrink-0" size={18} />

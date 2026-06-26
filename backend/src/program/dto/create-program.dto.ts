@@ -55,6 +55,29 @@ export class CreateTerminDto {
   persyaratan?: CreateRequirementDto[];
 }
 
+export class CreatePertemuanDto {
+  @IsString()
+  @IsNotEmpty()
+  nama_pertemuan: string;
+
+  @IsOptional()
+  @IsString()
+  deskripsi?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  urutan?: number;
+
+  @IsOptional()
+  @IsString()
+  tanggal_mulai?: string;
+
+  @IsOptional()
+  @IsString()
+  tanggal_selesai?: string;
+}
+
 export class CreateKegiatansDto {
   @IsString()
   @IsNotEmpty()
@@ -82,6 +105,12 @@ export class CreateKegiatansDto {
   @ValidateNested({ each: true })
   @Type(() => CreateRequirementDto)
   persyaratan?: CreateRequirementDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePertemuanDto)
+  pertemuan?: CreatePertemuanDto[];
 }
 
 export class CreateFaseWithKegiatansDto {

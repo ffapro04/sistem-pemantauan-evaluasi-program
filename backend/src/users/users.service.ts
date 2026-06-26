@@ -17,6 +17,7 @@ import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.ent
 @Injectable()
 export class UsersService {
   private readonly ROLE_KEPALA_DINAS_ID = 7;
+  private readonly ROLE_KEPALA_SEKOLAH_ID = 10;
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
@@ -51,6 +52,114 @@ export class UsersService {
     }
 
     return id;
+  }
+
+  private getAuthRoleId(authUser: any): number {
+    return Number(
+      authUser?.id_role ||
+        authUser?.role_id ||
+        authUser?.role?.id_role ||
+        authUser?.user?.id_role ||
+        authUser?.user?.role_id ||
+        authUser?.user?.role?.id_role ||
+        0,
+    );
+  }
+
+  private getAuthSekolahId(authUser: any): number {
+    return Number(
+      authUser?.id_sekolah ||
+        authUser?.sekolah_id ||
+        authUser?.school_id ||
+        authUser?.sekolah?.id_sekolah ||
+        authUser?.sekolah?.id ||
+        authUser?.school?.id_sekolah ||
+        authUser?.school?.id ||
+        authUser?.user?.id_sekolah ||
+        authUser?.user?.sekolah_id ||
+        authUser?.user?.sekolah?.id_sekolah ||
+        authUser?.user?.sekolah?.id ||
+        0,
+    );
+  }
+
+  private isAdmin(authUser: any): boolean {
+    return this.getAuthRoleId(authUser) === 1;
+  }
+
+  private isOperatorSekolah(authUser: any): boolean {
+    const roleId = this.getAuthRoleId(authUser);
+    const role = String(
+      authUser?.role ||
+        authUser?.nama_role ||
+        authUser?.user?.role ||
+        authUser?.user?.nama_role ||
+        '',
+    ).toLowerCase();
+    const jabatan = String(
+      authUser?.jabatan || authUser?.user?.jabatan || '',
+    ).toLowerCase();
+
+    return (
+      roleId === 9 ||
+      role.includes('operator') ||
+      jabatan.includes('operator sekolah') ||
+      jabatan.includes('operator')
+    );
+  }
+
+  private assertAdmin(authUser: any) {
+    if (!this.isAdmin(authUser)) {
+      throw new BadRequestException('Akses hanya untuk Admin.');
+    }
+  }
+
+  private assertOperatorSekolah(authUser: any) {
+    if (!this.isOperatorSekolah(authUser)) {
+      throw new BadRequestException('Akses hanya untuk Operator Sekolah.');
+    }
+  }
+
+  private getOperatorSekolahId(authUser: any): number {
+    this.assertOperatorSekolah(authUser);
+
+    const sekolahId = this.getAuthSekolahId(authUser);
+
+    if (!Number.isFinite(sekolahId) || sekolahId <= 0) {
+      throw new BadRequestException(
+        'ID sekolah tidak ditemukan pada akun operator.',
+      );
+    }
+
+    return sekolahId;
+  }
+
+  private normalizeEmail(value: any): string {
+    return String(value || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private validateEmail(email: string) {
+    if (!email) {
+      throw new BadRequestException('Email wajib diisi.');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Format email tidak valid.');
+    }
+  }
+
+  private validateNama(nama: string) {
+    if (!nama) {
+      throw new BadRequestException('Nama Kepala Sekolah wajib diisi.');
+    }
+  }
+
+  private validatePassword(password: string) {
+    if (!password || password.length < 6) {
+      throw new BadRequestException('Password minimal 6 karakter.');
+    }
   }
 
   private normalizeProfileText(value: any): string {
@@ -703,6 +812,224 @@ export class UsersService {
         error?.detail || error?.message || 'Gagal memperbarui data user.',
       );
     }
+  }
+
+  async findAllKepalaSekolah(authUser?: any) {
+    if (authUser) {
+      this.assertAdmin(authUser);
+    }
+
+    return this.userRepo.find({
+      where: {
+        role: {
+          id_role: this.ROLE_KEPALA_SEKOLAH_ID,
+        },
+      },
+      relations: ['role', 'sekolah', 'sekolah.wilayah'],
+      order: {
+        id_user: 'DESC',
+      },
+    });
+  }
+
+  async findKepalaSekolahBySekolah(authUser: any, idSekolahParam: number) {
+    const requestedSekolahId = Number(idSekolahParam);
+
+    if (!Number.isFinite(requestedSekolahId) || requestedSekolahId <= 0) {
+      throw new BadRequestException('ID sekolah tidak valid.');
+    }
+
+    if (!this.isAdmin(authUser)) {
+      const operatorSekolahId = this.getOperatorSekolahId(authUser);
+
+      if (Number(operatorSekolahId) !== Number(requestedSekolahId)) {
+        throw new BadRequestException(
+          'Operator hanya boleh melihat Kepala Sekolah pada sekolahnya sendiri.',
+        );
+      }
+    }
+
+    return this.userRepo.findOne({
+      where: {
+        role: {
+          id_role: this.ROLE_KEPALA_SEKOLAH_ID,
+        },
+        sekolah: {
+          id_sekolah: requestedSekolahId,
+        },
+      },
+      relations: ['role', 'sekolah', 'sekolah.wilayah'],
+    });
+  }
+
+  async createKepalaSekolah(authUser: any, data: any) {
+    const idSekolah = this.getOperatorSekolahId(authUser);
+    const nama = String(data?.nama || '').trim();
+    const email = this.normalizeEmail(data?.email);
+    const password = String(data?.password || '').trim();
+
+    this.validateNama(nama);
+    this.validateEmail(email);
+    this.validatePassword(password);
+
+    const existingBySchool = await this.userRepo.findOne({
+      where: {
+        role: {
+          id_role: this.ROLE_KEPALA_SEKOLAH_ID,
+        },
+        sekolah: {
+          id_sekolah: idSekolah,
+        },
+      },
+      relations: ['role', 'sekolah'],
+    });
+
+    if (existingBySchool) {
+      throw new ConflictException(
+        'Sekolah ini sudah memiliki akun Kepala Sekolah. Silakan edit akun yang sudah ada.',
+      );
+    }
+
+    const existingEmail = await this.findByEmail(email);
+
+    if (existingEmail) {
+      throw new ConflictException('Email sudah digunakan oleh user lain.');
+    }
+
+    try {
+      const newUser = this.userRepo.create({
+        nama,
+        email,
+        password,
+        jabatan: 'Kepala Sekolah',
+        no_telp: data?.no_telp || null,
+        jenis: data?.jenis || null,
+        sub_jenis: data?.sub_jenis || null,
+        foto_profile: data?.foto_profile || null,
+        kabupaten_tugas: [],
+        status: this.normalizeStatus(data?.status, true),
+        role: { id_role: this.ROLE_KEPALA_SEKOLAH_ID } as any,
+        sekolah: { id_sekolah: idSekolah } as any,
+      });
+
+      const savedUser = await this.userRepo.save(newUser);
+      return this.findOne(savedUser.id_user);
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      console.error('CREATE KEPALA SEKOLAH ERROR:', error);
+
+      throw new InternalServerErrorException(
+        error?.detail || error?.message || 'Gagal membuat akun Kepala Sekolah.',
+      );
+    }
+  }
+
+  async updateKepalaSekolah(authUser: any, id: number, data: any) {
+    const idSekolah = this.getOperatorSekolahId(authUser);
+
+    const user = await this.userRepo.findOne({
+      where: {
+        id_user: Number(id),
+      },
+      relations: ['role', 'sekolah'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('Akun Kepala Sekolah tidak ditemukan.');
+    }
+
+    const roleId = Number(user.role?.id_role || user.id_role || 0);
+    const userSekolahId = Number(
+      user.sekolah?.id_sekolah || user.id_sekolah || 0,
+    );
+
+    if (roleId !== this.ROLE_KEPALA_SEKOLAH_ID) {
+      throw new BadRequestException('User ini bukan akun Kepala Sekolah.');
+    }
+
+    if (userSekolahId !== idSekolah) {
+      throw new BadRequestException(
+        'Operator hanya boleh mengubah Kepala Sekolah pada sekolahnya sendiri.',
+      );
+    }
+
+    try {
+      if (data?.nama !== undefined) {
+        const nama = String(data.nama || '').trim();
+        this.validateNama(nama);
+        user.nama = nama;
+      }
+
+      if (data?.email !== undefined) {
+        const email = this.normalizeEmail(data.email);
+        this.validateEmail(email);
+
+        if (email !== user.email) {
+          const existingEmail = await this.findByEmail(email);
+
+          if (existingEmail && Number(existingEmail.id_user) !== Number(id)) {
+            throw new ConflictException(
+              'Email sudah digunakan oleh user lain.',
+            );
+          }
+        }
+
+        user.email = email;
+      }
+
+      if (data?.no_telp !== undefined) {
+        user.no_telp = data.no_telp || null;
+      }
+
+      if (data?.status !== undefined) {
+        user.status = this.normalizeStatus(data.status, user.status ?? true);
+      }
+
+      if (data?.password !== undefined && String(data.password || '').trim()) {
+        const password = String(data.password || '').trim();
+        this.validatePassword(password);
+        user.password = password;
+      }
+
+      user.jabatan = 'Kepala Sekolah';
+      user.role = { id_role: this.ROLE_KEPALA_SEKOLAH_ID } as any;
+      user.sekolah = { id_sekolah: idSekolah } as any;
+
+      const savedUser = await this.userRepo.save(user);
+      return this.findOne(savedUser.id_user);
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      console.error('UPDATE KEPALA SEKOLAH ERROR:', error);
+
+      throw new InternalServerErrorException(
+        error?.detail ||
+          error?.message ||
+          'Gagal memperbarui akun Kepala Sekolah.',
+      );
+    }
+  }
+
+  async resetPasswordKepalaSekolah(authUser: any, id: number, data: any) {
+    const password = String(data?.password || '').trim();
+    this.validatePassword(password);
+
+    return this.updateKepalaSekolah(authUser, id, {
+      password,
+    });
   }
 
   async remove(id: number) {

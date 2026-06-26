@@ -13,6 +13,8 @@ import { Fase } from './fase.entity';
 import { Termin } from './termin.entity';
 import { PersyaratanKegiatan } from './persyaratan-kegiatan.entity';
 import { KegiatanComment } from './kegiatan-comment.entity';
+import { KegiatanPertemuan } from './kegiatan-pertemuan.entity';
+import { KegiatanRating } from './kegiatan-rating.entity';
 
 @Entity('t_kegiatans')
 export class Kegiatans {
@@ -75,4 +77,10 @@ export class Kegiatans {
 
   @OneToMany(() => KegiatanComment, (comment) => comment.kegiatan)
   comments: KegiatanComment[];
+
+  @OneToMany(() => KegiatanPertemuan, (pertemuan) => pertemuan.kegiatan)
+  pertemuan: KegiatanPertemuan[];
+
+  @OneToMany(() => KegiatanRating, (rating) => rating.kegiatan)
+  ratings: KegiatanRating[];
 }

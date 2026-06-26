@@ -92,6 +92,7 @@ const normalizeWilayah = (item) => ({
         "-",
     jenis_wilayah: item?.jenis_wilayah || "KABUPATEN",
     tipe_wilayah: item?.tipe_wilayah || "Absolute",
+    area_wilayah: item?.area_wilayah || item?.areaWilayah || item?.area || "",
     status: item?.status ?? true,
     id_parent: item?.id_parent ?? item?.parent?.id_wilayah ?? null,
     parent: item?.parent || null,
@@ -120,7 +121,9 @@ const getKabupatenOptions = (auxData = {}) =>
         value: String(item.id_wilayah),
         label: item.nama_wilayah,
         description: item.parent?.nama_wilayah || "",
-        meta: item.jenis_wilayah || "KABUPATEN",
+        meta: item.area_wilayah
+            ? `${item.jenis_wilayah || "KABUPATEN"} · ${item.area_wilayah}`
+            : item.jenis_wilayah || "KABUPATEN",
         icon: MapPin,
 
         id_wilayah: item.id_wilayah,
@@ -128,6 +131,7 @@ const getKabupatenOptions = (auxData = {}) =>
         nama_kabupaten: item.nama_wilayah,
         nama_provinsi: item.parent?.nama_wilayah || "",
         id_parent: item.id_parent || item.parent?.id_wilayah || null,
+        area_wilayah: item.area_wilayah || "",
     }));
 
 const findSelectedWilayahOption = (formData = {}, auxData = {}) => {
@@ -402,6 +406,7 @@ export const sekolahConfig = {
                 id_wilayah: value,
                 kode_kabupaten: selected?.kode_kabupaten || "",
                 nama_kabupaten: selected?.nama_kabupaten || "",
+                area: selected?.area_wilayah || next.area || "",
             };
         }
 

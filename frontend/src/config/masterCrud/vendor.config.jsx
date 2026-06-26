@@ -92,6 +92,12 @@ const normalizeVendor = (row) => ({
         row?.akta_notaris ||
         null,
 
+    buku_rekening_file:
+        row?.buku_rekening_file ||
+        row?.buku_rekening ||
+        row?.rekening_file ||
+        null,
+
     status:
         row?.status ?? true,
 });
@@ -145,6 +151,7 @@ export const vendorConfig = {
         email: "",
         password: "",
         npwp_file: null,
+        buku_rekening_file: null,
         ktp_pj_file: null,
         akta_notaris_file: null,
         status: "Bermitra",
@@ -396,14 +403,23 @@ export const vendorConfig = {
                     helperText: "Wajib · PDF/JPG/PNG · Maks. 10 MB",
                 },
                 {
-                    name: "ktp_pj_file",
-                    label: "KTP Penanggung Jawab",
+                    name: "buku_rekening_file",
+                    label: "Buku Rekening",
                     type: "upload",
                     required: true,
                     accept: ".pdf,image/jpeg,image/jpg,image/png,image/webp",
                     maxSize: 10 * 1024 * 1024,
-                    buttonText: "Upload KTP PJ",
+                    buttonText: "Upload Buku Rekening",
                     helperText: "Wajib · PDF/JPG/PNG · Maks. 10 MB",
+                },
+                {
+                    name: "ktp_pj_file",
+                    label: "KTP Penanggung Jawab",
+                    type: "upload",
+                    accept: ".pdf,image/jpeg,image/jpg,image/png,image/webp",
+                    maxSize: 10 * 1024 * 1024,
+                    buttonText: "Upload KTP PJ",
+                    helperText: "Opsional · PDF/JPG/PNG · Maks. 10 MB",
                 },
                 {
                     name: "akta_notaris_file",
@@ -466,11 +482,11 @@ export const vendorConfig = {
             return "Dokumen NPWP wajib diunggah.";
         }
 
-        if (!formData.ktp_pj_file) {
-            return "KTP Penanggung Jawab wajib diunggah.";
+        if (!formData.buku_rekening_file) {
+            return "Buku Rekening wajib diunggah.";
         }
 
-        // PJ 2, Kontak PJ 2, dan Akta Notaris tidak divalidasi
+        // PJ 2, Kontak PJ 2, KTP PJ, dan Akta Notaris tidak divalidasi
         // karena bersifat opsional.
 
         return true;
@@ -507,6 +523,7 @@ export const vendorConfig = {
             }
         };
         appendDocument("npwp_file");
+        appendDocument("buku_rekening_file");
         appendDocument("ktp_pj_file");
         appendDocument("akta_notaris_file");
 
@@ -598,6 +615,7 @@ export const vendorConfig = {
                     { label: "PJ 2", key: "pj_2", icon: User },
                     { label: "Kontak PJ 2", key: "telp_pj_2", icon: Phone },
                     { label: "NPWP", key: "npwp_file", icon: UploadCloud },
+                    { label: "Buku Rekening", key: "buku_rekening_file", icon: UploadCloud },
                     { label: "KTP PJ", key: "ktp_pj_file", icon: UploadCloud },
                     {
                         label: "Akta Notaris",

@@ -90,17 +90,6 @@ export class AssessmentService {
     const query = this.assessmentRepo
       .createQueryBuilder('a')
       .leftJoin('m_users', 'u', 'u.id_user = a.id_ho')
-      .leftJoin('m_sekolah', 's', 's.id_sekolah = ANY(a.target_sekolah_ids)')
-      .leftJoin(
-        't_assessment_pertanyaan',
-        'ap',
-        'ap.id_assessment = a.id_assessment',
-      )
-      .leftJoin(
-        'assessment_jawaban',
-        'aj',
-        'aj.id_pertanyaan = ap.id_pertanyaan',
-      )
       .select([
         'a.id_assessment AS id_assessment',
         'a.nama AS nama',
@@ -112,11 +101,36 @@ export class AssessmentService {
         'a.pilar AS pilar',
         'a.target_sekolah_ids AS target_sekolah_ids',
         'u.nama AS ho',
-        "STRING_AGG(DISTINCT s.nama_sekolah, ', ') AS daftar_sekolah",
-        'COUNT(DISTINCT aj.nama_pengisi) AS jumlah_pengisi',
       ])
-      .groupBy(
-        'a.id_assessment, u.nama, a.sent_at, a.tenggat, a.jenis, a.pilar, a.target_sekolah_ids',
+      .addSelect(
+        `COALESCE((
+          SELECT STRING_AGG(DISTINCT s.nama_sekolah, ', ')
+          FROM public.m_sekolah s
+          WHERE s.id_sekolah = ANY(a.target_sekolah_ids)
+        ), '')`,
+        'daftar_sekolah',
+      )
+      .addSelect(
+        `COALESCE((
+          SELECT COUNT(DISTINCT COALESCE(
+            aj.id_guru_assessment::text,
+            aj.id_user::text || aj.nama_pengisi
+          ))
+          FROM public.t_assessment_pertanyaan ap
+          JOIN public.assessment_jawaban aj
+            ON aj.id_pertanyaan = ap.id_pertanyaan
+          WHERE ap.id_assessment = a.id_assessment
+        ), 0)`,
+        'jumlah_pengisi',
+      )
+      .addSelect(
+        `COALESCE((
+          SELECT COUNT(DISTINCT ag.id_guru_assessment)
+          FROM public.assessment_guru ag
+          WHERE ag.id_sekolah = ANY(a.target_sekolah_ids)
+            AND ag.is_active = true
+        ), 0)`,
+        'jumlah_guru_target',
       );
 
     if (jenis) query.andWhere('a.jenis = :jenis', { jenis });
@@ -127,7 +141,23 @@ export class AssessmentService {
       });
     }
 
-    return query.getRawMany();
+    const rows = await query.getRawMany();
+
+    return rows.map((row) => {
+      const jumlahPengisi = Number(row.jumlah_pengisi || 0);
+      const jumlahGuruTarget = Number(row.jumlah_guru_target || 0);
+
+      return {
+        ...row,
+        jumlah_pengisi: jumlahPengisi,
+        jumlah_guru_target: jumlahGuruTarget,
+        belum_mengisi: Math.max(jumlahGuruTarget - jumlahPengisi, 0),
+        persentase_pengisian:
+          jumlahGuruTarget > 0
+            ? Math.round((jumlahPengisi / jumlahGuruTarget) * 100)
+            : 0,
+      };
+    });
   }
 
   async findOne(id: number) {
@@ -340,6 +370,202 @@ export class AssessmentService {
       })),
 
       pengisi,
+    };
+  }
+
+  async exportHasilAssessmentCsv(id: number) {
+    const hasil = await this.getHasilAssessment(id);
+    const headers = [
+      'Assessment',
+      'Jenis',
+      'Nama Pengisi',
+      'Sekolah',
+      'Tanggal Mengisi',
+      'Pertanyaan',
+      'Jawaban',
+      'Skor',
+    ];
+
+    const escapeCsv = (value: any) => {
+      const text = String(value ?? '').replace(/"/g, '""');
+      return `"${text}"`;
+    };
+
+    const rows = [];
+
+    for (const pengisi of hasil.pengisi || []) {
+      for (const jawaban of pengisi.jawaban || []) {
+        const pertanyaan = (hasil.pertanyaan || []).find(
+          (item) => Number(item.id_pertanyaan) === Number(jawaban.id_pertanyaan),
+        );
+
+        rows.push([
+          hasil.nama_assessment,
+          hasil.jenis,
+          pengisi.nama,
+          pengisi.sekolah,
+          pengisi.tanggal_mengisi,
+          pertanyaan?.teks || '',
+          jawaban.jawaban,
+          jawaban.skor,
+        ]);
+      }
+    }
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(','))
+      .join('\n');
+
+    return {
+      filename: `hasil-assessment-${id}.csv`,
+      content: `\uFEFF${csv}`,
+    };
+  }
+
+  async importHasilAssessment(id: number, body: any) {
+    const assessment = await this.assessmentRepo.findOne({
+      where: { id_assessment: id },
+    });
+
+    if (!assessment) {
+      throw new NotFoundException('Assessment tidak ditemukan');
+    }
+
+    const rows = Array.isArray(body?.rows) ? body.rows : [];
+    if (rows.length === 0) {
+      throw new BadRequestException('Data import kosong.');
+    }
+
+    const pertanyaan = await this.pertanyaanRepo.find({
+      where: { id_assessment: id },
+      order: { urutan: 'ASC' },
+    });
+
+    if (pertanyaan.length === 0) {
+      throw new BadRequestException('Assessment belum memiliki pertanyaan.');
+    }
+
+    const questionMap = new Map<string, AssessmentPertanyaan>();
+    pertanyaan.forEach((item, index) => {
+      questionMap.set(String(item.id_pertanyaan), item);
+      questionMap.set(`q${index + 1}`, item);
+      questionMap.set(`soal${index + 1}`, item);
+      questionMap.set(
+        String(item.pertanyaan || '')
+          .trim()
+          .toLowerCase(),
+        item,
+      );
+    });
+
+    const targetSekolahIds = assessment.target_sekolah_ids || [];
+    const guruRows =
+      targetSekolahIds.length > 0
+        ? await this.guruRepo
+            .createQueryBuilder('guru')
+            .where('guru.id_sekolah IN (:...ids)', { ids: targetSekolahIds })
+            .getMany()
+        : [];
+
+    const normalize = (value: any) =>
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    const getGuru = (row: any) => {
+      const idGuru = Number(row.id_guru_assessment || row.id_guru || 0);
+      if (idGuru) {
+        return guruRows.find(
+          (guru) => Number(guru.id_guru_assessment) === Number(idGuru),
+        );
+      }
+
+      const nama = normalize(row.nama_pengisi || row.nama_guru || row.nama);
+      if (!nama) return null;
+
+      return guruRows.find((guru) => normalize(guru.nama_guru) === nama) || null;
+    };
+
+    const answerRows: any[] = [];
+
+    for (const row of rows) {
+      const guru = getGuru(row);
+      const namaPengisi =
+        row.nama_pengisi ||
+        row.nama_guru ||
+        row.nama ||
+        guru?.nama_guru ||
+        'Pengisi Import';
+      const idGuru = guru?.id_guru_assessment || row.id_guru_assessment || null;
+
+      const answers = Array.isArray(row.answers) ? row.answers : [];
+
+      for (const answer of answers) {
+        const key = normalize(
+          answer.id_pertanyaan ||
+            answer.pertanyaan ||
+            answer.question ||
+            answer.key ||
+            '',
+        );
+        const question =
+          questionMap.get(String(answer.id_pertanyaan || '')) ||
+          questionMap.get(key);
+
+        if (!question || !String(answer.jawaban || '').trim()) continue;
+
+        answerRows.push({
+          id_pertanyaan: question.id_pertanyaan,
+          id_user: row.id_user || null,
+          id_guru_assessment: idGuru,
+          nama_pengisi: String(namaPengisi).trim(),
+          nama_guru_snapshot: String(namaPengisi).trim(),
+          jawaban: String(answer.jawaban).trim(),
+          skor: Number(answer.skor || 0),
+        });
+      }
+    }
+
+    if (answerRows.length === 0) {
+      throw new BadRequestException(
+        'Tidak ada jawaban valid yang bisa diimport.',
+      );
+    }
+
+    const questionIds = pertanyaan.map((item) => item.id_pertanyaan);
+    const guruIds = [
+      ...new Set(
+        answerRows
+          .map((row) => Number(row.id_guru_assessment || 0))
+          .filter(Boolean),
+      ),
+    ];
+    const importedNames = [
+      ...new Set(answerRows.map((row) => row.nama_pengisi).filter(Boolean)),
+    ];
+
+    const deleteQuery = this.jawabanRepo
+      .createQueryBuilder()
+      .delete()
+      .from('assessment_jawaban')
+      .where('id_pertanyaan IN (:...questionIds)', { questionIds });
+
+    if (guruIds.length > 0) {
+      deleteQuery.andWhere('id_guru_assessment IN (:...guruIds)', { guruIds });
+    } else {
+      deleteQuery.andWhere('nama_pengisi IN (:...importedNames)', {
+        importedNames,
+      });
+    }
+
+    await deleteQuery.execute();
+    await this.jawabanRepo.save(answerRows);
+
+    return {
+      message: 'Hasil assessment berhasil diimport.',
+      imported_rows: rows.length,
+      imported_answers: answerRows.length,
     };
   }
 

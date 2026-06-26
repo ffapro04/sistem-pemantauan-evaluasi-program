@@ -1,21 +1,23 @@
 ﻿/* eslint-disable no-unused-vars */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import {
-    BookOpen,
     CheckCircle2,
     Eye,
     GraduationCap,
+    KeyRound,
     Mail,
     Pencil,
     Phone,
     Plus,
     RefreshCw,
+    ShieldCheck,
+    UserRound,
     Users,
     XCircle,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
@@ -32,6 +34,29 @@ function decodeUser() {
     } catch {
         return null;
     }
+}
+
+function getAuthHeaders() {
+    const token = localStorage.getItem("token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function unwrapArray(payload) {
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.items)) return payload.items;
+    if (Array.isArray(payload?.rows)) return payload.rows;
+    if (Array.isArray(payload?.result)) return payload.result;
+    if (payload?.data && typeof payload.data === "object") return [payload.data];
+    if (payload && typeof payload === "object") return [payload];
+    return [];
+}
+
+function unwrapObject(payload) {
+    if (!payload) return null;
+    if (payload?.data && typeof payload.data === "object") return payload.data;
+    if (payload && typeof payload === "object") return payload;
+    return null;
 }
 
 function getSchoolId(user) {
@@ -135,6 +160,16 @@ function getGuruActive(item) {
     return !["false", "nonaktif", "inactive", "0"].includes(value);
 }
 
+function getKepsekId(item) {
+    return item?.id_user || item?.id || null;
+}
+
+function getKepsekActive(item) {
+    if (typeof item?.status === "boolean") return item.status;
+    const value = String(item?.status || "").toLowerCase();
+    return !["false", "nonaktif", "inactive", "0"].includes(value);
+}
+
 function formatDate(value) {
     if (!value) return "Belum pernah";
 
@@ -148,12 +183,31 @@ function formatDate(value) {
     });
 }
 
+function StatusBadge({ active }) {
+    return active ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500">
+            <CheckCircle2 size={11} />
+            Aktif
+        </span>
+    ) : (
+        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-rose-400">
+            <XCircle size={11} />
+            Nonaktif
+        </span>
+    );
+}
+
 export default function DaftarGuru() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
 
+    const initialTab = searchParams.get("tab") === "kepala-sekolah" ? "kepala-sekolah" : "guru";
+
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [user, setUser] = useState(null);
     const [sekolahDetail, setSekolahDetail] = useState(null);
     const [list, setList] = useState([]);
+    const [kepalaSekolah, setKepalaSekolah] = useState(null);
     const [loading, setLoading] = useState(false);
     const [note, setNote] = useState({
         show: false,
@@ -164,6 +218,8 @@ export default function DaftarGuru() {
     const idSekolah = getSchoolId(user);
     const isOperator = isOperatorSekolah(user);
     const isSmk = getJenjang(user, sekolahDetail) === "SMK";
+
+    const currentTitle = activeTab === "kepala-sekolah" ? "Kepala Sekolah" : "Guru";
 
     useEffect(() => {
         const decoded = decodeUser();
@@ -180,6 +236,15 @@ export default function DaftarGuru() {
         setUser(decoded);
     }, []);
 
+    const switchTab = (tab) => {
+        setActiveTab(tab);
+        if (tab === "kepala-sekolah") {
+            setSearchParams({ tab: "kepala-sekolah" });
+        } else {
+            setSearchParams({});
+        }
+    };
+
     const fetchData = useCallback(async () => {
         if (!idSekolah) {
             setNote({
@@ -193,16 +258,16 @@ export default function DaftarGuru() {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
-            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+            const headers = getAuthHeaders();
 
             const guruEndpoint = isOperator
                 ? `${BASE_URL}/assessment-guru/sekolah/${idSekolah}`
                 : `${BASE_URL}/assessment-guru/sekolah/${idSekolah}/aktif`;
 
-            const [guruResponse, sekolahResponse] = await Promise.allSettled([
+            const [guruResponse, sekolahResponse, kepsekResponse] = await Promise.allSettled([
                 axios.get(guruEndpoint, { headers }),
                 axios.get(`${BASE_URL}/sekolah/${idSekolah}`, { headers }),
+                axios.get(`${BASE_URL}/users/kepala-sekolah/sekolah/${idSekolah}`, { headers }),
             ]);
 
             if (guruResponse.status === "rejected") {
@@ -215,6 +280,13 @@ export default function DaftarGuru() {
             if (sekolahResponse.status === "fulfilled") {
                 const sekolahPayload = sekolahResponse.value?.data;
                 setSekolahDetail(sekolahPayload?.data || sekolahPayload || null);
+            }
+
+            if (kepsekResponse.status === "fulfilled") {
+                const payload = unwrapObject(kepsekResponse.value?.data);
+                setKepalaSekolah(payload?.id_user || payload?.id ? payload : null);
+            } else {
+                setKepalaSekolah(null);
             }
         } catch (error) {
             console.error("Gagal memuat daftar guru:", error);
@@ -233,12 +305,12 @@ export default function DaftarGuru() {
         if (user) fetchData();
     }, [user, fetchData]);
 
-    const handleCreate = () => {
+    const handleCreateGuru = () => {
         if (!isOperator) return;
         navigate("/sekolah/guru/create");
     };
 
-    const handleEdit = (item) => {
+    const handleEditGuru = (item) => {
         if (!isOperator) return;
 
         const id = getGuruId(item);
@@ -247,20 +319,81 @@ export default function DaftarGuru() {
         navigate(`/sekolah/guru/edit/${id}`);
     };
 
-    const handleDetail = (item) => {
+    const handleDetailGuru = (item) => {
         const id = getGuruId(item);
         if (!id) return;
 
         navigate(`/sekolah/guru/detail/${id}`);
     };
 
+    const handleCreateKepsek = () => {
+        if (!isOperator) return;
+        navigate("/sekolah/guru/kepala-sekolah/create");
+    };
+
+    const handleEditKepsek = () => {
+        if (!isOperator || !kepalaSekolah) return;
+
+        const id = getKepsekId(kepalaSekolah);
+        if (!id) return;
+
+        navigate(`/sekolah/guru/kepala-sekolah/edit/${id}`);
+    };
+
+    const handleResetPasswordKepsek = async () => {
+        if (!isOperator || !kepalaSekolah) return;
+
+        const id = getKepsekId(kepalaSekolah);
+        if (!id) return;
+
+        const password = window.prompt("Masukkan password baru Kepala Sekolah. Minimal 6 karakter:");
+
+        if (password === null) return;
+
+        const cleanPassword = String(password || "").trim();
+
+        if (cleanPassword.length < 6) {
+            setNote({
+                show: true,
+                type: "error",
+                message: "Password minimal 6 karakter.",
+            });
+            return;
+        }
+
+        try {
+            await axios.patch(
+                `${BASE_URL}/users/kepala-sekolah/${id}/reset-password`,
+                { password: cleanPassword },
+                { headers: getAuthHeaders() },
+            );
+
+            setNote({
+                show: true,
+                type: "success",
+                message: "Password Kepala Sekolah berhasil direset.",
+            });
+
+            fetchData();
+        } catch (error) {
+            console.error("Gagal reset password Kepala Sekolah:", error);
+            const message = error?.response?.data?.message || "Gagal reset password Kepala Sekolah.";
+
+            setNote({
+                show: true,
+                type: "error",
+                message: Array.isArray(message) ? message.join(", ") : message,
+            });
+        }
+    };
+
     return (
         <MasterPageShell
             title="Daftar"
-            highlight="Guru"
+            highlight={currentTitle}
             subtitle={
                 isOperator
-                    ? "Kelola data guru assessment pada sekolah operator."
+                    ? "Kelola data guru assessment dan akun Kepala Sekolah."
                     : "Daftar guru assessment aktif pada sekolah Anda."
             }
             action={
@@ -270,21 +403,40 @@ export default function DaftarGuru() {
                         onClick={fetchData}
                         className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 shadow-sm transition-all hover:text-slate-700 active:scale-95"
                     >
-                        <RefreshCw
-                            size={12}
-                            className={loading ? "animate-spin" : ""}
-                        />
+                        <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                         Refresh
                     </button>
 
-                    {isOperator && (
+                    {isOperator && activeTab === "guru" && (
                         <button
                             type="button"
-                            onClick={handleCreate}
+                            onClick={handleCreateGuru}
                             className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
                         >
                             <Plus size={12} />
                             Tambah Guru
+                        </button>
+                    )}
+
+                    {isOperator && activeTab === "kepala-sekolah" && !kepalaSekolah && (
+                        <button
+                            type="button"
+                            onClick={handleCreateKepsek}
+                            className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                        >
+                            <Plus size={12} />
+                            Tambah Kepala Sekolah
+                        </button>
+                    )}
+
+                    {isOperator && activeTab === "kepala-sekolah" && kepalaSekolah && (
+                        <button
+                            type="button"
+                            onClick={handleEditKepsek}
+                            className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                        >
+                            <Pencil size={12} />
+                            Edit Akun
                         </button>
                     )}
                 </div>
@@ -293,15 +445,169 @@ export default function DaftarGuru() {
             <MasterAlert note={note} setNote={setNote} />
 
             <div className="h-full overflow-y-auto no-scrollbar px-5 py-6 sm:px-8 lg:px-10 lg:py-8">
+                <div className="mb-5 flex flex-wrap gap-2 rounded-[1.5rem] border border-slate-100 bg-white p-2 shadow-sm">
+                    <button
+                        type="button"
+                        onClick={() => switchTab("guru")}
+                        className={`flex items-center gap-2 rounded-[1.1rem] px-4 py-2.5 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === "guru"
+                            ? "bg-[#0AC4E0] text-white shadow-lg shadow-cyan-100"
+                            : "bg-slate-50 text-slate-400 hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                            }`}
+                    >
+                        <GraduationCap size={13} />
+                        Guru Assessment
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => switchTab("kepala-sekolah")}
+                        className={`flex items-center gap-2 rounded-[1.1rem] px-4 py-2.5 text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === "kepala-sekolah"
+                            ? "bg-[#0AC4E0] text-white shadow-lg shadow-cyan-100"
+                            : "bg-slate-50 text-slate-400 hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                            }`}
+                    >
+                        <ShieldCheck size={13} />
+                        Kepala Sekolah
+                    </button>
+                </div>
+
                 {loading ? (
                     <div className="flex flex-col items-center justify-center gap-3 py-24">
-                        <RefreshCw
-                            size={28}
-                            className="animate-spin text-[#0AC4E0]"
-                        />
+                        <RefreshCw size={28} className="animate-spin text-[#0AC4E0]" />
                         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                             Memuat data...
                         </p>
+                    </div>
+                ) : activeTab === "kepala-sekolah" ? (
+                    <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-sm">
+                        <div className="flex flex-col gap-1 border-b border-slate-100 bg-slate-50 px-6 py-5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                                Akun Kepala Sekolah
+                            </p>
+                            <p className="text-sm font-bold text-slate-500">
+                                Satu sekolah hanya dapat memiliki satu akun Kepala Sekolah.
+                            </p>
+                        </div>
+
+                        {!kepalaSekolah ? (
+                            <div className="flex flex-col items-center justify-center gap-4 py-24">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-cyan-50">
+                                    <ShieldCheck size={34} className="text-[#0AC4E0]" />
+                                </div>
+
+                                <div className="text-center">
+                                    <p className="text-sm font-black text-slate-700">
+                                        Belum ada akun Kepala Sekolah.
+                                    </p>
+                                    <p className="mt-1 text-xs font-semibold text-slate-400">
+                                        Tambahkan akun Kepala Sekolah agar dapat login ke dashboard Kepala Sekolah.
+                                    </p>
+                                </div>
+
+                                {isOperator && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCreateKepsek}
+                                        className="mt-2 flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                                    >
+                                        <Plus size={13} />
+                                        Tambah Kepala Sekolah
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[940px] text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 bg-white">
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Nama
+                                            </th>
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Email
+                                            </th>
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Jabatan
+                                            </th>
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Sekolah
+                                            </th>
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Status
+                                            </th>
+                                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                Aksi
+                                            </th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        <tr className="border-b border-slate-50 bg-white transition-colors hover:bg-slate-50/70">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-[11px] font-black text-[#0AC4E0]">
+                                                        {String(kepalaSekolah.nama || "K").charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-black text-slate-800">
+                                                            {kepalaSekolah.nama || "-"}
+                                                        </p>
+                                                        <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                                                            Role Kepala Sekolah
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                                                    <Mail size={12} className="text-slate-300" />
+                                                    {kepalaSekolah.email || "-"}
+                                                </div>
+                                            </td>
+
+                                            <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                                                {kepalaSekolah.jabatan || "Kepala Sekolah"}
+                                            </td>
+
+                                            <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                                                {kepalaSekolah.sekolah?.nama_sekolah || sekolahDetail?.nama_sekolah || "-"}
+                                            </td>
+
+                                            <td className="px-6 py-4">
+                                                <StatusBadge active={getKepsekActive(kepalaSekolah)} />
+                                            </td>
+
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    {isOperator && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleEditKepsek}
+                                                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0] transition hover:bg-[#0AC4E0] hover:text-white"
+                                                                title="Edit Akun"
+                                                            >
+                                                                <Pencil size={14} />
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleResetPasswordKepsek}
+                                                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-500 transition hover:bg-amber-500 hover:text-white"
+                                                                title="Reset Password"
+                                                            >
+                                                                <KeyRound size={14} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 ) : list.length === 0 ? (
                     <div className="flex flex-col items-center justify-center gap-4 rounded-[2rem] border border-dashed border-slate-200 bg-white py-24">
@@ -323,7 +629,7 @@ export default function DaftarGuru() {
                         {isOperator && (
                             <button
                                 type="button"
-                                onClick={handleCreate}
+                                        onClick={handleCreateGuru}
                                 className="mt-2 flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
                             >
                                 <Plus size={13} />
@@ -360,14 +666,12 @@ export default function DaftarGuru() {
                                         </th>
                                         <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
                                             Mata Pelajaran
-                                        </th>
-
+                                                    </th>
                                         {isSmk && (
                                             <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
                                                 Jurusan
                                             </th>
-                                        )}
-
+                                                    )}
                                         <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
                                             Status
                                         </th>
@@ -396,9 +700,7 @@ export default function DaftarGuru() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
                                                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-[11px] font-black text-[#0AC4E0]">
-                                                            {getGuruName(item)
-                                                                ?.charAt(0)
-                                                                ?.toUpperCase() || "G"}
+                                                            {getGuruName(item)?.charAt(0)?.toUpperCase() || "G"}
                                                         </div>
 
                                                         <div>
@@ -426,37 +728,18 @@ export default function DaftarGuru() {
                                                     </div>
                                                 </td>
 
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                                                        <BookOpen size={12} className="text-slate-300" />
-                                                        {getGuruMapel(item)}
-                                                    </div>
+                                                <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                                                    {getGuruMapel(item)}
                                                 </td>
 
                                                 {isSmk && (
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
-                                                            <GraduationCap
-                                                                size={12}
-                                                                className="text-slate-300"
-                                                            />
-                                                            {getGuruJurusanLabel(item)}
-                                                        </div>
+                                                    <td className="px-6 py-4 text-[10px] font-bold text-slate-500">
+                                                        {getGuruJurusanLabel(item)}
                                                     </td>
                                                 )}
 
                                                 <td className="px-6 py-4">
-                                                    {active ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-500">
-                                                            <CheckCircle2 size={11} />
-                                                            Aktif
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-rose-400">
-                                                            <XCircle size={11} />
-                                                            Nonaktif
-                                                        </span>
-                                                    )}
+                                                    <StatusBadge active={active} />
                                                 </td>
 
                                                 <td className="px-6 py-4 text-[10px] font-bold text-slate-400">
@@ -467,7 +750,7 @@ export default function DaftarGuru() {
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleDetail(item)}
+                                                            onClick={() => handleDetailGuru(item)}
                                                             className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 transition hover:text-[#0AC4E0]"
                                                             title="Detail"
                                                         >
@@ -477,7 +760,7 @@ export default function DaftarGuru() {
                                                         {isOperator && (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleEdit(item)}
+                                                                onClick={() => handleEditGuru(item)}
                                                                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0] transition hover:bg-[#0AC4E0] hover:text-white"
                                                                 title="Edit"
                                                             >

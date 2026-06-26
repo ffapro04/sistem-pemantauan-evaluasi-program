@@ -37,6 +37,7 @@ import {
 } from "recharts";
 import { toast } from "react-toastify";
 import { Sidebar, PageWrapper } from "../common";
+import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = (
     import.meta.env.VITE_API_URL ||
@@ -47,55 +48,21 @@ const API_BASE_URL = (
 const PAGE_SIZE = 5;
 
 const COLORS = {
-    cyan: "#0AC4E0",
-    blue: "#3B82F6",
-    violet: "#8B5CF6",
-    pink: "#EC4899",
-    amber: "#F59E0B",
-    emerald: "#10B981",
-    orange: "#F97316",
-    indigo: "#6366F1",
-    red: "#EF4444",
+    cyan: CHART_STATUS_COLORS.info,
+    blue: CHART_STATUS_COLORS.info,
+    violet: CHART_STATUS_COLORS.deep,
+    pink: CHART_STATUS_COLORS.purple,
+    amber: CHART_STATUS_COLORS.warning,
+    emerald: CHART_STATUS_COLORS.success,
+    orange: CHART_STATUS_COLORS.orange,
+    indigo: CHART_STATUS_COLORS.deep,
+    red: CHART_STATUS_COLORS.danger,
     slate: "#64748B",
 };
 
-const DISTRICT_CHART_COLORS = [
-    "#0AC4E0",
-    "#7C3AED",
-    "#F59E0B",
-    "#E11D48",
-    "#2563EB",
-    "#059669",
-    "#EA580C",
-    "#DB2777",
-    "#4F46E5",
-    "#65A30D",
-    "#0891B2",
-    "#9333EA",
-    "#B45309",
-    "#DC2626",
-    "#0F766E",
-    "#475569",
-];
+const DISTRICT_CHART_COLORS = CHART_PALETTE;
 
-const SCHOOL_BAR_COLORS = [
-    "#0AC4E0",
-    "#7C3AED",
-    "#F59E0B",
-    "#E11D48",
-    "#2563EB",
-    "#059669",
-    "#EA580C",
-    "#DB2777",
-    "#4F46E5",
-    "#84CC16",
-    "#0891B2",
-    "#A855F7",
-    "#D97706",
-    "#DC2626",
-    "#0F766E",
-    "#334155",
-];
+const SCHOOL_BAR_COLORS = CHART_PALETTE;
 
 
 const PROGRAM_STATUS_ORDER = [
@@ -782,9 +749,13 @@ function getProgramCategoryLabel(value) {
 
 function getProgramPillar(program = {}) {
     const value = normalizeValue(
+        program?.pilar_program ||
+        program?.pilarProgram ||
         program?.pilar ||
         program?.kategori_pilar ||
+        program?.kategoriPilar ||
         program?.sub_kategori ||
+        program?.subKategori ||
         program?.subkategori ||
         program?.jenis_non_akademik ||
         program?.program_pilar ||
@@ -2649,7 +2620,7 @@ function AODashboardPage({
 
             <main className="min-h-screen w-full pt-[76px]">
                 <header className="border-b border-slate-200 bg-white">
-                    <div className="mx-auto flex max-w-[1560px] flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+                    <div className="flex w-full flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
                         <div className="flex min-w-0 items-center gap-4">
                             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-[0_12px_26px_rgba(10,196,224,0.22)]">
                                 <MapPinned size={22} />
@@ -2687,7 +2658,7 @@ function AODashboardPage({
                     </div>
                 </header>
 
-                <section className="mx-auto max-w-[1560px] space-y-6 px-5 py-6 lg:px-8">
+                <section className="w-full space-y-6 px-5 py-6 lg:px-8">
                     {errorMessage && (
                         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-700">
                             <AlertTriangle

@@ -34,6 +34,12 @@ import {
 
 import Sidebar from "../../../components/Sidebar";
 import PageWrapper from "../../../components/PageWrapper";
+import Dropdown from "../../../components/Dropdown";
+import {
+  CHART_PALETTE,
+  CHART_STATUS_COLORS,
+  getChartPaletteColor,
+} from "../../../utils/chartPalette";
 import {
   CircleMarker,
   MapContainer,
@@ -117,18 +123,18 @@ function createKabupatenMarkerIcon(name, totalSchools = 0, active = false) {
 }
 
 const WARNA = {
-  cyan: "#0AC4E0",
-  cyanTua: "#0891B2",
-  biru: "#3B82F6",
-  ungu: "#8B5CF6",
-  pink: "#EC4899",
-  merah: "#EF4444",
-  amber: "#F59E0B",
-  hijau: "#10B981",
-  emerald: "#059669",
-  indigo: "#6366F1",
-  orange: "#F97316",
-  slate: "#64748B",
+  cyan: CHART_STATUS_COLORS.info,
+  cyanTua: CHART_STATUS_COLORS.deep,
+  biru: CHART_STATUS_COLORS.info,
+  ungu: CHART_STATUS_COLORS.deep,
+  pink: CHART_STATUS_COLORS.purple,
+  merah: CHART_STATUS_COLORS.danger,
+  amber: CHART_STATUS_COLORS.warning,
+  hijau: CHART_STATUS_COLORS.success,
+  emerald: CHART_STATUS_COLORS.success,
+  indigo: CHART_STATUS_COLORS.deep,
+  orange: CHART_STATUS_COLORS.orange,
+  slate: CHART_STATUS_COLORS.deep,
 };
 
 const ROLE_LABEL = {
@@ -144,29 +150,18 @@ const ROLE_LABEL = {
 };
 
 const ROLE_COLOR = {
-  1: WARNA.slate,
-  2: WARNA.cyan,
-  3: WARNA.biru,
-  4: WARNA.ungu,
-  5: WARNA.hijau,
-  6: WARNA.orange,
-  7: WARNA.pink,
-  8: WARNA.indigo,
-  9: WARNA.amber,
+  1: getChartPaletteColor(4),
+  2: getChartPaletteColor(3),
+  3: getChartPaletteColor(5),
+  4: getChartPaletteColor(2),
+  5: getChartPaletteColor(7),
+  6: getChartPaletteColor(0),
+  7: getChartPaletteColor(1),
+  8: getChartPaletteColor(6),
+  9: getChartPaletteColor(4),
 };
 
-const WARNA_DIAGRAM = [
-  WARNA.cyan,
-  WARNA.biru,
-  WARNA.ungu,
-  WARNA.pink,
-  WARNA.hijau,
-  WARNA.amber,
-  WARNA.orange,
-  WARNA.indigo,
-  WARNA.merah,
-  WARNA.slate,
-];
+const WARNA_DIAGRAM = CHART_PALETTE;
 
 const STATUS_FILTERS = [
   { label: "Semua", value: "SEMUA" },
@@ -314,15 +309,44 @@ async function safeJson(response) {
   }
 }
 
+function withFreshParam(endpoint) {
+  const separator = endpoint.includes("?") ? "&" : "?";
+  return `${endpoint}${separator}_ts=${Date.now()}`;
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        ...(options.headers || {}),
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+      },
+    });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function ambilDataDenganFallback(endpointList, headers = {}) {
   for (const endpoint of endpointList) {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers });
+      const response = await fetchWithTimeout(
+        `${API_BASE_URL}${withFreshParam(endpoint)}`,
+        { headers },
+      );
       if (!response.ok) continue;
 
       const payload = await safeJson(response);
       return ambilArray(payload);
-    } catch {
+    } catch (error) {
+      console.warn(`Endpoint dashboard admin gagal: ${endpoint}`, error);
       // lanjut endpoint berikutnya
     }
   }
@@ -1048,8 +1072,11 @@ function ambilKategoriProgram(program) {
   if (program?._resolved_program_category) return program._resolved_program_category;
 
   return normalisasiKategoriVendor(
-    program?.kategori ||
+    program?.pilar_program ||
+    program?.pilarProgram ||
+    program?.sub_kategori ||
     program?.kategori_program ||
+    program?.kategori ||
     program?.jenis ||
     program?.tipe ||
     "",
@@ -1202,6 +1229,42 @@ function resolveNamaWilayahUser(user, wilayahMap) {
   const direct = ambilNamaWilayah(user);
 
   return dariMap || (direct !== "-" ? direct : "Belum Dipetakan");
+}
+
+function ambilAreaWilayah(wilayah = {}) {
+  return nilaiTampil(
+    wilayah?.area_wilayah,
+    wilayah?.areaWilayah,
+    wilayah?.nama_area,
+    wilayah?.area,
+    wilayah?.area_binaan,
+    "Belum Ada Area",
+  );
+}
+
+function collectAreaBinaanUser(user, wilayahMap) {
+  const ids = collectWilayahIds(user);
+  const areaFromIds = ids
+    .map((id) => wilayahMap.get(String(id)))
+    .map(ambilAreaWilayah)
+    .filter((area) => area && area !== "Belum Ada Area");
+
+  const directAreas = [
+    user?.area_wilayah,
+    user?.areaWilayah,
+    user?.nama_area,
+    user?.area_binaan,
+    typeof user?.area === "string" ? user.area : null,
+  ]
+    .map((area) => String(area || "").trim())
+    .filter(Boolean);
+
+  return [...new Set([...areaFromIds, ...directAreas])];
+}
+
+function resolveAreaBinaanUser(user, wilayahMap) {
+  const areas = collectAreaBinaanUser(user, wilayahMap);
+  return areas.length ? areas.join(", ") : "Belum Ada Area";
 }
 
 function resolveNamaWilayahSekolah(sekolah, wilayahMap) {
@@ -3661,6 +3724,7 @@ export default function DashboardAdmin() {
   const [roleExplorerFilter, setRoleExplorerFilter] = useState("SEMUA");
   const [hoFilter, setHoFilter] = useState("SEMUA");
   const [aoFilter, setAoFilter] = useState("SEMUA");
+  const [aoAreaFilter, setAoAreaFilter] = useState("SEMUA");
   const [kadinFilter, setKadinFilter] = useState("SEMUA");
   const [vendorFilter, setVendorFilter] = useState("SEMUA");
   const [operatorFilter, setOperatorFilter] = useState("SEMUA");
@@ -3679,12 +3743,20 @@ export default function DashboardAdmin() {
 
     try {
       const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const headers = token
+        ? {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+        }
+        : {
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+        };
 
       const [
         userData,
         aoData,
-        kepalaDinasData,
         wilayahData,
         schoolData,
         vendorData,
@@ -3697,7 +3769,6 @@ export default function DashboardAdmin() {
       ] = await Promise.all([
         ambilDataDenganFallback(["/users"], headers),
         ambilDataDenganFallback(["/users/ao"], headers),
-        ambilDataDenganFallback(["/kepala-dinas", "/kadin"], headers),
         ambilDataDenganFallback(["/wilayah"], headers),
         ambilDataDenganFallback(["/sekolah"], headers),
         ambilDataDenganFallback(["/vendor"], headers),
@@ -3730,7 +3801,6 @@ export default function DashboardAdmin() {
 
       const mergedUsers = mergeUsersWithRoleData(userData, [
         { roleId: 4, data: aoData },
-        { roleId: 7, data: kepalaDinasData },
       ]);
 
       const mergedVendors = mergeVendorsWithCategoryHints(
@@ -3753,7 +3823,12 @@ export default function DashboardAdmin() {
       setAgendas(agendaData);
     } catch (error) {
       console.error("Dashboard Admin Error:", error);
-      alert(error.message || "Gagal memuat Dashboard Admin");
+      setUsers([]);
+      setWilayah([]);
+      setSchools([]);
+      setVendors([]);
+      setPrograms([]);
+      setAgendas([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -3992,10 +4067,40 @@ export default function DashboardAdmin() {
 
   const aoTableData = useMemo(() => {
     return areaOfficer.filter((item) => {
-      if (aoFilter === "SEMUA") return true;
-      return AssignmentStatus(item, wilayahMap) === aoFilter;
+      const statusMatch =
+        aoFilter === "SEMUA" || AssignmentStatus(item, wilayahMap) === aoFilter;
+      const areaMatch =
+        aoAreaFilter === "SEMUA" ||
+        collectAreaBinaanUser(item, wilayahMap).some(
+          (area) => String(area) === String(aoAreaFilter),
+        );
+
+      return statusMatch && areaMatch;
     });
-  }, [areaOfficer, aoFilter, wilayahMap]);
+  }, [areaOfficer, aoFilter, aoAreaFilter, wilayahMap]);
+
+  const aoAreaOptions = useMemo(() => {
+    const areas = [
+      ...new Set(
+        areaOfficer.flatMap((item) => collectAreaBinaanUser(item, wilayahMap)),
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+
+    return [
+      { value: "SEMUA", label: "Semua Area Binaan" },
+      ...areas.map((area) => ({
+        value: area,
+        label: area,
+      })),
+    ];
+  }, [areaOfficer, wilayahMap]);
+
+  useEffect(() => {
+    const stillExists = aoAreaOptions.some(
+      (item) => String(item.value) === String(aoAreaFilter),
+    );
+    if (!stillExists) setAoAreaFilter("SEMUA");
+  }, [aoAreaFilter, aoAreaOptions]);
 
   const aoChartData = useMemo(() => {
     return warnaDataKonsisten(
@@ -4674,12 +4779,26 @@ export default function DashboardAdmin() {
               chartTitle="Status Pemetaan AO"
               tableTitle="List Area Officer"
               filters={
-                <FilterButtonGroup
-                  options={ASSIGNMENT_FILTERS}
-                  value={aoFilter}
-                  onChange={setAoFilter}
-                  dark
-                />
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                  <FilterButtonGroup
+                    options={ASSIGNMENT_FILTERS}
+                    value={aoFilter}
+                    onChange={setAoFilter}
+                    dark
+                  />
+                  <label className="flex min-w-[220px] flex-col gap-1">
+                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                      Area Binaan
+                    </span>
+                    <Dropdown
+                      value={aoAreaFilter}
+                      items={aoAreaOptions}
+                      onChange={setAoAreaFilter}
+                      placeholder="Semua Area Binaan"
+                      width="w-full"
+                    />
+                  </label>
+                </div>
               }
               chart={
                 <PieWithLegend
@@ -4692,9 +4811,9 @@ export default function DashboardAdmin() {
                 <TableMini
                   data={aoTableData}
                   getSearchText={(user) =>
-                    `${ambilNamaUser(user)} ${user?.email || ""} ${resolveNamaWilayahUser(user, wilayahMap)} ${statusLabel(user)}`
+                    `${ambilNamaUser(user)} ${user?.email || ""} ${resolveNamaWilayahUser(user, wilayahMap)} ${resolveAreaBinaanUser(user, wilayahMap)} ${statusLabel(user)}`
                   }
-                  searchPlaceholder="Cari nama, email, wilayah, atau status..."
+                  searchPlaceholder="Cari nama, email, wilayah, area, atau status..."
                   emptyText="Belum ada AO sesuai filter"
                   columns={[
                     {
@@ -4709,6 +4828,15 @@ export default function DashboardAdmin() {
                             {ambilEmail(user)}
                           </p>
                         </div>
+                      ),
+                    },
+                    {
+                      key: "area",
+                      label: "Area",
+                      render: (user) => (
+                        <p className="max-w-[120px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
+                          {resolveAreaBinaanUser(user, wilayahMap)}
+                        </p>
                       ),
                     },
                     {
