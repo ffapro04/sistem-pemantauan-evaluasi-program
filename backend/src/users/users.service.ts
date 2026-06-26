@@ -533,6 +533,36 @@ export class UsersService {
     return hydratedUsers;
   }
 
+  async getUsersByRoleIds(roleIds: number[]) {
+    const normalizedRoleIds = [
+      ...new Set(
+        roleIds
+          .map((roleId) => Number(roleId))
+          .filter((roleId) => Number.isFinite(roleId) && roleId > 0),
+      ),
+    ];
+
+    if (!normalizedRoleIds.length) {
+      return [];
+    }
+
+    const users = await this.userRepo.find({
+      where: {
+        id_role: In(normalizedRoleIds),
+      },
+      relations: ['role', 'wilayah', 'sekolah'],
+      order: {
+        nama: 'ASC',
+      },
+    });
+
+    const hydratedUsers = await Promise.all(
+      users.map((user) => this.hydrateKepalaDinasWilayah(user)),
+    );
+
+    return hydratedUsers;
+  }
+
   async findByEmail(email: string) {
     const user = await this.userRepo
       .createQueryBuilder('user')

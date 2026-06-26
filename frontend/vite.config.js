@@ -3,10 +3,21 @@ import react from "@vitejs/plugin-react";
 
 const backendTarget = "http://localhost:3000";
 
+const bypassSpaNavigation = (req) => {
+  const accept = String(req.headers.accept || "");
+
+  if (accept.includes("text/html")) {
+    return req.url;
+  }
+
+  return undefined;
+};
+
 const proxyTarget = {
   target: backendTarget,
   changeOrigin: true,
   secure: false,
+  bypass: bypassSpaNavigation,
 };
 
 export default defineConfig({

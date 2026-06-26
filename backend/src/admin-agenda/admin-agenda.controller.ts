@@ -162,7 +162,7 @@ export class AdminAgendaController {
     return this.adminAgendaService.findAll(getIdentity(req, authHeader));
   }
 
-  @Get(':id')
+  @Get(':id(\\d+)')
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,
@@ -180,7 +180,7 @@ export class AdminAgendaController {
     return this.adminAgendaService.create(dto, getIdentity(req, authHeader));
   }
 
-  @Patch(':id/status')
+  @Patch(':id(\\d+)/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminAgendaStatusDto,
@@ -194,7 +194,7 @@ export class AdminAgendaController {
     );
   }
 
-  @Patch(':id')
+  @Patch(':id(\\d+)')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminAgendaDto,
@@ -208,7 +208,7 @@ export class AdminAgendaController {
     );
   }
 
-  @Delete(':id')
+  @Delete(':id(\\d+)')
   remove(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,

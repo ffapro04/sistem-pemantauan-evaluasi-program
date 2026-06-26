@@ -100,11 +100,40 @@ export class UsersController {
     return this.usersService.getUsersByRole('PENGURUS');
   }
 
+  @Get('kadin')
+  getKadinUsers() {
+    return this.usersService.getUsersByRoleIds([7]);
+  }
+
+  @Get('kepala-dinas')
+  getKepalaDinasUsers() {
+    return this.usersService.getUsersByRoleIds([7]);
+  }
+
+  @Get('sekolah')
+  getSekolahUsers() {
+    return this.usersService.getUsersByRoleIds([5, 9]);
+  }
+
+  @Get('operator-sekolah')
+  getOperatorSekolahUsers() {
+    return this.usersService.getUsersByRoleIds([5, 9]);
+  }
+
   @Get('kepala-sekolah')
   @UseGuards(JwtAuthGuard)
   findAllKepalaSekolah(@Req() req: any) {
     const currentUser = req?.user?.user ?? req?.user;
     return this.usersService.findAllKepalaSekolah(currentUser);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  getMe(@Req() req: any) {
+    const currentUser = req?.user?.user ?? req?.user;
+    return this.usersService.findOne(
+      Number(currentUser?.id_user || currentUser?.sub || currentUser?.id || 0),
+    );
   }
 
   @Get('kepala-sekolah/sekolah/:id_sekolah')
@@ -124,7 +153,7 @@ export class UsersController {
     return this.usersService.createKepalaSekolah(currentUser, body);
   }
 
-  @Patch('kepala-sekolah/:id')
+  @Patch('kepala-sekolah/:id(\\d+)')
   @UseGuards(JwtAuthGuard)
   updateKepalaSekolah(
     @Req() req: any,
@@ -135,7 +164,7 @@ export class UsersController {
     return this.usersService.updateKepalaSekolah(currentUser, id, body);
   }
 
-  @Patch('kepala-sekolah/:id/reset-password')
+  @Patch('kepala-sekolah/:id(\\d+)/reset-password')
   @UseGuards(JwtAuthGuard)
   resetPasswordKepalaSekolah(
     @Req() req: any,
@@ -188,12 +217,12 @@ export class UsersController {
     );
   }
 
-  @Get(':id')
+  @Get(':id(\\d+)')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch(':id(\\d+)')
   @UseInterceptors(userPhotoInterceptor)
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -203,7 +232,7 @@ export class UsersController {
     return this.usersService.update(id, this.mergeUploadedPhoto(body, file));
   }
 
-  @Delete(':id')
+  @Delete(':id(\\d+)')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.remove(id);
   }

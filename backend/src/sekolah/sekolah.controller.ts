@@ -100,12 +100,12 @@ export class SekolahController {
     return this.sekolahService.findAll();
   }
 
-  @Get(':id')
+  @Get(':id(\\d+)')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.sekolahService.findOne(id);
   }
 
-  @Patch(':id/statistik')
+  @Patch(':id(\\d+)/statistik')
   updateStatistikSekolah(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
@@ -113,7 +113,7 @@ export class SekolahController {
     return this.sekolahService.updateStatistikSekolah(id, body);
   }
 
-  @Patch(':id')
+  @Patch(':id(\\d+)')
   @UseInterceptors(
     FileInterceptor('logo', {
       storage: sekolahLogoStorage,
@@ -138,7 +138,7 @@ export class SekolahController {
     return this.sekolahService.update(id, updateSekolahDto, file);
   }
 
-  @Delete(':id')
+  @Delete(':id(\\d+)')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.sekolahService.remove(id);
   }
