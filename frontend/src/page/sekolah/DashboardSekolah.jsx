@@ -567,8 +567,8 @@ function ProgramCompositionChart({ rows, total }) {
     if (!rows.length) return <EmptyProgramState />;
 
     return (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-            <div className="relative h-[300px] rounded-[1.6rem] border border-slate-100 bg-white p-4">
+        <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+            <div className="relative h-[300px] min-h-[300px] min-w-0 rounded-[1.6rem] border border-slate-100 bg-white p-4">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
@@ -610,7 +610,7 @@ function ProgramCompositionChart({ rows, total }) {
                 </div>
             </div>
 
-            <div className="h-[300px] rounded-[1.6rem] border border-slate-100 bg-white p-4">
+            <div className="h-[300px] min-h-[300px] min-w-0 rounded-[1.6rem] border border-slate-100 bg-white p-4">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                         data={rows}
@@ -895,6 +895,7 @@ export default function DashboardSekolah() {
     const [user, setUser] = useState(null);
     const [sekolah, setSekolah] = useState(null);
     const [programs, setPrograms] = useState([]);
+    const [guruList, setGuruList] = useState([]);
     const [loadingSekolah, setLoadingSekolah] = useState(false);
     const [loadingProgram, setLoadingProgram] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -906,6 +907,7 @@ export default function DashboardSekolah() {
     const [editingJumlahSiswa, setEditingJumlahSiswa] = useState(false);
     const [jumlahSiswaDraft, setJumlahSiswaDraft] = useState("");
     const [savingJumlahSiswa, setSavingJumlahSiswa] = useState(false);
+    const idSekolahAktif = useMemo(() => getSekolahIdFromToken(user), [user]);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -921,9 +923,7 @@ export default function DashboardSekolah() {
     }, []);
 
     const fetchSekolah = async () => {
-        const idSekolah = getSekolahIdFromToken(user);
-
-        console.log("ID SEKOLAH DARI TOKEN:", idSekolah);
+        const idSekolah = Number(idSekolahAktif || 0);
 
         if (!idSekolah) return;
 
@@ -941,12 +941,7 @@ export default function DashboardSekolah() {
                 },
             );
 
-            const dataSekolah = response.data?.data || response.data;
-
-            console.log("DATA SEKOLAH DASHBOARD:", dataSekolah);
-            console.log("TAHUN BINAAN DASHBOARD:", dataSekolah?.tahun_binaan);
-
-            setSekolah(dataSekolah);
+            setSekolah(response.data?.data || response.data);
         } catch (error) {
             console.warn("Gagal mengambil detail sekolah:", error);
             setSekolah(null);
@@ -956,7 +951,7 @@ export default function DashboardSekolah() {
     };
 
     const fetchProgramSekolah = async () => {
-        const idSekolah = getSekolahIdFromToken(user);
+        const idSekolah = Number(idSekolahAktif || 0);
 
         if (!idSekolah) return;
 
@@ -981,8 +976,30 @@ export default function DashboardSekolah() {
         }
     };
 
+    const fetchGuruSekolah = async () => {
+        const idSekolah = Number(idSekolahAktif || 0);
+
+        if (!idSekolah) return;
+
+        try {
+            const response = await axios.get(
+                `${API_BASE_URL}/assessment-guru/sekolah/${idSekolah}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                    },
+                },
+            );
+
+            setGuruList(normalizeArray(response.data));
+        } catch (error) {
+            console.warn("Gagal mengambil guru sekolah:", error);
+            setGuruList([]);
+        }
+    };
+
     const fetchJurusanSekolah = async () => {
-        const idSekolah = getSekolahIdFromToken(user);
+        const idSekolah = Number(idSekolahAktif || 0);
 
         if (!idSekolah) return;
 
@@ -1017,16 +1034,18 @@ export default function DashboardSekolah() {
     };
 
     const refreshDashboard = async () => {
+        if (!Number(idSekolahAktif || 0)) return;
+
         await Promise.all([
             fetchSekolah(),
             fetchProgramSekolah(),
-            fetchJurusanSekolah(),
+            fetchGuruSekolah(),
         ]);
     };
 
     useEffect(() => {
         refreshDashboard();
-    }, [user?.id_sekolah, user?.sekolah_id, user?.school_id]);
+    }, [idSekolahAktif]);
 
     const roleId = Number(user?.id_role);
     const isGuru = roleId === 8;
@@ -1040,6 +1059,19 @@ export default function DashboardSekolah() {
         user?.school?.jenjang ||
         "",
     ).toUpperCase();
+    const isSmkSekolah = jenjang === "SMK" || jenjang.includes("SMK");
+
+    useEffect(() => {
+        if (!Number(idSekolahAktif || 0)) return;
+
+        if (!isSmkSekolah) {
+            setJurusanList([]);
+            setSelectedJurusanId("");
+            return;
+        }
+
+        fetchJurusanSekolah();
+    }, [idSekolahAktif, isSmkSekolah]);
 
     const roleLabel = isGuru
         ? "Guru Assessment"
@@ -1060,6 +1092,20 @@ export default function DashboardSekolah() {
             (item) => String(item.id_jurusan) === String(selectedJurusanId),
         );
     }, [jurusanList, selectedJurusanId]);
+
+    const selectedJurusanTeachers = useMemo(() => {
+        if (!selectedJurusanId) return [];
+
+        return guruList.filter((guru) => {
+            const guruJurusanId =
+                guru?.id_jurusan ||
+                guru?.jurusan_data?.id_jurusan ||
+                guru?.jurusan?.id_jurusan ||
+                "";
+
+            return String(guruJurusanId) === String(selectedJurusanId);
+        });
+    }, [guruList, selectedJurusanId]);
 
     const programStats = useMemo(() => {
         return programs.reduce(
@@ -1614,6 +1660,57 @@ export default function DashboardSekolah() {
                                                     {selectedJurusan.deskripsi ||
                                                         "Belum ada deskripsi jurusan. Tambahkan deskripsi melalui Master Jurusan."}
                                                 </p>
+
+                                                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                                                    <div className="mb-3 flex items-center justify-between gap-3">
+                                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                            Guru Terhubung
+                                                        </p>
+                                                        <span className="rounded-full bg-white px-3 py-1 text-[9px] font-black text-slate-500 shadow-sm">
+                                                            {selectedJurusanTeachers.length} Guru
+                                                        </span>
+                                                    </div>
+
+                                                    {selectedJurusanTeachers.length ? (
+                                                        <div className="grid gap-2">
+                                                            {selectedJurusanTeachers.map((guru) => (
+                                                                <div
+                                                                    key={
+                                                                        guru.id_guru_assessment ||
+                                                                        guru.id_user ||
+                                                                        guru.email_guru
+                                                                    }
+                                                                    className="flex flex-col gap-2 rounded-xl border border-white bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                                                                >
+                                                                    <div className="min-w-0">
+                                                                        <p className="truncate text-xs font-black text-slate-800">
+                                                                            {guru.nama_guru || guru.nama || "Guru"}
+                                                                        </p>
+                                                                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
+                                                                            {guru.email_guru || guru.email || "-"}
+                                                                        </p>
+                                                                    </div>
+
+                                                                    <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase tracking-wider">
+                                                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-600">
+                                                                            {guru.mata_pelajaran || "Mapel belum diisi"}
+                                                                        </span>
+                                                                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-600">
+                                                                            {guru.kelas_data?.nama_kelas ||
+                                                                                guru.nama_kelas ||
+                                                                                guru.kelas_wali ||
+                                                                                "Kelas belum diisi"}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-400">
+                                                            Belum ada guru yang tersambung ke jurusan ini.
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>

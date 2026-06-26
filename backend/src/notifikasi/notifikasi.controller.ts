@@ -132,7 +132,7 @@ export class NotifikasiController {
     );
   }
 
-  @Patch(':id/read')
+  @Patch(':id(\\d+)/read')
   markAsRead(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: any,
