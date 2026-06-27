@@ -5,8 +5,6 @@ import {
     Building2,
     CheckCircle2,
     ClipboardCheck,
-    Clock,
-    FileText,
     FolderKanban,
     Loader2,
     Mail,
@@ -20,16 +18,25 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import Sidebar from "../../components/Sidebar";
 
-const API_BASE_URL = "";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 function normalizeArray(payload) {
-    if (Array.isArray(payload?.data)) return payload.data;
     if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    if (Array.isArray(payload?.data?.data)) return payload.data.data;
     if (Array.isArray(payload?.program)) return payload.program;
     if (Array.isArray(payload?.programs)) return payload.programs;
+    if (Array.isArray(payload?.data?.program)) return payload.data.program;
+    if (Array.isArray(payload?.data?.programs)) return payload.data.programs;
     if (Array.isArray(payload?.assessment)) return payload.assessment;
     if (Array.isArray(payload?.assessments)) return payload.assessments;
+    if (Array.isArray(payload?.data?.assessment)) return payload.data.assessment;
+    if (Array.isArray(payload?.data?.assessments)) return payload.data.assessments;
     return [];
+}
+
+function unwrapPayload(payload) {
+    return payload?.data || payload;
 }
 
 function getSchoolName(school) {
@@ -59,6 +66,8 @@ function getWilayahName(school) {
     return (
         school?.wilayah?.nama_wilayah?.split("/")?.filter(Boolean)?.pop() ||
         school?.nama_wilayah ||
+        school?.wilayah_nama ||
+        school?.wilayah?.nama ||
         "Wilayah"
     );
 }
@@ -98,21 +107,31 @@ function getAllRequirements(program) {
     const periods = Array.isArray(program?.fases) ? program.fases : [];
 
     return periods.flatMap((period) => {
-        const openingRequirements = normalizeArray(period?.termin || period?.termins || period?.t_termin)
-            .flatMap((termin) => normalizeArray(
+        const openingRequirements = normalizeArray(
+            period?.termin ||
+            period?.termins ||
+            period?.t_termin,
+        ).flatMap((termin) =>
+            normalizeArray(
                 termin?.persyaratan ||
                 termin?.persyaratan_termin ||
                 termin?.requirements ||
                 termin?.t_persyaratan_termin,
-            ));
+            ),
+        );
 
-        const activityRequirements = normalizeArray(period?.kegiatans || period?.kegiatan || period?.t_kegiatans)
-            .flatMap((activity) => normalizeArray(
+        const activityRequirements = normalizeArray(
+            period?.kegiatans ||
+            period?.kegiatan ||
+            period?.t_kegiatans,
+        ).flatMap((activity) =>
+            normalizeArray(
                 activity?.persyaratan ||
                 activity?.persyaratan_kegiatan ||
                 activity?.requirements ||
                 activity?.t_persyaratan_kegiatan,
-            ));
+            ),
+        );
 
         return [...openingRequirements, ...activityRequirements];
     });
@@ -121,13 +140,28 @@ function getAllRequirements(program) {
 function getProgramProgress(program) {
     const requirements = getAllRequirements(program);
     const total = requirements.length;
-    const approved = requirements.filter((item) => getRequirementStatus(item) === "APPROVED").length;
-    const waitingAo = requirements.filter((item) => getRequirementStatus(item) === "WAITING_AO").length;
-    const waitingHo = requirements.filter((item) => getRequirementStatus(item) === "WAITING_HO").length;
-    const rejected = requirements.filter((item) =>
-        ["REJECTED", "REJECTED_AO", "REJECTED_HO"].includes(getRequirementStatus(item)),
+
+    const approved = requirements.filter(
+        (item) => getRequirementStatus(item) === "APPROVED",
     ).length;
-    const waitingUpload = requirements.filter((item) => getRequirementStatus(item) === "WAITING_UPLOAD").length;
+
+    const waitingAo = requirements.filter(
+        (item) => getRequirementStatus(item) === "WAITING_AO",
+    ).length;
+
+    const waitingHo = requirements.filter(
+        (item) => getRequirementStatus(item) === "WAITING_HO",
+    ).length;
+
+    const rejected = requirements.filter((item) =>
+        ["REJECTED", "REJECTED_AO", "REJECTED_HO"].includes(
+            getRequirementStatus(item),
+        ),
+    ).length;
+
+    const waitingUpload = requirements.filter(
+        (item) => getRequirementStatus(item) === "WAITING_UPLOAD",
+    ).length;
 
     return {
         total,
@@ -162,12 +196,17 @@ function StatusBadge({ status }) {
             ? "border-red-100 bg-red-50 text-red-500"
             : lower.includes("ao")
                 ? "border-sky-100 bg-sky-50 text-sky-600"
-                : lower.includes("ho") || lower.includes("upload") || lower.includes("approval") || lower.includes("menunggu")
+                : lower.includes("ho") ||
+                    lower.includes("upload") ||
+                    lower.includes("approval") ||
+                    lower.includes("menunggu")
                     ? "border-amber-100 bg-amber-50 text-amber-600"
                     : "border-cyan-100 bg-cyan-50 text-cyan-600";
 
     return (
-        <span className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${className}`}>
+        <span
+            className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${className}`}
+        >
             {normalized}
         </span>
     );
@@ -237,23 +276,37 @@ export default function DetailSekolahKepalaDinas() {
         try {
             const token = localStorage.getItem("token");
 
-            const response = await fetch(
-                `${API_BASE_URL}/kepala-dinas/sekolah/${id}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                },
-            );
+            const headers = token
+                ? {
+                    Authorization: `Bearer ${token}`,
+                }
+                : {};
 
-            const payload = await response.json().catch(() => ({}));
+            const fetchJson = async (url) => {
+                const response = await fetch(url, { headers });
+                const payload = await response.json().catch(() => ({}));
 
-            if (!response.ok) {
-                throw new Error(payload?.message || "Gagal memuat detail sekolah");
-            }
+                if (!response.ok) {
+                    throw new Error(payload?.message || `Gagal memuat data dari ${url}`);
+                }
 
-            const rawPrograms = normalizeArray(payload?.program || payload?.programs);
-            const headers = { Authorization: `Bearer ${token}` };
+                return unwrapPayload(payload);
+            };
+
+            const [schoolPayload, programPayload, assessmentPayload] =
+                await Promise.all([
+                    fetchJson(`${API_BASE_URL}/sekolah/${id}`),
+                    fetchJson(`${API_BASE_URL}/program/sekolah/${id}`).catch((error) => {
+                        console.warn("Gagal memuat program sekolah:", error);
+                        return [];
+                    }),
+                    fetchJson(`${API_BASE_URL}/assessment/sekolah/${id}`).catch((error) => {
+                        console.warn("Gagal memuat assessment sekolah:", error);
+                        return [];
+                    }),
+                ]);
+
+            const rawPrograms = normalizeArray(programPayload);
 
             const detailedPrograms = await Promise.all(
                 rawPrograms.map(async (program) => {
@@ -262,26 +315,35 @@ export default function DetailSekolahKepalaDinas() {
                     if (!programId) return program;
 
                     try {
-                        const detailResponse = await fetch(`${API_BASE_URL}/program/${programId}`, {
-                            headers,
-                        });
+                        const detailResponse = await fetch(
+                            `${API_BASE_URL}/program/${programId}`,
+                            { headers },
+                        );
 
-                        const detailPayload = await detailResponse.json().catch(() => ({}));
+                        const detailPayload = await detailResponse
+                            .json()
+                            .catch(() => ({}));
 
                         if (!detailResponse.ok) return program;
 
-                        return detailPayload?.data || detailPayload || program;
-                    } catch {
+                        return unwrapPayload(detailPayload) || program;
+                    } catch (error) {
+                        console.warn(`Gagal memuat detail program ${programId}:`, error);
                         return program;
                     }
                 }),
             );
 
-            setSchool(payload?.sekolah || payload?.school || payload);
+            const schoolData =
+                schoolPayload?.sekolah ||
+                schoolPayload?.school ||
+                schoolPayload?.data?.sekolah ||
+                schoolPayload?.data?.school ||
+                schoolPayload;
+
+            setSchool(schoolData);
             setPrograms(detailedPrograms);
-            setAssessments(
-                normalizeArray(payload?.assessment || payload?.assessments),
-            );
+            setAssessments(normalizeArray(assessmentPayload));
         } catch (error) {
             console.error("Detail sekolah Kepala Dinas error:", error);
             setSchool(null);
@@ -295,6 +357,7 @@ export default function DetailSekolahKepalaDinas() {
 
     useEffect(() => {
         fetchDetail();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     const activePrograms = useMemo(() => {
@@ -379,7 +442,10 @@ export default function DetailSekolahKepalaDinas() {
                                 disabled={refreshing}
                                 className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-cyan-500 disabled:opacity-60"
                             >
-                                <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+                                <RefreshCcw
+                                    size={14}
+                                    className={refreshing ? "animate-spin" : ""}
+                                />
                                 Refresh
                             </button>
                         </div>
@@ -399,7 +465,8 @@ export default function DetailSekolahKepalaDinas() {
                                 </h1>
 
                                 <p className="mt-2 max-w-2xl text-[13px] font-semibold leading-6 text-slate-400">
-                                    Informasi detail sekolah dan ringkasan program yang berjalan pada sekolah ini.
+                                    Informasi detail sekolah dan ringkasan program yang
+                                    berjalan pada sekolah ini.
                                 </p>
                             </div>
                         </div>
@@ -439,11 +506,16 @@ export default function DetailSekolahKepalaDinas() {
 
                             <div className="mt-5 space-y-4">
                                 <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
-                                    <MapPin size={18} className="mt-0.5 text-[#0AC4E0]" />
+                                    <MapPin
+                                        size={18}
+                                        className="mt-0.5 text-[#0AC4E0]"
+                                    />
+
                                     <div>
                                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                             Alamat
                                         </p>
+
                                         <p className="mt-1 text-[12px] font-bold leading-6 text-slate-700">
                                             {getSchoolAddress(school)}
                                         </p>
@@ -452,37 +524,59 @@ export default function DetailSekolahKepalaDinas() {
 
                                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
-                                        <User size={18} className="mt-0.5 text-[#0AC4E0]" />
+                                        <User
+                                            size={18}
+                                            className="mt-0.5 text-[#0AC4E0]"
+                                        />
+
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                 Kepala Sekolah
                                             </p>
+
                                             <p className="mt-1 text-[12px] font-bold leading-6 text-slate-700">
-                                                {school?.kepala_sekolah || school?.nama_kepsek || "-"}
+                                                {school?.kepala_sekolah ||
+                                                    school?.nama_kepsek ||
+                                                    "-"}
                                             </p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
-                                        <Phone size={18} className="mt-0.5 text-[#0AC4E0]" />
+                                        <Phone
+                                            size={18}
+                                            className="mt-0.5 text-[#0AC4E0]"
+                                        />
+
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                 Kontak
                                             </p>
+
                                             <p className="mt-1 text-[12px] font-bold leading-6 text-slate-700">
-                                                {school?.no_hp || school?.telepon || school?.phone || "-"}
+                                                {school?.no_hp ||
+                                                    school?.telepon ||
+                                                    school?.phone ||
+                                                    "-"}
                                             </p>
                                         </div>
                                     </div>
 
                                     <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4 md:col-span-2">
-                                        <Mail size={18} className="mt-0.5 text-[#0AC4E0]" />
+                                        <Mail
+                                            size={18}
+                                            className="mt-0.5 text-[#0AC4E0]"
+                                        />
+
                                         <div>
                                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                                 Email
                                             </p>
+
                                             <p className="mt-1 text-[12px] font-bold leading-6 text-slate-700">
-                                                {school?.email || "-"}
+                                                {school?.email ||
+                                                    school?.email_login ||
+                                                    "-"}
                                             </p>
                                         </div>
                                     </div>
@@ -496,8 +590,10 @@ export default function DetailSekolahKepalaDinas() {
                                     <h2 className="text-[15px] font-black text-slate-900">
                                         Program Sekolah
                                     </h2>
+
                                     <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                        {activePrograms.length} berjalan · {completedPrograms.length} selesai
+                                        {activePrograms.length} berjalan ·{" "}
+                                        {completedPrograms.length} selesai
                                     </p>
                                 </div>
 
@@ -507,7 +603,10 @@ export default function DetailSekolahKepalaDinas() {
                             <div className="mt-5 max-h-[520px] space-y-3 overflow-y-auto pr-1">
                                 {programs.length === 0 ? (
                                     <div className="flex h-64 flex-col items-center justify-center text-center">
-                                        <FolderKanban size={34} className="text-cyan-200" />
+                                        <FolderKanban
+                                            size={34}
+                                            className="text-cyan-200"
+                                        />
 
                                         <p className="mt-4 text-[12px] font-black uppercase tracking-widest text-slate-400">
                                             Belum ada program
@@ -516,7 +615,11 @@ export default function DetailSekolahKepalaDinas() {
                                 ) : (
                                     programs.map((program) => (
                                         <ProgramCard
-                                            key={program?.id_program || program?.id || program?.nama_program}
+                                            key={
+                                                program?.id_program ||
+                                                program?.id ||
+                                                program?.nama_program
+                                            }
                                             program={program}
                                         />
                                     ))
@@ -529,4 +632,3 @@ export default function DetailSekolahKepalaDinas() {
         </>
     );
 }
-

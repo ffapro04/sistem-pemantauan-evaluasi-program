@@ -203,9 +203,17 @@ export default function MasterField({
     auxData,
     mode,
     onChange,
-    showPassword,
-    setShowPassword,
+    // showPassword & setShowPassword dipertahankan untuk backward compat,
+    // tapi tiap field password sekarang punya state sendiri
+    showPassword: showPasswordProp,
+    setShowPassword: setShowPasswordProp,
 }) {
+    // State internal per field (tidak bergantung pada parent)
+    const [showPwdLocal, setShowPwdLocal] = useState(false);
+
+    // Pakai state internal — setiap field password independen
+    const showPassword = showPwdLocal;
+    const togglePassword = () => setShowPwdLocal((prev) => !prev);
     const context = {
         field,
         value,
@@ -234,7 +242,7 @@ export default function MasterField({
         "w-full !rounded-xl !bg-white !py-3 !pl-10 !text-[11px] font-bold";
     const passwordPlaceholder =
         field.type === "password" && mode === "edit"
-            ? field.editPlaceholder || "••••••••"
+            ? field.editPlaceholder || "Isi untuk ubah password"
             : field.placeholder || "";
 
     return (
@@ -327,10 +335,11 @@ export default function MasterField({
                             />
                         )}
 
-                        {field.type === "password" && setShowPassword && (
+                        {field.type === "password" && (
                             <button
                                 type="button"
-                                onClick={() => setShowPassword(!showPassword)}
+                                onClick={togglePassword}
+                                title={showPassword ? "Sembunyikan password" : "Lihat password"}
                                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 transition-all hover:text-[#0AC4E0] active:scale-90"
                             >
                                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}

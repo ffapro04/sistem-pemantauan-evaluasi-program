@@ -59,6 +59,7 @@ export class VendorService {
         this.getUploadedFilename(files, 'npwp_file') ||
         createVendorDto.npwp_file ||
         null;
+
       const bukuRekeningFile =
         this.getUploadedFilename(files, 'buku_rekening_file') ||
         createVendorDto.buku_rekening_file ||
@@ -130,22 +131,22 @@ export class VendorService {
   }
 
   async findOne(id: number) {
-    const vendor = await this.vendorRepo.findOne({
-      where: {
-        id_vendor: id,
-      },
-      relations: ['user'],
-    });
+    const vendor = await this.vendorRepo
+      .createQueryBuilder('vendor')
+      .leftJoinAndSelect('vendor.user', 'user')
+      .addSelect('user.password')
+      .where('vendor.id_vendor = :id', { id })
+      .getOne();
 
     if (!vendor) {
       throw new NotFoundException(`Vendor #${id} tidak ditemukan`);
     }
 
-    if (vendor.user) {
-      delete (vendor.user as any).password;
-    }
-
-    return vendor;
+    return {
+      ...vendor,
+      email: vendor.user?.email || '',
+      password: (vendor.user as any)?.password || '',
+    };
   }
 
   async getManagementSummary() {
@@ -236,11 +237,13 @@ export class VendorService {
         );
 
         const programCount = programs.length;
+
         const totalBudget = programs.reduce(
           (total: number, program: any) =>
             total + this.toNumber(program.harga_vendor, 0),
           0,
         );
+
         const totalEvidence = programs.reduce(
           (total: number, program: any) =>
             total +
@@ -248,6 +251,7 @@ export class VendorService {
             this.toNumber(program.total_bukti_administrasi, 0),
           0,
         );
+
         const approvedEvidence = programs.reduce(
           (total: number, program: any) =>
             total +
@@ -255,6 +259,7 @@ export class VendorService {
             this.toNumber(program.administrasi_approved, 0),
           0,
         );
+
         const rejectedEvidence = programs.reduce(
           (total: number, program: any) =>
             total +
@@ -262,6 +267,7 @@ export class VendorService {
             this.toNumber(program.administrasi_rejected, 0),
           0,
         );
+
         const lateEvidence = programs.reduce(
           (total: number, program: any) =>
             total +
@@ -269,29 +275,40 @@ export class VendorService {
             this.toNumber(program.administrasi_late, 0),
           0,
         );
+
         const totalRating = programs.reduce(
           (total: number, program: any) =>
             total + this.toNumber(program.total_rating, 0),
           0,
         );
+
         const averageRating = this.average(
           programs
-            .filter((program: any) => this.toNumber(program.total_rating, 0) > 0)
+            .filter(
+              (program: any) => this.toNumber(program.total_rating, 0) > 0,
+            )
             .map((program: any) => this.toNumber(program.average_rating, 0)),
         );
 
         const completionScore =
           totalEvidence > 0 ? (approvedEvidence / totalEvidence) * 100 : 100;
+
         const rejectionPenalty =
           totalEvidence > 0 ? (rejectedEvidence / totalEvidence) * 28 : 0;
+
         const latePenalty =
           totalEvidence > 0 ? (lateEvidence / totalEvidence) * 22 : 0;
+
         const ratingScore =
           totalRating > 0 ? (averageRating / 5) * 100 : completionScore;
+
         const rawScore =
-          completionScore * 0.45 + ratingScore * 0.35 + 20 -
+          completionScore * 0.45 +
+          ratingScore * 0.35 +
+          20 -
           rejectionPenalty -
           latePenalty;
+
         const score = Math.max(0, Math.min(100, Math.round(rawScore)));
 
         if (vendor.user) {
@@ -321,12 +338,15 @@ export class VendorService {
             const programEvidence =
               this.toNumber(program.total_bukti_kegiatan, 0) +
               this.toNumber(program.total_bukti_administrasi, 0);
+
             const programApproved =
               this.toNumber(program.kegiatan_approved, 0) +
               this.toNumber(program.administrasi_approved, 0);
+
             const programRejected =
               this.toNumber(program.kegiatan_rejected, 0) +
               this.toNumber(program.administrasi_rejected, 0);
+
             const programLate =
               this.toNumber(program.kegiatan_late, 0) +
               this.toNumber(program.administrasi_late, 0);
@@ -361,7 +381,9 @@ export class VendorService {
     const summary = {
       total_vendor: rows.length,
       active_vendor: rows.filter((row) =>
-        String(row.status || '').toLowerCase().includes('bermitra'),
+        String(row.status || '')
+          .toLowerCase()
+          .includes('bermitra'),
       ).length,
       total_program: rows.reduce(
         (total, row) => total + this.toNumber(row.total_program, 0),

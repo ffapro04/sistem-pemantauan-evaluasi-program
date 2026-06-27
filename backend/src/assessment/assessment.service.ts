@@ -58,6 +58,138 @@ export class AssessmentService {
     private guruRepo: Repository<AssessmentGuru>,
   ) {}
 
+  private toNumberArray(value: any): number[] {
+    if (Array.isArray(value)) {
+      return value.map(Number).filter((item) => Number.isFinite(item));
+    }
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number).filter((item) => Number.isFinite(item));
+        }
+      } catch {
+        return value
+          .split(',')
+          .map((item) => Number(item.trim()))
+          .filter((item) => Number.isFinite(item));
+      }
+    }
+
+    if (typeof value === 'number') return [value];
+
+    return [];
+  }
+
+  private async hydrateAssessmentPersonas<T extends any>(payload: T | T[]) {
+    const isArrayPayload = Array.isArray(payload);
+    const assessments = (isArrayPayload ? payload : [payload]).filter(
+      Boolean,
+    ) as any[];
+
+    if (assessments.length === 0) return payload;
+
+    const uniqueNumbers = (values: any[]) =>
+      Array.from(
+        new Set(
+          values
+            .flatMap((value) => this.toNumberArray(value))
+            .map(Number)
+            .filter((value) => Number.isFinite(value) && value > 0),
+        ),
+      );
+
+    const hoIds = uniqueNumbers(
+      assessments.flatMap((assessment) => [
+        assessment?.id_ho,
+        assessment?.ho_id,
+        assessment?.created_by,
+        assessment?.created_by_user_id,
+      ]),
+    );
+
+    const sekolahIds = uniqueNumbers(
+      assessments.flatMap((assessment) => [
+        assessment?.target_sekolah_ids,
+        assessment?.sekolah_ids,
+        assessment?.id_sekolah,
+        assessment?.sekolah_id,
+      ]),
+    );
+
+    const [hoRows, sekolahRows] = await Promise.all([
+      hoIds.length
+        ? this.userRepo
+            .createQueryBuilder('user')
+            .select([
+              'user.id_user AS id_user',
+              'user.nama AS nama',
+              'user.email AS email',
+              'user.jabatan AS jabatan',
+              'user.id_role AS id_role',
+            ])
+            .where('user.id_user IN (:...ids)', { ids: hoIds })
+            .getRawMany()
+        : Promise.resolve([]),
+
+      sekolahIds.length
+        ? this.sekolahRepo
+            .createQueryBuilder('sekolah')
+            .select([
+              'sekolah.id_sekolah AS id_sekolah',
+              'sekolah.nama_sekolah AS nama_sekolah',
+              'sekolah.npsn AS npsn',
+              'sekolah.jenjang AS jenjang',
+              'sekolah.id_wilayah AS id_wilayah',
+            ])
+            .where('sekolah.id_sekolah IN (:...ids)', { ids: sekolahIds })
+            .getRawMany()
+        : Promise.resolve([]),
+    ]);
+
+    const hoMap = new Map(hoRows.map((row: any) => [Number(row.id_user), row]));
+    const sekolahMap = new Map(
+      sekolahRows.map((row: any) => [Number(row.id_sekolah), row]),
+    );
+
+    assessments.forEach((assessment) => {
+      const assessmentHoIds = uniqueNumbers([
+        assessment?.id_ho,
+        assessment?.ho_id,
+        assessment?.created_by,
+        assessment?.created_by_user_id,
+      ]);
+
+      const targetSekolahIds = uniqueNumbers([
+        assessment?.target_sekolah_ids,
+        assessment?.sekolah_ids,
+        assessment?.id_sekolah,
+        assessment?.sekolah_id,
+      ]);
+
+      const ho =
+        assessmentHoIds.map((id) => hoMap.get(id)).find(Boolean) || null;
+      const targetSekolahs = targetSekolahIds
+        .map((id) => sekolahMap.get(id))
+        .filter(Boolean);
+
+      assessment.ho = assessment.ho || ho?.nama || null;
+      assessment.ho_user = ho;
+      assessment.user = ho;
+      assessment.creator = ho;
+      assessment.created_by_user = ho;
+      assessment.pembuat = ho;
+
+      assessment.target_sekolahs = targetSekolahs;
+      assessment.targetSekolahs = targetSekolahs;
+      assessment.sekolahs = targetSekolahs;
+      assessment.schools = targetSekolahs;
+    });
+
+    return isArrayPayload ? assessments : assessments[0];
+  }
+
   async create(dto: CreateAssessmentDto) {
     const assessment = await this.assessmentRepo.save({
       id_ho: dto.id_ho,
@@ -92,6 +224,7 @@ export class AssessmentService {
       .leftJoin('m_users', 'u', 'u.id_user = a.id_ho')
       .select([
         'a.id_assessment AS id_assessment',
+        'a.id_ho AS id_ho',
         'a.nama AS nama',
         'a.status AS status',
         'a.aktif AS aktif',
@@ -143,7 +276,7 @@ export class AssessmentService {
 
     const rows = await query.getRawMany();
 
-    return rows.map((row) => {
+    const mappedRows = rows.map((row) => {
       const jumlahPengisi = Number(row.jumlah_pengisi || 0);
       const jumlahGuruTarget = Number(row.jumlah_guru_target || 0);
 
@@ -158,6 +291,8 @@ export class AssessmentService {
             : 0,
       };
     });
+
+    return this.hydrateAssessmentPersonas(mappedRows);
   }
 
   async findOne(id: number) {
@@ -182,8 +317,9 @@ export class AssessmentService {
         )
       : null;
 
-    return {
+    const result = {
       id_assessment: assessment.id_assessment,
+      id_ho: assessment.id_ho,
       nama: assessment.nama,
       status: assessment.status,
       aktif: assessment.aktif,
@@ -201,6 +337,8 @@ export class AssessmentService {
         options: Array.isArray(p.options) ? p.options : [],
       })),
     };
+
+    return this.hydrateAssessmentPersonas(result);
   }
 
   async getHasilAssessment(id: number) {
@@ -396,7 +534,8 @@ export class AssessmentService {
     for (const pengisi of hasil.pengisi || []) {
       for (const jawaban of pengisi.jawaban || []) {
         const pertanyaan = (hasil.pertanyaan || []).find(
-          (item) => Number(item.id_pertanyaan) === Number(jawaban.id_pertanyaan),
+          (item) =>
+            Number(item.id_pertanyaan) === Number(jawaban.id_pertanyaan),
         );
 
         rows.push([
@@ -484,7 +623,9 @@ export class AssessmentService {
       const nama = normalize(row.nama_pengisi || row.nama_guru || row.nama);
       if (!nama) return null;
 
-      return guruRows.find((guru) => normalize(guru.nama_guru) === nama) || null;
+      return (
+        guruRows.find((guru) => normalize(guru.nama_guru) === nama) || null
+      );
     };
 
     const answerRows: any[] = [];

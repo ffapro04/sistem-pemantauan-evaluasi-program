@@ -202,10 +202,6 @@ const getLogoUrl = (row) => {
     return `${API_BASE_URL}${logo}`;
 };
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Normalize sekolah
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 const normalizeSekolah = (row) => {
     const wilayah = getRowWilayah(row);
 
@@ -250,7 +246,7 @@ const normalizeSekolah = (row) => {
         jumlah_guru: Number(row?.jumlah_guru || row?.jumlahGuru || 0),
         jumlah_siswa: Number(row?.jumlah_siswa || row?.jumlahSiswa || 0),
         email_login: row?.email_login || "",
-        password_login: "",
+        password_login: row?.password_login || "",
 
         alamat: row?.alamat || "",
         latitude: row?.latitude ?? row?.lat ?? "",
@@ -351,6 +347,8 @@ export const sekolahConfig = {
         jumlah_siswa: "",
         email_login: "",
         password_login: "",
+        password_login_original: "",
+        password_login_changed: false,
         akreditasi: "Belum Terakreditasi",
         akreditasi_internal: "Dasar",
         tahun_binaan: "",
@@ -369,6 +367,7 @@ export const sekolahConfig = {
 
     normalizeDetail: (payload) => {
         const normalized = normalizeSekolah(payload);
+        const passwordLoginValue = payload?.password_login || normalized.password_login || "";
 
         return {
             ...normalized,
@@ -389,12 +388,21 @@ export const sekolahConfig = {
                 "",
             logo: null,
             logo_url: normalized.logo_url || "",
-            password_login: "",
+            password_login: passwordLoginValue,
+            password_login_original: passwordLoginValue,
+            password_login_changed: false,
         };
     },
 
     onFieldChange: ({ field, value, next, auxData }) => {
         const safeAuxData = auxData || {};
+
+        if (field === "password_login") {
+            return {
+                ...next,
+                password_login_changed: true,
+            };
+        }
 
         if (field === "id_wilayah") {
             const selected = getKabupatenOptions(safeAuxData).find(
@@ -708,6 +716,10 @@ export const sekolahConfig = {
                     requiredOnCreate: true,
                     minLength: 8,
                     placeholder: "Minimal 8 karakter",
+                    help: ({ mode }) =>
+                        mode === "edit"
+                            ? "Password lama sudah tersimpan. Isi field ini hanya jika ingin mengganti password."
+                            : "Password digunakan sekolah untuk masuk ke sistem.",
                 },
                 {
                     name: "jumlah_guru",
@@ -844,6 +856,7 @@ export const sekolahConfig = {
 
         if (
             mode === "edit" &&
+            formData.password_login_changed &&
             formData.password_login &&
             String(formData.password_login).length < 8
         ) {
@@ -913,8 +926,17 @@ export const sekolahConfig = {
 
         payload.append("status", String(formData.status ?? true));
 
-        if (mode === "create" || formData.password_login?.trim()) {
+        if (mode === "create") {
             payload.append("password_login", formData.password_login || "");
+        }
+
+        if (
+            mode === "edit" &&
+            formData.password_login_changed &&
+            formData.password_login?.trim() &&
+            formData.password_login !== formData.password_login_original
+        ) {
+            payload.append("password_login", formData.password_login);
         }
 
         if (formData.alamat) {

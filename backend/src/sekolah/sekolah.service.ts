@@ -41,17 +41,23 @@ export class SekolahService {
     });
 
     if (!wilayah) {
-      throw new BadRequestException('Kabupaten/kota tidak ditemukan pada Master Wilayah.');
+      throw new BadRequestException(
+        'Kabupaten/kota tidak ditemukan pada Master Wilayah.',
+      );
     }
 
     const jenis = String(wilayah.jenis_wilayah || '').toUpperCase();
 
     if (jenis === 'PROVINSI') {
-      throw new BadRequestException('Sekolah harus memilih kabupaten/kota, bukan provinsi.');
+      throw new BadRequestException(
+        'Sekolah harus memilih kabupaten/kota, bukan provinsi.',
+      );
     }
 
     if (wilayah.status === false) {
-      throw new BadRequestException('Kabupaten/kota yang dipilih sedang nonaktif.');
+      throw new BadRequestException(
+        'Kabupaten/kota yang dipilih sedang nonaktif.',
+      );
     }
 
     return wilayah;
@@ -360,10 +366,13 @@ export class SekolahService {
   // 🚨 PERBAIKAN: FIND ONE (Suntik objek wilayah & Terjemahkan ID Kabupaten)
   // =========================================================
   async findOne(id: number) {
-    const sekolah = await this.sekolahRepo.findOne({
-      where: { id_sekolah: id },
-      relations: ['wilayah', 'wilayah.parent'],
-    });
+    const sekolah = await this.sekolahRepo
+      .createQueryBuilder('sekolah')
+      .leftJoinAndSelect('sekolah.wilayah', 'wilayah')
+      .leftJoinAndSelect('wilayah.parent', 'parent')
+      .addSelect('sekolah.password_login')
+      .where('sekolah.id_sekolah = :id', { id })
+      .getOne();
 
     if (!sekolah) {
       throw new NotFoundException(`Sekolah #${id} tidak ditemukan`);
@@ -536,8 +545,7 @@ export class SekolahService {
           ? updateSekolahDto.password_login
           : sekolah.password_login,
 
-      id_wilayah:
-        kabupatenWilayah.id_wilayah,
+      id_wilayah: kabupatenWilayah.id_wilayah,
 
       id_kabupaten: kabupatenWilayah.id_wilayah,
 
@@ -569,7 +577,9 @@ export class SekolahService {
 
       area:
         kabupatenWilayah.area_wilayah ||
-        (updateSekolahDto.area !== undefined ? updateSekolahDto.area : sekolah.area),
+        (updateSekolahDto.area !== undefined
+          ? updateSekolahDto.area
+          : sekolah.area),
 
       sertifikat_iso:
         updateSekolahDto.sertifikat_iso !== undefined

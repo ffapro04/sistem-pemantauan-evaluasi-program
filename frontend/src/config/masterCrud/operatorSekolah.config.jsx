@@ -161,7 +161,7 @@ export const operatorSekolahConfig = {
             id_user: normalized.id_user,
             nama: normalized.nama || "",
             email: normalized.email || "",
-            password: "",
+            password: payload?.password || "",
             id_role: ROLE_OPERATOR_SEKOLAH,
             jabatan: normalized.jabatan || "Operator Sekolah",
             id_sekolah: normalized.id_sekolah ? String(normalized.id_sekolah) : "",

@@ -66,17 +66,20 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.reminderTimer = setInterval(() => {
-      const now = new Date();
-      const today = now.toISOString().slice(0, 10);
+    this.reminderTimer = setInterval(
+      () => {
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
 
-      if (now.getHours() !== 7 || this.lastReminderRunDate === today) return;
+        if (now.getHours() !== 7 || this.lastReminderRunDate === today) return;
 
-      this.lastReminderRunDate = today;
-      this.createDeadlineReminders().catch((error) => {
-        console.error('PROGRAM_DEADLINE_REMINDER_ERROR:', error);
-      });
-    }, 60 * 60 * 1000);
+        this.lastReminderRunDate = today;
+        this.createDeadlineReminders().catch((error) => {
+          console.error('PROGRAM_DEADLINE_REMINDER_ERROR:', error);
+        });
+      },
+      60 * 60 * 1000,
+    );
   }
 
   onModuleDestroy() {
@@ -175,6 +178,147 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private normalizeAccessText(value: any): string {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ');
+  }
+
+  private normalizeSchoolJenjang(value: any): string {
+    const text = String(value || '')
+      .trim()
+      .toUpperCase();
+
+    if (/\bSMK\b/.test(text) || text === 'SMK') return 'SMK';
+    if (/\bSMP\b/.test(text) || text === 'SMP') return 'SMP';
+    if (/\bSD\b/.test(text) || text === 'SD') return 'SD';
+
+    return '';
+  }
+
+  private uniquePositiveNumbers(values: any[]): number[] {
+    return Array.from(
+      new Set(
+        values
+          .map((value) => Number(value))
+          .filter((value) => Number.isFinite(value) && value > 0),
+      ),
+    );
+  }
+
+  private async getAllowedJenjangForHo(
+    id_user: number,
+    id_role?: number | null,
+  ): Promise<string[] | null> {
+    const rows = await this.programRepo.manager.query(
+      `
+        SELECT
+          id_user,
+          id_role,
+          jabatan,
+          jenis,
+          sub_jenis
+        FROM m_users
+        WHERE id_user = $1
+        LIMIT 1
+      `,
+      [id_user],
+    );
+
+    const user = rows?.[0] || {};
+    const resolvedRoleId = Number(user?.id_role || id_role || 0);
+    const jabatan = this.normalizeAccessText(user?.jabatan);
+    const jenis = this.normalizeAccessText(user?.jenis);
+    const subJenis = this.normalizeAccessText(user?.sub_jenis);
+
+    const isHo =
+      resolvedRoleId === 3 ||
+      jabatan.includes('head office') ||
+      jabatan.includes('ho');
+
+    if (!isHo) return null;
+
+    if (jenis.includes('non')) {
+      return ['SD', 'SMP', 'SMK'];
+    }
+
+    if (jenis.includes('akademik') && !jenis.includes('non')) {
+      if (subJenis.includes('smk')) return ['SMK'];
+
+      if (subJenis.includes('sd') && subJenis.includes('smp')) {
+        return ['SD', 'SMP'];
+      }
+
+      if (subJenis.includes('sd')) return ['SD'];
+      if (subJenis.includes('smp')) return ['SMP'];
+
+      throw new BadRequestException(
+        'Profil HO Akademik belum memiliki sub_jenis yang valid. Isi sub_jenis dengan SD & SMP atau SMK.',
+      );
+    }
+
+    throw new BadRequestException(
+      'Profil Head Office belum memiliki jenis yang valid.',
+    );
+  }
+
+  private async validateHoSchoolAccess(
+    id_user: number,
+    id_role: number | null | undefined,
+    selectedSchoolIds: any[],
+  ): Promise<void> {
+    const schoolIds = this.uniquePositiveNumbers(selectedSchoolIds || []);
+
+    if (schoolIds.length === 0) {
+      throw new BadRequestException('Minimal pilih satu sekolah sasaran.');
+    }
+
+    const allowedJenjang = await this.getAllowedJenjangForHo(id_user, id_role);
+
+    if (!allowedJenjang) return;
+
+    const schools = await this.programRepo.manager.query(
+      `
+        SELECT
+          id_sekolah,
+          nama_sekolah,
+          jenjang
+        FROM m_sekolah
+        WHERE id_sekolah = ANY($1::int[])
+      `,
+      [schoolIds],
+    );
+
+    if (schools.length !== schoolIds.length) {
+      const foundIds = schools.map((item: any) => Number(item.id_sekolah));
+      const missingIds = schoolIds.filter((id) => !foundIds.includes(id));
+
+      throw new BadRequestException(
+        `Sekolah sasaran tidak ditemukan: ${missingIds.join(', ')}`,
+      );
+    }
+
+    const invalidSchools = schools.filter((school: any) => {
+      const jenjang = this.normalizeSchoolJenjang(school?.jenjang);
+      return !allowedJenjang.includes(jenjang);
+    });
+
+    if (invalidSchools.length > 0) {
+      const invalidNames = invalidSchools
+        .map(
+          (school: any) =>
+            `${school.nama_sekolah || `ID ${school.id_sekolah}`} (${school.jenjang || '-'})`,
+        )
+        .join(', ');
+
+      throw new BadRequestException(
+        `Sekolah sasaran tidak sesuai akses HO. HO ini hanya boleh memilih jenjang ${allowedJenjang.join('/')}. Sekolah tidak valid: ${invalidNames}`,
+      );
+    }
+  }
+
   private normalizeRole(role: any) {
     return String(role || '')
       .trim()
@@ -244,6 +388,197 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       driveFile?.drive_file_id ||
       fallbackName
     );
+  }
+
+  private async hydrateProgramPersonas<T extends any>(payload: T | T[]) {
+    const isArrayPayload = Array.isArray(payload);
+    const programs = (isArrayPayload ? payload : [payload]).filter(
+      Boolean,
+    ) as any[];
+
+    if (programs.length === 0) return payload;
+
+    const uniqueNumbers = (values: any[]) =>
+      Array.from(
+        new Set(
+          values
+            .flatMap((value) => this.toArray(value))
+            .map(Number)
+            .filter((value) => Number.isFinite(value) && value > 0),
+        ),
+      );
+
+    const hoIds = uniqueNumbers(
+      programs.flatMap((program) => [
+        program?.id_ho,
+        program?.ho_id,
+        program?.dibuat_oleh,
+        program?.created_by,
+        program?.created_by_user_id,
+      ]),
+    );
+
+    const aoIds = uniqueNumbers(
+      programs.flatMap((program) => [
+        program?.id_pengawas,
+        program?.id_ao,
+        program?.ao_id,
+        program?.ao_ids,
+      ]),
+    );
+
+    const vendorIds = uniqueNumbers(
+      programs.flatMap((program) => [
+        program?.id_vendor,
+        program?.vendor_id,
+        program?.vendor_ids,
+      ]),
+    );
+
+    const sekolahIds = uniqueNumbers(
+      programs.flatMap((program) => [
+        program?.id_sekolah,
+        program?.sekolah_id,
+        program?.sekolah_ids,
+        program?.target_sekolah_ids,
+      ]),
+    );
+
+    const [hoRows, aoRows, vendorRows, sekolahRows] = await Promise.all([
+      hoIds.length
+        ? this.programRepo.manager.query(
+            `
+              SELECT
+                id_user,
+                nama,
+                email,
+                jabatan,
+                id_role
+              FROM m_users
+              WHERE id_user = ANY($1::int[])
+            `,
+            [hoIds],
+          )
+        : Promise.resolve([]),
+
+      aoIds.length
+        ? this.programRepo.manager.query(
+            `
+              SELECT
+                id_user,
+                nama,
+                email,
+                jabatan,
+                id_role
+              FROM m_users
+              WHERE id_user = ANY($1::int[])
+            `,
+            [aoIds],
+          )
+        : Promise.resolve([]),
+
+      vendorIds.length
+        ? this.programRepo.manager.query(
+            `
+              SELECT
+                id_vendor,
+                nama_vendor,
+                no_register,
+                pilar,
+                id_user
+              FROM m_vendor
+              WHERE id_vendor = ANY($1::int[])
+            `,
+            [vendorIds],
+          )
+        : Promise.resolve([]),
+
+      sekolahIds.length
+        ? this.programRepo.manager.query(
+            `
+              SELECT
+                id_sekolah,
+                nama_sekolah,
+                npsn,
+                jenjang,
+                id_wilayah
+              FROM m_sekolah
+              WHERE id_sekolah = ANY($1::int[])
+            `,
+            [sekolahIds],
+          )
+        : Promise.resolve([]),
+    ]);
+
+    const hoMap = new Map(hoRows.map((row: any) => [Number(row.id_user), row]));
+    const aoMap = new Map(aoRows.map((row: any) => [Number(row.id_user), row]));
+    const vendorMap = new Map(
+      vendorRows.map((row: any) => [Number(row.id_vendor), row]),
+    );
+    const sekolahMap = new Map(
+      sekolahRows.map((row: any) => [Number(row.id_sekolah), row]),
+    );
+
+    programs.forEach((program) => {
+      const programHoIds = uniqueNumbers([
+        program?.id_ho,
+        program?.ho_id,
+        program?.dibuat_oleh,
+        program?.created_by,
+        program?.created_by_user_id,
+      ]);
+
+      const programAoIds = uniqueNumbers([
+        program?.id_pengawas,
+        program?.id_ao,
+        program?.ao_id,
+        program?.ao_ids,
+      ]);
+
+      const programVendorIds = uniqueNumbers([
+        program?.id_vendor,
+        program?.vendor_id,
+        program?.vendor_ids,
+      ]);
+
+      const programSekolahIds = uniqueNumbers([
+        program?.id_sekolah,
+        program?.sekolah_id,
+        program?.sekolah_ids,
+        program?.target_sekolah_ids,
+      ]);
+
+      const ho = programHoIds.map((id) => hoMap.get(id)).find(Boolean) || null;
+      const aos = programAoIds.map((id) => aoMap.get(id)).filter(Boolean);
+      const vendors = programVendorIds
+        .map((id) => vendorMap.get(id))
+        .filter(Boolean);
+      const sekolahs = programSekolahIds
+        .map((id) => sekolahMap.get(id))
+        .filter(Boolean);
+
+      program.ho = ho;
+      program.head_office = ho;
+      program.created_by_user = ho;
+      program.creator = ho;
+
+      program.aos = aos;
+      program.ao_users = aos;
+      program.pengawas = program.pengawas || aos[0] || null;
+      program.ao = program.ao || aos[0] || null;
+
+      program.vendors = vendors;
+      program.vendorList = vendors;
+      program.vendor = program.vendor || vendors[0] || null;
+
+      program.sekolahs = sekolahs;
+      program.schools = sekolahs;
+      program.sekolahList = sekolahs;
+      program.sekolah = program.sekolah || sekolahs[0] || null;
+      program.target_sekolahs = sekolahs;
+    });
+
+    return isArrayPayload ? programs : programs[0];
   }
 
   private async getProgramNotificationTargets(program: Program) {
@@ -564,6 +899,11 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       if (!idSekolah) throw new Error('id_sekolah tidak valid');
       if (!idPengawas) throw new Error('id_pengawas tidak valid');
 
+      const finalSekolahIds = sekolahIds.length ? sekolahIds : [idSekolah];
+      const finalAoIds = aoIds.length ? aoIds : [idPengawas];
+
+      await this.validateHoSchoolAccess(id_user, id_role, finalSekolahIds);
+
       const kategori = this.normalizeProgramCategory(createProgramDto.kategori);
       const pilarProgram = this.normalizeProgramPilar(
         createProgramDto.pilar_program,
@@ -578,8 +918,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         id_pengawas: idPengawas,
         id_vendor: vendorIds,
         vendor_ids: vendorIds,
-        sekolah_ids: sekolahIds.length ? sekolahIds : [idSekolah],
-        ao_ids: aoIds.length ? aoIds : [idPengawas],
+        sekolah_ids: finalSekolahIds,
+        ao_ids: finalAoIds,
         kategori,
         pilar_program: pilarProgram,
         jenis_program: createProgramDto.jenis_program || 'PROJECT',
@@ -753,10 +1093,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
                 tanggal_selesai: pertemuanData.tanggal_selesai
                   ? new Date(pertemuanData.tanggal_selesai)
                   : null,
-                urutan: this.toNumber(
-                  pertemuanData.urutan,
-                  pertemuanIndex + 1,
-                ),
+                urutan: this.toNumber(pertemuanData.urutan, pertemuanIndex + 1),
                 status: pertemuanData.status || 'PLANNED',
               }),
             );
@@ -810,10 +1147,12 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     if (kategori) where.kategori = kategori;
     if (jenis_program) where.jenis_program = jenis_program;
 
-    return this.programRepo.find({
+    const programs = await this.programRepo.find({
       where,
       order: { created_at: 'DESC' },
     });
+
+    return this.hydrateProgramPersonas(programs);
   }
 
   async findBySekolah(id_sekolah: number) {
@@ -822,16 +1161,18 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('ID sekolah tidak valid');
     }
 
-    return this.programRepo
+    const programs = await this.programRepo
       .createQueryBuilder('p')
       .where('p.id_sekolah = :id_sekolah', { id_sekolah: idSekolah })
       .orWhere(':id_sekolah = ANY(p.sekolah_ids)', { id_sekolah: idSekolah })
       .orderBy('p.created_at', 'DESC')
       .getMany();
+
+    return this.hydrateProgramPersonas(programs);
   }
 
   async findOne(id: number) {
-    return this.programRepo.findOne({
+    const program = await this.programRepo.findOne({
       where: { id_program: id },
       relations: [
         'fases',
@@ -860,6 +1201,12 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+
+    if (!program) {
+      throw new NotFoundException(`Program #${id} tidak ditemukan`);
+    }
+
+    return this.hydrateProgramPersonas(program);
   }
 
   async getRatingSummary(id_program: number) {
@@ -889,7 +1236,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     );
 
     const approvedActivities = activities.filter(
-      (item: any) => String(item.status_kegiatan || '').toUpperCase() === 'APPROVED',
+      (item: any) =>
+        String(item.status_kegiatan || '').toUpperCase() === 'APPROVED',
     );
 
     const ratingRows = await this.programRepo.manager.query(
@@ -1791,7 +2139,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     if (idGuruAssessment) {
       existingRating = await this.kegiatanRatingRepo.findOne({
-        where: { id_kegiatans: id_kegiatan, id_guru_assessment: idGuruAssessment },
+        where: {
+          id_kegiatans: id_kegiatan,
+          id_guru_assessment: idGuruAssessment,
+        },
       });
     } else if (idVendor) {
       existingRating = await this.kegiatanRatingRepo.findOne({
@@ -1818,7 +2169,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     );
 
     kegiatan.guru_rating = rating;
-    kegiatan.guru_comment = body.comment?.trim() || body.komentar?.trim() || null;
+    kegiatan.guru_comment =
+      body.comment?.trim() || body.komentar?.trim() || null;
     kegiatan.guru_rated_by = id_user;
     kegiatan.guru_rated_at = new Date();
     await this.kegiatansRepo.save(kegiatan);
@@ -1831,7 +2183,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
           nama_user,
           role_user: raterType === 'VENDOR' ? 'Vendor' : 'Guru Assessment',
           comment_text: body.comment?.trim() || body.komentar?.trim(),
-          comment_type: raterType === 'VENDOR' ? 'VENDOR_RATING' : 'GURU_RATING',
+          comment_type:
+            raterType === 'VENDOR' ? 'VENDOR_RATING' : 'GURU_RATING',
         }),
       );
     }
@@ -1916,6 +2269,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         : Array.isArray(existingProgram.vendor_ids)
           ? existingProgram.vendor_ids
           : this.toArray(existingProgram.id_vendor);
+
+    await this.validateHoSchoolAccess(id_user, id_role, finalSekolahIds);
 
     const kategori =
       updateData.kategori !== undefined

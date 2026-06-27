@@ -242,7 +242,7 @@ export const guruConfig = {
                 data.jurusan_data?.nama_jurusan ||
                 "",
             nip: data.nip || "",
-            password: "",
+            password: data.password_hash || data.password || "",
             is_active:
                 data.is_active === undefined || data.is_active === null
                     ? true
