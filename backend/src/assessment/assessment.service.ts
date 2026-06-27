@@ -218,13 +218,40 @@ export class AssessmentService {
     };
   }
 
-  async findAll(jenis?: string, id_ho?: number, pilar?: string) {
+  async findAll(
+    jenis?: string,
+    id_ho?: number,
+    pilar?: string,
+    currentUser?: any,
+  ) {
+    const roleId = Number(
+      currentUser?.id_role ??
+        currentUser?.role?.id_role ??
+        currentUser?.role_id ??
+        0,
+    );
+
+    const currentUserId = Number(
+      currentUser?.id_user ??
+        currentUser?.user_id ??
+        currentUser?.sub ??
+        currentUser?.id ??
+        0,
+    );
+
+    const subJenis = String(
+      currentUser?.sub_jenis ?? currentUser?.subJenis ?? '',
+    )
+      .trim()
+      .toUpperCase();
+
     const query = this.assessmentRepo
       .createQueryBuilder('a')
       .leftJoin('m_users', 'u', 'u.id_user = a.id_ho')
       .select([
         'a.id_assessment AS id_assessment',
         'a.id_ho AS id_ho',
+        'a.dibuat_oleh AS dibuat_oleh',
         'a.nama AS nama',
         'a.status AS status',
         'a.aktif AS aktif',
@@ -266,8 +293,39 @@ export class AssessmentService {
         'jumlah_guru_target',
       );
 
-    if (jenis) query.andWhere('a.jenis = :jenis', { jenis });
-    if (id_ho) query.andWhere('a.id_ho = :id_ho', { id_ho });
+    if (jenis) {
+      query.andWhere('a.jenis = :jenis', { jenis });
+    }
+
+    if (roleId === 3 && currentUserId > 0) {
+      query.andWhere(
+        '(a.id_ho = :currentUserId OR a.dibuat_oleh = :currentUserId)',
+        { currentUserId },
+      );
+
+      if (subJenis.includes('SMK')) {
+        query.andWhere(`
+          NOT EXISTS (
+            SELECT 1
+            FROM public.m_sekolah sx
+            WHERE sx.id_sekolah = ANY(a.target_sekolah_ids)
+              AND UPPER(TRIM(COALESCE(sx.jenjang, ''))) <> 'SMK'
+          )
+        `);
+      } else if (subJenis.includes('SD') || subJenis.includes('SMP')) {
+        query.andWhere(`
+          NOT EXISTS (
+            SELECT 1
+            FROM public.m_sekolah sx
+            WHERE sx.id_sekolah = ANY(a.target_sekolah_ids)
+              AND UPPER(TRIM(COALESCE(sx.jenjang, ''))) = 'SMK'
+          )
+        `);
+      }
+    } else if (id_ho) {
+      query.andWhere('(a.id_ho = :id_ho OR a.dibuat_oleh = :id_ho)', { id_ho });
+    }
+
     if (pilar && pilar !== 'SEMUA') {
       query.andWhere('a.pilar = :pilar', {
         pilar: normalizeAssessmentPilar(pilar, jenis),
