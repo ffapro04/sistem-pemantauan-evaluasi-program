@@ -846,25 +846,20 @@ function ReadAssessmentPage({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-5">
-                                                    <div className="flex max-w-[250px] flex-wrap gap-1.5">
+                                                <td className="px-5 py-5 align-top">
+                                                    <div className="max-w-[360px]">
                                                         {sekolahList.length > 0 ? (
-                                                            <>
-                                                                {sekolahList.slice(0, 2).map((nama, idx) => (
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {sekolahList.map((nama, idx) => (
                                                                     <span
-                                                                        key={idx}
-                                                                        className="rounded-lg border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase text-cyan-700"
+                                                                        key={`${nama}-${idx}`}
+                                                                        title={nama}
+                                                                        className="inline-flex max-w-[165px] items-center rounded-lg border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase text-cyan-700"
                                                                     >
-                                                                        {nama}
+                                                                        <span className="truncate">{nama}</span>
                                                                     </span>
                                                                 ))}
-
-                                                                {sekolahList.length > 2 && (
-                                                                    <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase text-slate-400">
-                                                                        +{sekolahList.length - 2}
-                                                                    </span>
-                                                                )}
-                                                            </>
+                                                            </div>
                                                         ) : (
                                                             <span className="text-[10px] font-bold text-gray-300">
                                                                 Belum ada target
