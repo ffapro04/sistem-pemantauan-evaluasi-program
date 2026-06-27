@@ -217,7 +217,7 @@ const getRoleMenus = (idRole, hoUser) => {
           items: [
             {
               label: "Daftar Program",
-              path: "/ho/daftar-program/non-akademik", // â† Kunci ke non-akademik
+              path: "/ho/daftar-program/non-akademik", // <- Kunci ke non-akademik
               icon: ClipboardList,
             },
             {
@@ -267,7 +267,7 @@ const getRoleMenus = (idRole, hoUser) => {
         items: [
           {
             label: "Daftar Program",
-            path: "/ho/daftar-program/akademik", // â† Kunci ke akademik
+            path: "/ho/daftar-program/akademik", // <- Kunci ke akademik
             icon: ClipboardList,
           },
           {

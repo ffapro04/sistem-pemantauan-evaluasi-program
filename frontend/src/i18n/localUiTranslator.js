@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useState } from "react";
+﻿/* eslint-disable no-dupe-keys */
+import { useCallback, useEffect, useState } from "react";
 
 export const APP_LANGUAGE_KEY = "ypa_mdr_language";
 export const DEFAULT_LANGUAGE = "id";
@@ -147,7 +148,7 @@ const ID_TO_EN = {
     "Administrasi Pembuka Periode": "Administrasi Pembuka Period",
     "Administrasi pembuka sudah disetujui. Narasumber dapat menjalankan aktivitas dan mengunggah bukti pelaksanaan.": "Opening Administration sudah disetujui. Resource Person dapat menjalankan aktivitas dan mengunggah bukti pelaksanaan.",
     "Administrasi pembuka wajib memiliki minimal satu bukti upload.": "Opening Administration wajib memiliki minimal satu bukti upload.",
-    "Administrasi â†’ Aktivitas": "Administrasi ’ Activity",
+    "Administrasi -> Aktivitas": "Administrasi ’ Activity",
     "Agenda Kepala Dinas": "Agenda Education Office Head",
     "Agenda Pengurus": "Agenda Management Board",
     "Agenda Sekolah": "Agenda School",
@@ -220,7 +221,7 @@ const ID_TO_EN = {
     "AO hanya muncul jika wilayah/provinsi sesuai dengan sekolah sasaran.": "AO hanya muncul jika region/province sesuai with school sasaran.",
     "AO memberi komentar dan review lapangan.": "AO memberi comment and review lapangan.",
     "AO review bukti aktivitas, lalu HO memberi keputusan final.": "AO review evidence activity, lalu HO memberi keputusan final.",
-    "AO review â†’ referensi HO untuk ACC/Reject · Guru beri feedback": "AO review â†’ referensi HO untuk ACC/Reject · Teacher beri feedback",
+    "AO review -> referensi HO untuk ACC/Reject · Guru beri feedback": "AO review -> referensi HO untuk ACC/Reject · Teacher beri feedback",
     "AO wilayah binaan": "AO region supervised",
     "AO, HO, atau Guru bisa tambahkan komentar di sini.": "AO, HO, atau Teacher bisa tambahkan komentar here.",
     "Approved semua": "Approved all",
@@ -1409,7 +1410,7 @@ const ID_TO_EN = {
     "Narasumber pelaksana aktivitas program.": "Resource Person pelaksana aktivitas program.",
     "Narasumber upload administrasi pembuka periode.": "Resource Person upload administrasi pembuka periode.",
     "Narasumber upload bukti aktivitas.": "Resource Person upload bukti aktivitas.",
-    "Narasumber upload bukti â†’ AO review â†’ HO keputusan": "Resource Person upload bukti â†’ AO review â†’ HO keputusan",
+    "Narasumber upload bukti -> AO review -> HO keputusan": "Resource Person upload bukti -> AO review -> HO keputusan",
     "Narasumber wajib mengunggah bukti administratif pembuka periode. Setelah direview AO dan disetujui HO, aktivitas pada periode ini akan terbuka.": "Resource Person wajib mengunggah bukti administratif pembuka periode. Setelah direview AO dan disetujui HO, aktivitas pada periode ini akan terbuka.",
     "Narasumber wajib upload bukti administratif sebelum aktivitas periode ini terbuka.": "Resource Person wajib upload bukti administratif sebelum aktivitas periode ini terbuka.",
     "Nomor MOU dan nilai anggaran vendor.": "Nomor MOU and nilai anggaran vendor.",
@@ -2023,16 +2024,15 @@ const ID_TO_EN = {
     "Zoom dibatasi sesuai wilayah/provinsi otoritas": "Zoom dibatasi sesuai region/province otoritas",
     "- Administrasi pembuka harus di-review AO dan di-ACC HO.": "- Opening Administration harus di-review AO dan di-ACC HO.",
     "- Aktivitas terbuka setelah administrasi periode disetujui.": "- Activity terbuka setelah administrasi periode disetujui.",
-    "- Bukti aktivitas melewati alur Narasumber â†’ AO â†’ HO.": "- Evidence aktivitas melewati alur Resource Person â†’ AO â†’ HO.",
+    "- Bukti aktivitas melewati alur Narasumber -> AO -> HO.": "- Evidence aktivitas melewati alur Resource Person -> AO -> HO.",
     "- Periode/bulan menggantikan konsep fase.": "- Period/bulan menggantikan konsep fase.",
-    "âš ï¸ Filter kategori vendor kosong, fallback menampilkan semua vendor aktif": "âš ï¸ Filter category vendor empty, fallback menampilkan all vendor active",
-    "âš ï¸ Tidak ada user dengan role AO terdeteksi, menampilkan semua user": "âš ï¸ No user dengan role AO terdeteksi, menampilkan semua user",
-    "âŒ Gagal membuat program:": "âŒ Failed to create program:",
-    "âŒ Gagal mengambil data master:": "âŒ Failed to fetch data master:",
-    "â­ Rating Kegiatan": "â­ Rating Activity",
-    "ðŸŽ¯ HO ACCESS FILTER": "ðŸŽ¯ HO ACCESS Filter",
-    "ðŸ’¬ Komentar Kegiatan": "ðŸ’¬ Comment Activity",
-    "ðŸš« Akses Ditolak": "ðŸš« Access Denied",
+    "Filter kategori vendor kosong, fallback menampilkan semua vendor aktif": "Filter category vendor empty, fallback menampilkan all vendor active",
+    "Tidak ada user dengan role AO terdeteksi, menampilkan semua user": "No user dengan role AO terdeteksi, menampilkan semua user",
+    "Gagal mengambil data master:": "Failed to fetch data master:",
+    "Rating Kegiatan": "Rating Activity",
+    "HO ACCESS FILTER": "HO ACCESS Filter",
+    "Komentar Kegiatan": "Comment Activity",
+    "Akses Ditolak": "Access Denied",
 };
 
 const EN_TO_ID = Object.fromEntries(
@@ -2288,4 +2288,9 @@ export function useUiAutoTranslate(rootRef = null) {
         applyTranslation,
     };
 }
+
+
+
+
+
 

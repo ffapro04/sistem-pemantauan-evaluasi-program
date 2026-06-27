@@ -1837,7 +1837,7 @@ function VendorProgramDetailPage({
                     <div className="flex w-full max-w-[400px] flex-col bg-white shadow-[0_0_60px_rgba(15,23,42,0.2)]">
                         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
                             <div>
-                                <p className="text-[8px] font-black uppercase tracking-widest text-violet-500">ðŸ’¬ Komentar Kegiatan</p>
+                                <p className="text-[8px] font-black uppercase tracking-widest text-violet-500"> Komentar Kegiatan</p>
                                 <h3 className="mt-0.5 text-[16px] font-black text-slate-900">{commentRow?.title || "Kegiatan"}</h3>
                                 <p className="mt-1 text-[10px] text-slate-400 font-semibold">Review AO · Keputusan HO · Feedback Guru</p>
                             </div>
@@ -2095,7 +2095,7 @@ function VendorArrowPhaseSteps({
                 </div>
 
                 <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi â†’ Aktivitas
+                    Administrasi -> Aktivitas
                 </p>
             </div>
 

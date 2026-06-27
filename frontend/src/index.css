@@ -8,7 +8,7 @@ body {
   font-family: "Poppins", sans-serif;
 }
 
-/* ✅ Fade + Slide masuk */
+/*  Fade + Slide masuk */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -20,7 +20,7 @@ body {
   }
 }
 
-/* ✅ Shake kalau error */
+/*  Shake kalau error */
 @keyframes shake {
   0%,
   100% {
