@@ -2095,7 +2095,7 @@ function VendorArrowPhaseSteps({
                 </div>
 
                 <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi -> Aktivitas
+                    Administrasi ke Aktivitas
                 </p>
             </div>
 
@@ -3076,3 +3076,4 @@ function VendorChatDrawer({
 }
 
 export default VendorProgramDetailPage;
+

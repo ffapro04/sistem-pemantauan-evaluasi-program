@@ -2903,7 +2903,7 @@ function ArrowPhaseSteps({
                 </div>
 
                 <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi -> Aktivitas
+                    Administrasi ke Aktivitas
                 </p>
             </div>
 
@@ -3530,7 +3530,7 @@ function CommentDrawer({ open, row, comments, commentText, setCommentText, comme
                             {row?.title || "Kegiatan"}
                         </h3>
                         <p className="mt-1 text-[10px] text-slate-400 font-semibold">
-                            AO review -> referensi HO untuk ACC/Reject · Guru beri feedback
+                            AO review menjadi referensi HO untuk ACC/Reject · Guru beri feedback
                         </p>
                     </div>
                     <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:text-slate-700">
@@ -3943,3 +3943,4 @@ function EvidenceReviewModal({
 
 
 export default DetailProgramPage;
+
