@@ -21,6 +21,7 @@ import {
     PowerOff,
     Loader2,
     Upload,
+    Download,
 } from "lucide-react";
 
 import Sidebar from "../Sidebar";
@@ -531,6 +532,15 @@ function ReadAssessmentPage({
         }
     };
 
+    const handleExportResult = (row) => {
+        if (!row?.id) return;
+
+        const apiBaseUrl =
+            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+        window.location.href = `${apiBaseUrl}/assessment/${row.id}/hasil/export`;
+    };
+
     const handleImportResult = async (assessmentId, event) => {
         const file = event.target.files?.[0];
         event.target.value = "";
@@ -740,11 +750,21 @@ function ReadAssessmentPage({
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-auto px-10 pb-5">
-                        <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                            <table className="w-full border-collapse text-left">
+                        <div className="overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm custom-scrollbar">
+                            <table className="w-full min-w-[1320px] table-fixed border-collapse text-left">
+                                <colgroup>
+                                    <col className="w-[52px]" />
+                                    <col className="w-[360px]" />
+                                    <col className="w-[110px]" />
+                                    <col className="w-[165px]" />
+                                    <col className="w-[190px]" />
+                                    <col className="w-[125px]" />
+                                    <col className="w-[135px]" />
+                                    <col className="w-[145px]" />
+                                </colgroup>
                                 <thead>
                                     <tr className="border-b border-gray-100 bg-gray-50/70">
-                                        <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="px-2 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             No
                                         </th>
 
@@ -760,15 +780,15 @@ function ReadAssessmentPage({
                                             HO
                                         </th>
 
-                                        <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Sekolah Target
+                                        <th className="px-3 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                            Target Sekolah
                                         </th>
 
                                         <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Progress
                                         </th>
 
-                                        <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Deadline
                                         </th>
 
@@ -853,11 +873,11 @@ function ReadAssessmentPage({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-5 align-top">
-                                                    <div className="w-[230px]">
+                                                <td className="px-3 py-5 align-top">
+                                                    <div className="w-[180px]">
                                                         {sekolahList.length > 0 ? (
                                                             <Dropdown
-                                                                placeholder={`${sekolahList.length} Sekolah Target`}
+                                                                placeholder={`${sekolahList.length} Target Sekolah`}
                                                                 value=""
                                                                 onChange={() => { }}
                                                                 width="w-full"
@@ -942,19 +962,15 @@ function ReadAssessmentPage({
                                                             </button>
                                                         )}
 
-                                                        <label
-                                                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
-                                                            title="Import hasil Excel/CSV"
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleExportResult(row)}
+                                                            disabled={actionLoading[row.id]}
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-50"
+                                                            title="Export hasil assessment"
                                                         >
-                                                            <Upload size={14} />
-                                                            <input
-                                                                type="file"
-                                                                accept=".xlsx,.xls,.csv,.tsv,.txt,.ods"
-                                                                className="hidden"
-                                                                disabled={actionLoading[row.id]}
-                                                                onChange={(event) => handleImportResult(row.id, event)}
-                                                            />
-                                                        </label>
+                                                            <Download size={14} />
+                                                        </button>
 
                                                         {!row.sent_at && (
                                                             <button

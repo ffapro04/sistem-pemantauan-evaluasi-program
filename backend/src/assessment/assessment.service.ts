@@ -613,8 +613,18 @@ export class AssessmentService {
       .map((row) => row.map(escapeCsv).join(','))
       .join('\n');
 
+    const safeAssessmentName =
+      String(hasil.nama_assessment || `assessment-${id}`)
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .toLowerCase()
+        .slice(0, 120) || `assessment-${id}`;
+
     return {
-      filename: `hasil-assessment-${id}.csv`,
+      filename: `${safeAssessmentName}.csv`,
       content: `\uFEFF${csv}`,
     };
   }
