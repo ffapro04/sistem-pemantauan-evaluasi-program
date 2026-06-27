@@ -508,9 +508,14 @@ export class UsersService {
       throw new NotFoundException(`User dengan ID #${id} tidak ditemukan`);
     }
 
-    delete user.password;
+    const password = user.password;
 
-    return this.hydrateKepalaDinasWilayah(user);
+    const hydratedUser = await this.hydrateKepalaDinasWilayah(user);
+
+    return {
+      ...hydratedUser,
+      password,
+    };
   }
 
   async getUsersByRole(roleName: string) {

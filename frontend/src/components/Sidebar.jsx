@@ -217,7 +217,7 @@ const getRoleMenus = (idRole, hoUser) => {
           items: [
             {
               label: "Daftar Program",
-              path: "/ho/daftar-program/non-akademik", // â† Kunci ke non-akademik
+              path: "/ho/daftar-program/non-akademik", // <- Kunci ke non-akademik
               icon: ClipboardList,
             },
             {
@@ -267,7 +267,7 @@ const getRoleMenus = (idRole, hoUser) => {
         items: [
           {
             label: "Daftar Program",
-            path: "/ho/daftar-program/akademik", // â† Kunci ke akademik
+            path: "/ho/daftar-program/akademik", // <- Kunci ke akademik
             icon: ClipboardList,
           },
           {
@@ -1183,6 +1183,159 @@ const NotchNavigation = ({
   );
 };
 
+const RightPoniNavigation = ({
+  menuGroups,
+  location,
+  onLogout,
+  user,
+  unreadCount,
+  onProfileClick,
+  onNotificationClick,
+  onSettingsClick,
+  brandTitle = "Kepala Dinas",
+  brandSubtitle = "Wilayah",
+}) => {
+  const avatarUrl = getUserAvatarUrl(user);
+  const menuItems = menuGroups.flatMap((group) => group.items || []);
+
+  return (
+    <>
+      <aside className="group fixed right-4 top-1/2 z-[9999] w-[78px] -translate-y-1/2 overflow-hidden rounded-l-[2rem] border border-cyan-100/80 bg-white/95 p-2 text-slate-800 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-2xl transition-all duration-300 hover:w-[270px] max-lg:right-2 max-lg:w-[70px] max-lg:hover:w-[235px]">
+        <div className="pointer-events-none absolute -left-20 top-0 h-40 w-40 rounded-full bg-[#0AC4E0]/15 blur-3xl" />
+
+        <div className="relative mb-2 flex items-center gap-3 rounded-[1.25rem] bg-cyan-50/80 p-2 ring-1 ring-cyan-100">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] text-white shadow-[0_10px_24px_rgba(10,196,224,0.28)]">
+            <Home size={17} />
+          </div>
+
+          <div className="min-w-0 max-w-0 overflow-hidden opacity-0 transition-all duration-300 group-hover:max-w-[170px] group-hover:opacity-100">
+            <p className="truncate text-[12px] font-black leading-none tracking-tight text-slate-950">
+              {brandTitle}
+            </p>
+            <p className="mt-1 truncate text-[8px] font-bold uppercase tracking-wider text-slate-400">
+              {brandSubtitle}
+            </p>
+          </div>
+        </div>
+
+        <nav className="relative space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon || LayoutDashboard;
+            const isActive =
+              location.pathname === item.path ||
+              location.pathname.startsWith(`${item.path}/`);
+
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                title={item.label}
+                className={`group/item flex h-12 items-center gap-3 rounded-[1.15rem] px-2 text-[11px] font-black transition-all duration-200 ${isActive
+                  ? "bg-cyan-50 text-slate-950 shadow-[0_12px_28px_rgba(10,196,224,0.18)]"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+              >
+                <span
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${isActive
+                    ? "bg-white text-[#0AC4E0] shadow-sm"
+                    : "bg-white text-slate-400 ring-1 ring-slate-100 group-hover/item:text-[#0AC4E0]"
+                    }`}
+                >
+                  <Icon size={16} />
+                </span>
+
+                <span className="min-w-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-300 group-hover:max-w-[160px] group-hover:opacity-100">
+                  {item.label}
+                </span>
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        <div className="relative mt-2 space-y-1 border-t border-slate-100 pt-2">
+          <button
+            type="button"
+            onClick={onNotificationClick}
+            title="Notifikasi"
+            className="relative flex h-11 w-full items-center gap-3 rounded-[1.15rem] px-2 text-slate-400 transition-all hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-100">
+              <Bell size={15} />
+            </span>
+
+            {unreadCount > 0 && (
+              <span className="absolute left-8 top-1 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white bg-[#0AC4E0] px-1 text-[7px] font-black text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-black opacity-0 transition-all duration-300 group-hover:max-w-[150px] group-hover:opacity-100">
+              Notifikasi
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onSettingsClick}
+            title="Pengaturan"
+            className="flex h-11 w-full items-center gap-3 rounded-[1.15rem] px-2 text-slate-400 transition-all hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-100">
+              <Settings size={15} />
+            </span>
+
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-black opacity-0 transition-all duration-300 group-hover:max-w-[150px] group-hover:opacity-100">
+              Pengaturan
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onProfileClick}
+            title="Profil"
+            className="flex h-11 w-full items-center gap-3 rounded-[1.15rem] px-2 text-slate-500 transition-all hover:bg-cyan-50 hover:text-slate-900 active:scale-95"
+          >
+            <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] text-[10px] font-black uppercase text-white shadow-[0_6px_14px_rgba(10,196,224,0.25)]">
+              {getInitial(user?.nama)}
+
+              {avatarUrl && (
+                <img
+                  src={avatarUrl}
+                  alt={user?.nama || "Profile"}
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.remove();
+                  }}
+                />
+              )}
+            </span>
+
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-black opacity-0 transition-all duration-300 group-hover:max-w-[150px] group-hover:opacity-100">
+              Profil
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Keluar"
+            className="flex h-11 w-full items-center gap-3 rounded-[1.15rem] px-2 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 active:scale-95"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-slate-100">
+              <LogOut size={14} />
+            </span>
+
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-[11px] font-black opacity-0 transition-all duration-300 group-hover:max-w-[150px] group-hover:opacity-100">
+              Keluar
+            </span>
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+};
+
+
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1504,7 +1657,9 @@ const Sidebar = () => {
     );
   };
 
-  // ===== ROLE DENGAN NAVIGASI NOTCH: PENGURUS, AO, KEPALA DINAS, DAN KEPALA SEKOLAH =====
+  // ===== ROLE DENGAN NAVIGASI PONI =====
+  // Pengurus, AO, dan Kepala Sekolah tetap memakai poni atas.
+  // Kepala Dinas memakai poni khusus di sisi kanan agar tidak menutup konten atas.
   if ([2, 4, 7, 10].includes(Number(user.id_role)) || isKepalaSekolahUser(user)) {
     const currentRoleId = Number(user.id_role);
     const isKepsek = currentRoleId === 10 || isKepalaSekolahUser(user);
@@ -1530,33 +1685,55 @@ const Sidebar = () => {
               subtitle: "Dashboard",
             };
 
+    const openProfileHub = () => {
+      setShowNotificationHub(false);
+      setShowProfileHub(true);
+    };
+
+    const openNotificationHub = () => {
+      setShowProfileHub(false);
+      setShowNotificationHub(true);
+      fetchNotifications({ silent: true });
+    };
+
+    const openSettingsPage = () => {
+      setShowProfileHub(false);
+      setShowNotificationHub(false);
+      navigate("/pengaturan-akun");
+    };
+
     return (
       <>
-        <NotchNavigation
-          menuGroups={staticMenuGroups}
-          location={location}
-          onLogout={handleLogout}
-          user={user}
-          roleLabel={roleLabel}
-          unreadCount={unreadNotificationCount}
-          onProfileClick={() => {
-            setShowNotificationHub(false);
-            setShowProfileHub(true);
-          }}
-          onNotificationClick={() => {
-            setShowProfileHub(false);
-            setShowNotificationHub(true);
-            fetchNotifications({ silent: true });
-          }}
-          onSettingsClick={() => {
-            setShowProfileHub(false);
-            setShowNotificationHub(false);
-            navigate("/pengaturan-akun");
-          }}
-          now={now}
-          brandTitle={notchBrand.title}
-          brandSubtitle={notchBrand.subtitle}
-        />
+        {currentRoleId === 7 ? (
+          <RightPoniNavigation
+            menuGroups={staticMenuGroups}
+            location={location}
+            onLogout={handleLogout}
+            user={user}
+            unreadCount={unreadNotificationCount}
+            onProfileClick={openProfileHub}
+            onNotificationClick={openNotificationHub}
+            onSettingsClick={openSettingsPage}
+            brandTitle={notchBrand.title}
+            brandSubtitle={notchBrand.subtitle}
+          />
+        ) : (
+            <NotchNavigation
+              menuGroups={staticMenuGroups}
+              location={location}
+              onLogout={handleLogout}
+              user={user}
+              roleLabel={roleLabel}
+              unreadCount={unreadNotificationCount}
+              onProfileClick={openProfileHub}
+              onNotificationClick={openNotificationHub}
+              onSettingsClick={openSettingsPage}
+              now={now}
+              brandTitle={notchBrand.title}
+              brandSubtitle={notchBrand.subtitle}
+            />
+        )}
+
         <UserNotificationModal
           open={showNotificationHub}
           onClose={() => setShowNotificationHub(false)}
@@ -1568,6 +1745,7 @@ const Sidebar = () => {
           onNotificationClick={handleNotificationClick}
           onMarkAllRead={handleMarkAllRead}
         />
+
         <UserMiniProfileModal
           open={showProfileHub}
           onClose={() => setShowProfileHub(false)}

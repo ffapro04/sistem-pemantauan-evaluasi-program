@@ -8,11 +8,14 @@ import {
   Param,
   Query,
   Res,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AssessmentService } from './assessment.service';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { UpdateAssessmentDto } from './dto/update-assessment.dto';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth-guard';
 
 @Controller('assessment')
 export class AssessmentController {
@@ -31,16 +34,21 @@ export class AssessmentController {
     return this.assessmentService.findBySekolah(+id_sekolah, +id_user);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(
+    @Req() req: any,
     @Query('jenis') jenis?: string,
     @Query('id_ho') id_ho?: string,
     @Query('pilar') pilar?: string,
   ) {
+    const currentUser = req?.user?.user ?? req?.user;
+
     return this.assessmentService.findAll(
       jenis,
       id_ho ? +id_ho : undefined,
       pilar,
+      currentUser,
     );
   }
 

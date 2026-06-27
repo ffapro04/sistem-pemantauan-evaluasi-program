@@ -1219,6 +1219,344 @@ function getEventJenjangLabel(event) {
     return "Semua Jenjang";
 }
 
+function toPersonaArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.filter(Boolean);
+    return [value].filter(Boolean);
+}
+
+function getReadableName(value, fallback = "") {
+    if (!value) return fallback;
+
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return fallback ? `${fallback} #${value}` : String(value);
+
+    return (
+        value.nama ||
+        value.name ||
+        value.nama_user ||
+        value.nama_lengkap ||
+        value.full_name ||
+        value.nama_ho ||
+        value.nama_pengawas ||
+        value.nama_ao ||
+        value.nama_vendor ||
+        value.nama_sekolah ||
+        value.namaSekolah ||
+        value.namaVendor ||
+        value.email ||
+        value.user?.nama ||
+        value.user?.name ||
+        value.user?.email ||
+        value.ho?.nama ||
+        value.pengawas?.nama ||
+        value.ao?.nama ||
+        value.vendor?.nama_vendor ||
+        value.sekolah?.nama_sekolah ||
+        fallback
+    );
+}
+
+function normalizePersonaItems(items, roleLabel) {
+    return toPersonaArray(items)
+        .map((item) => ({
+            role: roleLabel,
+            name: getReadableName(item, roleLabel),
+        }))
+        .filter((item) => item.name);
+}
+
+function normalizePersonaIds(ids, roleLabel) {
+    return toPersonaArray(ids)
+        .map((id) => ({
+            role: roleLabel,
+            name: `${roleLabel} #${id}`,
+        }))
+        .filter((item) => item.name);
+}
+
+function uniquePersonas(personas = []) {
+    const seen = new Set();
+
+    return personas
+        .filter(Boolean)
+        .filter((item) => {
+            const key = `${item.role}-${item.name}`.toLowerCase();
+
+            if (!item.name || seen.has(key)) return false;
+
+            seen.add(key);
+            return true;
+        });
+}
+
+function getEventPersonas(event = {}) {
+    const raw = event.raw || {};
+    const type = String(event.type || "").toUpperCase();
+
+    if (type === "ASSESSMENT") {
+        const creator =
+            getReadableName(raw.ho, "") ||
+            getReadableName(raw.ho_user, "") ||
+            getReadableName(raw.user, "") ||
+            getReadableName(raw.creator, "") ||
+            getReadableName(raw.created_by_user, "") ||
+            getReadableName(raw.createdBy, "") ||
+            getReadableName(raw.pembuat, "");
+
+        const namedTargetSchools = uniquePersonas([
+            ...normalizePersonaItems(raw.target_sekolahs, "Target Sekolah"),
+            ...normalizePersonaItems(raw.targetSekolahs, "Target Sekolah"),
+            ...normalizePersonaItems(raw.sekolahs, "Target Sekolah"),
+            ...normalizePersonaItems(raw.schools, "Target Sekolah"),
+            ...normalizePersonaItems(raw.sekolah_targets, "Target Sekolah"),
+            ...normalizePersonaItems(raw.target_sekolah, "Target Sekolah"),
+            ...normalizePersonaItems(raw.sekolah, "Target Sekolah"),
+        ]);
+
+        const fallbackTargetSchools = namedTargetSchools.length
+            ? []
+            : [
+                ...normalizePersonaIds(raw.target_sekolah_ids, "Target Sekolah"),
+                ...normalizePersonaIds(raw.sekolah_ids, "Target Sekolah"),
+            ];
+
+        return uniquePersonas([
+            creator
+                ? {
+                    role: "Pembuat",
+                    name: creator,
+                }
+                : raw.id_ho
+                    ? {
+                        role: "Pembuat",
+                        name: `HO #${raw.id_ho}`,
+                    }
+                    : null,
+
+            ...namedTargetSchools,
+            ...fallbackTargetSchools,
+        ]);
+    }
+
+    if (type === "PROGRAM" || type === "FASE") {
+        const namedHO = uniquePersonas([
+            {
+                role: "HO",
+                name:
+                    getReadableName(raw.ho, "") ||
+                    getReadableName(raw.head_office, "") ||
+                    getReadableName(raw.headOffice, "") ||
+                    getReadableName(raw.user_ho, "") ||
+                    getReadableName(raw.created_by_user, "") ||
+                    getReadableName(raw.createdBy, "") ||
+                    getReadableName(raw.creator, ""),
+            },
+        ].filter((item) => item?.name));
+
+        const fallbackHO = namedHO.length
+            ? []
+            : [
+                raw.id_ho
+                    ? {
+                        role: "HO",
+                        name: `HO #${raw.id_ho}`,
+                    }
+                    : null,
+                raw.ho_id
+                    ? {
+                        role: "HO",
+                        name: `HO #${raw.ho_id}`,
+                    }
+                    : null,
+                raw.dibuat_oleh
+                    ? {
+                        role: "HO",
+                        name: `HO #${raw.dibuat_oleh}`,
+                    }
+                    : null,
+            ].filter(Boolean);
+
+        const namedAOs = uniquePersonas([
+            {
+                role: "AO",
+                name:
+                    getReadableName(raw.pengawas, "") ||
+                    getReadableName(raw.ao, "") ||
+                    getReadableName(raw.area_officer, "") ||
+                    getReadableName(raw.ao_user, ""),
+            },
+
+            ...normalizePersonaItems(raw.aos, "AO"),
+            ...normalizePersonaItems(raw.ao_users, "AO"),
+            ...normalizePersonaItems(raw.aoList, "AO"),
+            ...normalizePersonaItems(raw.pengawas_list, "AO"),
+        ].filter((item) => item?.name));
+
+        const fallbackAOs = namedAOs.length
+            ? []
+            : [
+                ...normalizePersonaIds(raw.ao_ids, "AO"),
+                raw.id_pengawas
+                    ? {
+                        role: "AO",
+                        name: `AO #${raw.id_pengawas}`,
+                    }
+                    : null,
+                raw.id_ao
+                    ? {
+                        role: "AO",
+                        name: `AO #${raw.id_ao}`,
+                    }
+                    : null,
+                raw.ao_id
+                    ? {
+                        role: "AO",
+                        name: `AO #${raw.ao_id}`,
+                    }
+                    : null,
+            ].filter(Boolean);
+
+        const namedVendors = uniquePersonas([
+            {
+                role: "Vendor",
+                name: getReadableName(raw.vendor, ""),
+            },
+
+            ...normalizePersonaItems(raw.vendors, "Vendor"),
+            ...normalizePersonaItems(raw.vendorList, "Vendor"),
+            ...normalizePersonaItems(raw.vendor_users, "Vendor"),
+        ].filter((item) => item?.name));
+
+        const fallbackVendors = namedVendors.length
+            ? []
+            : [
+                ...normalizePersonaIds(raw.vendor_ids, "Vendor"),
+                raw.id_vendor
+                    ? {
+                        role: "Vendor",
+                        name: `Vendor #${raw.id_vendor}`,
+                    }
+                    : null,
+                raw.vendor_id
+                    ? {
+                        role: "Vendor",
+                        name: `Vendor #${raw.vendor_id}`,
+                    }
+                    : null,
+            ].filter(Boolean);
+
+        const namedSchools = uniquePersonas([
+            {
+                role: "Sekolah",
+                name: getReadableName(raw.sekolah, ""),
+            },
+
+            ...normalizePersonaItems(raw.sekolahs, "Sekolah"),
+            ...normalizePersonaItems(raw.schools, "Sekolah"),
+            ...normalizePersonaItems(raw.target_sekolahs, "Sekolah"),
+            ...normalizePersonaItems(raw.sekolahList, "Sekolah"),
+        ].filter((item) => item?.name));
+
+        const fallbackSchools = namedSchools.length
+            ? []
+            : [
+                ...normalizePersonaIds(raw.sekolah_ids, "Sekolah"),
+                ...normalizePersonaIds(raw.target_sekolah_ids, "Sekolah"),
+                raw.id_sekolah
+                    ? {
+                        role: "Sekolah",
+                        name: `Sekolah #${raw.id_sekolah}`,
+                    }
+                    : null,
+                raw.sekolah_id
+                    ? {
+                        role: "Sekolah",
+                        name: `Sekolah #${raw.sekolah_id}`,
+                    }
+                    : null,
+            ].filter(Boolean);
+
+        return uniquePersonas([
+            ...namedHO,
+            ...fallbackHO,
+            ...namedAOs,
+            ...fallbackAOs,
+            ...namedVendors,
+            ...fallbackVendors,
+            ...namedSchools,
+            ...fallbackSchools,
+        ]);
+    }
+
+    return [];
+}
+function getEventPersonaText(event = {}) {
+    return getEventPersonas(event)
+        .map((item) => `${item.role}: ${item.name}`)
+        .join(" · ");
+}
+
+function PersonaCell({ event }) {
+    const type = String(event?.type || "").toUpperCase();
+
+    if (type === "HOLIDAY") {
+        return (
+            <p className="text-[11px] font-bold leading-relaxed text-slate-700">
+                Tanggal merah / hari besar
+            </p>
+        );
+    }
+
+    const personas = getEventPersonas(event);
+
+    if (!personas.length) {
+        return (
+            <p className="text-[11px] font-bold leading-relaxed text-slate-400">
+                Persona belum terbaca
+            </p>
+        );
+    }
+
+    const mainPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() !== "sekolah",
+    );
+
+    const schoolPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() === "sekolah",
+    );
+
+    return (
+        <div className="max-w-[920px] space-y-2 text-[11px] font-bold leading-relaxed text-slate-700">
+            {mainPersonas.length > 0 && (
+                <p className="break-words">
+                    {mainPersonas
+                        .map((persona) => `${persona.role}: ${persona.name}`)
+                        .join(", ")}
+                </p>
+            )}
+
+            {schoolPersonas.length > 0 && (
+                <div className="space-y-1">
+                    <p className="font-black text-slate-800">Sekolah:</p>
+
+                    <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                        {schoolPersonas.map((persona, index) => (
+                            <p
+                                key={`${persona.role}-${persona.name}-${index}`}
+                                className="min-w-0 truncate"
+                                title={persona.name}
+                            >
+                                {persona.name}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function AgendaDaySection({
     title,
     events,
@@ -2478,6 +2816,7 @@ export default function AgendaCalendarBase({
                 event.location,
                 event.description,
                 getStatusLabel(getEventStatus(event)),
+                getEventPersonaText(event),
                 formatReadableDate(event.date),
             ]
                 .join(" ")
@@ -2500,6 +2839,30 @@ export default function AgendaCalendarBase({
         tableStartIndex + paginatedTableEvents.length,
         tableEvents.length,
     );
+
+    const hasCOEInCurrentTable = paginatedTableEvents.some(
+        (event) => event.type === "COE",
+    );
+
+    const agendaTableColumns = hasCOEInCurrentTable
+        ? [
+            "Nama Agenda",
+            "Tanggal",
+            "Jenis",
+            "Pilar",
+            "Jenjang",
+            "Waktu",
+            "Lokasi",
+            ...(canManageCOE ? ["Action"] : []),
+        ]
+        : [
+            "Nama Agenda",
+            "Tanggal",
+            "Jenis",
+            "Pilar",
+            "Jenjang",
+            "Persona",
+        ];
 
     useEffect(() => {
         setTablePage(1);
@@ -3017,16 +3380,7 @@ export default function AgendaCalendarBase({
                                 <table className="w-full min-w-[1040px] border-collapse text-left">
                                     <thead className="bg-slate-50">
                                         <tr>
-                                            {[
-                                                "Nama Agenda",
-                                                "Tanggal",
-                                                "Jenis",
-                                                "Pilar",
-                                                "Jenjang",
-                                                "Waktu",
-                                                "Lokasi",
-                                                ...(canManageCOE ? ["Action"] : []),
-                                            ].map((column) => (
+                                            {agendaTableColumns.map((column) => (
                                                 <th
                                                     key={column}
                                                     className="border-b border-slate-100 px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400"
@@ -3070,69 +3424,72 @@ export default function AgendaCalendarBase({
                                                         <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
                                                             {isHoliday ? "-" : getEventJenjangLabel(event)}
                                                         </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {event.startTime || event.endTime
-                                                                ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
-                                                                : "Sepanjang hari"}
-                                                            {isCOE && (
-                                                                <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-amber-600">
-                                                                    {getActivityTypeLabel(event.activityType)}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {event.location || "-"}
-                                                            {isCOE && event.meetingLink && (
-                                                                <a
-                                                                    href={normalizeExternalUrl(event.meetingLink)}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
-                                                                >
-                                                                    Buka meeting
-                                                                </a>
-                                                            )}
-                                                        </td>
-                                                        {canManageCOE && (
-                                                            <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {event.path && (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleOpenEvent(event)}
-                                                                            className="rounded-lg bg-[#0AC4E0] px-3 py-2 text-[9px] font-black uppercase tracking-wide text-white"
+
+                                                        {isCOE ? (
+                                                            <>
+                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                                    {event.startTime || event.endTime
+                                                                        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+                                                                        : "Sepanjang hari"}
+
+                                                                    <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-amber-600">
+                                                                        {getActivityTypeLabel(event.activityType)}
+                                                                    </span>
+                                                                </td>
+
+                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
+                                                                    {event.location || "-"}
+
+                                                                    {event.meetingLink && (
+                                                                        <a
+                                                                            href={normalizeExternalUrl(event.meetingLink)}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                            className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
                                                                         >
-                                                                            Detail
-                                                                        </button>
+                                                                            Buka meeting
+                                                                        </a>
                                                                     )}
-                                                                    {isCOE && (
-                                                                    <>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => openEditCOE(event)}
-                                                                            className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-600"
-                                                                        >
-                                                                            Edit
-                                                                        </button>
-                                                                        {!["SELESAI", "DIBATALKAN"].includes(status) && (
+                                                                </td>
+
+                                                                {canManageCOE && (
+                                                                    <td className="border-b border-slate-50 px-4 py-3 align-top">
+                                                                        <div className="flex flex-wrap gap-2">
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => handleDoneCOE(event)}
-                                                                                className="rounded-lg bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-emerald-600"
+                                                                                onClick={() => openEditCOE(event)}
+                                                                                className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-600"
                                                                             >
-                                                                                Selesai
+                                                                                Edit
                                                                             </button>
-                                                                        )}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => handleDeleteCOE(event)}
-                                                                            className="rounded-lg bg-rose-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-rose-600"
-                                                                        >
-                                                                            Hapus
-                                                                        </button>
-                                                                    </>
-                                                                    )}
-                                                                </div>
+
+                                                                            {!["SELESAI", "DIBATALKAN"].includes(status) && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleDoneCOE(event)}
+                                                                                    className="rounded-lg bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-emerald-600"
+                                                                                >
+                                                                                    Selesai
+                                                                                </button>
+                                                                            )}
+
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handleDeleteCOE(event)}
+                                                                                className="rounded-lg bg-rose-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-rose-600"
+                                                                            >
+                                                                                Hapus
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <td
+                                                                colSpan={hasCOEInCurrentTable ? (canManageCOE ? 3 : 2) : 1}
+                                                                className="border-b border-slate-50 px-4 py-3 align-top"
+                                                            >
+                                                                <PersonaCell event={event} />
                                                             </td>
                                                         )}
                                                     </tr>
@@ -3140,7 +3497,7 @@ export default function AgendaCalendarBase({
                                             })
                                         ) : (
                                             <tr>
-                                                <td colSpan={canManageCOE ? 8 : 7} className="px-4 py-12 text-center">
+                                                    <td colSpan={agendaTableColumns.length} className="px-4 py-12 text-center">
                                                     <p className="text-[12px] font-black text-slate-700">
                                                         Agenda tidak ditemukan
                                                     </p>

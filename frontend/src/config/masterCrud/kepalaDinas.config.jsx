@@ -171,7 +171,7 @@ export const kepalaDinasConfig = {
             id_user: payload?.id_user ?? payload?.idUser ?? payload?.id,
             nama: payload?.nama || "",
             email: payload?.email || "",
-            password: "",
+            password: payload?.password || "",
             jabatan: payload?.jabatan || "Kepala Dinas Pendidikan",
             id_role: ROLE_KEPALA_DINAS,
             status: payload?.status ?? true,

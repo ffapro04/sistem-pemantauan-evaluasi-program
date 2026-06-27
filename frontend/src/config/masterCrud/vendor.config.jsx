@@ -161,7 +161,7 @@ export const vendorConfig = {
 
     normalizeDetail: (payload) => ({
         ...normalizeVendor(payload),
-        password: "",
+        password: payload?.password || "",
     }),
 
     sortRows: (a, b) => Number(b.id_vendor || 0) - Number(a.id_vendor || 0),

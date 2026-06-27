@@ -704,6 +704,9 @@ function collectWilayahIds(item = {}) {
     item?.assigned_wilayah_ids,
     item?.assigned_area_ids,
     item?.area_ids,
+    item?.kabupaten_tugas,
+    item?.kabupatenTugas,
+    item?.wilayah_tugas_detail,
     item?.wilayah?.id_wilayah,
     item?.wilayah?.id,
     item?.wilayah_penugasan,
@@ -776,6 +779,9 @@ function collectWilayahNames(item = {}) {
     item?.nama_provinsi,
     item?.kabupaten,
     item?.provinsi,
+    item?.kabupaten_tugas,
+    item?.kabupatenTugas,
+    item?.wilayah_tugas_detail,
   ];
 
   const names = [];
@@ -1249,6 +1255,42 @@ function collectAreaBinaanUser(user, wilayahMap) {
     .map(ambilAreaWilayah)
     .filter((area) => area && area !== "Belum Ada Area");
 
+  const areaFromKabupatenTugas = [
+    user?.kabupaten_tugas,
+    user?.kabupatenTugas,
+    user?.wilayah_tugas_detail,
+  ]
+    .flatMap((value) => nilaiArray(value))
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+
+      const directArea = ambilAreaWilayah(item);
+      if (directArea && directArea !== "Belum Ada Area") return directArea;
+
+      const id =
+        item?.id_wilayah ||
+        item?.id_kabupaten ||
+        item?.wilayah_id ||
+        item?.kabupaten_id ||
+        null;
+      const wilayahById = id ? wilayahMap.get(String(id)) : null;
+      const areaById = ambilAreaWilayah(wilayahById);
+      if (areaById && areaById !== "Belum Ada Area") return areaById;
+
+      const name = item?.nama_kabupaten || item?.nama_wilayah || item?.name;
+      if (!name) return null;
+
+      const wilayahByName = Array.from(wilayahMap.values()).find(
+        (wilayah) =>
+          normalisasiText(wilayah?.nama_wilayah || wilayah?.nama) ===
+          normalisasiText(name),
+      );
+
+      const areaByName = ambilAreaWilayah(wilayahByName);
+      return areaByName && areaByName !== "Belum Ada Area" ? areaByName : null;
+    })
+    .filter(Boolean);
+
   const directAreas = [
     user?.area_wilayah,
     user?.areaWilayah,
@@ -1259,7 +1301,7 @@ function collectAreaBinaanUser(user, wilayahMap) {
     .map((area) => String(area || "").trim())
     .filter(Boolean);
 
-  return [...new Set([...areaFromIds, ...directAreas])];
+  return [...new Set([...areaFromIds, ...areaFromKabupatenTugas, ...directAreas])];
 }
 
 function resolveAreaBinaanUser(user, wilayahMap) {
@@ -2184,13 +2226,13 @@ function TableMini({
       ) : (
         <>
           <div className={`min-h-0 flex-1 ${maxHeight} overflow-auto`}>
-            <table className="w-full border-collapse">
+            <table className="w-full min-w-max border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-slate-100 bg-slate-50">
                   {columns.map((column) => (
                     <th
                       key={column.key}
-                      className="px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400"
+                      className="min-w-[140px] whitespace-nowrap px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400"
                     >
                       {column.label}
                     </th>
@@ -2212,7 +2254,7 @@ function TableMini({
                     className="border-b border-slate-100 last:border-b-0 hover:bg-cyan-50/40"
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className="px-4 py-3">
+                      <td key={column.key} className="min-w-[140px] whitespace-nowrap px-4 py-3 align-top">
                         {column.render(item, startIndex + index)}
                       </td>
                     ))}
@@ -2309,6 +2351,9 @@ function ChartTableSection({
 }
 
 function AssignmentStatus(user, wilayahMap) {
+  const hasArea = collectAreaBinaanUser(user, wilayahMap).length > 0;
+  if (hasArea) return "DIPETAKAN";
+
   return resolveNamaWilayahUser(user, wilayahMap) === "Belum Dipetakan"
     ? "BELUM_DIPETAKAN"
     : "DIPETAKAN";
@@ -4105,8 +4150,8 @@ export default function DashboardAdmin() {
   const aoChartData = useMemo(() => {
     return warnaDataKonsisten(
       kelompokkanData(aoTableData, (item) => {
-        const status = AssignmentStatus(item, wilayahMap);
-        return status === "DIPETAKAN" ? "Sudah Dipetakan" : "Belum Dipetakan";
+        const areas = collectAreaBinaanUser(item, wilayahMap);
+        return areas.length ? areas.join(", ") : "Belum Ada Area";
       }),
     );
   }, [aoTableData, wilayahMap]);
@@ -4776,7 +4821,7 @@ export default function DashboardAdmin() {
               title="Data Area Officer"
               subtitle="Fokus pada kelengkapan pemetaan wilayah AO."
               icon={<UserCog size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Status Pemetaan AO"
+              chartTitle="Distribusi AO per Area Binaan"
               tableTitle="List Area Officer"
               filters={
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

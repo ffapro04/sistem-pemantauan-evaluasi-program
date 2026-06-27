@@ -140,6 +140,8 @@ export const hoConfig = {
         nama: "",
         email: "",
         password: "",
+        password_original: "",
+        password_changed: false,
         foto_profile: "",
         foto_profile_file: null,
         id_role: ROLE_HO,
@@ -151,23 +153,29 @@ export const hoConfig = {
 
     normalizeRow: normalizeHO,
 
-    normalizeDetail: (payload) => ({
-        id_user: payload?.id_user ?? payload?.idUser ?? payload?.id,
-        nama: payload?.nama || "",
-        email: payload?.email || "",
-        password: "",
-        foto_profile: payload?.foto_profile || "",
-        foto_profile_file: null,
-        foto_profile_url: getUserPhotoUrl(payload?.foto_profile),
-        jabatan: payload?.jabatan || "Staff Head Office",
-        id_role: ROLE_HO,
-        status: payload?.status ?? true,
-        jenis: normalizeJenis(payload?.jenis),
-        sub_jenis:
-            normalizeJenis(payload?.jenis) === "akademik"
-                ? payload?.sub_jenis || "SD & SMP"
-                : null,
-    }),
+    normalizeDetail: (payload) => {
+        const passwordValue = payload?.password || "";
+
+        return {
+            id_user: payload?.id_user ?? payload?.idUser ?? payload?.id,
+            nama: payload?.nama || "",
+            email: payload?.email || "",
+            password: passwordValue,
+            password_original: passwordValue,
+            password_changed: false,
+            foto_profile: payload?.foto_profile || "",
+            foto_profile_file: null,
+            foto_profile_url: getUserPhotoUrl(payload?.foto_profile),
+            jabatan: payload?.jabatan || "Staff Head Office",
+            id_role: ROLE_HO,
+            status: payload?.status ?? true,
+            jenis: normalizeJenis(payload?.jenis),
+            sub_jenis:
+                normalizeJenis(payload?.jenis) === "akademik"
+                    ? payload?.sub_jenis || "SD & SMP"
+                    : null,
+        };
+    },
 
     transformRows: (rows) => rows.filter(isHO),
 
@@ -310,6 +318,13 @@ export const hoConfig = {
     ],
 
     onFieldChange: ({ field, value, next }) => {
+        if (field === "password") {
+            return {
+                ...next,
+                password_changed: true,
+            };
+        }
+
         if (field === "jenis") {
             if (value === "non-akademik") {
                 return {
@@ -368,7 +383,7 @@ export const hoConfig = {
                     placeholder: "Minimal 8 karakter",
                     help: ({ mode }) =>
                         mode === "edit"
-                            ? "Kosongkan jika password tidak ingin diubah."
+                            ? "Password lama sudah tersimpan. Isi field ini hanya jika ingin mengganti password."
                             : "Password digunakan HO untuk masuk ke sistem.",
                 },
                 {
@@ -434,6 +449,7 @@ export const hoConfig = {
 
         if (
             mode === "edit" &&
+            formData.password_changed &&
             formData.password &&
             String(formData.password).length < 8
         ) {
@@ -474,7 +490,16 @@ export const hoConfig = {
         );
         payload.append("status", String(formData.status ?? true));
 
-        if (mode === "create" || formData.password?.trim()) {
+        if (mode === "create") {
+            payload.append("password", formData.password);
+        }
+
+        if (
+            mode === "edit" &&
+            formData.password_changed &&
+            formData.password?.trim() &&
+            formData.password !== formData.password_original
+        ) {
             payload.append("password", formData.password);
         }
 

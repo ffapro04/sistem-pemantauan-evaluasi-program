@@ -1010,7 +1010,7 @@ function ListProgramPage({
                                             ? "border-violet-100 bg-violet-50 text-violet-600"
                                             : "border-[#0AC4E0]/20 bg-[#0AC4E0]/5 text-[#0AC4E0]"
                                             }`}>
-                                            {row.jenis_program === "REGULER" ? "ðŸ”„ Reguler" : "ðŸ“‹ Project"}
+                                            {row.jenis_program === "REGULER" ? "Reguler" : "Project"}
                                         </span>
                                     )}
 

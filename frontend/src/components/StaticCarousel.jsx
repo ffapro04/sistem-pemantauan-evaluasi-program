@@ -8,7 +8,7 @@ export default function StaticCarousel({ slides }) {
 
   return (
     <div className="text-center text-white w-full">
-      {/* âœ… Render Slide Object */}
+      {/*  Render Slide Object */}
       <div className="transition-all duration-500">
         <h2 className="text-2xl font-bold">{current.title}</h2>
 
@@ -21,7 +21,7 @@ export default function StaticCarousel({ slides }) {
         )}
       </div>
 
-      {/* âœ… Dots */}
+      {/*  Dots */}
       <div className="flex justify-center gap-2 mt-6">
         {slides.map((_, index) => (
           <button

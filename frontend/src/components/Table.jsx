@@ -3,7 +3,7 @@ export default function Table({ columns = [], data = [], footer }) {
   return (
     <div className="w-full bg-white rounded-[1.8rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden ring-1 ring-black/[0.02]">
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table className="w-full min-w-max border-collapse">
 
           {/* HEADER */}
           <thead>
@@ -24,6 +24,7 @@ export default function Table({ columns = [], data = [], footer }) {
                     top: 0,
                     zIndex: 10,
                     whiteSpace: "nowrap",
+                    minWidth: col.minWidth || "140px",
                     ...(index === 0 ? { borderTopLeftRadius: "1.8rem" } : {}),
                     ...(index === columns.length - 1 ? { borderTopRightRadius: "1.8rem" } : {}),
                   }}
@@ -72,6 +73,7 @@ export default function Table({ columns = [], data = [], footer }) {
                         borderBottom: "1px solid #F8FAFC",
                         verticalAlign: "middle",
                         whiteSpace: "nowrap",
+                        minWidth: col.minWidth || "140px",
                       }}
                       className={col.align || "text-left"}
                     >

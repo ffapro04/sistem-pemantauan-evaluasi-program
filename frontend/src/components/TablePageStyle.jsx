@@ -18,6 +18,8 @@
           table {
             border-collapse: separate;
             border-spacing: 0;
+            min-width: max-content;
+            table-layout: auto;
             width: 100%;
           }
 
@@ -30,6 +32,9 @@
             letter-spacing: 0.12em !important;
             padding: 1.15rem 1.5rem !important;
             border: none !important;
+            line-height: 1.35 !important;
+            min-width: 140px !important;
+            white-space: nowrap !important;
             position: sticky;
             top: 0;
             z-index: 10;
@@ -46,7 +51,27 @@
           tbody td {
             padding: 0.85rem 1.5rem !important;
             border-bottom: 1px solid #F8FAFC !important;
+            max-width: none !important;
+            min-width: 140px !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
             vertical-align: middle !important;
+            white-space: nowrap !important;
+          }
+
+          thead th .truncate,
+          tbody td .truncate,
+          thead th [class*="truncate"],
+          tbody td [class*="truncate"] {
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+          }
+
+          thead th [class*="max-w-"],
+          tbody td [class*="max-w-"] {
+            max-width: none !important;
           }
 
           tbody tr:last-child td {

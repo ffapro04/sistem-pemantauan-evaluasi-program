@@ -72,7 +72,7 @@ export const kepalaSekolahOperatorConfig = {
       nama: data.nama || "",
       email: data.email || "",
       no_telp: data.no_telp || "",
-      password: "",
+      password: data.password || "",
       status:
         data.status === undefined || data.status === null
           ? true

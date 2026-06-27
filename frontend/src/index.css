@@ -8,7 +8,7 @@ body {
   font-family: "Poppins", sans-serif;
 }
 
-/* ✅ Fade + Slide masuk */
+/*  Fade + Slide masuk */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -20,7 +20,7 @@ body {
   }
 }
 
-/* ✅ Shake kalau error */
+/*  Shake kalau error */
 @keyframes shake {
   0%,
   100% {
@@ -869,10 +869,7 @@ html {
 }
 
 /* =========================================================
-   GLOBAL RESPONSIVE FOUNDATION - FINAL OVERRIDE
-   Tempel paling bawah index.css agar berlaku ke seluruh halaman.
-   Tujuan: cegah horizontal overflow, table aman di mobile,
-   grid besar turun otomatis, dan spacing lebih ramah layar kecil.
+   GLOBAL RESPONSIVE FOUNDATION - SAFE VERSION
    ========================================================= */
 
 html,
@@ -918,29 +915,110 @@ div {
   min-width: 0;
 }
 
-table {
+/* TABLE RESPONSIVE KHUSUS TABEL DATA */
+.responsive-table,
+.table-scroll,
+.table-wrapper,
+.table-container,
+.overflow-table {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-table table,
+.table-scroll table,
+.table-wrapper table,
+.table-container table,
+.overflow-table table {
   width: 100%;
+  min-width: 860px;
   border-collapse: collapse;
   table-layout: auto;
 }
 
-table th,
-table td {
+.responsive-table th,
+.responsive-table td,
+.table-scroll th,
+.table-scroll td,
+.table-wrapper th,
+.table-wrapper td,
+.table-container th,
+.table-container td,
+.overflow-table th,
+.overflow-table td {
   white-space: nowrap;
   word-break: keep-all;
   overflow-wrap: normal;
   hyphens: none;
 }
 
-.responsive-overflow-x,
-.table-scroll,
-.table-wrapper,
-.table-container,
-.overflow-table,
-div:has(> table),
-section:has(> table),
-article:has(> table) {
-  max-width: 100%;
+/* FIX FULLCALENDAR BIAR TIDAK KENA TABLE RESPONSIVE */
+.fc {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.fc table,
+.fc .fc-scrollgrid,
+.fc .fc-scrollgrid table,
+.fc .fc-col-header,
+.fc .fc-col-header table,
+.fc .fc-daygrid-body,
+.fc .fc-daygrid-body table,
+.fc .fc-timegrid-body,
+.fc .fc-timegrid-body table {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+}
+
+.fc th,
+.fc td {
+  min-width: 0 !important;
+  max-width: none !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.fc .fc-scrollgrid-section,
+.fc .fc-scrollgrid-section table,
+.fc .fc-scrollgrid-section > td {
+  width: 100% !important;
+}
+
+.fc .fc-scroller {
+  overflow: hidden !important;
+}
+
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #1e293b !important;
+  text-decoration: none !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.fc .fc-daygrid-day-number {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.fc .fc-daygrid-day-frame {
+  min-height: 96px !important;
 }
 
 /* Laptop kecil / tablet besar */
@@ -963,23 +1041,8 @@ article:has(> table) {
     overflow-x: hidden;
   }
 
-  [class*="grid-cols-["],
-  [class*="grid-cols-2"],
-  [class*="grid-cols-3"],
-  [class*="grid-cols-4"],
-  [class*="grid-cols-5"],
-  [class*="grid-cols-6"] {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-
   [class*="lg:flex-row"] {
     flex-direction: column !important;
-  }
-
-  [class*="w-["],
-  [class*="min-w-["],
-  [class*="max-w-["] {
-    max-width: 100% !important;
   }
 }
 
@@ -1015,30 +1078,32 @@ article:has(> table) {
     line-height: 1.18 !important;
   }
 
-  div:has(> table),
-  section:has(> table),
-  article:has(> table),
-  .responsive-table,
-  .table-scroll,
-  .table-wrapper,
-  .table-container,
-  .overflow-table {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  .responsive-table table,
+  .table-scroll table,
+  .table-wrapper table,
+  .table-container table,
+  .overflow-table table {
+    min-width: 760px;
   }
 
-  table {
-    min-width: max-content;
+  .responsive-table th,
+  .responsive-table td,
+  .table-scroll th,
+  .table-scroll td,
+  .table-wrapper th,
+  .table-wrapper td,
+  .table-container th,
+  .table-container td,
+  .overflow-table th,
+  .overflow-table td {
+    min-width: 120px;
+    max-width: none;
+    white-space: nowrap;
   }
 
   [class*="justify-end"],
   [class*="justify-between"] {
     flex-wrap: wrap;
-  }
-
-  [class*="w-[min"],
-  [class*="max-w-"] {
-    max-width: calc(100vw - 2rem) !important;
   }
 
   .leaflet-container,
@@ -1078,7 +1143,49 @@ article:has(> table) {
     padding-bottom: 1rem !important;
   }
 
-  table {
-    min-width: max-content;
+  .responsive-table table,
+  .table-scroll table,
+  .table-wrapper table,
+  .table-container table,
+  .overflow-table table {
+    min-width: 700px;
+  }
+
+  /* =========================================================
+   FULLCALENDAR PROTECTION FROM GLOBAL TABLE RESPONSIVE
+   ========================================================= */
+
+  .fc table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: separate !important;
+  }
+
+  .fc th,
+  .fc td {
+    min-width: 0 !important;
+    max-width: none !important;
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    hyphens: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  .fc .fc-scrollgrid,
+  .fc .fc-scrollgrid table,
+  .fc .fc-daygrid-body,
+  .fc .fc-daygrid-body table,
+  .fc .fc-timegrid-body,
+  .fc .fc-timegrid-body table {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .fc .fc-scroller {
+    overflow: auto !important;
   }
 }

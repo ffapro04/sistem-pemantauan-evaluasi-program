@@ -130,7 +130,7 @@ function cleanWilayahName(value) {
     return raw;
 }
 
-// ðŸ”§ Fungsi baru untuk normalisasi kategori (Akademik / Non-Akademik)
+//  Fungsi baru untuk normalisasi kategori (Akademik / Non-Akademik)
 function normalizeCategory(value) {
     return String(value || "")
         .trim()
@@ -239,14 +239,19 @@ function pushWilayahObjectIds(ids, wilayah) {
     pushWilayahId(ids, wilayah.idWilayah);
     pushWilayahId(ids, wilayah.wilayah_id);
     pushWilayahId(ids, wilayah.id);
+    pushWilayahId(ids, wilayah.id_kabupaten);
+    pushWilayahId(ids, wilayah.kabupaten_id);
+    pushWilayahId(ids, wilayah.id_provinsi);
+    pushWilayahId(ids, wilayah.provinsi_id);
 
-    // penting: sekolah biasanya tersimpan di KABUPATEN,
-    // sedangkan AO bisa tersimpan di PROVINSI.
     pushWilayahId(ids, wilayah.id_parent);
     pushWilayahId(ids, wilayah.parent_id);
+
     pushWilayahObjectIds(ids, wilayah.parent);
     pushWilayahObjectIds(ids, wilayah.induk);
     pushWilayahObjectIds(ids, wilayah.wilayah_induk);
+    pushWilayahObjectIds(ids, wilayah.provinsi);
+    pushWilayahObjectIds(ids, wilayah.kabupaten);
 }
 
 function getWilayahIds(item) {
@@ -268,7 +273,7 @@ function getWilayahIds(item) {
     pushWilayahObjectIds(ids, source.wilayah);
     pushWilayahObjectIds(ids, source.kabupaten);
     pushWilayahObjectIds(ids, source.provinsi);
-    pushWilayahObjectIds(ids, source.parent);
+    pushWilayahObjectIds(ids, source.kabupaten_tugas);
 
     if (Array.isArray(source.wilayah_ids)) {
         source.wilayah_ids.forEach((id) => pushWilayahId(ids, id));
@@ -338,7 +343,6 @@ function getWilayahNames(item) {
     pushWilayahName(names, source.namaWilayah);
     pushWilayahName(names, source.nama_kabupaten);
     pushWilayahName(names, source.nama_provinsi);
-    pushWilayahName(names, source.kabupaten_tugas);
     pushWilayahName(names, source.area);
     pushWilayahName(names, typeof source.wilayah === "string" ? source.wilayah : "");
 
@@ -346,13 +350,88 @@ function getWilayahNames(item) {
     pushWilayahObjectNames(names, source.kabupaten);
     pushWilayahObjectNames(names, source.provinsi);
     pushWilayahObjectNames(names, source.parent);
+    pushWilayahObjectNames(names, source.kabupaten_tugas);
 
     return [...new Set(names.filter(Boolean))];
 }
 
-function isSameWilayahScope(ao, selectedWilayahIds, selectedWilayahNames) {
-    const aoIds = getWilayahIds(ao.raw || ao);
-    const aoNames = getWilayahNames(ao.raw || ao);
+function createWilayahLookup(rows = []) {
+    const map = new Map();
+
+    normalizeArray(rows).forEach((item) => {
+        const id = normalizeId(item?.id_wilayah ?? item?.id);
+        if (!id) return;
+        map.set(id, item);
+    });
+
+    return map;
+}
+
+function collectWilayahParentChain(ids, wilayahById, value, visited = new Set()) {
+    const id = normalizeId(value);
+    if (!id || visited.has(id)) return;
+
+    visited.add(id);
+    ids.push(id);
+
+    const wilayah = wilayahById?.get?.(id);
+    if (!wilayah) return;
+
+    [
+        wilayah?.id_parent,
+        wilayah?.parent_id,
+        wilayah?.id_provinsi,
+        wilayah?.provinsi_id,
+        wilayah?.parent?.id_wilayah,
+        wilayah?.parent?.id,
+        wilayah?.induk?.id_wilayah,
+        wilayah?.induk?.id,
+        wilayah?.wilayah_induk?.id_wilayah,
+        wilayah?.wilayah_induk?.id,
+        wilayah?.provinsi?.id_wilayah,
+        wilayah?.provinsi?.id,
+    ].forEach((parentId) => {
+        const normalizedParentId = normalizeId(parentId);
+        if (normalizedParentId && normalizedParentId !== id) {
+            collectWilayahParentChain(ids, wilayahById, normalizedParentId, visited);
+        }
+    });
+}
+
+function getExpandedWilayahIds(item, wilayahById) {
+    const ids = [];
+
+    getWilayahIds(item).forEach((id) => {
+        collectWilayahParentChain(ids, wilayahById, id);
+    });
+
+    return [...new Set(ids.map(normalizeId).filter(Boolean))];
+}
+
+function getExpandedWilayahNames(item, wilayahById) {
+    const names = [...getWilayahNames(item)];
+
+    getExpandedWilayahIds(item, wilayahById).forEach((id) => {
+        const wilayah = wilayahById?.get?.(String(id));
+        if (!wilayah) return;
+
+        pushWilayahName(names, wilayah?.nama_wilayah);
+        pushWilayahName(names, wilayah?.namaWilayah);
+        pushWilayahName(names, wilayah?.nama);
+        pushWilayahName(names, wilayah?.name);
+
+        pushWilayahObjectNames(names, wilayah?.parent);
+        pushWilayahObjectNames(names, wilayah?.induk);
+        pushWilayahObjectNames(names, wilayah?.wilayah_induk);
+        pushWilayahObjectNames(names, wilayah?.provinsi);
+    });
+
+    return [...new Set(names.filter(Boolean))];
+}
+
+function isSameWilayahScope(ao, selectedWilayahIds, selectedWilayahNames, wilayahById) {
+    const aoIds = getExpandedWilayahIds(ao.raw || ao, wilayahById);
+    const aoNames = getExpandedWilayahNames(ao.raw || ao, wilayahById);
 
     const matchById = aoIds.some((id) => selectedWilayahIds.includes(String(id)));
     if (matchById) return true;
@@ -371,21 +450,31 @@ function normalizeSchool(item) {
 }
 
 function normalizeAo(item) {
+    const tugasList = normalizeArray(item?.kabupaten_tugas);
+    const tugasLabel = tugasList
+        .map((tugas) => tugas?.nama_kabupaten || tugas?.nama_wilayah || tugas?.nama_provinsi)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", ");
+
     return {
         value: item?.id_user ?? item?.id,
         label: item?.nama ?? item?.name ?? item?.nama_lengkap ?? "User",
-        subLabel: cleanWilayahName(
-            item?.wilayah?.nama_wilayah ||
-            item?.nama_wilayah ||
-            item?.wilayah ||
-            item?.area ||
-            item?.kabupaten_tugas ||
-            ""
-        ) || item?.email || item?.jabatan || "",
+        subLabel:
+            tugasLabel ||
+            cleanWilayahName(
+                item?.wilayah?.nama_wilayah ||
+                item?.nama_wilayah ||
+                item?.wilayah ||
+                item?.area ||
+                ""
+            ) ||
+            item?.email ||
+            item?.jabatan ||
+            "",
         raw: item,
     };
 }
-
 function isAreaOfficer(item) {
     if (!item) return false;
     const idRole = Number(item?.id_role || item?.role?.id_role || item?.role_id || 0);
@@ -582,6 +671,7 @@ function CreateProgramForm({
     const [sekolahOptions, setSekolahOptions] = useState([]);
     const [aoOptions, setAoOptions] = useState([]);
     const [vendorOptions, setVendorOptions] = useState([]);
+    const [wilayahRows, setWilayahRows] = useState([]);
 
     const [hoUser, setHoUser] = useState({ id: null, nama: "Head Office" });
     const [loading, setLoading] = useState(false);
@@ -679,10 +769,10 @@ function CreateProgramForm({
                         const payload = await res.json().catch(() => []);
                         const normalized = normalizeArray(payload);
                         if (res.ok && normalized.length > 0) {
-                            console.log(`âœ… Data ditemukan dari ${url}:`, normalized.length, "items");
+                            console.log(` Data ditemukan dari ${url}:`, normalized.length, "items");
                             return normalized;
                         } else if (res.ok) {
-                            console.log(`âš ï¸ ${url} mengembalikan array kosong`);
+                            console.log(`âš  ${url} mengembalikan array kosong`);
                         }
                     } catch (error) {
                         console.log(`âŒ Gagal fetch ${url}:`, error.message);
@@ -692,7 +782,7 @@ function CreateProgramForm({
             };
 
             // Fetch semua data parallel
-            const [rawSekolahList, rawAoList, rawVendorList] = await Promise.all([
+            const [rawSekolahList, rawAoList, rawVendorList, rawWilayahList] = await Promise.all([
                 fetchSafe([`${API_BASE_URL}/sekolah`]),
                 fetchSafe([
                     `${API_BASE_URL}/users/ao`,
@@ -706,15 +796,17 @@ function CreateProgramForm({
                     // Fallback tanpa filter tetap disertakan agar tidak gagal, namun nanti akan difilter manual
                     `${API_BASE_URL}/vendor`
                 ]),
+                fetchSafe([`${API_BASE_URL}/wilayah`]),
             ]);
 
-            console.log("ðŸ“Š Raw Data:", {
+            console.log(" Raw Data:", {
                 sekolah: rawSekolahList.length,
                 ao: rawAoList.length,
-                vendor: rawVendorList.length
+                vendor: rawVendorList.length,
+                wilayah: rawWilayahList.length,
             });
 
-            // ðŸ”§ FILTER VENDOR BERDASARKAN KATEGORI
+            //  FILTER VENDOR BERDASARKAN KATEGORI
             const targetCategory = normalizeCategory(kategori);
             const filteredVendorList = rawVendorList.filter(item => {
                 const vendorCategoryRaw = item?.kategori || item?.kategori_vendor || item?.jenis || item?.pilar || "";
@@ -723,7 +815,7 @@ function CreateProgramForm({
                 if (!vendorCategory) return true;
                 return vendorCategory === targetCategory;
             });
-            console.log(`ðŸ“Š Vendor setelah filter kategori ${kategori}: ${filteredVendorList.length} dari ${rawVendorList.length}`);
+            console.log(` Vendor setelah filter kategori ${kategori}: ${filteredVendorList.length} dari ${rawVendorList.length}`);
 
             // Proses Sekolah - strict by HO jenis/sub_jenis
             const activeRawSchools = rawSekolahList
@@ -732,7 +824,7 @@ function CreateProgramForm({
 
             const accessibleSchools = filterSchoolsByHoAccess(activeRawSchools, currentHo);
 
-            console.log("ðŸŽ¯ HO ACCESS FILTER", {
+            console.log(" HO ACCESS FILTER", {
                 currentHo,
                 totalSekolah: activeRawSchools.length,
                 sekolahSetelahFilter: accessibleSchools.length,
@@ -750,10 +842,10 @@ function CreateProgramForm({
             let aoList = [];
             const usersWithId = rawAoList.filter((item) => item?.id_user || item?.id);
             const recognizedAo = usersWithId.filter(isAreaOfficer);
-            console.log(`ðŸ” AO terdeteksi: ${recognizedAo.length} dari ${usersWithId.length} users`);
+            console.log(` AO terdeteksi: ${recognizedAo.length} dari ${usersWithId.length} users`);
             const aoSource = recognizedAo.length > 0 ? recognizedAo : usersWithId;
             if (recognizedAo.length === 0 && usersWithId.length > 0) {
-                console.warn("âš ï¸ Tidak ada user dengan role AO terdeteksi, menampilkan semua user");
+                console.warn("âš  Tidak ada user dengan role AO terdeteksi, menampilkan semua user");
             }
             aoList = aoSource
                 .filter((item) => isActiveValue(item?.status))
@@ -768,17 +860,18 @@ function CreateProgramForm({
                 .sort((a, b) => a.label.localeCompare(b.label));
 
             if (filteredVendorList.length === 0 && rawVendorList.length > 0) {
-                console.warn(`⚠️ Filter kategori vendor [${kategori}] tidak ditemukan, dropdown vendor akan kosong`, {
+                console.warn(`️ Filter kategori vendor [${kategori}] tidak ditemukan, dropdown vendor akan kosong`, {
                     kategori,
                     totalVendor: rawVendorList.length,
                 });
             }
 
-            console.log(`âœ… Final: ${sekolahList.length} sekolah, ${aoList.length} AO, ${vendorList.length} vendor`);
+            console.log(` Final: ${sekolahList.length} sekolah, ${aoList.length} AO, ${vendorList.length} vendor`);
 
             setSekolahOptions(sekolahList);
             setAoOptions(aoList);
             setVendorOptions(vendorList);
+            setWilayahRows(rawWilayahList);
 
             if (aoList.length === 0) {
                 toast.warning("Tidak ada data Area Officer ditemukan. Silakan tambahkan AO terlebih dahulu.", {
@@ -809,25 +902,27 @@ function CreateProgramForm({
     }, [initialSekolahId, sekolahOptions]);
 
     // â”€â”€ AO FILTER BY WILAYAH â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    const wilayahById = useMemo(() => createWilayahLookup(wilayahRows), [wilayahRows]);
+
     const selectedWilayahIds = useMemo(() => {
         return [
             ...new Set(
                 formData.selectedSekolahs.flatMap((school) =>
-                    getWilayahIds(school.raw || school),
+                    getExpandedWilayahIds(school.raw || school, wilayahById),
                 ),
             ),
         ];
-    }, [formData.selectedSekolahs]);
+    }, [formData.selectedSekolahs, wilayahById]);
 
     const selectedWilayahNames = useMemo(() => {
         return [
             ...new Set(
                 formData.selectedSekolahs.flatMap((school) =>
-                    getWilayahNames(school.raw || school),
+                    getExpandedWilayahNames(school.raw || school, wilayahById),
                 ),
             ),
         ];
-    }, [formData.selectedSekolahs]);
+    }, [formData.selectedSekolahs, wilayahById]);
 
     const filteredAoOptions = useMemo(() => {
         // Jangan tampilkan semua AO sebelum sekolah dipilih.
@@ -840,12 +935,13 @@ function CreateProgramForm({
         }
 
         return aoOptions.filter((ao) =>
-            isSameWilayahScope(ao, selectedWilayahIds, selectedWilayahNames),
+            isSameWilayahScope(ao, selectedWilayahIds, selectedWilayahNames, wilayahById),
         );
     }, [
         aoOptions,
         selectedWilayahIds,
         selectedWilayahNames,
+        wilayahById,
         formData.selectedSekolahs.length,
     ]);
 

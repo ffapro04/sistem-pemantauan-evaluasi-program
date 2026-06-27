@@ -2903,7 +2903,7 @@ function ArrowPhaseSteps({
                 </div>
 
                 <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi â†’ Aktivitas
+                    Administrasi ke Aktivitas
                 </p>
             </div>
 
@@ -3524,13 +3524,13 @@ function CommentDrawer({ open, row, comments, commentText, setCommentText, comme
                 <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
                     <div>
                         <p className="text-[8px] font-black uppercase tracking-widest text-violet-500">
-                            ðŸ’¬ Komentar Kegiatan
+                             Komentar Kegiatan
                         </p>
                         <h3 className="mt-0.5 text-[16px] font-black text-slate-900 leading-tight">
                             {row?.title || "Kegiatan"}
                         </h3>
                         <p className="mt-1 text-[10px] text-slate-400 font-semibold">
-                            AO review â†’ referensi HO untuk ACC/Reject · Guru beri feedback
+                            AO review menjadi referensi HO untuk ACC/Reject · Guru beri feedback
                         </p>
                     </div>
                     <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:text-slate-700">
@@ -3943,3 +3943,4 @@ function EvidenceReviewModal({
 
 
 export default DetailProgramPage;
+

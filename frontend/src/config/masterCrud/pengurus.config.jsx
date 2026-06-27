@@ -139,6 +139,8 @@ export const pengurusConfig = {
         nama: "",
         email: "",
         password: "",
+        password_original: "",
+        password_changed: false,
         foto_profile: "",
         foto_profile_file: null,
         id_role: ROLE_PENGURUS,
@@ -146,22 +148,27 @@ export const pengurusConfig = {
         adminKey: "",
         status: true,
     }),
-
     normalizeRow: normalizePengurus,
 
-    normalizeDetail: (payload) => ({
-        id_user: payload?.id_user ?? payload?.idUser ?? payload?.id,
-        nama: payload?.nama || "",
-        email: payload?.email || "",
-        password: "",
-        foto_profile: payload?.foto_profile || "",
-        foto_profile_file: null,
-        foto_profile_url: getUserPhotoUrl(payload?.foto_profile),
-        id_role: getRoleId(payload) || ROLE_PENGURUS,
-        jabatan: getJabatanLabel(payload),
-        adminKey: "",
-        status: payload?.status ?? true,
-    }),
+    normalizeDetail: (payload) => {
+        const passwordValue = payload?.password || "";
+
+        return {
+            id_user: payload?.id_user ?? payload?.idUser ?? payload?.id,
+            nama: payload?.nama || "",
+            email: payload?.email || "",
+            password: passwordValue,
+            password_original: passwordValue,
+            password_changed: false,
+            foto_profile: payload?.foto_profile || "",
+            foto_profile_file: null,
+            foto_profile_url: getUserPhotoUrl(payload?.foto_profile),
+            id_role: getRoleId(payload) || ROLE_PENGURUS,
+            jabatan: getJabatanLabel(payload),
+            adminKey: "",
+            status: payload?.status ?? true,
+        };
+    },
 
     transformRows: (rows) => rows.filter(isPengurusOrAdmin),
 
@@ -297,6 +304,13 @@ export const pengurusConfig = {
     ],
 
     onFieldChange: ({ field, value, next }) => {
+        if (field === "password") {
+            return {
+                ...next,
+                password_changed: true,
+            };
+        }
+
         if (field === "jabatan" && value !== "Admin") {
             return {
                 ...next,
@@ -414,6 +428,7 @@ export const pengurusConfig = {
 
         if (
             mode === "edit" &&
+            formData.password_changed &&
             formData.password &&
             String(formData.password).length < 8
         ) {
@@ -441,7 +456,16 @@ export const pengurusConfig = {
         payload.append("jabatan", formData.jabatan);
         payload.append("status", String(formData.status ?? true));
 
-        if (mode === "create" || formData.password?.trim()) {
+        if (mode === "create") {
+            payload.append("password", formData.password);
+        }
+
+        if (
+            mode === "edit" &&
+            formData.password_changed &&
+            formData.password?.trim() &&
+            formData.password !== formData.password_original
+        ) {
             payload.append("password", formData.password);
         }
 

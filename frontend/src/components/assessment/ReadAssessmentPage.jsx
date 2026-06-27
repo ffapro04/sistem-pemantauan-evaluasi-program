@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import Dropdown from "../Dropdown";
 import * as XLSX from "xlsx";
 import {
     Search,
@@ -20,6 +21,7 @@ import {
     PowerOff,
     Loader2,
     Upload,
+    Download,
 } from "lucide-react";
 
 import Sidebar from "../Sidebar";
@@ -530,6 +532,15 @@ function ReadAssessmentPage({
         }
     };
 
+    const handleExportResult = (row) => {
+        if (!row?.id) return;
+
+        const apiBaseUrl =
+            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+        window.location.href = `${apiBaseUrl}/assessment/${row.id}/hasil/export`;
+    };
+
     const handleImportResult = async (assessmentId, event) => {
         const file = event.target.files?.[0];
         event.target.value = "";
@@ -739,11 +750,21 @@ function ReadAssessmentPage({
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-auto px-10 pb-5">
-                        <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                            <table className="w-full border-collapse text-left">
+                        <div className="overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm custom-scrollbar">
+                            <table className="w-full min-w-[1320px] table-fixed border-collapse text-left">
+                                <colgroup>
+                                    <col className="w-[52px]" />
+                                    <col className="w-[360px]" />
+                                    <col className="w-[110px]" />
+                                    <col className="w-[165px]" />
+                                    <col className="w-[190px]" />
+                                    <col className="w-[125px]" />
+                                    <col className="w-[135px]" />
+                                    <col className="w-[145px]" />
+                                </colgroup>
                                 <thead>
                                     <tr className="border-b border-gray-100 bg-gray-50/70">
-                                        <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="px-2 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             No
                                         </th>
 
@@ -759,19 +780,19 @@ function ReadAssessmentPage({
                                             HO
                                         </th>
 
-                                        <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Sekolah Target
+                                        <th className="px-3 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                            Target Sekolah
                                         </th>
 
                                         <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Progress
                                         </th>
 
-                                        <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Deadline
                                         </th>
 
-                                        <th className="px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="sticky right-0 z-10 w-[180px] bg-gray-50/70 px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Aksi
                                         </th>
                                     </tr>
@@ -780,6 +801,12 @@ function ReadAssessmentPage({
                                 <tbody>
                                     {currentData.map((row, index) => {
                                         const active = isActiveValue(row.aktif);
+
+                                        const alreadySent =
+                                            Boolean(row.sent_at) ||
+                                            ["TERKIRIM", "PROSES PENGISIAN"].includes(
+                                                String(row.status || "").trim().toUpperCase(),
+                                            );
 
                                         const sekolahList =
                                             row.sekolah && row.sekolah !== "-"
@@ -846,25 +873,20 @@ function ReadAssessmentPage({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-5">
-                                                    <div className="flex max-w-[250px] flex-wrap gap-1.5">
+                                                <td className="px-3 py-5 align-top">
+                                                    <div className="w-[180px]">
                                                         {sekolahList.length > 0 ? (
-                                                            <>
-                                                                {sekolahList.slice(0, 2).map((nama, idx) => (
-                                                                    <span
-                                                                        key={idx}
-                                                                        className="rounded-lg border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase text-cyan-700"
-                                                                    >
-                                                                        {nama}
-                                                                    </span>
-                                                                ))}
-
-                                                                {sekolahList.length > 2 && (
-                                                                    <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase text-slate-400">
-                                                                        +{sekolahList.length - 2}
-                                                                    </span>
-                                                                )}
-                                                            </>
+                                                            <Dropdown
+                                                                placeholder={`${sekolahList.length} Target Sekolah`}
+                                                                value=""
+                                                                onChange={() => { }}
+                                                                width="w-full"
+                                                                usePortal={true}
+                                                                items={sekolahList.map((nama, idx) => ({
+                                                                    label: nama,
+                                                                    value: `${idx}-${nama}`,
+                                                                }))}
+                                                            />
                                                         ) : (
                                                             <span className="text-[10px] font-bold text-gray-300">
                                                                 Belum ada target
@@ -916,8 +938,8 @@ function ReadAssessmentPage({
                                                     </p>
                                                 </td>
 
-                                                <td className="px-5 py-5">
-                                                    <div className="flex justify-end gap-1.5">
+                                                <td className="sticky right-0 z-10 w-[180px] bg-white px-5 py-5">
+                                                    <div className="flex min-w-max justify-end gap-1.5">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -929,30 +951,26 @@ function ReadAssessmentPage({
                                                             <Eye size={14} />
                                                         </button>
 
+                                                        {!alreadySent && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => navigate(`${basePath}/edit/${row.id}`)}
+                                                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-amber-500"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit3 size={14} />
+                                                            </button>
+                                                        )}
+
                                                         <button
                                                             type="button"
-                                                            onClick={() =>
-                                                                navigate(`${basePath}/edit/${row.id}`)
-                                                            }
-                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-amber-500"
-                                                            title="Edit"
+                                                            onClick={() => handleExportResult(row)}
+                                                            disabled={actionLoading[row.id]}
+                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-50"
+                                                            title="Export hasil assessment"
                                                         >
-                                                            <Edit3 size={14} />
+                                                            <Download size={14} />
                                                         </button>
-
-                                                        <label
-                                                            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
-                                                            title="Import hasil Excel/CSV"
-                                                        >
-                                                            <Upload size={14} />
-                                                            <input
-                                                                type="file"
-                                                                accept=".xlsx,.xls,.csv,.tsv,.txt,.ods"
-                                                                className="hidden"
-                                                                disabled={actionLoading[row.id]}
-                                                                onChange={(event) => handleImportResult(row.id, event)}
-                                                            />
-                                                        </label>
 
                                                         {!row.sent_at && (
                                                             <button

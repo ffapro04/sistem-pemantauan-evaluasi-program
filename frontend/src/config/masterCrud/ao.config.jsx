@@ -431,7 +431,7 @@ export const aoConfig = {
             ...payload,
             nama: payload?.nama || "",
             email: payload?.email || "",
-            password: "",
+            password: payload?.password || "",
             jabatan: payload?.jabatan || "Area Officer",
             id_role: ROLE_AO,
             status: payload?.status ?? true,

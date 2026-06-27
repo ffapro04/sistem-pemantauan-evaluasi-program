@@ -529,6 +529,7 @@ table {
   width: 100%;
   border-collapse: separate;
   table-layout: auto;
+  min-width: max-content;
 }
 
 table th,
@@ -538,6 +539,27 @@ table td {
   overflow-wrap: normal;
   hyphens: none;
   vertical-align: top;
+  min-width: 120px;
+  max-width: none;
+}
+
+table th {
+  line-height: 1.35;
+}
+
+table td .truncate,
+table th .truncate,
+table td [class*="truncate"],
+table th [class*="truncate"] {
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
+}
+
+table td [class*="max-w-"],
+table th [class*="max-w-"] {
+  max-width: none !important;
 }
 
 @media (max-width: 768px) {
