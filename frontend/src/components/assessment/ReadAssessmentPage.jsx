@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import Dropdown from "../Dropdown";
 import * as XLSX from "xlsx";
 import {
     Search,
@@ -771,7 +772,7 @@ function ReadAssessmentPage({
                                             Deadline
                                         </th>
 
-                                        <th className="px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="sticky right-0 z-10 w-[180px] bg-gray-50/70 px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Aksi
                                         </th>
                                     </tr>
@@ -780,6 +781,12 @@ function ReadAssessmentPage({
                                 <tbody>
                                     {currentData.map((row, index) => {
                                         const active = isActiveValue(row.aktif);
+
+                                        const alreadySent =
+                                            Boolean(row.sent_at) ||
+                                            ["TERKIRIM", "PROSES PENGISIAN"].includes(
+                                                String(row.status || "").trim().toUpperCase(),
+                                            );
 
                                         const sekolahList =
                                             row.sekolah && row.sekolah !== "-"
@@ -847,19 +854,19 @@ function ReadAssessmentPage({
                                                 </td>
 
                                                 <td className="px-5 py-5 align-top">
-                                                    <div className="max-w-[360px]">
+                                                    <div className="w-[230px]">
                                                         {sekolahList.length > 0 ? (
-                                                            <div className="flex flex-wrap gap-1.5">
-                                                                {sekolahList.map((nama, idx) => (
-                                                                    <span
-                                                                        key={`${nama}-${idx}`}
-                                                                        title={nama}
-                                                                        className="inline-flex max-w-[165px] items-center rounded-lg border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase text-cyan-700"
-                                                                    >
-                                                                        <span className="truncate">{nama}</span>
-                                                                    </span>
-                                                                ))}
-                                                            </div>
+                                                            <Dropdown
+                                                                placeholder={`${sekolahList.length} Sekolah Target`}
+                                                                value=""
+                                                                onChange={() => { }}
+                                                                width="w-full"
+                                                                usePortal={true}
+                                                                items={sekolahList.map((nama, idx) => ({
+                                                                    label: nama,
+                                                                    value: `${idx}-${nama}`,
+                                                                }))}
+                                                            />
                                                         ) : (
                                                             <span className="text-[10px] font-bold text-gray-300">
                                                                 Belum ada target
@@ -911,8 +918,8 @@ function ReadAssessmentPage({
                                                     </p>
                                                 </td>
 
-                                                <td className="px-5 py-5">
-                                                    <div className="flex justify-end gap-1.5">
+                                                <td className="sticky right-0 z-10 w-[180px] bg-white px-5 py-5">
+                                                    <div className="flex min-w-max justify-end gap-1.5">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -924,16 +931,16 @@ function ReadAssessmentPage({
                                                             <Eye size={14} />
                                                         </button>
 
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                navigate(`${basePath}/edit/${row.id}`)
-                                                            }
-                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-amber-500"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit3 size={14} />
-                                                        </button>
+                                                        {!alreadySent && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => navigate(`${basePath}/edit/${row.id}`)}
+                                                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-amber-500"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit3 size={14} />
+                                                            </button>
+                                                        )}
 
                                                         <label
                                                             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
