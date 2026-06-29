@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import Dropdown from "../Dropdown";
-import * as XLSX from "xlsx";
 import {
     Search,
     Plus,
@@ -33,6 +32,7 @@ import Label from "../Label";
 import { canHoAccessSchool } from "../../utils/hoAccess";
 
 const API_BASE = "";
+const loadXlsx = async () => import("xlsx");
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -556,6 +556,7 @@ function ReadAssessmentPage({
         try {
             setRowLoading(assessmentId, true);
 
+            const XLSX = await loadXlsx();
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: "array" });
             const sheetName = workbook.SheetNames[0];

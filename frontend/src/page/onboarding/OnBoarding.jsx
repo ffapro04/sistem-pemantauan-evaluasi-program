@@ -1,7 +1,7 @@
 ﻿/* eslint-disable react/prop-types */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-unused-vars */
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import {
   ArrowRight,
@@ -17,11 +17,13 @@ import {
   MapPinned,
   MousePointerClick,
   Rocket,
+  Search as SearchIcon,
   School,
   ShieldCheck,
   Sparkles,
   Target,
   UploadCloud,
+  X,
 } from "lucide-react";
 
 import { Footer, Navbar } from "../../components/common";
@@ -187,8 +189,235 @@ function isActive(value) {
   );
 }
 
+
+function safeText(...values) {
+  for (const value of values) {
+    if (value === 0) return "0";
+    if (value === false) return "Tidak";
+    if (value === true) return "Ya";
+
+    const text = String(value ?? "").trim();
+    if (
+      text &&
+      text !== "-" &&
+      text.toLowerCase() !== "null" &&
+      text.toLowerCase() !== "undefined"
+    ) {
+      return text;
+    }
+  }
+
+  return "Belum Diisi";
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat("id-ID").format(Number(value || 0));
+}
+
+function normalizeSearchValue(value = "") {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getSearchTokens(value = "") {
+  return normalizeSearchValue(value)
+    .split(" ")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function matchesEveryKeyword(sourceText = "", keywords = []) {
+  const normalizedSource = normalizeSearchValue(sourceText);
+  if (!keywords.length) return false;
+  return keywords.every((keyword) => normalizedSource.includes(keyword));
+}
+
+const SEARCH_MARK_SELECTOR = "mark[data-onboarding-search-mark='true']";
+
+function escapeRegExp(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function removeOnboardingSearchMarks() {
+  if (typeof document === "undefined") return;
+
+  const marks = document.querySelectorAll(SEARCH_MARK_SELECTOR);
+
+  marks.forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+
+    parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+    parent.normalize();
+  });
+}
+
+function getSearchTargetElement(anchor = "top") {
+  if (typeof document === "undefined") return null;
+
+  if (!anchor || anchor === "top") {
+    return (
+      document.getElementById("top") ||
+      document.getElementById("onboarding-page") ||
+      document.body
+    );
+  }
+
+  return (
+    document.getElementById(anchor) ||
+    document.getElementById("onboarding-page") ||
+    document.body
+  );
+}
+
+function highlightKeywordsInElement(root, keywords = []) {
+  if (typeof document === "undefined" || !root || keywords.length === 0) {
+    return false;
+  }
+
+  const uniqueKeywords = [
+    ...new Set(
+      keywords
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .sort((a, b) => b.length - a.length),
+    ),
+  ];
+
+  if (!uniqueKeywords.length) return false;
+
+  const matcher = new RegExp(
+    `(${uniqueKeywords.map(escapeRegExp).join("|")})`,
+    "gi",
+  );
+
+  const textNodes = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      const text = node.nodeValue || "";
+
+      if (!parent || !text.trim()) return NodeFilter.FILTER_REJECT;
+
+      if (
+        parent.closest(
+          "nav, input, textarea, select, option, script, style, [data-search-ignore='true'], mark[data-onboarding-search-mark='true']",
+        )
+      ) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      const normalizedText = normalizeSearchValue(text);
+      const hasKeyword = uniqueKeywords.some((keyword) =>
+        normalizedText.includes(normalizeSearchValue(keyword)),
+      );
+
+      return hasKeyword ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    },
+  });
+
+  while (walker.nextNode()) {
+    textNodes.push(walker.currentNode);
+  }
+
+  textNodes.forEach((node) => {
+    const text = node.nodeValue || "";
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let hasMatch = false;
+
+    text.replace(matcher, (match, _keyword, offset) => {
+      if (offset > lastIndex) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+      }
+
+      const mark = document.createElement("mark");
+      mark.dataset.onboardingSearchMark = "true";
+      mark.className = "onboarding-search-mark";
+      mark.textContent = match;
+      fragment.appendChild(mark);
+
+      lastIndex = offset + match.length;
+      hasMatch = true;
+      return match;
+    });
+
+    if (!hasMatch) return;
+
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+
+    node.parentNode?.replaceChild(fragment, node);
+  });
+
+  const firstMark = root.querySelector(SEARCH_MARK_SELECTOR);
+
+  if (firstMark) {
+    window.setTimeout(() => {
+      firstMark.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }
+
+  return Boolean(firstMark);
+}
+
+function highlightOnboardingSearchTarget(anchor, keywords = []) {
+  removeOnboardingSearchMarks();
+
+  const target = getSearchTargetElement(anchor);
+  const highlightedInTarget = highlightKeywordsInElement(target, keywords);
+
+  if (highlightedInTarget) return true;
+
+  const pageRoot = document.getElementById("onboarding-page") || document.body;
+  return highlightKeywordsInElement(pageRoot, keywords);
+}
+
+function getSchoolSearchContent(school = {}) {
+  return [
+    school.nama_sekolah,
+    school.namaSekolah,
+    school.nama,
+    school.name,
+    school.npsn,
+    school.NPSN,
+    school.jenjang,
+    school.tingkat,
+    school.bentuk_pendidikan,
+    school.akreditasi,
+    school.alamat,
+    school.nama_kabupaten,
+    school.kabupaten,
+    school.nama_provinsi,
+    school.provinsi,
+    school.wilayah?.nama_wilayah,
+    school.wilayah?.nama,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getWilayahSearchContent(wilayah = {}) {
+  return [
+    wilayah.nama_wilayah,
+    wilayah.nama,
+    wilayah.name,
+    wilayah.kode_wilayah,
+    wilayah.kode,
+    wilayah.jenis_wilayah,
+    wilayah.tipe_wilayah,
+    wilayah.nama_kabupaten,
+    wilayah.nama_provinsi,
+    wilayah.alamat_lengkap,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function getWilayahName(wilayah) {
@@ -293,7 +522,7 @@ function HeroMetric({ label, value }) {
 
 function HeroSection({ image, stats }) {
   return (
-    <section className="relative isolate overflow-hidden bg-[#0AC4E0] px-4 pb-[170px] pt-20 text-white sm:px-6 lg:px-8 lg:pb-[210px] lg:pt-28">
+    <section id="top" className="relative isolate overflow-hidden bg-[#0AC4E0] px-4 pb-[170px] pt-20 text-white sm:px-6 lg:px-8 lg:pb-[210px] lg:pt-28">
       <SoftHeroDecor />
 
       <div className="relative z-10 mx-auto grid max-w-7xl grid-cols-1 gap-12 lg:grid-cols-[0.94fr_1.06fr] lg:items-center">
@@ -752,6 +981,82 @@ function MapSection({
   );
 }
 
+
+function OnboardingSearchPanel({ query, results, onOpenResult, onClear }) {
+  const keyword = String(query || "").trim();
+
+  if (!keyword) return null;
+
+  const shownResults = results.slice(0, 8);
+
+  return (
+    <div className="fixed inset-x-0 top-[92px] z-[90] px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl overflow-hidden rounded-[1.6rem] border border-[#0AC4E0]/20 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#E9FBFF] text-[#0AC4E0]">
+              <SearchIcon size={18} />
+            </div>
+
+            <div className="min-w-0">
+              <p className="truncate text-[12px] font-black text-[#103F49]">
+                Hasil pencarian untuk “{keyword}”
+              </p>
+              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                {results.length} hasil ditemukan di halaman onboarding
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClear}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-rose-50 hover:text-rose-500"
+            aria-label="Bersihkan pencarian"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {shownResults.length > 0 ? (
+          <div className="max-h-[330px] divide-y divide-slate-100 overflow-y-auto">
+            {shownResults.map((item) => (
+              <button
+                key={`${item.kind}-${item.id}`}
+                type="button"
+                onClick={() => onOpenResult(item)}
+                className="group flex w-full items-start gap-4 px-5 py-4 text-left transition hover:bg-[#F6FDFF]"
+              >
+                <span className="mt-0.5 rounded-full border border-[#0AC4E0]/18 bg-[#E9FBFF] px-3 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                  {item.typeLabel}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[12px] font-black text-[#103F49] group-hover:text-[#0AC4E0]">
+                    {item.title}
+                  </span>
+                  <span className="mt-1 line-clamp-2 block text-[11px] font-semibold leading-5 text-slate-500">
+                    {item.description || item.searchText}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="px-5 py-8 text-center">
+            <p className="text-[12px] font-black text-slate-700">
+              Kata kunci belum ditemukan.
+            </p>
+            <p className="mt-2 text-[11px] font-semibold leading-5 text-slate-400">
+              Coba gunakan kata seperti vision, akademik, peta, sekolah, program, evaluasi, nama wilayah, atau nama sekolah.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OnBoarding() {
   const [wilayahList, setWilayahList] = useState([]);
   const [sekolahList, setSekolahList] = useState([]);
@@ -759,6 +1064,9 @@ function OnBoarding() {
   const [selectedWilayah, setSelectedWilayah] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSchoolModal, setSelectedSchoolModal] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchHighlightEnabled, setSearchHighlightEnabled] = useState(false);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const schoolStats = useMemo(() => {
     const flattenedWilayah = flattenWilayah(wilayahList);
@@ -791,6 +1099,168 @@ function OnBoarding() {
       filteredSekolah: sekolahList.length,
     };
   }, [wilayahList, sekolahList]);
+
+  const flattenedWilayahList = useMemo(
+    () => flattenWilayah(wilayahList),
+    [wilayahList],
+  );
+
+  const onboardingSearchItems = useMemo(() => {
+    const staticItems = [
+      {
+        id: "top",
+        kind: "section",
+        typeLabel: "Halaman",
+        title: "Beranda Sistem Monitoring",
+        anchor: "top",
+        description:
+          "Sistem monitoring pembinaan, data wilayah, sekolah, program, assessment, dan evaluasi.",
+        searchText:
+          "beranda top sistem monitoring pembinaan data wilayah sekolah program assessment evaluasi operational hub guru siswa yayasan pendidikan astra michael d ruslim",
+      },
+      {
+        id: "vision-mission",
+        kind: "section",
+        typeLabel: "Strategi",
+        title: "Vision, Mission, Goal, and Aim",
+        anchor: "vision",
+        description:
+          "Arah besar pembinaan YPA-MDR dari visi, misi, tujuan, sampai dampak jangka panjang.",
+        searchText: VISION_MISSION_ITEMS.map(
+          (item) => `${item.title} ${item.eyebrow} ${item.desc}`,
+        ).join(" "),
+      },
+      {
+        id: "pillars",
+        kind: "section",
+        typeLabel: "Pilar",
+        title: "4 Pilar Pembinaan",
+        anchor: "pilar-akademik",
+        description:
+          "Akademik, Karakter, Kecakapan Hidup, dan Seni Budaya sebagai fokus pembinaan.",
+        searchText: PILLARS.map(
+          (item) => `${item.title} ${item.desc} ${item.outcome}`,
+        ).join(" "),
+      },
+      {
+        id: "workflow",
+        kind: "section",
+        typeLabel: "Alur",
+        title: "Cara Kerja Platform",
+        anchor: "cara-kerja",
+        description:
+          "Pemetaan kebutuhan, perencanaan program, pelaksanaan monitoring, evaluasi, dan keputusan.",
+        searchText: FLOW_ITEMS.map(
+          (item) => `${item.title} ${item.desc}`,
+        ).join(" "),
+      },
+      {
+        id: "map",
+        kind: "section",
+        typeLabel: "Peta",
+        title: "Peta Sekolah Binaan",
+        anchor: "peta",
+        description:
+          "Peta Indonesia yang terhubung dengan data sekolah, wilayah, provinsi, dan kabupaten binaan.",
+        searchText:
+          "peta map registry sekolah binaan provinsi kabupaten wilayah marker interactive map pilih marker reset wilayah",
+      },
+    ];
+
+    const visionItems = VISION_MISSION_ITEMS.map((item) => ({
+      id: `vision-${item.anchor}`,
+      kind: "section",
+      typeLabel: "Strategi",
+      title: item.title,
+      anchor: item.anchor,
+      description: item.desc,
+      searchText: `${item.title} ${item.eyebrow} ${item.desc}`,
+    }));
+
+    const pillarItems = PILLARS.map((item) => ({
+      id: `pillar-${item.anchor}`,
+      kind: "section",
+      typeLabel: "Pilar",
+      title: item.title,
+      anchor: item.anchor,
+      description: item.desc,
+      searchText: `${item.title} ${item.desc} ${item.outcome}`,
+    }));
+
+    const flowItems = FLOW_ITEMS.map((item, index) => ({
+      id: `flow-${index}`,
+      kind: "section",
+      typeLabel: "Alur",
+      title: item.title,
+      anchor: "cara-kerja",
+      description: item.desc,
+      searchText: `${item.title} ${item.desc}`,
+    }));
+
+    const wilayahItems = flattenedWilayahList.map((wilayah, index) => ({
+      id: `wilayah-${wilayah.id_wilayah ?? wilayah.id ?? index}`,
+      kind: "wilayah",
+      typeLabel: "Wilayah",
+      title: getWilayahName(wilayah),
+      anchor: "peta",
+      description: safeText(
+        wilayah.jenis_wilayah,
+        wilayah.tipe_wilayah,
+        wilayah.kode_wilayah,
+        "Wilayah binaan",
+      ),
+      searchText: getWilayahSearchContent(wilayah),
+      raw: wilayah,
+    }));
+
+    const schoolItems = sekolahList.map((school, index) => ({
+      id: `school-${school.id_sekolah ?? school.id ?? index}`,
+      kind: "school",
+      typeLabel: "Sekolah",
+      title: safeText(
+        school.nama_sekolah,
+        school.namaSekolah,
+        school.nama,
+        school.name,
+        "Sekolah",
+      ),
+      anchor: "peta",
+      description: [
+        safeText(school.jenjang, school.tingkat, "Jenjang belum diisi"),
+        school.npsn ? `NPSN ${school.npsn}` : "NPSN belum diisi",
+        safeText(school.nama_kabupaten, school.kabupaten, school.nama_provinsi),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      searchText: getSchoolSearchContent(school),
+      raw: school,
+    }));
+
+    return [
+      ...visionItems,
+      ...pillarItems,
+      ...flowItems,
+      ...wilayahItems,
+      ...schoolItems,
+      ...staticItems,
+    ];
+  }, [flattenedWilayahList, sekolahList]);
+
+  const searchKeywords = useMemo(
+    () => getSearchTokens(deferredSearchQuery),
+    [deferredSearchQuery],
+  );
+
+  const searchResults = useMemo(() => {
+    if (!searchKeywords.length) return [];
+
+    return onboardingSearchItems.filter((item) =>
+      matchesEveryKeyword(
+        `${item.title} ${item.description || ""} ${item.searchText || ""}`,
+        searchKeywords,
+      ),
+    );
+  }, [onboardingSearchItems, searchKeywords]);
 
   useEffect(() => {
     const fetchOnboardingData = async () => {
@@ -843,11 +1313,102 @@ function OnBoarding() {
     setIsModalOpen(false);
   };
 
+  const scrollToSearchTarget = (item, runAction = false) => {
+    if (!item) return;
+
+    if (runAction && item.kind === "wilayah") {
+      setSelectedWilayah(item.raw || null);
+    }
+
+    if (runAction && item.kind === "school") {
+      openSchoolModal(item.raw);
+    }
+
+    const anchor = item.anchor || "top";
+
+    const executeScroll = () => {
+      if (anchor === "top") {
+        window.history.pushState(null, "", "#top");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const targetElement = document.getElementById(anchor);
+
+      if (!targetElement) return;
+
+      window.history.pushState(null, "", `#${anchor}`);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+
+      targetElement.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    };
+
+    window.setTimeout(executeScroll, runAction ? 120 : 0);
+  };
+
+  const handleOnboardingSearchChange = (value) => {
+    setSearchQuery(value);
+    setSearchHighlightEnabled(Boolean(String(value || "").trim()));
+  };
+
+  const clearSearchHighlight = () => {
+    setSearchHighlightEnabled(false);
+    removeOnboardingSearchMarks();
+  };
+
+  useEffect(() => {
+    if (!searchKeywords.length) {
+      removeOnboardingSearchMarks();
+      setSearchHighlightEnabled(false);
+      return undefined;
+    }
+
+    if (!searchHighlightEnabled) return undefined;
+
+    const firstResult = searchResults[0];
+
+    removeOnboardingSearchMarks();
+
+    if (!firstResult) return undefined;
+
+    if (firstResult.kind === "wilayah") {
+      setSelectedWilayah(firstResult.raw || null);
+    }
+
+    if (firstResult.kind === "school") {
+      setSelectedSchoolModal(firstResult.raw || null);
+      setIsModalOpen(true);
+    }
+
+    const timer = window.setTimeout(() => {
+      scrollToSearchTarget(firstResult, false);
+
+      window.setTimeout(() => {
+        highlightOnboardingSearchTarget(firstResult.anchor || "top", searchKeywords);
+      }, 460);
+    }, 260);
+
+    return () => window.clearTimeout(timer);
+  }, [searchKeywords, searchResults, searchHighlightEnabled]);
+
+  useEffect(() => {
+    return () => removeOnboardingSearchMarks();
+  }, []);
+
   if (loading) return <LoadingScreen />;
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-white font-sans text-[#103F49] selection:bg-cyan-400 selection:text-white">
-      <Navbar isDashboard />
+    <div id="onboarding-page" className="min-h-screen w-full overflow-hidden bg-white font-sans text-[#103F49] selection:bg-cyan-400 selection:text-white">
+      <Navbar
+        isDashboard
+        searchValue={searchQuery}
+        onSearchChange={handleOnboardingSearchChange}
+        onSearchSubmit={clearSearchHighlight}
+        searchPlaceholder="Cari kata kunci halaman..."
+      />
 
       <HeroSection image={picturependidikan} stats={schoolStats} />
 
@@ -872,6 +1433,33 @@ function OnBoarding() {
         initialSchool={selectedSchoolModal}
         allSchools={sekolahList}
         wilayahList={flattenWilayah(wilayahList)}
+      />
+
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .onboarding-search-mark {
+              display: inline;
+              border-radius: 0.45rem;
+              background: linear-gradient(135deg, rgba(255, 235, 59, 0.95), rgba(255, 193, 7, 0.88));
+              color: #103F49;
+              box-shadow: 0 0 0 3px rgba(255, 235, 59, 0.34), 0 12px 30px rgba(15, 23, 42, 0.12);
+              font-weight: 900;
+              padding: 0.05rem 0.22rem;
+              animation: onboardingSearchPulse 1.15s ease-in-out infinite alternate;
+            }
+
+            @keyframes onboardingSearchPulse {
+              from {
+                box-shadow: 0 0 0 2px rgba(255, 235, 59, 0.28), 0 8px 22px rgba(15, 23, 42, 0.10);
+              }
+
+              to {
+                box-shadow: 0 0 0 5px rgba(255, 235, 59, 0.46), 0 14px 36px rgba(15, 23, 42, 0.16);
+              }
+            }
+          `,
+        }}
       />
     </div>
   );

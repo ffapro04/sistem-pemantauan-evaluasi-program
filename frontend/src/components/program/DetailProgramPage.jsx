@@ -239,6 +239,31 @@ function getCurrentUserIdFromToken() {
     }
 }
 
+function getCommentReadStorageKey(programId) {
+    const userId = getCurrentUserIdFromToken() || "guest";
+    return `program-comment-read:${userId}:${programId || "unknown"}`;
+}
+
+function loadCommentReadRows(programId) {
+    try {
+        const raw = localStorage.getItem(getCommentReadStorageKey(programId));
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveCommentReadRows(programId, value) {
+    try {
+        localStorage.setItem(
+            getCommentReadStorageKey(programId),
+            JSON.stringify(value || {}),
+        );
+    } catch {
+        // localStorage bisa gagal kalau browser membatasi storage
+    }
+}
+
 function getCurrentUserRoleFromToken() {
     const token = localStorage.getItem("token");
 
@@ -649,6 +674,19 @@ function DetailProgramPage({
     const [commentType, setCommentType] = useState("AO_REVIEW");
     const [commentLoading, setCommentLoading] = useState(false);
 
+    // UI state: badge komentar hilang setelah drawer komentar dibuka.
+    const [readCommentRows, setReadCommentRows] = useState(() =>
+        loadCommentReadRows(id),
+    );
+
+    // UI state: filter konten eksekusi berdasarkan shape alur.
+    const [flowFilter, setFlowFilter] = useState({
+        type: "phase",
+        phaseIndex: 0,
+        rowId: null,
+        rowType: null,
+    });
+
     // Guru rating
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [ratingRow, setRatingRow] = useState(null);
@@ -796,6 +834,12 @@ function DetailProgramPage({
             setMonitoringRows(buildMonitoringRows(detail));
             setActivePhase(0);
             setSelectedRow(null);
+            setFlowFilter({
+                type: "phase",
+                phaseIndex: 0,
+                rowId: null,
+                rowType: null,
+            });
         } catch (error) {
             console.error("Gagal memuat detail program:", error);
             toast.error(error.message || "Gagal memuat detail program");
@@ -807,6 +851,10 @@ function DetailProgramPage({
     useEffect(() => {
         fetchProgramDetail();
     }, [id, kategori]);
+
+    useEffect(() => {
+        setReadCommentRows(loadCommentReadRows(id));
+    }, [id]);
 
     const getSchoolName = () => {
         const school = masterSekolah.find(
@@ -1205,6 +1253,29 @@ function DetailProgramPage({
     const innerRows = useMemo(() => {
         return allCurrentRows.filter((row) => row.type === "kegiatan");
     }, [allCurrentRows]);
+
+    const visibleOpeningRows = useMemo(() => {
+        if (flowFilter?.type === "row") {
+            return openingRows.filter(
+                (row) => row.id === flowFilter.rowId && row.type === "termin",
+            );
+        }
+
+        return openingRows;
+    }, [openingRows, flowFilter]);
+
+    const visibleInnerRows = useMemo(() => {
+        if (flowFilter?.type === "row") {
+            return innerRows.filter(
+                (row) => row.id === flowFilter.rowId && row.type === "kegiatan",
+            );
+        }
+
+        return innerRows;
+    }, [innerRows, flowFilter]);
+
+    const hasVisibleOpeningRows = visibleOpeningRows.length > 0;
+    const hasVisibleInnerRows = visibleInnerRows.length > 0;
 
     const getRowStatus = (row) => {
         if (!row?.evidences?.length) return "WAITING_UPLOAD";
@@ -1846,19 +1917,38 @@ function DetailProgramPage({
 
     const openCommentForRow = async (row) => {
         if (!row?.parentId) return;
+
         setCommentRow(row);
         setComments([]);
         setCommentText("");
+
+        const nextReadRows = {
+            ...readCommentRows,
+            [row.id]: Number(row.commentCount || 0),
+        };
+
+        setReadCommentRows(nextReadRows);
+        saveCommentReadRows(id, nextReadRows);
+
         const token = localStorage.getItem("token");
-        let role = "unknown";
+
         try {
             const payload = JSON.parse(atob(token.split(".")[1]));
             const idRole = Number(payload.id_role || payload.role_id || 0);
-            if (idRole === 4) { setCommentType("AO_REVIEW"); role = "ao"; }
-            else if (idRole === 3) { setCommentType("HO_APPROVAL"); role = "ho"; }
-            else if (idRole === 8) { setCommentType("GURU_RATING"); role = "guru"; }
-            else { setCommentType("AO_REVIEW"); }
-        } catch { setCommentType("AO_REVIEW"); }
+
+            if (idRole === 4) {
+                setCommentType("AO_REVIEW");
+            } else if (idRole === 3) {
+                setCommentType("HO_APPROVAL");
+            } else if (idRole === 8) {
+                setCommentType("GURU_RATING");
+            } else {
+                setCommentType("AO_REVIEW");
+            }
+        } catch {
+            setCommentType("AO_REVIEW");
+        }
+
         setShowCommentDrawer(true);
         await fetchComments(row.parentId);
     };
@@ -2100,6 +2190,43 @@ function DetailProgramPage({
 
         setActivePhase(phaseIndex);
         setSelectedRow(null);
+        setFlowFilter({
+            type: "phase",
+            phaseIndex,
+            rowId: null,
+            rowType: null,
+        });
+    };
+
+    const handleFlowRowClick = (row, phaseIndex) => {
+        if (!row) return;
+
+        if (!checkPhaseUnlocked(phaseIndex)) {
+            toast.info("Periode ini masih terkunci. Selesaikan periode sebelumnya terlebih dahulu.");
+            return;
+        }
+
+        if (row.type === "kegiatan" && !isPhaseContentOpen(phaseIndex)) {
+            setActivePhase(phaseIndex);
+            setSelectedRow(null);
+            setFlowFilter({
+                type: "phase",
+                phaseIndex,
+                rowId: null,
+                rowType: null,
+            });
+            toast.info("Aktivitas pada periode ini belum terbuka. Selesaikan administrasi pembuka terlebih dahulu.");
+            return;
+        }
+
+        setActivePhase(phaseIndex);
+        setSelectedRow(row);
+        setFlowFilter({
+            type: "row",
+            phaseIndex,
+            rowId: row.id,
+            rowType: row.type,
+        });
     };
     const currentPhase = phases[activePhase] || null;
 
@@ -2241,44 +2368,52 @@ function DetailProgramPage({
                 </header>
 
                 <section className="simple-scroll min-h-0 flex-1 overflow-y-auto pt-4">
-                    <div className="grid grid-cols-12 gap-5">
-                        <aside className="col-span-12 xl:col-span-4">
-                            <ProgramSummaryPanel
-                                program={program}
-                                schoolName={getSchoolName()}
-                                hoName={getHoName()}
-                                aoName={getAoName()}
-                                vendorName={getVendorName()}
-                                progress={progress}
-                                assessment={assessment}
-                                assessmentChartData={assessmentChartData}
-                                ratingSummary={ratingSummary}
-                            />
-                        </aside>
+                    <div className="space-y-5">
+                        <ProgramSummaryPanel
+                            program={program}
+                            schoolName={getSchoolName()}
+                            hoName={getHoName()}
+                            aoName={getAoName()}
+                            vendorName={getVendorName()}
+                            progress={progress}
+                            assessment={assessment}
+                            assessmentChartData={assessmentChartData}
+                            ratingSummary={ratingSummary}
+                        />
 
-                        <section className="col-span-12 space-y-5 xl:col-span-8">
+                        <section className="space-y-5">
                             <ArrowPhaseSteps
                                 phases={phases}
+                                monitoringRows={monitoringRows}
                                 activePhase={activePhase}
+                                selectedRow={selectedRow}
+                                flowFilter={flowFilter}
                                 onPhaseClick={handlePhaseClick}
+                                onRowClick={handleFlowRowClick}
                                 checkPhaseUnlocked={checkPhaseUnlocked}
                                 isPhaseCompleted={isPhaseCompleted}
+                                isPhaseContentOpen={isPhaseContentOpen}
                                 getPhaseWorkflowStatus={getPhaseWorkflowStatus}
+                                getRowStatus={getRowStatus}
                             />
 
                             <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0">
                                         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                                            Periode Aktif
+                                            Konten Eksekusi Aktif
                                         </p>
 
                                         <h2 className="mt-1 truncate text-[21px] font-black tracking-[-0.05em] text-slate-950">
-                                            {currentPhase?.nama || `Periode ${activePhase + 1}`}
+                                            {flowFilter?.type === "row" && selectedRow
+                                                ? selectedRow.title
+                                                : currentPhase?.nama || `Periode ${activePhase + 1}`}
                                         </h2>
 
                                         <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-400">
-                                            {currentPhase?.deskripsi ||
+                                            {flowFilter?.type === "row" && selectedRow
+                                                ? `${selectedRow.phaseName} · ${selectedRow.parentLabel}. Tabel di bawah hanya menampilkan item yang dipilih pada shape alur.`
+                                                : currentPhase?.deskripsi ||
                                                 "Eksekusi dimulai dari administrasi pembuka periode, lalu aktivitas terbuka setelah review AO dan keputusan HO selesai."}
                                         </p>
                                     </div>
@@ -2300,41 +2435,61 @@ function DetailProgramPage({
 
                                 <div className="mt-3 rounded-[1.2rem] border border-slate-100 bg-slate-50 px-4 py-3">
                                     <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                                        {activeWorkflowStatus.description}
+                                        {flowFilter?.type === "row" && selectedRow
+                                            ? selectedRow.description || activeWorkflowStatus.description
+                                            : activeWorkflowStatus.description}
                                     </p>
                                 </div>
                             </div>
 
-                            <ExecutionTablePanel
-                                title={EXECUTION_COPY.openingTitle}
-                                subtitle={EXECUTION_COPY.openingSubtitle}
-                                description={EXECUTION_COPY.openingDesc}
-                                rows={openingRows}
-                                sectionStatus={openingSectionStatus}
-                                selectedRow={selectedRow}
-                                setSelectedRow={setSelectedRow}
-                                getRowStatus={getRowStatus}
-                                isRowLocked={isRowLocked}
-                                openChatForRow={openChatForRow}
-                                openCommentForRow={openCommentForRow}
-                                openRatingModal={openRatingModal}
-                            />
+                            {hasVisibleOpeningRows && (
+                                <ExecutionTablePanel
+                                    title={EXECUTION_COPY.openingTitle}
+                                    subtitle={EXECUTION_COPY.openingSubtitle}
+                                    description={EXECUTION_COPY.openingDesc}
+                                    rows={visibleOpeningRows}
+                                    sectionStatus={openingSectionStatus}
+                                    selectedRow={selectedRow}
+                                    setSelectedRow={setSelectedRow}
+                                    getRowStatus={getRowStatus}
+                                    isRowLocked={isRowLocked}
+                                    openChatForRow={openChatForRow}
+                                    openCommentForRow={openCommentForRow}
+                                    openRatingModal={openRatingModal}
+                                    readCommentRows={readCommentRows}
+                                />
+                            )}
 
-                            <ExecutionTablePanel
-                                title={EXECUTION_COPY.innerTitle}
-                                subtitle={EXECUTION_COPY.innerSubtitle}
-                                description={EXECUTION_COPY.innerDesc}
-                                rows={innerRows}
-                                sectionStatus={innerSectionStatus}
-                                selectedRow={selectedRow}
-                                setSelectedRow={setSelectedRow}
-                                getRowStatus={getRowStatus}
-                                isRowLocked={isRowLocked}
-                                openChatForRow={openChatForRow}
-                                openCommentForRow={openCommentForRow}
-                                openRatingModal={openRatingModal}
-                                locked={!isPhaseContentOpen(activePhase)}
-                            />
+                            {hasVisibleInnerRows && (
+                                <ExecutionTablePanel
+                                    title={EXECUTION_COPY.innerTitle}
+                                    subtitle={EXECUTION_COPY.innerSubtitle}
+                                    description={EXECUTION_COPY.innerDesc}
+                                    rows={visibleInnerRows}
+                                    sectionStatus={innerSectionStatus}
+                                    selectedRow={selectedRow}
+                                    setSelectedRow={setSelectedRow}
+                                    getRowStatus={getRowStatus}
+                                    isRowLocked={isRowLocked}
+                                    openChatForRow={openChatForRow}
+                                    openCommentForRow={openCommentForRow}
+                                    openRatingModal={openRatingModal}
+                                    locked={!isPhaseContentOpen(activePhase)}
+                                    readCommentRows={readCommentRows}
+                                />
+                            )}
+
+                            {!hasVisibleOpeningRows && !hasVisibleInnerRows && (
+                                <section className="rounded-[1.6rem] border border-dashed border-slate-200 bg-white px-6 py-10 text-center shadow-[0_12px_35px_rgba(15,23,42,0.04)]">
+                                    <Layers3 size={32} className="mx-auto text-slate-300" />
+                                    <h3 className="mt-3 text-sm font-black text-slate-700">
+                                        Belum ada item eksekusi pada pilihan ini
+                                    </h3>
+                                    <p className="mx-auto mt-2 max-w-lg text-[12px] font-semibold leading-relaxed text-slate-400">
+                                        Pilih shape fase, administrasi, atau aktivitas lain pada alur eksekusi di atas.
+                                    </p>
+                                </section>
+                            )}
 
                             <SelectedRowDetailPanel
                                 selectedRow={selectedRow}
@@ -2608,204 +2763,105 @@ function ProgramSummaryPanel({
     vendorName,
     progress,
     assessment,
-    assessmentChartData,
     ratingSummary,
 }) {
+    const summaryItems = [
+        { label: "Sekolah", value: schoolName },
+        { label: "Head Office", value: hoName },
+        { label: "Area Officer", value: aoName },
+        { label: "Vendor", value: vendorName },
+        {
+            label: "KPI",
+            value: `${program?.kpi_nama || "-"}${program?.kpi_target
+                ? ` · Target ${program.kpi_target}${program?.kpi_satuan || ""}`
+                : ""
+                }`,
+        },
+        { label: "Anggaran", value: formatCurrency(program?.harga_vendor) },
+        { label: "Tahun", value: program?.tahun || "-" },
+        {
+            label: "Validasi",
+            value: `${progress.approved}/${progress.total} disetujui · ${progress.percentage}%`,
+        },
+    ];
+
+    if (assessment) {
+        summaryItems.push({
+            label: "Assessment",
+            value: `${getAssessmentTitle(assessment)} · Skor ${getAssessmentScore(assessment)}`,
+        });
+    }
+
+    if (ratingSummary) {
+        summaryItems.push({
+            label: "Rating",
+            value: `${ratingSummary.average_rating || 0}/5 · ${ratingSummary.total_rating || 0} rating · Partisipasi ${ratingSummary.participation_percentage || 0}%`,
+        });
+    }
+
     return (
-        <div className="sticky top-0 rounded-[1.8rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
-            <div className="mb-5">
-                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                    Execution Summary
-                </p>
+        <section className="overflow-hidden rounded-[1.6rem] border-2 border-[#0AC4E0] bg-white shadow-[0_14px_36px_rgba(10,196,224,0.10)]">
+            <div className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white">
+                            <Layers3 size={22} />
+                        </div>
 
-                <h2 className="mt-1 text-[20px] font-black tracking-[-0.05em] text-slate-950">
-                    Ringkasan Program
-                </h2>
+                        <div className="min-w-0">
+                            <p className="text-[8px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
+                                Ringkasan Program
+                            </p>
 
-                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-400">
-                    Progress upload, validasi HO, baseline assessment, dan tim pelaksana.
-                </p>
-            </div>
+                            <h2 className="mt-1 truncate text-[22px] font-black tracking-[-0.05em] text-slate-950">
+                                {program?.nama_program || program?.nama || "Detail Program"}
+                            </h2>
 
-            <div className="mb-5 rounded-[1.4rem] border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                            Progress Validasi
-                        </p>
-
-                        <p className="mt-1 text-[32px] font-black leading-none tracking-[-0.07em] text-slate-950">
-                            {progress.percentage}%
-                        </p>
-                    </div>
-
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-white text-[18px] font-black text-[#0AC4E0]">
-                        {progress.approved}/{progress.total}
+                            <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">
+                                Informasi inti program, pelaksana, KPI, anggaran, dan progres validasi.
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white">
+                <div className="shrink-0 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-right">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                        Progress
+                    </p>
+
+                    <p className="mt-1 text-[24px] font-black leading-none tracking-[-0.06em] text-slate-950">
+                        {progress.percentage}%
+                    </p>
+
+                    <p className="mt-1 text-[10px] font-bold text-slate-500">
+                        {progress.approved}/{progress.total} bukti approved
+                    </p>
+                </div>
+            </div>
+
+            <div className="border-t border-cyan-100 px-5 py-4">
+                <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {summaryItems.map((item) => (
+                        <div key={item.label} className="min-w-0">
+                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                {item.label}
+                            </p>
+
+                            <p className="mt-1 truncate text-[12px] font-black text-slate-800" title={String(item.value || "-")}>
+                                {item.value || "-"}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-cyan-50">
                     <div
                         className="h-full rounded-full bg-[#0AC4E0] transition-all"
                         style={{ width: `${progress.percentage}%` }}
                     />
                 </div>
             </div>
-
-            <div className="mb-5 grid grid-cols-2 gap-3">
-                <SummaryMetric
-                    label="Approved"
-                    value={progress.approved}
-                    className="text-emerald-600"
-                />
-
-                <SummaryMetric
-                    label="Menunggu HO"
-                    value={progress.waitingHo}
-                    className="text-amber-600"
-                />
-
-                <SummaryMetric
-                    label="Perlu Upload"
-                    value={progress.waitingUpload}
-                    className="text-slate-500"
-                />
-
-                <SummaryMetric
-                    label="Rejected"
-                    value={progress.rejected}
-                    className="text-rose-600"
-                />
-            </div>
-
-            {ratingSummary && (
-                <div className="mb-5 rounded-[1.4rem] border border-amber-100 bg-amber-50/60 p-4">
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                            <p className="text-[8px] font-black uppercase tracking-widest text-amber-600">
-                                Rating Blueprint
-                            </p>
-                            <h3 className="mt-1 text-[14px] font-black text-slate-900">
-                                Average Program
-                            </h3>
-                            <p className="mt-1 text-[10px] font-semibold leading-relaxed text-amber-700/70">
-                                Rata-rata dari rating yang sudah masuk.
-                            </p>
-                        </div>
-                        <div className="rounded-2xl bg-white px-4 py-3 text-center">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                Bintang
-                            </p>
-                            <p className="mt-1 text-[22px] font-black leading-none text-amber-600">
-                                {ratingSummary.average_rating || 0}/5
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                        <SummaryMetric
-                            label="Total Rating"
-                            value={ratingSummary.total_rating || 0}
-                            className="text-amber-600"
-                        />
-                        <SummaryMetric
-                            label="Partisipasi"
-                            value={`${ratingSummary.participation_percentage || 0}%`}
-                            className="text-[#0AC4E0]"
-                        />
-                        <SummaryMetric
-                            label="Guru Rating"
-                            value={ratingSummary.guru_rating_count || 0}
-                            className="text-emerald-600"
-                        />
-                        <SummaryMetric
-                            label="Belum Rating"
-                            value={ratingSummary.missing_guru_rating || 0}
-                            className="text-rose-600"
-                        />
-                    </div>
-                </div>
-            )}
-
-            {assessment && (
-                <div className="mb-5 rounded-[1.4rem] border border-cyan-100 bg-cyan-50/70 p-4">
-                    <div className="mb-3 flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                Assessment Baseline
-                            </p>
-
-                            <h3 className="mt-1 truncate text-[14px] font-black text-slate-900">
-                                {getAssessmentTitle(assessment)}
-                            </h3>
-
-                            <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                                Tolak ukur awal program.
-                            </p>
-                        </div>
-
-                        <div className="rounded-2xl bg-white px-4 py-3 text-center">
-                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                Skor
-                            </p>
-
-                            <p className="mt-1 text-[20px] font-black leading-none text-slate-950">
-                                {getAssessmentScore(assessment)}
-                            </p>
-                        </div>
-                    </div>
-
-                    <AssessmentMiniChart data={assessmentChartData} />
-                </div>
-            )}
-
-            <div className="space-y-3">
-                <SummaryLine
-                    icon={<Building2 size={15} />}
-                    label="Sekolah"
-                    value={schoolName}
-                />
-
-                <SummaryLine
-                    icon={<UserCheck size={15} />}
-                    label="Head Office"
-                    value={hoName}
-                />
-
-                <SummaryLine
-                    icon={<UserCheck size={15} />}
-                    label="Area Officer"
-                    value={aoName}
-                />
-
-                <SummaryLine
-                    icon={<Briefcase size={15} />}
-                    label="Vendor"
-                    value={vendorName}
-                />
-
-                <SummaryLine
-                    icon={<Target size={15} />}
-                    label="KPI"
-                    value={`${program?.kpi_nama || "-"} ${program?.kpi_target
-                        ? `(${program.kpi_target}${program?.kpi_satuan || ""})`
-                        : ""
-                        }`}
-                />
-
-                <SummaryLine
-                    icon={<Wallet size={15} />}
-                    label="Anggaran"
-                    value={formatCurrency(program?.harga_vendor)}
-                />
-
-                <SummaryLine
-                    icon={<Calendar size={15} />}
-                    label="Tahun"
-                    value={program?.tahun || "-"}
-                />
-            </div>
-        </div>
+        </section>
     );
 }
 
@@ -2883,15 +2939,70 @@ function AssessmentMiniChart({ data = [] }) {
 }
 function ArrowPhaseSteps({
     phases,
+    monitoringRows = {},
     activePhase,
+    selectedRow,
+    flowFilter,
     onPhaseClick,
+    onRowClick,
     checkPhaseUnlocked,
     isPhaseCompleted,
+    isPhaseContentOpen,
     getPhaseWorkflowStatus,
+    getRowStatus,
 }) {
+    const getFlowRows = (phaseIndex) => monitoringRows[phaseIndex] || [];
+
+    const getFlowTone = ({ active, completed, locked, rowStatus, type }) => {
+        if (locked) {
+            return {
+                wrapper: "border-slate-200 bg-slate-50 text-slate-400",
+                icon: "bg-white text-slate-300",
+            };
+        }
+
+        if (active) {
+            return {
+                wrapper: "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-[0_16px_35px_rgba(10,196,224,0.22)]",
+                icon: "bg-white/20 text-white",
+            };
+        }
+
+        if (completed || rowStatus === "APPROVED") {
+            return {
+                wrapper: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-white",
+                icon: "bg-white text-emerald-600",
+            };
+        }
+
+        if (rowStatus === "WAITING_HO" || rowStatus === "WAITING_AO") {
+            return {
+                wrapper: "border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-white",
+                icon: "bg-white text-amber-600",
+            };
+        }
+
+        if (type === "termin") {
+            return {
+                wrapper: "border-blue-100 bg-blue-50 text-blue-700 hover:border-blue-200 hover:bg-white",
+                icon: "bg-white text-blue-600",
+            };
+        }
+
+        return {
+            wrapper: "border-slate-100 bg-white text-slate-700 hover:border-cyan-100 hover:bg-cyan-50",
+            icon: "bg-slate-50 text-[#0AC4E0]",
+        };
+    };
+
+    const arrowStyle = {
+        clipPath:
+            "polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%)",
+    };
+
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-            <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
                         Periode Program
@@ -2900,82 +3011,176 @@ function ArrowPhaseSteps({
                     <h3 className="mt-1 text-[17px] font-black tracking-[-0.04em] text-slate-950">
                         Alur Eksekusi
                     </h3>
+
+                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                        Klik shape fase, administrasi, aktivitas, atau pertemuan untuk memfilter tabel eksekusi di bawah.
+                    </p>
                 </div>
 
-                <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi ke Aktivitas
+                <p className="w-fit rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Geser horizontal jika alur panjang
                 </p>
             </div>
 
-            <div className="simple-scroll flex gap-3 overflow-x-auto pb-1">
-                {phases.length === 0 && (
-                    <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
-                        <p className="text-[12px] font-bold text-slate-400">
-                            Belum ada periode pada program ini.
-                        </p>
-                    </div>
-                )}
-
-                {phases.map((phase, index) => {
-                    const active = activePhase === index;
-                    const unlocked = checkPhaseUnlocked(index);
-                    const completed = isPhaseCompleted(index);
-                    const status = getPhaseWorkflowStatus(index);
-
-                    return (
-                        <div
-                            key={`${phase.id}-${index}`}
-                            className="flex shrink-0 items-center gap-3"
-                        >
-                            <button
-                                type="button"
-                                onClick={() => onPhaseClick(index)}
-                                className={`min-w-[185px] rounded-[1.25rem] border px-4 py-3 text-left transition ${active
-                                    ? "border-cyan-100 bg-cyan-50 shadow-sm"
-                                    : "border-slate-100 bg-slate-50 hover:bg-white"
-                                    } ${!unlocked ? "cursor-not-allowed opacity-60" : ""}`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span
-                                        className={`flex h-9 w-9 items-center justify-center rounded-2xl ${completed
-                                            ? "bg-emerald-50 text-emerald-600"
-                                            : active
-                                                ? "bg-white text-[#0AC4E0]"
-                                                : "bg-white text-slate-400"
-                                            }`}
-                                    >
-                                        {!unlocked ? (
-                                            <Lock size={15} />
-                                        ) : completed ? (
-                                            <CheckCircle2 size={15} />
-                                        ) : (
-                                            <Layers3 size={15} />
-                                        )}
-                                    </span>
-
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                        Step {String(index + 1).padStart(2, "0")}
-                                    </span>
-                                </div>
-
-                                <h4 className="mt-3 truncate text-[13px] font-black text-slate-900">
-                                    {phase.nama || `Periode ${index + 1}`}
-                                </h4>
-
-                                <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                                    {status.label}
-                                </p>
-                            </button>
-
-                            {index < phases.length - 1 && (
-                                <div className="flex items-center gap-1 text-slate-300">
-                                    <div className="h-0.5 w-5 rounded-full bg-slate-200" />
-                                    <ChevronRight size={16} />
-                                </div>
-                            )}
+            <div className="simple-scroll overflow-x-auto pb-2">
+                <div className="flex min-w-max items-stretch gap-2 pr-4">
+                    {phases.length === 0 && (
+                        <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                            <p className="text-[12px] font-bold text-slate-400">
+                                Belum ada periode pada program ini.
+                            </p>
                         </div>
-                    );
-                })}
+                    )}
+
+                    {phases.map((phase, index) => {
+                        const phaseRows = getFlowRows(index);
+                        const unlocked = checkPhaseUnlocked(index);
+                        const completed = isPhaseCompleted(index);
+                        const status = getPhaseWorkflowStatus(index);
+                        const phaseActive =
+                            activePhase === index && flowFilter?.type !== "row";
+                        const phaseTone = getFlowTone({
+                            active: phaseActive,
+                            completed,
+                            locked: !unlocked,
+                            type: "phase",
+                        });
+
+                        const openingRows = phaseRows.filter((row) => row.type === "termin");
+                        const activityRows = phaseRows.filter((row) => row.type === "kegiatan");
+
+                        return (
+                            <div
+                                key={`${phase.id}-${index}`}
+                                className="flex shrink-0 items-stretch gap-2"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => onPhaseClick(index)}
+                                    style={arrowStyle}
+                                    className={`min-h-[86px] w-[210px] border px-7 py-3 text-left transition ${phaseTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span
+                                            className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
+                                        >
+                                            {!unlocked ? (
+                                                <Lock size={14} />
+                                            ) : completed ? (
+                                                    <CheckCircle2 size={14} />
+                                                ) : (
+                                                <Layers3 size={14} />
+                                            )}
+                                        </span>
+
+                                        <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                            Fase {String(index + 1).padStart(2, "0")}
+                                        </span>
+                                    </div>
+
+                                    <h4 className="mt-2 truncate text-[12px] font-black">
+                                        {phase.nama || `Periode ${index + 1}`}
+                                    </h4>
+
+                                    <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                        {status.label}
+                                    </p>
+                                </button>
+
+                                {openingRows.map((row) => {
+                                    const rowStatus = getRowStatus(row);
+                                    const rowActive =
+                                        flowFilter?.type === "row" &&
+                                        flowFilter?.rowId === row.id;
+                                    const rowTone = getFlowTone({
+                                        active: rowActive,
+                                        completed: rowStatus === "APPROVED",
+                                        locked: !unlocked,
+                                        rowStatus,
+                                        type: row.type,
+                                    });
+
+                                    return (
+                                        <button
+                                            key={row.id}
+                                            type="button"
+                                            onClick={() => onRowClick(row, index)}
+                                            style={arrowStyle}
+                                            className={`min-h-[86px] w-[230px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                >
+                                                    <UploadCloud size={14} />
+                                                </span>
+
+                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    Administrasi
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-2 truncate text-[12px] font-black">
+                                                {row.title}
+                                            </h4>
+
+                                            <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                {STATUS_LABEL[rowStatus] || rowStatus}
+                                            </p>
+                                        </button>
+                                    );
+                                })}
+
+                                {activityRows.map((row, activityIndex) => {
+                                    const rowStatus = getRowStatus(row);
+                                    const phaseContentOpen = isPhaseContentOpen(index);
+                                    const rowActive =
+                                        flowFilter?.type === "row" &&
+                                        flowFilter?.rowId === row.id;
+                                    const rowTone = getFlowTone({
+                                        active: rowActive,
+                                        completed: rowStatus === "APPROVED",
+                                        locked: !unlocked || !phaseContentOpen,
+                                        rowStatus,
+                                        type: row.type,
+                                    });
+
+                                    return (
+                                        <button
+                                            key={row.id}
+                                            type="button"
+                                            onClick={() => onRowClick(row, index)}
+                                            style={arrowStyle}
+                                            className={`min-h-[86px] w-[245px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                >
+                                                    <FileText size={14} />
+                                                </span>
+
+                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    Aktivitas {activityIndex + 1}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-2 truncate text-[12px] font-black">
+                                                {row.title}
+                                            </h4>
+
+                                            <div className="mt-1 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                <span>{(row.meetings || []).length} Pertemuan</span>
+                                                <span>·</span>
+                                                <span>{STATUS_LABEL[rowStatus] || rowStatus}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -2995,6 +3200,7 @@ function ExecutionTablePanel({
     openChatForRow,
     openCommentForRow,
     openRatingModal,
+    readCommentRows = {},
 }) {
     return (
         <section className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
@@ -3205,11 +3411,18 @@ function ExecutionTablePanel({
                                                             title="Komentar Kegiatan (AO/HO/Guru)"
                                                         >
                                                             <MessageSquare size={15} />
-                                                            {(row.commentCount || 0) > 0 && (
-                                                                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[8px] font-black text-white">
-                                                                    {row.commentCount > 9 ? "9+" : row.commentCount}
-                                                                </span>
-                                                            )}
+                                                            {(() => {
+                                                                const unreadCommentCount = Math.max(
+                                                                    Number(row.commentCount || 0) - Number(readCommentRows[row.id] || 0),
+                                                                    0,
+                                                                );
+
+                                                                return unreadCommentCount > 0 ? (
+                                                                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[8px] font-black text-white">
+                                                                        {unreadCommentCount > 9 ? "9+" : unreadCommentCount}
+                                                                    </span>
+                                                                ) : null;
+                                                            })()}
                                                         </button>
                                                     )}
 
@@ -3524,7 +3737,7 @@ function CommentDrawer({ open, row, comments, commentText, setCommentText, comme
                 <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
                     <div>
                         <p className="text-[8px] font-black uppercase tracking-widest text-violet-500">
-                             Komentar Kegiatan
+                            Komentar Kegiatan
                         </p>
                         <h3 className="mt-0.5 text-[16px] font-black text-slate-900 leading-tight">
                             {row?.title || "Kegiatan"}

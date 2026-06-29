@@ -193,6 +193,31 @@ function formatChatDateTime(value) {
     };
 }
 
+function getCommentReadStorageKey(programId) {
+    const userId = getCurrentUserIdFromToken() || "guest";
+    return `vendor-program-comment-read:${userId}:${programId || "unknown"}`;
+}
+
+function loadCommentReadRows(programId) {
+    try {
+        const raw = localStorage.getItem(getCommentReadStorageKey(programId));
+        return raw ? JSON.parse(raw) : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveCommentReadRows(programId, value) {
+    try {
+        localStorage.setItem(
+            getCommentReadStorageKey(programId),
+            JSON.stringify(value || {}),
+        );
+    } catch {
+        // localStorage bisa gagal kalau browser membatasi storage
+    }
+}
+
 function getCurrentUserIdFromToken() {
     const token = localStorage.getItem("token");
 
@@ -358,10 +383,22 @@ function VendorProgramDetailPage({
     const [chatContext, setChatContext] = useState(null);
     const [message, setMessage] = useState("");
 
+    const [readCommentRows, setReadCommentRows] = useState(() =>
+        loadCommentReadRows(id),
+    );
+
     // Komentar kegiatan (Vendor bisa lihat, tapi tidak bisa tambah)
     const [showCommentDrawer, setShowCommentDrawer] = useState(false);
     const [commentRow, setCommentRow] = useState(null);
     const [comments, setComments] = useState([]);
+
+    // UI state: filter konten eksekusi berdasarkan shape alur.
+    const [flowFilter, setFlowFilter] = useState({
+        type: "phase",
+        phaseIndex: 0,
+        rowId: null,
+        rowType: null,
+    });
 
     const [chats, setChats] = useState([
         {
@@ -501,6 +538,9 @@ function VendorProgramDetailPage({
 
     useEffect(() => {
         fetchProgramDetail();
+    }, [id]);
+    useEffect(() => {
+        setReadCommentRows(loadCommentReadRows(id));
     }, [id]);
     const getSchoolName = () => {
         const school = masterSekolah.find(
@@ -915,6 +955,29 @@ function VendorProgramDetailPage({
         return allCurrentRows.filter((row) => row.type === "kegiatan");
     }, [allCurrentRows]);
 
+    const visibleOpeningRows = useMemo(() => {
+        if (flowFilter?.type === "row") {
+            return openingRows.filter(
+                (row) => row.id === flowFilter.rowId && row.type === "termin",
+            );
+        }
+
+        return openingRows;
+    }, [openingRows, flowFilter]);
+
+    const visibleInnerRows = useMemo(() => {
+        if (flowFilter?.type === "row") {
+            return innerRows.filter(
+                (row) => row.id === flowFilter.rowId && row.type === "kegiatan",
+            );
+        }
+
+        return innerRows;
+    }, [innerRows, flowFilter]);
+
+    const hasVisibleOpeningRows = visibleOpeningRows.length > 0;
+    const hasVisibleInnerRows = visibleInnerRows.length > 0;
+
     const getRowStatus = (row) => {
         if (!row?.evidences?.length) return "WAITING_UPLOAD";
 
@@ -1178,6 +1241,43 @@ function VendorProgramDetailPage({
 
         setActivePhase(phaseIndex);
         setSelectedRow(null);
+        setFlowFilter({
+            type: "phase",
+            phaseIndex,
+            rowId: null,
+            rowType: null,
+        });
+    };
+
+    const handleFlowRowClick = (row, phaseIndex) => {
+        if (!row) return;
+
+        if (!checkPhaseUnlocked(phaseIndex)) {
+            toast.info("Periode ini masih terkunci. Selesaikan periode sebelumnya terlebih dahulu.");
+            return;
+        }
+
+        if (row.type === "kegiatan" && !isPhaseContentOpen(phaseIndex)) {
+            setActivePhase(phaseIndex);
+            setSelectedRow(null);
+            setFlowFilter({
+                type: "phase",
+                phaseIndex,
+                rowId: null,
+                rowType: null,
+            });
+            toast.info("Aktivitas pada periode ini belum terbuka. Selesaikan administrasi pembuka terlebih dahulu.");
+            return;
+        }
+
+        setActivePhase(phaseIndex);
+        setSelectedRow(row);
+        setFlowFilter({
+            type: "row",
+            phaseIndex,
+            rowId: row.id,
+            rowType: row.type,
+        });
     };
 
     const openFile = (file) => {
@@ -1205,8 +1305,18 @@ function VendorProgramDetailPage({
 
     const openCommentForRow = async (row) => {
         if (!row?.parentId) return;
+
         setCommentRow(row);
         setComments([]);
+
+        const nextReadRows = {
+            ...readCommentRows,
+            [row.id]: Number(row.commentCount || 0),
+        };
+
+        setReadCommentRows(nextReadRows);
+        saveCommentReadRows(id, nextReadRows);
+
         setShowCommentDrawer(true);
         await fetchComments(row.parentId);
     };
@@ -1700,47 +1810,55 @@ function VendorProgramDetailPage({
                 </header>
 
                 <section className="simple-scroll min-h-0 flex-1 overflow-y-auto pt-4">
-                    <div className="grid grid-cols-12 gap-5">
-                        <aside className="col-span-12 xl:col-span-4">
-                            <VendorSummaryPanel
-                                program={program}
-                                schoolName={getSchoolName()}
-                                hoName={getHoName()}
-                                aoName={getAoName()}
-                                vendorName={getVendorName()}
-                                progress={progress}
-                            />
-                        </aside>
+                    <div className="space-y-5">
+                        <VendorSummaryPanel
+                            program={program}
+                            schoolName={getSchoolName()}
+                            hoName={getHoName()}
+                            aoName={getAoName()}
+                            vendorName={getVendorName()}
+                            progress={progress}
+                        />
 
-                        <section className="col-span-12 space-y-5 xl:col-span-8">
+                        <section className="space-y-5">
                             <VendorArrowPhaseSteps
                                 phases={phases}
+                                monitoringRows={monitoringRows}
                                 activePhase={activePhase}
+                                selectedRow={selectedRow}
+                                flowFilter={flowFilter}
                                 onPhaseClick={handlePhaseClick}
+                                onRowClick={handleFlowRowClick}
                                 checkPhaseUnlocked={checkPhaseUnlocked}
                                 isPhaseCompleted={isPhaseCompleted}
+                                isPhaseContentOpen={isPhaseContentOpen}
                                 getPhaseWorkflowStatus={getPhaseWorkflowStatus}
+                                getRowStatus={getRowStatus}
                             />
 
                             <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-                                <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="min-w-0">
                                         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                                            Periode Aktif
+                                            Konten Eksekusi Aktif
                                         </p>
 
                                         <h2 className="mt-1 truncate text-[21px] font-black tracking-[-0.05em] text-slate-950">
-                                            {currentPhase?.nama || `Periode ${activePhase + 1}`}
+                                            {flowFilter?.type === "row" && selectedRow
+                                                ? selectedRow.title
+                                                : currentPhase?.nama || `Periode ${activePhase + 1}`}
                                         </h2>
 
                                         <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-400">
-                                            {currentPhase?.deskripsi ||
+                                            {flowFilter?.type === "row" && selectedRow
+                                                ? `${selectedRow.phaseName} · ${selectedRow.parentLabel}. Tabel di bawah hanya menampilkan item yang dipilih pada shape alur.`
+                                                : currentPhase?.deskripsi ||
                                                 "Upload dimulai dari administrasi pembuka periode, lalu aktivitas terbuka setelah review AO dan keputusan HO selesai."}
                                         </p>
                                     </div>
 
                                     <div
-                                        className={`inline-flex shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-[9px] font-black uppercase tracking-widest ${activeWorkflowStatus.className}`}
+                                        className={`inline-flex w-fit shrink-0 items-center gap-2 rounded-2xl border px-4 py-2.5 text-[9px] font-black uppercase tracking-widest ${activeWorkflowStatus.className}`}
                                     >
                                         {activeWorkflowStatus.label.includes("Terkunci") ? (
                                             <Lock size={14} />
@@ -1756,43 +1874,63 @@ function VendorProgramDetailPage({
 
                                 <div className="mt-3 rounded-[1.2rem] border border-slate-100 bg-slate-50 px-4 py-3">
                                     <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                                        {activeWorkflowStatus.description}
+                                        {flowFilter?.type === "row" && selectedRow
+                                            ? selectedRow.description || activeWorkflowStatus.description
+                                            : activeWorkflowStatus.description}
                                     </p>
                                 </div>
                             </div>
 
-                            <VendorExecutionTablePanel
-                                title={EXECUTION_COPY.openingTitle}
-                                subtitle={EXECUTION_COPY.openingSubtitle}
-                                description={EXECUTION_COPY.openingDesc}
-                                rows={openingRows}
-                                sectionStatus={openingSectionStatus}
-                                selectedRow={selectedRow}
-                                setSelectedRow={setSelectedRow}
-                                getRowStatus={getRowStatus}
-                                isRowLocked={isRowLocked}
-                                openUploadModal={openUploadModal}
-                                openFile={openFile}
-                                handleOpenChat={handleOpenChat}
-                                openCommentForRow={openCommentForRow}
-                            />
+                            {hasVisibleOpeningRows && (
+                                <VendorExecutionTablePanel
+                                    title={EXECUTION_COPY.openingTitle}
+                                    subtitle={EXECUTION_COPY.openingSubtitle}
+                                    description={EXECUTION_COPY.openingDesc}
+                                    rows={visibleOpeningRows}
+                                    sectionStatus={openingSectionStatus}
+                                    selectedRow={selectedRow}
+                                    setSelectedRow={setSelectedRow}
+                                    getRowStatus={getRowStatus}
+                                    isRowLocked={isRowLocked}
+                                    openUploadModal={openUploadModal}
+                                    openFile={openFile}
+                                    handleOpenChat={handleOpenChat}
+                                    openCommentForRow={openCommentForRow}
+                                    readCommentRows={readCommentRows}
+                                />
+                            )}
 
-                            <VendorExecutionTablePanel
-                                title={EXECUTION_COPY.innerTitle}
-                                subtitle={EXECUTION_COPY.innerSubtitle}
-                                description={EXECUTION_COPY.innerDesc}
-                                rows={innerRows}
-                                sectionStatus={innerSectionStatus}
-                                selectedRow={selectedRow}
-                                setSelectedRow={setSelectedRow}
-                                getRowStatus={getRowStatus}
-                                isRowLocked={isRowLocked}
-                                openUploadModal={openUploadModal}
-                                openFile={openFile}
-                                handleOpenChat={handleOpenChat}
-                                openCommentForRow={openCommentForRow}
-                                locked={!isPhaseContentOpen(activePhase)}
-                            />
+                            {hasVisibleInnerRows && (
+                                <VendorExecutionTablePanel
+                                    title={EXECUTION_COPY.innerTitle}
+                                    subtitle={EXECUTION_COPY.innerSubtitle}
+                                    description={EXECUTION_COPY.innerDesc}
+                                    rows={visibleInnerRows}
+                                    sectionStatus={innerSectionStatus}
+                                    selectedRow={selectedRow}
+                                    setSelectedRow={setSelectedRow}
+                                    getRowStatus={getRowStatus}
+                                    isRowLocked={isRowLocked}
+                                    openUploadModal={openUploadModal}
+                                    openFile={openFile}
+                                    handleOpenChat={handleOpenChat}
+                                    openCommentForRow={openCommentForRow}
+                                    locked={!isPhaseContentOpen(activePhase)}
+                                    readCommentRows={readCommentRows}
+                                />
+                            )}
+
+                            {!hasVisibleOpeningRows && !hasVisibleInnerRows && (
+                                <section className="rounded-[1.6rem] border border-dashed border-slate-200 bg-white px-6 py-10 text-center shadow-[0_12px_35px_rgba(15,23,42,0.04)]">
+                                    <Layers3 size={32} className="mx-auto text-slate-300" />
+                                    <h3 className="mt-3 text-sm font-black text-slate-700">
+                                        Belum ada item eksekusi pada pilihan ini
+                                    </h3>
+                                    <p className="mx-auto mt-2 max-w-lg text-[12px] font-semibold leading-relaxed text-slate-400">
+                                        Pilih shape fase, administrasi, atau aktivitas lain pada alur eksekusi di atas.
+                                    </p>
+                                </section>
+                            )}
 
                             <VendorSelectedRowPanel
                                 selectedRow={selectedRow}
@@ -1806,8 +1944,7 @@ function VendorProgramDetailPage({
                                 handleOpenChat={handleOpenChat}
                             />
                         </section>
-                    </div>
-                </section>
+                    </div>                </section>
             </main>
             <UploadEvidenceModal
                 uploadContext={uploadContext}
@@ -1926,248 +2063,326 @@ function VendorSummaryPanel({
     vendorName,
     progress,
 }) {
+    const infoItems = [
+        { label: "Sekolah", value: schoolName },
+        { label: "HO", value: hoName },
+        { label: "AO", value: aoName },
+        { label: "Vendor", value: vendorName },
+        { label: "Kategori", value: program?.kategori || program?.kategori_program || "-" },
+        { label: "Tahun", value: program?.tahun || "-" },
+        { label: "Status", value: program?.status_program || "Approval" },
+        { label: "MOU", value: program?.nomor_mou || program?.no_mou || "-" },
+    ];
+
     return (
-        <div className="sticky top-0 rounded-[1.8rem] border border-slate-100 bg-white p-5 shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
-            <div className="mb-5">
-                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                    Execution Summary
-                </p>
+        <section className="overflow-hidden rounded-[1.6rem] border-2 border-[#0AC4E0]/70 bg-white shadow-[0_18px_55px_rgba(10,196,224,0.10)]">
+            <div className="flex flex-col gap-5 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                            Ringkasan Program
+                        </span>
+                        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
+                            Vendor Execution View
+                        </span>
+                    </div>
 
-                <h2 className="mt-1 text-[20px] font-black tracking-[-0.05em] text-slate-950">
-                    Ringkasan Upload
-                </h2>
+                    <h2 className="mt-2 truncate text-[20px] font-black tracking-[-0.05em] text-slate-950">
+                        {program?.nama_program || "Detail Program"}
+                    </h2>
 
-                <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-400">
-                    Pantau upload bukti, review AO, keputusan HO, dan alur periode program.
-                </p>
-            </div>
+                    <div className="mt-3 grid gap-x-5 gap-y-2 text-[11px] font-semibold text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
+                        {infoItems.map((item) => (
+                            <div key={item.label} className="min-w-0">
+                                <span className="font-black uppercase tracking-[0.14em] text-slate-400">
+                                    {item.label}: {" "}
+                                </span>
+                                <span className="break-words font-bold text-slate-700">
+                                    {item.value || "-"}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
-            <div className="mb-5 rounded-[1.4rem] border border-slate-100 bg-slate-50 p-4">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                            Progress Approved
-                        </p>
-
-                        <p className="mt-1 text-[32px] font-black leading-none tracking-[-0.07em] text-slate-950">
+                <div className="w-full shrink-0 rounded-[1.25rem] border border-cyan-100 bg-cyan-50/50 px-4 py-3 lg:w-[250px]">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                                Progress Bukti
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-slate-500">
+                                {progress.approved}/{progress.total || 0} bukti disetujui
+                            </p>
+                        </div>
+                        <p className="text-2xl font-black tracking-[-0.06em] text-slate-950">
                             {progress.percentage}%
                         </p>
                     </div>
 
-                    <div className="flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-white text-[18px] font-black text-[#0AC4E0]">
-                        {progress.approved}/{progress.total}
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+                        <div
+                            className="h-full rounded-full bg-[#0AC4E0]"
+                            style={{ width: `${progress.percentage}%` }}
+                        />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                        <span>Upload {progress.waitingUpload}</span>
+                        <span>AO {progress.waitingAo}</span>
+                        <span>HO {progress.waitingHo}</span>
+                        <span>Reject {progress.rejected}</span>
                     </div>
                 </div>
-
-                <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white">
-                    <div
-                        className="h-full rounded-full bg-[#0AC4E0] transition-all"
-                        style={{ width: `${progress.percentage}%` }}
-                    />
-                </div>
             </div>
-
-            <div className="mb-5 grid grid-cols-2 gap-3">
-                <VendorSummaryMetric
-                    label="Approved"
-                    value={progress.approved}
-                    className="text-emerald-600"
-                />
-
-                <VendorSummaryMetric
-                    label="Review AO"
-                    value={progress.waitingAo}
-                    className="text-sky-600"
-                />
-
-                <VendorSummaryMetric
-                    label="Keputusan HO"
-                    value={progress.waitingHo}
-                    className="text-amber-600"
-                />
-
-                <VendorSummaryMetric
-                    label="Perlu Upload"
-                    value={progress.waitingUpload}
-                    className="text-slate-500"
-                />
-
-                <VendorSummaryMetric
-                    label="Rejected"
-                    value={progress.rejected}
-                    className="text-rose-600"
-                />
-            </div>
-
-            <div className="space-y-3">
-                <VendorSummaryLine
-                    icon={<FolderOpen size={15} />}
-                    label="Program"
-                    value={program?.nama_program || "-"}
-                />
-
-                <VendorSummaryLine
-                    icon={<BriefcaseBusiness size={15} />}
-                    label="Vendor / Narasumber"
-                    value={vendorName}
-                />
-
-                <VendorSummaryLine
-                    icon={<FileText size={15} />}
-                    label="Sekolah"
-                    value={schoolName}
-                />
-
-                <VendorSummaryLine
-                    icon={<UserCheck size={15} />}
-                    label="Head Office"
-                    value={hoName}
-                />
-
-                <VendorSummaryLine
-                    icon={<UserCheck size={15} />}
-                    label="Area Officer"
-                    value={aoName}
-                />
-
-                <VendorSummaryLine
-                    icon={<CheckSquare size={15} />}
-                    label="Status Program"
-                    value={program?.status_program || "-"}
-                />
-            </div>
-        </div>
+        </section>
     );
 }
 
-function VendorSummaryMetric({ label, value, className = "" }) {
-    return (
-        <div className="rounded-[1.2rem] border border-slate-100 bg-slate-50 px-4 py-3">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                {label}
-            </p>
-
-            <p className={`mt-1 text-[22px] font-black leading-none ${className}`}>
-                {value}
-            </p>
-        </div>
-    );
-}
-
-function VendorSummaryLine({ icon, label, value }) {
-    return (
-        <div className="flex items-start gap-3 rounded-[1.2rem] border border-slate-100 bg-slate-50 px-4 py-3">
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#0AC4E0]">
-                {icon}
-            </div>
-
-            <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                    {label}
-                </p>
-
-                <p className="mt-1 truncate text-[12px] font-black text-slate-800">
-                    {value || "-"}
-                </p>
-            </div>
-        </div>
-    );
-}
 function VendorArrowPhaseSteps({
     phases,
+    monitoringRows = {},
     activePhase,
+    selectedRow,
+    flowFilter,
     onPhaseClick,
+    onRowClick,
     checkPhaseUnlocked,
     isPhaseCompleted,
+    isPhaseContentOpen,
     getPhaseWorkflowStatus,
+    getRowStatus,
 }) {
+    const getFlowRows = (phaseIndex) => monitoringRows[phaseIndex] || [];
+
+    const getFlowTone = ({ active, completed, locked, rowStatus, type }) => {
+        if (locked) {
+            return {
+                wrapper: "border-slate-200 bg-slate-50 text-slate-400",
+                icon: "bg-white text-slate-300",
+            };
+        }
+
+        if (active) {
+            return {
+                wrapper: "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-[0_16px_35px_rgba(10,196,224,0.22)]",
+                icon: "bg-white/20 text-white",
+            };
+        }
+
+        if (completed || rowStatus === "APPROVED") {
+            return {
+                wrapper: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-white",
+                icon: "bg-white text-emerald-600",
+            };
+        }
+
+        if (rowStatus === "WAITING_HO" || rowStatus === "WAITING_AO") {
+            return {
+                wrapper: "border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-white",
+                icon: "bg-white text-amber-600",
+            };
+        }
+
+        if (type === "termin") {
+            return {
+                wrapper: "border-blue-100 bg-blue-50 text-blue-700 hover:border-blue-200 hover:bg-white",
+                icon: "bg-white text-blue-600",
+            };
+        }
+
+        return {
+            wrapper: "border-slate-100 bg-white text-slate-700 hover:border-cyan-100 hover:bg-cyan-50",
+            icon: "bg-slate-50 text-[#0AC4E0]",
+        };
+    };
+
+    const arrowStyle = {
+        clipPath:
+            "polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%)",
+    };
+
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-            <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
                         Periode Program
                     </p>
 
                     <h3 className="mt-1 text-[17px] font-black tracking-[-0.04em] text-slate-950">
-                        Alur Upload
+                        Alur Eksekusi
                     </h3>
+
+                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                        Klik shape fase, administrasi, atau aktivitas untuk memfilter tabel upload di bawah.
+                    </p>
                 </div>
 
-                <p className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Administrasi ke Aktivitas
+                <p className="w-fit rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Geser horizontal jika alur panjang
                 </p>
             </div>
 
-            <div className="simple-scroll flex gap-3 overflow-x-auto pb-1">
-                {phases.length === 0 && (
-                    <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
-                        <p className="text-[12px] font-bold text-slate-400">
-                            Belum ada periode pada program ini.
-                        </p>
-                    </div>
-                )}
-
-                {phases.map((phase, index) => {
-                    const active = activePhase === index;
-                    const unlocked = checkPhaseUnlocked(index);
-                    const completed = isPhaseCompleted(index);
-                    const status = getPhaseWorkflowStatus(index);
-
-                    return (
-                        <div
-                            key={`${phase.id}-${index}`}
-                            className="flex shrink-0 items-center gap-3"
-                        >
-                            <button
-                                type="button"
-                                onClick={() => onPhaseClick(index)}
-                                className={`min-w-[185px] rounded-[1.25rem] border px-4 py-3 text-left transition ${active
-                                    ? "border-cyan-100 bg-cyan-50 shadow-sm"
-                                    : "border-slate-100 bg-slate-50 hover:bg-white"
-                                    } ${!unlocked ? "cursor-not-allowed opacity-60" : ""}`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <span
-                                        className={`flex h-9 w-9 items-center justify-center rounded-2xl ${completed
-                                            ? "bg-emerald-50 text-emerald-600"
-                                            : active
-                                                ? "bg-white text-[#0AC4E0]"
-                                                : "bg-white text-slate-400"
-                                            }`}
-                                    >
-                                        {!unlocked ? (
-                                            <Lock size={15} />
-                                        ) : completed ? (
-                                            <CheckCircle2 size={15} />
-                                        ) : (
-                                            <Layers3 size={15} />
-                                        )}
-                                    </span>
-
-                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                        Step {String(index + 1).padStart(2, "0")}
-                                    </span>
-                                </div>
-
-                                <h4 className="mt-3 truncate text-[13px] font-black text-slate-900">
-                                    {phase.nama || `Periode ${index + 1}`}
-                                </h4>
-
-                                <p className="mt-1 truncate text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                                    {status.label}
-                                </p>
-                            </button>
-
-                            {index < phases.length - 1 && (
-                                <div className="flex items-center gap-1 text-slate-300">
-                                    <div className="h-0.5 w-5 rounded-full bg-slate-200" />
-                                    <ChevronRight size={16} />
-                                </div>
-                            )}
+            <div className="simple-scroll overflow-x-auto pb-2">
+                <div className="flex min-w-max items-stretch gap-2 pr-4">
+                    {phases.length === 0 && (
+                        <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                            <p className="text-[12px] font-bold text-slate-400">
+                                Belum ada periode pada program ini.
+                            </p>
                         </div>
-                    );
-                })}
+                    )}
+
+                    {phases.map((phase, index) => {
+                        const phaseRows = getFlowRows(index);
+                        const unlocked = checkPhaseUnlocked(index);
+                        const completed = isPhaseCompleted(index);
+                        const status = getPhaseWorkflowStatus(index);
+                        const phaseActive =
+                            activePhase === index && flowFilter?.type !== "row";
+                        const phaseTone = getFlowTone({
+                            active: phaseActive,
+                            completed,
+                            locked: !unlocked,
+                            type: "phase",
+                        });
+
+                        const openingRows = phaseRows.filter((row) => row.type === "termin");
+                        const activityRows = phaseRows.filter((row) => row.type === "kegiatan");
+
+                        return (
+                            <div
+                                key={`${phase.id}-${index}`}
+                                className="flex shrink-0 items-stretch gap-2"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => onPhaseClick(index)}
+                                    style={arrowStyle}
+                                    className={`min-h-[86px] w-[210px] border px-7 py-3 text-left transition ${phaseTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span
+                                            className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
+                                        >
+                                            {!unlocked ? (
+                                                <Lock size={14} />
+                                            ) : completed ? (
+                                                    <CheckCircle2 size={14} />
+                                                ) : (
+                                                <Layers3 size={14} />
+                                            )}
+                                        </span>
+
+                                        <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                            Fase {String(index + 1).padStart(2, "0")}
+                                        </span>
+                                    </div>
+
+                                    <h4 className="mt-2 truncate text-[12px] font-black">
+                                        {phase.nama || `Periode ${index + 1}`}
+                                    </h4>
+
+                                    <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                        {status.label}
+                                    </p>
+                                </button>
+
+                                {openingRows.map((row) => {
+                                    const rowStatus = getRowStatus(row);
+                                    const rowActive =
+                                        flowFilter?.type === "row" &&
+                                        flowFilter?.rowId === row.id;
+                                    const rowTone = getFlowTone({
+                                        active: rowActive,
+                                        completed: rowStatus === "APPROVED",
+                                        locked: !unlocked,
+                                        rowStatus,
+                                        type: row.type,
+                                    });
+
+                                    return (
+                                        <button
+                                            key={row.id}
+                                            type="button"
+                                            onClick={() => onRowClick(row, index)}
+                                            style={arrowStyle}
+                                            className={`min-h-[86px] w-[230px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                >
+                                                    <UploadCloud size={14} />
+                                                </span>
+
+                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    Administrasi
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-2 truncate text-[12px] font-black">
+                                                {row.title}
+                                            </h4>
+
+                                            <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                {STATUS_LABEL[rowStatus] || rowStatus}
+                                            </p>
+                                        </button>
+                                    );
+                                })}
+
+                                {activityRows.map((row, activityIndex) => {
+                                    const rowStatus = getRowStatus(row);
+                                    const phaseContentOpen = isPhaseContentOpen(index);
+                                    const rowActive =
+                                        flowFilter?.type === "row" &&
+                                        flowFilter?.rowId === row.id;
+                                    const rowTone = getFlowTone({
+                                        active: rowActive,
+                                        completed: rowStatus === "APPROVED",
+                                        locked: !unlocked || !phaseContentOpen,
+                                        rowStatus,
+                                        type: row.type,
+                                    });
+
+                                    return (
+                                        <button
+                                            key={row.id}
+                                            type="button"
+                                            onClick={() => onRowClick(row, index)}
+                                            style={arrowStyle}
+                                            className={`min-h-[86px] w-[245px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                >
+                                                    <FileText size={14} />
+                                                </span>
+
+                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    Aktivitas {activityIndex + 1}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-2 truncate text-[12px] font-black">
+                                                {row.title}
+                                            </h4>
+
+                                            <div className="mt-1 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                <span>{(row.meetings || []).length} Pertemuan</span>
+                                                <span>·</span>
+                                                <span>{STATUS_LABEL[rowStatus] || rowStatus}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );
@@ -2188,6 +2403,7 @@ function VendorExecutionTablePanel({
     openFile,
     handleOpenChat,
     openCommentForRow,
+    readCommentRows = {},
 }) {
     return (
         <section className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
@@ -2417,11 +2633,19 @@ function VendorExecutionTablePanel({
                                                             title="Lihat Komentar AO/HO/Guru"
                                                         >
                                                             <MessageSquare size={15} />
-                                                            {(row.commentCount || 0) > 0 && (
-                                                                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[8px] font-black text-white">
-                                                                    {row.commentCount > 9 ? "9+" : row.commentCount}
-                                                                </span>
-                                                            )}
+                                                            {(() => {
+                                                                const unreadCommentCount = Math.max(
+                                                                    Number(row.commentCount || 0) -
+                                                                    Number(readCommentRows[row.id] || 0),
+                                                                    0,
+                                                                );
+
+                                                                return unreadCommentCount > 0 ? (
+                                                                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[8px] font-black text-white">
+                                                                        {unreadCommentCount > 9 ? "9+" : unreadCommentCount}
+                                                                    </span>
+                                                                ) : null;
+                                                            })()}
                                                         </button>
                                                     )}
 

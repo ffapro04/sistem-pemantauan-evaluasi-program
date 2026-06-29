@@ -1554,8 +1554,25 @@ function ExecutiveMap({ mapData }) {
     };
 
     return (
-        <section className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-5 border-b border-slate-100 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="executive-map-shell relative isolate overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+            <style>{`
+                .executive-map-shell .leaflet-container,
+                .executive-map-shell .leaflet-pane,
+                .executive-map-shell .leaflet-control-container {
+                    z-index: 0 !important;
+                }
+
+                .executive-map-shell .leaflet-top,
+                .executive-map-shell .leaflet-bottom {
+                    z-index: 5 !important;
+                }
+
+                .executive-map-shell .leaflet-popup-pane {
+                    z-index: 10 !important;
+                }
+            `}</style>
+
+            <div className="relative z-30 flex flex-col gap-5 border-b border-slate-100 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <div className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-700">
                         <MapPinned size={13} />
@@ -1581,33 +1598,31 @@ function ExecutiveMap({ mapData }) {
                 )}
             </div>
 
-            <div className="grid gap-3 border-b border-slate-100 bg-slate-50/70 px-6 py-4 md:grid-cols-3">
-                <select
+            <div className="relative z-40 grid gap-3 border-b border-slate-100 bg-slate-50/70 px-6 py-4 md:grid-cols-3">
+                <Dropdown
                     value={selectedProvince}
-                    onChange={(event) => handleProvinceFilter(event.target.value)}
-                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Provinsi</option>
-                    {provinceOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                            {item.label}
-                        </option>
-                    ))}
-                </select>
+                    items={[
+                        { value: "ALL", label: "Semua Provinsi" },
+                        ...provinceOptions,
+                    ]}
+                    onChange={handleProvinceFilter}
+                    placeholder="Semua Provinsi"
+                    width="w-full"
+                    usePortal
+                />
 
-                <select
+                <Dropdown
                     value={selectedDistrict}
+                    items={[
+                        { value: "ALL", label: "Semua Kabupaten/Kota" },
+                        ...districtOptions,
+                    ]}
                     disabled={!activeProvince}
-                    onChange={(event) => handleDistrictFilter(event.target.value)}
-                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                    <option value="ALL">Semua Kabupaten/Kota</option>
-                    {districtOptions.map((item) => (
-                        <option key={item.value} value={item.value}>
-                            {item.label}
-                        </option>
-                    ))}
-                </select>
+                    onChange={handleDistrictFilter}
+                    placeholder="Semua Kabupaten/Kota"
+                    width="w-full"
+                    usePortal
+                />
 
                 <div className="relative">
                     <Search
@@ -1627,13 +1642,13 @@ function ExecutiveMap({ mapData }) {
                 </div>
             </div>
 
-            <div className="relative h-[540px]">
+            <div className="relative z-0 h-[540px] overflow-hidden">
                 <MapContainer
                     center={INDONESIA_CENTER}
                     zoom={INDONESIA_ZOOM}
                     minZoom={4}
                     scrollWheelZoom
-                    className="h-full w-full"
+                    className="relative z-0 h-full w-full"
                 >
                     <MapViewport request={viewport} />
 
@@ -1701,7 +1716,7 @@ function ExecutiveMap({ mapData }) {
                         ))}
                 </MapContainer>
 
-                <div className="pointer-events-none absolute bottom-5 left-5 z-[500] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md">
+                <div className="pointer-events-none absolute bottom-5 left-5 z-10 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
                         Tampilan Aktif
                     </p>
@@ -2470,47 +2485,32 @@ export default function DashboardPengurus() {
                                     width="w-full"
                                 />
 
-                                <select
+                                <Dropdown
                                     value={programPillar}
-                                    onChange={(event) =>
-                                        setProgramPillar(event.target.value)
-                                    }
-                                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wider text-slate-600 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                                >
-                                    {PILLAR_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    items={PILLAR_OPTIONS}
+                                    onChange={setProgramPillar}
+                                    placeholder="Semua Pilar"
+                                    width="w-full"
+                                    usePortal
+                                />
 
-                                <select
+                                <Dropdown
                                     value={programType}
-                                    onChange={(event) =>
-                                        setProgramType(event.target.value)
-                                    }
-                                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wider text-slate-600 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                                >
-                                    {PROGRAM_TYPE_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    items={PROGRAM_TYPE_OPTIONS}
+                                    onChange={setProgramType}
+                                    placeholder="Semua Jenis"
+                                    width="w-full"
+                                    usePortal
+                                />
 
-                                <select
+                                <Dropdown
                                     value={programStatus}
-                                    onChange={(event) =>
-                                        setProgramStatus(event.target.value)
-                                    }
-                                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wider text-slate-600 shadow-sm outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
-                                >
-                                    {PROGRAM_STATUS_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    items={PROGRAM_STATUS_OPTIONS}
+                                    onChange={setProgramStatus}
+                                    placeholder="Semua Status"
+                                    width="w-full"
+                                    usePortal
+                                />
                             </div>
                         }
                         chart={

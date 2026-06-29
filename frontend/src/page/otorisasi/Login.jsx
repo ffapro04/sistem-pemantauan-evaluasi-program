@@ -26,7 +26,7 @@ import pilar2 from "../../assets/img/2.png";
 import pilar3 from "../../assets/img/3.png";
 import pilar4 from "../../assets/img/4.png";
 import logo_ypamdr_blue from "../../assets/img/YPA-MDR-LOGO.png";
-import library_YPAMDR from "../../assets/img/library_YPAMDR.png";
+import library_YPAMDR from "../../assets/img/library_YPAMDR.optimized.jpg";
 
 // COMPONENTS
 import PageWrapper from "../../components/PageWrapper";
@@ -53,6 +53,36 @@ const ROLE_OPTIONS = [
 ];
 
 const normalizeText = (value = "") => String(value || "").trim().toLowerCase();
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const isValidEmailFormat = (value = "") => EMAIL_REGEX.test(String(value).trim());
+
+const showValidationError = (message) => {
+  toast.error(message, {
+    position: "top-right",
+    autoClose: 2200,
+    pauseOnHover: true,
+    draggable: true,
+  });
+};
+
+const getLoginErrorMessage = (err) => {
+  if (err?.isRoleMismatch) {
+    return err.message;
+  }
+
+  const serverMessage =
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err?.message;
+
+  if (err?.response?.status === 401 || err?.response?.status === 403) {
+    return "Email, password, atau role tidak sesuai.";
+  }
+
+  return serverMessage || "Gagal masuk. Periksa kembali kredensial Anda.";
+};
 
 const getDecodedRoleInfo = (decoded = {}) => {
   const idRole = Number(decoded.id_role || decoded.role_id || 0);
@@ -103,7 +133,7 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
 };
 
 const getRoleMismatchMessage = (selectedRole) =>
-  `Akun dengan role ${selectedRole} belum terdaftar atau kredensial tidak sesuai dengan role yang dipilih.`;
+  `Akun yang digunakan tidak sesuai dengan role ${selectedRole}. Silakan pilih role yang benar atau gunakan akun yang sesuai.`;
 
 // =========================================================================
 // REDIRECT BERDASARKAN JWT
@@ -455,45 +485,52 @@ const Login = () => {
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
-    if (loading || !selectedRole) return;
+    if (loading) return;
+
+    const emailValue = String(formData.email || "").trim();
+    const passwordValue = String(formData.password || "").trim();
+    const guruNameValue = String(formData.nama_guru || "").trim();
+
+    if (!selectedRole) {
+      showValidationError("Role harus dipilih.");
+      return;
+    }
+
+    if (isSistem) {
+      if (!emailValue) {
+        showValidationError("Email harus di isi");
+        return;
+      }
+
+      if (!passwordValue) {
+        showValidationError("Password harus di isi");
+        return;
+      }
+
+      if (!isValidEmailFormat(emailValue)) {
+        showValidationError("Format email tidak valid.");
+        return;
+      }
+    }
+
+    if (isGuru) {
+      if (!formData.id_sekolah) {
+        showValidationError("Sekolah harus dipilih.");
+        return;
+      }
+
+      if (!guruNameValue) {
+        showValidationError("Nama guru harus di isi.");
+        return;
+      }
+
+      if (!passwordValue) {
+        showValidationError("Password harus di isi");
+        return;
+      }
+    }
 
     setLoading(true);
-
-    if (isGuru && !formData.id_sekolah) {
-      toast.error("Pilih sekolah terlebih dahulu.", {
-        position: "top-right",
-        autoClose: 2200,
-      });
-      setLoading(false);
-      return;
-    }
-
-    if (isGuru && !formData.nama_guru?.trim()) {
-      toast.error("Nama guru wajib diisi.", {
-        position: "top-right",
-        autoClose: 2200,
-      });
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.password?.trim()) {
-      toast.error("Password wajib diisi.", {
-        position: "top-right",
-        autoClose: 2200,
-      });
-      setLoading(false);
-      return;
-    }
-
-    if (isSistem && !formData.email?.trim()) {
-      toast.error("Email wajib diisi.", {
-        position: "top-right",
-        autoClose: 2200,
-      });
-      setLoading(false);
-      return;
-    }
 
     try {
       let token;
@@ -501,14 +538,14 @@ const Login = () => {
       if (isGuru) {
         const res = await axios.post(`${API_BASE_URL}/auth/login-guru`, {
           id_sekolah: Number(formData.id_sekolah),
-          nama_guru: formData.nama_guru.trim(),
-          password: formData.password,
+          nama_guru: guruNameValue,
+          password: passwordValue,
         });
         token = res.data.access_token || res.data.token;
       } else {
         const res = await axios.post(`${API_BASE_URL}/auth/login`, {
-          email: formData.email.trim(),
-          password: formData.password,
+          email: emailValue,
+          password: passwordValue,
         });
         token = res.data.access_token || res.data.token;
       }
@@ -546,18 +583,12 @@ const Login = () => {
       console.error("LOGIN ERROR:", err);
       setLoading(false);
       setIsSuccess(false);
-      toast.error(
-        err.isRoleMismatch
-          ? err.message
-          : err.response?.data?.message ||
-          "Gagal Masuk: Kredensial tidak valid.",
-        {
-          position: "top-right",
-          autoClose: 2600,
-          pauseOnHover: true,
-          draggable: true,
-        }
-      );
+      toast.error(getLoginErrorMessage(err), {
+        position: "top-right",
+        autoClose: 2600,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
   };
 
@@ -767,6 +798,8 @@ const Login = () => {
                   src={library_YPAMDR}
                   className="h-full w-full object-cover"
                   alt="Library YPA-MDR"
+                  decoding="async"
+                  fetchPriority="high"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-[#0AC4E0]/10 to-slate-950/65" />
                 <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.18)_0%,transparent_36%,rgba(15,23,42,0.25)_100%)]" />

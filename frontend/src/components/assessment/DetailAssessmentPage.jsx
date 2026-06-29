@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
-import * as XLSX from "xlsx";
 import {
     BarChart,
     Bar,
@@ -53,6 +52,7 @@ import { canHoAccessSchool } from "../../utils/hoAccess";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const DEFAULT_API_BASE = "";
+const loadXlsx = async () => import("xlsx");
 const ANSWER_CHART_COLORS = ["#FF0052", "#FFD400", "#00C68D", "#0055DA"];
 
 const ASSESSMENT_PILAR_OPTIONS = {
@@ -579,12 +579,13 @@ function AssessmentDetailBase({
         );
     };
 
-    const handleExport = () => {
+    const handleExport = async () => {
         if (!assessment) {
             toast.error("Data assessment belum siap diexport.");
             return;
         }
 
+        const XLSX = await loadXlsx();
         const workbook = XLSX.utils.book_new();
         const totalResponden = Number(assessment.total_responden || 0);
         const sudahMengisi = respondents.length;

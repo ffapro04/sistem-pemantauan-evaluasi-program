@@ -1,197 +1,134 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-// =========================================================================
-// ONBOARDING & OTORISASI
-// =========================================================================
-import Onboarding from "./page/onboarding/OnBoarding";
-import Login from "./page/otorisasi/Login";
-
-// =========================================================================
-// ADMIN - DASHBOARD & GLOBAL
-// =========================================================================
-import DashboardAdmin from "./page/admin/dashboardadmin/DashboardAdmin";
-import AgendaAdmin from "./page/admin/dashboardadmin/AgendaAdmin";
-
-// =========================================================================
-// PENGATURAN AKUN
-// =========================================================================
-import AccountSettings from "./page/pengaturan/AccountSettings";
-import GlobalUiTranslator from "./i18n/GlobalUiTranslator";
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ENABLE_UI_TRANSLATOR } from "./config/features";
-// =========================================================================
-// PENGURUS ROLE
-// =========================================================================
-import DashboardPengurus from "./page/pengurus/DashboardPengurus";
-import AgendaPengurus from "./page/pengurus/AgendaPengurus";
 
-// =========================================================================
-// KEPALA DINAS ROLE
-// =========================================================================
-import DashboardKepalaDinas from "./page/kepaladinas/DashboardKepalaDinas";
-import AgendaKepalaDinas from "./page/kepaladinas/AgendaKepalaDinas";
-import DaftarSekolahKepalaDinas from "./page/kepaladinas/DaftarSekolahKepalaDinas";
-import DetailSekolahKepalaDinas from "./page/kepaladinas/DetailSekolahKepalaDinas";
+const Onboarding = lazy(() => import("./page/onboarding/OnBoarding"));
+const Login = lazy(() => import("./page/otorisasi/Login"));
+const AccountSettings = lazy(() => import("./page/pengaturan/AccountSettings"));
+const GlobalUiTranslator = lazy(() => import("./i18n/GlobalUiTranslator"));
 
-// =========================================================================
-// ADMIN - KELOLA MASTER DATA
-// =========================================================================
+const DashboardAdmin = lazy(() => import("./page/admin/dashboardadmin/DashboardAdmin"));
+const AgendaAdmin = lazy(() => import("./page/admin/dashboardadmin/AgendaAdmin"));
+const ReadUser = lazy(() => import("./page/admin/kelolamaster/masteruser/ReadUser"));
+const CreateUser = lazy(() => import("./page/admin/kelolamaster/masteruser/CreateUser"));
+const EditUser = lazy(() => import("./page/admin/kelolamaster/masteruser/EditUser"));
+const DetailUser = lazy(() => import("./page/admin/kelolamaster/masteruser/DetailUser"));
+const ReadPengurus = lazy(() => import("./page/admin/kelolamaster/masterpengurus/ReadPengurus"));
+const CreatePengurus = lazy(() => import("./page/admin/kelolamaster/masterpengurus/CreatePengurus"));
+const EditPengurus = lazy(() => import("./page/admin/kelolamaster/masterpengurus/EditPengurus"));
+const DetailPengurus = lazy(() => import("./page/admin/kelolamaster/masterpengurus/DetailPengurus"));
+const ReadHO = lazy(() => import("./page/admin/kelolamaster/masterho/ReadHO"));
+const CreateHO = lazy(() => import("./page/admin/kelolamaster/masterho/CreateHO"));
+const EditHO = lazy(() => import("./page/admin/kelolamaster/masterho/EditHO"));
+const DetailHO = lazy(() => import("./page/admin/kelolamaster/masterho/DetailHO"));
+const ReadAO = lazy(() => import("./page/admin/kelolamaster/masterao/ReadAO"));
+const CreateAO = lazy(() => import("./page/admin/kelolamaster/masterao/CreateAO"));
+const EditAO = lazy(() => import("./page/admin/kelolamaster/masterao/EditAO"));
+const DetailAO = lazy(() => import("./page/admin/kelolamaster/masterao/DetailAO"));
+const ReadWilayah = lazy(() => import("./page/admin/kelolamaster/masterWilayah/ReadWilayah"));
+const CreateWilayah = lazy(() => import("./page/admin/kelolamaster/masterWilayah/CreateWilayah"));
+const EditWilayah = lazy(() => import("./page/admin/kelolamaster/masterWilayah/EditWilayah"));
+const DetailWilayah = lazy(() => import("./page/admin/kelolamaster/masterWilayah/DetailWilayah"));
+const ReadSekolah = lazy(() => import("./page/admin/kelolamaster/mastersekolah/ReadSekolah"));
+const CreateSekolah = lazy(() => import("./page/admin/kelolamaster/mastersekolah/CreateSekolah"));
+const EditSekolah = lazy(() => import("./page/admin/kelolamaster/mastersekolah/EditSekolah"));
+const DetailSekolah = lazy(() => import("./page/admin/kelolamaster/mastersekolah/DetailSekolah"));
+const ReadOperatorSekolah = lazy(() => import("./page/admin/kelolamaster/masteroperatorsekolah/ReadOperatorSekolah"));
+const CreateOperatorSekolah = lazy(() => import("./page/admin/kelolamaster/masteroperatorsekolah/CreateOperatorSekolah"));
+const EditOperatorSekolah = lazy(() => import("./page/admin/kelolamaster/masteroperatorsekolah/EditOperatorSekolah"));
+const DetailOperatorSekolah = lazy(() => import("./page/admin/kelolamaster/masteroperatorsekolah/DetailOperatorSekolah"));
+const ReadVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/ReadVendor"));
+const CreateVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/CreateVendor"));
+const EditVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/EditVendor"));
+const DetailVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/DetailVendor"));
+const ManajemenVendor = lazy(() => import("./page/admin/vendor/ManajemenVendor"));
+const ReadKepalaSekolah = lazy(() => import("./page/admin/kelolamaster/masterkepalasekolah/ReadKepalaSekolah"));
+const ReadKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas"));
+const CreateKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/CreateKepalaDinas"));
+const EditKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/EditKepalaDinas"));
+const DetailKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/DetailKepalaDinas"));
 
-// MASTER USER
-import ReadUser from "./page/admin/kelolamaster/masteruser/ReadUser";
-import CreateUser from "./page/admin/kelolamaster/masteruser/CreateUser";
-import EditUser from "./page/admin/kelolamaster/masteruser/EditUser";
-import DetailUser from "./page/admin/kelolamaster/masteruser/DetailUser";
+const DashboardSekolah = lazy(() => import("./page/sekolah/DashboardSekolah"));
+const AgendaSekolah = lazy(() => import("./page/sekolah/AgendaSekolah"));
+const AssessmentSekolah = lazy(() => import("./page/sekolah/AssessmentSekolah"));
+const IsiAssessmentSekolah = lazy(() => import("./page/sekolah/IsiAssessmentSekolah"));
+const ProgramSekolah = lazy(() => import("./page/sekolah/ProgramSekolah"));
+const DaftarGuru = lazy(() => import("./page/sekolah/DaftarGuru"));
+const BeritaAcara = lazy(() => import("./page/sekolah/BeritaAcara"));
+const DashboardKepalaSekolah = lazy(() => import("./page/kepalasekolah/DashboardKepalaSekolah"));
+const DataKelas = lazy(() => import("./page/sekolah/DataKelas"));
+const CreateGuru = lazy(() => import("./page/sekolah/CreateGuru"));
+const EditGuru = lazy(() => import("./page/sekolah/EditGuru"));
+const DetailGuru = lazy(() => import("./page/sekolah/DetailGuru"));
+const CreateKepalaSekolah = lazy(() => import("./page/sekolah/CreateKepalaSekolah"));
+const EditKepalaSekolah = lazy(() => import("./page/sekolah/EditKepalaSekolah"));
+const CreateKelas = lazy(() => import("./page/sekolah/CreateKelas"));
+const EditKelas = lazy(() => import("./page/sekolah/EditKelas"));
+const DetailKelas = lazy(() => import("./page/sekolah/DetailKelas"));
+const ReadJurusan = lazy(() => import("./page/sekolah/jurusan/ReadJurusan"));
+const CreateJurusan = lazy(() => import("./page/sekolah/jurusan/CreateJurusan"));
+const EditJurusan = lazy(() => import("./page/sekolah/jurusan/EditJurusan"));
+const DetailJurusan = lazy(() => import("./page/sekolah/jurusan/DetailJurusan"));
 
-// MASTER PENGURUS
-import ReadPengurus from "./page/admin/kelolamaster/masterpengurus/ReadPengurus";
-import CreatePengurus from "./page/admin/kelolamaster/masterpengurus/CreatePengurus";
-import EditPengurus from "./page/admin/kelolamaster/masterpengurus/EditPengurus";
-import DetailPengurus from "./page/admin/kelolamaster/masterpengurus/DetailPengurus";
+const DashboardPengurus = lazy(() => import("./page/pengurus/DashboardPengurus"));
+const AgendaPengurus = lazy(() => import("./page/pengurus/AgendaPengurus"));
+const DashboardKepalaDinas = lazy(() => import("./page/kepaladinas/DashboardKepalaDinas"));
+const AgendaKepalaDinas = lazy(() => import("./page/kepaladinas/AgendaKepalaDinas"));
+const DaftarSekolahKepalaDinas = lazy(() => import("./page/kepaladinas/DaftarSekolahKepalaDinas"));
+const DetailSekolahKepalaDinas = lazy(() => import("./page/kepaladinas/DetailSekolahKepalaDinas"));
 
-// MASTER HO / HEAD OFFICE
-import ReadHO from "./page/admin/kelolamaster/masterho/ReadHO";
-import CreateHO from "./page/admin/kelolamaster/masterho/CreateHO";
-import EditHO from "./page/admin/kelolamaster/masterho/EditHO";
-import DetailHO from "./page/admin/kelolamaster/masterho/DetailHO";
+const DashboardVendor = lazy(() => import("./page/vendor/DashboardVendor"));
+const AgendaVendor = lazy(() => import("./page/vendor/AgendaVendor"));
+const ListProgramVendor = lazy(() => import("./page/vendor/ListProgramVendor"));
+const DetailProgramVendor = lazy(() => import("./page/vendor/DetailProgramVendor"));
 
-// MASTER AO / AREA OFFICER
-import ReadAO from "./page/admin/kelolamaster/masterao/ReadAO";
-import CreateAO from "./page/admin/kelolamaster/masterao/CreateAO";
-import EditAO from "./page/admin/kelolamaster/masterao/EditAO";
-import DetailAO from "./page/admin/kelolamaster/masterao/DetailAO";
+const DashboardAkademik = lazy(() => import("./page/akademik/DashboardAkademik"));
+const DashboardnonAkademik = lazy(() => import("./page/nonAkademik/DashboardnonAkademik"));
+const ReadAssessmentAkademik = lazy(() => import("./page/akademik/assakademik/ReadAssessmentAkademik"));
+const CreateAssessmentAkademik = lazy(() => import("./page/akademik/assakademik/CreateAssessmentAkademik"));
+const DetailAssessmentAkademik = lazy(() => import("./page/akademik/assakademik/DetailAssessmentAkademik"));
+const EditAssessmentAkademik = lazy(() => import("./page/akademik/assakademik/EditAssessmentAkademik"));
+const ReadProgramAkademik = lazy(() => import("./page/akademik/proAkademik/ReadProgramAkademik"));
+const ListProgramAkademik = lazy(() => import("./page/akademik/proAkademik/ListProgramAkademik"));
+const CreateProgramAkademik = lazy(() => import("./page/akademik/proAkademik/CreateProgramAkademik"));
+const DetailProgramAkademik = lazy(() => import("./page/akademik/proAkademik/DetailProgramAkademik"));
+const EditProgramAkademik = lazy(() => import("./page/akademik/proAkademik/EditProgramAkademik"));
+const CalendarOfEventakademik = lazy(() => import("./page/akademik/proAkademik/CalendarOfEventakademik"));
+const ReadAssessmentNonAkademik = lazy(() => import("./page/nonAkademik/assnonakademik/ReadAssessmentnonAkademik"));
+const CreateAssessmentNonAkademik = lazy(() => import("./page/nonAkademik/assnonakademik/CreateAssessmentnonAkademik"));
+const DetailAssessmentNonAkademik = lazy(() => import("./page/nonAkademik/assnonakademik/DetailAssessmentnonAkademik"));
+const EditAssessmentNonAkademik = lazy(() => import("./page/nonAkademik/assnonakademik/EditAssessmentnonAkademik"));
+const ReadProgramNonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/ReadProgramnonAkademik"));
+const ListProgramNonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/ListProgramnonAkademik"));
+const CreateProgramNonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/CreateProgramnonAkademik"));
+const DetailProgramNonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/DetailProgramnonAkademik"));
+const EditProgramNonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/EditProgramnonAkademik"));
+const CalendarOfEventnonAkademik = lazy(() => import("./page/nonAkademik/proNonAkademik/CalendarOfEventnonAkademik"));
+const DaftarProgramPage = lazy(() => import("./components/program/DaftarProgramPage"));
 
-// MASTER WILAYAH
-import ReadWilayah from "./page/admin/kelolamaster/masterWilayah/ReadWilayah";
-import CreateWilayah from "./page/admin/kelolamaster/masterWilayah/CreateWilayah";
-import EditWilayah from "./page/admin/kelolamaster/masterWilayah/EditWilayah";
-import DetailWilayah from "./page/admin/kelolamaster/masterWilayah/DetailWilayah";
+const AODashboardPage = lazy(() => import("./components/ao/AODashboardPage"));
+const AgendaAO = lazy(() => import("./page/ao/AgendaAO"));
+const AOProgramDetailPage = lazy(() => import("./components/ao/AOProgramDetailPage"));
 
-// MASTER SEKOLAH
-import ReadSekolah from "./page/admin/kelolamaster/mastersekolah/ReadSekolah";
-import CreateSekolah from "./page/admin/kelolamaster/mastersekolah/CreateSekolah";
-import EditSekolah from "./page/admin/kelolamaster/mastersekolah/EditSekolah";
-import DetailSekolah from "./page/admin/kelolamaster/mastersekolah/DetailSekolah";
-
-// MASTER OPERATOR SEKOLAH
-import ReadOperatorSekolah from "./page/admin/kelolamaster/masteroperatorsekolah/ReadOperatorSekolah";
-import CreateOperatorSekolah from "./page/admin/kelolamaster/masteroperatorsekolah/CreateOperatorSekolah";
-import EditOperatorSekolah from "./page/admin/kelolamaster/masteroperatorsekolah/EditOperatorSekolah";
-import DetailOperatorSekolah from "./page/admin/kelolamaster/masteroperatorsekolah/DetailOperatorSekolah";
-
-// MASTER VENDOR
-import ReadVendor from "./page/admin/kelolamaster/mastervendor/ReadVendor";
-import CreateVendor from "./page/admin/kelolamaster/mastervendor/CreateVendor";
-import EditVendor from "./page/admin/kelolamaster/mastervendor/EditVendor";
-import DetailVendor from "./page/admin/kelolamaster/mastervendor/DetailVendor";
-import ManajemenVendor from "./page/admin/vendor/ManajemenVendor";
-
-// MASTER KEPALA SEKOLAH
-import ReadKepalaSekolah from "./page/admin/kelolamaster/masterkepalasekolah/ReadKepalaSekolah";
-
-// MASTER KEPALA DINAS
-import ReadKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas";
-import CreateKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/CreateKepalaDinas";
-import EditKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/EditKepalaDinas";
-import DetailKepalaDinas from "./page/admin/kelolamaster/masterkepaladinas/DetailKepalaDinas";
-
-// =========================================================================
-// SEKOLAH SHARED - Role 5, 8, dan 9
-// =========================================================================
-import DashboardSekolah from "./page/sekolah/DashboardSekolah";
-import AgendaSekolah from "./page/sekolah/AgendaSekolah";
-import AssessmentSekolah from "./page/sekolah/AssessmentSekolah";
-import IsiAssessmentSekolah from "./page/sekolah/IsiAssessmentSekolah";
-import ProgramSekolah from "./page/sekolah/ProgramSekolah";
-import DaftarGuru from "./page/sekolah/DaftarGuru";
-import BeritaAcara from "./page/sekolah/BeritaAcara";
-import DashboardKepalaSekolah from "./page/kepalasekolah/DashboardKepalaSekolah";
-
-// DATA GURU
-import DataGuru from "./page/sekolah/DataGuru";
-import CreateGuru from "./page/sekolah/CreateGuru";
-import EditGuru from "./page/sekolah/EditGuru";
-import DetailGuru from "./page/sekolah/DetailGuru";
-import CreateKepalaSekolah from "./page/sekolah/CreateKepalaSekolah";
-import EditKepalaSekolah from "./page/sekolah/EditKepalaSekolah";
-
-// DATA KELAS
-import DataKelas from "./page/sekolah/DataKelas";
-import CreateKelas from "./page/sekolah/CreateKelas";
-import EditKelas from "./page/sekolah/EditKelas";
-import DetailKelas from "./page/sekolah/DetailKelas";
-
-// MINI MASTER JURUSAN
-import ReadJurusan from "./page/sekolah/jurusan/ReadJurusan";
-import CreateJurusan from "./page/sekolah/jurusan/CreateJurusan";
-import EditJurusan from "./page/sekolah/jurusan/EditJurusan";
-import DetailJurusan from "./page/sekolah/jurusan/DetailJurusan";
-
-// =========================================================================
-// VENDOR ROLE
-// =========================================================================
-import DashboardVendor from "./page/vendor/DashboardVendor";
-import AgendaVendor from "./page/vendor/AgendaVendor";
-import ListProgramVendor from "./page/vendor/ListProgramVendor";
-import DetailProgramVendor from "./page/vendor/DetailProgramVendor";
-
-// =========================================================================
-// HO - DASHBOARD
-// =========================================================================
-import DashboardAkademik from "./page/akademik/DashboardAkademik";
-import DashboardnonAkademik from "./page/nonAkademik/DashboardnonAkademik";
-
-// =========================================================================
-// AKADEMIK - ASSESSMENT
-// =========================================================================
-import ReadAssessmentAkademik from "./page/akademik/assakademik/ReadAssessmentAkademik";
-import CreateAssessmentAkademik from "./page/akademik/assakademik/CreateAssessmentAkademik";
-import DetailAssessmentAkademik from "./page/akademik/assakademik/DetailAssessmentAkademik";
-import EditAssessmentAkademik from "./page/akademik/assakademik/EditAssessmentAkademik";
-
-// =========================================================================
-// AKADEMIK - PROGRAM
-// =========================================================================
-import ReadProgramAkademik from "./page/akademik/proAkademik/ReadProgramAkademik";
-import ListProgramAkademik from "./page/akademik/proAkademik/ListProgramAkademik";
-import CreateProgramAkademik from "./page/akademik/proAkademik/CreateProgramAkademik";
-import DetailProgramAkademik from "./page/akademik/proAkademik/DetailProgramAkademik";
-import EditProgramAkademik from "./page/akademik/proAkademik/EditProgramAkademik";
-import CalendarOfEventakademik from "./page/akademik/proAkademik/CalendarOfEventakademik";
-
-// =========================================================================
-// NON-AKADEMIK - ASSESSMENT
-// =========================================================================
-import ReadAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/ReadAssessmentnonAkademik";
-import CreateAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/CreateAssessmentnonAkademik";
-import DetailAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/DetailAssessmentnonAkademik";
-import EditAssessmentNonAkademik from "./page/nonAkademik/assnonakademik/EditAssessmentnonAkademik";
-
-// =========================================================================
-// NON-AKADEMIK - PROGRAM
-// =========================================================================
-import ReadProgramNonAkademik from "./page/nonAkademik/proNonAkademik/ReadProgramnonAkademik";
-import ListProgramNonAkademik from "./page/nonAkademik/proNonAkademik/ListProgramnonAkademik";
-import CreateProgramNonAkademik from "./page/nonAkademik/proNonAkademik/CreateProgramnonAkademik";
-import DetailProgramNonAkademik from "./page/nonAkademik/proNonAkademik/DetailProgramnonAkademik";
-import EditProgramNonAkademik from "./page/nonAkademik/proNonAkademik/EditProgramnonAkademik";
-import CalendarOfEventnonAkademik from "./page/nonAkademik/proNonAkademik/CalendarOfEventnonAkademik";
-
-// HO - DAFTAR PROGRAM
-import DaftarProgramPage from "./components/program/DaftarProgramPage";
-
-// =========================================================================
-// AO - DASHBOARD
-// =========================================================================
-import AODashboardPage from "./components/ao/AODashboardPage";
-import AgendaAO from "./page/ao/AgendaAO";
-import AOProgramDetailPage from "./components/ao/AOProgramDetailPage";
-
+function RouteLoadingFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#F5FBFF] px-6 text-center">
+      <div>
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0AC4E0]" />
+        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
+          Memuat halaman
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
-      {ENABLE_UI_TRANSLATOR && <GlobalUiTranslator />}
-      <Routes>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        {ENABLE_UI_TRANSLATOR && <GlobalUiTranslator />}
+        <Routes>
         {/* OTORISASI */}
         <Route path="/" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
@@ -458,6 +395,7 @@ function App() {
         {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
-import * as XLSX from "xlsx";
 import {
     ArrowLeft,
     Save,
@@ -158,6 +157,8 @@ const DEFAULT_SCORE_OPTIONS = [
     "1 - Kurang",
 ];
 
+const loadXlsx = async () => import("xlsx");
+
 const findQuestionHeaderIndex = (rows = []) =>
     rows.findIndex((row = []) =>
         row.some((cell) =>
@@ -170,7 +171,7 @@ const findQuestionHeaderIndex = (rows = []) =>
         ),
     );
 
-const worksheetToFlexibleRows = (sheet) => {
+const worksheetToFlexibleRows = (XLSX, sheet) => {
     const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     const headerIndex = findQuestionHeaderIndex(matrix);
 
@@ -214,7 +215,8 @@ const normalizeImportedQuestions = (rows = []) => {
         .filter((item) => item.question);
 };
 
-const downloadQuestionTemplate = () => {
+const downloadQuestionTemplate = async () => {
+    const XLSX = await loadXlsx();
     const workbook = XLSX.utils.book_new();
     const templateRows = [
         ["TEMPLATE IMPORT SOAL ASSESSMENT"],
@@ -521,6 +523,7 @@ function CreateAssessmentForm({
         }
 
         try {
+            const XLSX = await loadXlsx();
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: "array" });
             const firstSheetName = workbook.SheetNames[0];
@@ -531,7 +534,7 @@ function CreateAssessmentForm({
             }
 
             const sheet = workbook.Sheets["Template Soal"] || workbook.Sheets[firstSheetName];
-            const rows = worksheetToFlexibleRows(sheet);
+            const rows = worksheetToFlexibleRows(XLSX, sheet);
             const questions = normalizeImportedQuestions(rows);
 
             if (questions.length === 0) {
