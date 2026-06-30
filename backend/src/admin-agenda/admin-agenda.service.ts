@@ -569,20 +569,13 @@ export class AdminAgendaService {
 
     if (this.isAdmin(identity)) return rows;
 
-    const accessibleWilayahIds = await this.getAccessibleWilayahIds(identity);
-
-    return rows.filter((agenda) => {
-      const mentioned = (agenda.participants || []).some(
+    return rows.filter((agenda) =>
+      (agenda.participants || []).some(
         (participant) =>
           participant.participant_type === identity.recipientType &&
           Number(participant.participant_id) === Number(identity.id),
-      );
-
-      return (
-        mentioned ||
-        this.agendaMatchesIdentity(agenda, identity, accessibleWilayahIds)
-      );
-    });
+      ),
+    );
   }
 
   async findOne(id: number, identity: AgendaAuthIdentity) {

@@ -127,11 +127,40 @@ function getRatingStats(kegiatan = {}) {
         : Number(kegiatan.guru_rating || 0);
 
     return {
+        ratings,
         total,
         average: average ? Number(average.toFixed(2)) : 0,
         guruCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "GURU").length,
         vendorCount: ratings.filter((item) => String(item.rater_type || "").toUpperCase() === "VENDOR").length,
     };
+}
+
+function getTokenPayload() {
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) return {};
+        return JSON.parse(atob(token.split(".")[1]));
+    } catch {
+        return {};
+    }
+}
+
+function getOwnVendorRating(row = {}, vendorId) {
+    const payload = getTokenPayload();
+    const ratings = getArray(row.ratings, row.ratingStats?.ratings);
+    const idUser = String(payload.id_user || payload.sub || payload.id || "");
+    const idVendor = String(vendorId || "");
+
+    return ratings.find((item) => {
+        const type = String(item?.rater_type || "").toUpperCase();
+        const itemUserId = String(item?.id_user || "");
+        const itemVendorId = String(item?.id_vendor || "");
+
+        return (
+            type === "VENDOR" &&
+            ((idVendor && itemVendorId === idVendor) || (idUser && itemUserId === idUser))
+        );
+    }) || null;
 }
 
 async function safeJson(response) {
@@ -392,6 +421,12 @@ function VendorProgramDetailPage({
     const [commentRow, setCommentRow] = useState(null);
     const [comments, setComments] = useState([]);
 
+    const [showRatingModal, setShowRatingModal] = useState(false);
+    const [ratingRow, setRatingRow] = useState(null);
+    const [ratingValue, setRatingValue] = useState(0);
+    const [ratingComment, setRatingComment] = useState("");
+    const [ratingLoading, setRatingLoading] = useState(false);
+
     // UI state: filter konten eksekusi berdasarkan shape alur.
     const [flowFilter, setFlowFilter] = useState({
         type: "phase",
@@ -409,6 +444,16 @@ function VendorProgramDetailPage({
             time: "System",
         },
     ]);
+
+    const currentVendorId = useMemo(() => {
+        const payload = getTokenPayload();
+        const userId = String(payload.id_user || payload.sub || payload.id || "");
+        const matched = masterVendor.find(
+            (item) => String(item?.id_user || item?.user?.id_user || "") === userId,
+        );
+
+        return matched?.id_vendor || matched?.vendor_id || matched?.id || null;
+    }, [masterVendor]);
 
     const fetchUserById = async (userId, headers) => {
         if (!userId) return null;
@@ -906,6 +951,7 @@ function VendorProgramDetailPage({
 
                     statusKegiatan: kegiatan.status_kegiatan || "LOCKED",
                     guruRating: kegiatan.guru_rating || null,
+                    ratings: ratingStats.ratings,
                     meetings,
                     ratingStats,
                     commentCount: Array.isArray(kegiatan.comments) ? kegiatan.comments.length : 0,
@@ -1319,6 +1365,52 @@ function VendorProgramDetailPage({
 
         setShowCommentDrawer(true);
         await fetchComments(row.parentId);
+    };
+
+    const openRatingModal = (row) => {
+        if (!row?.parentId) return;
+        const ownRating = getOwnVendorRating(row, currentVendorId);
+        setRatingRow(row);
+        setRatingValue(ownRating?.rating || 0);
+        setRatingComment(ownRating?.komentar || "");
+        setShowRatingModal(true);
+    };
+
+    const submitRating = async () => {
+        if (!ratingValue || ratingValue < 1 || !ratingRow?.parentId) {
+            toast.warning("Pilih rating terlebih dahulu (1-5 bintang)");
+            return;
+        }
+
+        setRatingLoading(true);
+
+        try {
+            const token = localStorage.getItem("token");
+            const res = await fetch(`${API_BASE_URL}/program/kegiatan/${ratingRow.parentId}/rating`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    rating: ratingValue,
+                    comment: ratingComment,
+                    rater_type: "VENDOR",
+                    id_vendor: currentVendorId,
+                }),
+            });
+            const data = await safeJson(res);
+            if (!res.ok) throw new Error(data?.message || "Gagal kirim rating");
+
+            toast.success("Rating vendor berhasil disimpan.");
+            setShowRatingModal(false);
+            setRatingRow(null);
+            await fetchProgramDetail();
+        } catch (error) {
+            toast.error(error.message || "Gagal kirim rating");
+        } finally {
+            setRatingLoading(false);
+        }
     };
 
     const openUploadModal = (row, evidenceIndex) => {
@@ -1995,8 +2087,9 @@ function VendorProgramDetailPage({
                                         AO_REVIEW: "border-blue-100 bg-blue-50 text-blue-600",
                                         HO_APPROVAL: "border-emerald-100 bg-emerald-50 text-emerald-600",
                                         GURU_RATING: "border-amber-100 bg-amber-50 text-amber-600",
+                                        VENDOR_RATING: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600",
                                     };
-                                    const typeLabels = { AO_REVIEW: "Review AO", HO_APPROVAL: "Keputusan HO", GURU_RATING: "Feedback Guru" };
+                                    const typeLabels = { AO_REVIEW: "Review AO", HO_APPROVAL: "Keputusan HO", GURU_RATING: "Feedback Guru", VENDOR_RATING: "Feedback Vendor" };
                                     const meta = typeColors[c.comment_type] || typeColors.AO_REVIEW;
                                     const date = c.created_at ? new Date(c.created_at).toLocaleString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
                                     return (
@@ -2029,6 +2122,22 @@ function VendorProgramDetailPage({
                 </div>
             )}
 
+            <VendorRatingModal
+                open={showRatingModal}
+                row={ratingRow}
+                isEdit={Boolean(getOwnVendorRating(ratingRow || {}, currentVendorId))}
+                ratingValue={ratingValue}
+                setRatingValue={setRatingValue}
+                ratingComment={ratingComment}
+                setRatingComment={setRatingComment}
+                loading={ratingLoading}
+                onClose={() => {
+                    setShowRatingModal(false);
+                    setRatingRow(null);
+                }}
+                onSubmit={submitRating}
+            />
+
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
@@ -2055,6 +2164,112 @@ function VendorProgramDetailPage({
         </PageWrapper>
     );
 }
+
+function VendorRatingModal({
+    open,
+    row,
+    isEdit = false,
+    ratingValue,
+    setRatingValue,
+    ratingComment,
+    setRatingComment,
+    loading,
+    onClose,
+    onSubmit,
+}) {
+    if (!open) return null;
+
+    return (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_35px_90px_rgba(15,23,42,0.25)]">
+                <div className="border-b border-slate-100 px-6 py-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <p className="inline-flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-amber-500">
+                                <Star size={12} fill="currentColor" />
+                                Rating Vendor
+                            </p>
+                            <h3 className="mt-1 text-[20px] font-black leading-tight text-slate-900">
+                                {row?.title || "Kegiatan"}
+                            </h3>
+                            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                {isEdit
+                                    ? "Ubah penilaian dan komentar vendor untuk aktivitas ini."
+                                    : "Berikan penilaian vendor setelah aktivitas selesai."}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:text-slate-700"
+                        >
+                            <X size={15} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className="space-y-5 px-6 py-6">
+                    <div>
+                        <p className="mb-3 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                            Pilih Rating
+                        </p>
+                        <div className="flex justify-center gap-3">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                    key={star}
+                                    type="button"
+                                    onClick={() => setRatingValue(star)}
+                                    className={`flex h-14 w-14 items-center justify-center rounded-2xl border transition-all active:scale-90 ${ratingValue >= star
+                                        ? "scale-110 border-amber-200 bg-amber-50"
+                                        : "border-slate-100 bg-slate-50 opacity-40 hover:opacity-70"
+                                        }`}
+                                >
+                                    <Star
+                                        size={26}
+                                        className={ratingValue >= star ? "fill-amber-400 text-amber-400" : "text-slate-300"}
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                            Komentar
+                        </p>
+                        <textarea
+                            value={ratingComment}
+                            onChange={(event) => setRatingComment(event.target.value)}
+                            placeholder="Catatan evaluasi vendor untuk aktivitas ini..."
+                            rows={3}
+                            className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-[12px] font-semibold text-slate-700 outline-none focus:border-amber-300"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-3 border-t border-slate-100 px-6 py-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 rounded-full border border-slate-100 py-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-700"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSubmit}
+                        disabled={loading || ratingValue < 1}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber-400 py-3 text-[10px] font-black uppercase text-white shadow hover:bg-amber-500 disabled:opacity-40"
+                    >
+                        {loading ? <RefreshCcw size={14} className="animate-spin" /> : <Star size={14} />}
+                        {isEdit ? "Update Rating" : "Simpan Rating"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function VendorSummaryPanel({
     program,
     schoolName,
@@ -2646,6 +2861,21 @@ function VendorExecutionTablePanel({
                                                                     </span>
                                                                 ) : null;
                                                             })()}
+                                                        </button>
+                                                    )}
+
+                                                    {row.type === "kegiatan" && status === "APPROVED" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openRatingModal(row)}
+                                                            disabled={rowLocked}
+                                                            className="flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-100 bg-amber-50 px-2 text-[9px] font-black text-amber-500 transition hover:bg-amber-100 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                            title="Rating Vendor"
+                                                        >
+                                                            <Star size={12} fill={getOwnVendorRating(row, currentVendorId) ? "currentColor" : "none"} />
+                                                            {getOwnVendorRating(row, currentVendorId)
+                                                                ? `Edit ${getOwnVendorRating(row, currentVendorId)?.rating}/5`
+                                                                : "Rating"}
                                                         </button>
                                                     )}
 

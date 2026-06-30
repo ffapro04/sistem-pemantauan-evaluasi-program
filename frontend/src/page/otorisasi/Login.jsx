@@ -567,8 +567,6 @@ const Login = () => {
       localStorage.setItem("user", JSON.stringify(decoded));
 
       const redirectPath = getRedirectPath(decoded);
-      console.log("LOGIN DECODED:", decoded);
-      console.log("REDIRECT TARGET:", redirectPath);
 
       toast.success("Login berhasil. Mengarahkan ke dashboard...", {
         position: "top-right",
@@ -799,7 +797,7 @@ const Login = () => {
                   className="h-full w-full object-cover"
                   alt="Library YPA-MDR"
                   decoding="async"
-                  fetchPriority="high"
+                  fetchpriority="high"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-[#0AC4E0]/10 to-slate-950/65" />
                 <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.18)_0%,transparent_36%,rgba(15,23,42,0.25)_100%)]" />

@@ -664,6 +664,7 @@ function AccountSettings() {
 
     const [driveStatus, setDriveStatus] = useState({
         connected: false,
+        provider: null,
         google_email: null,
         google_name: null,
         owner_type: null,
@@ -857,7 +858,7 @@ function AccountSettings() {
         fetchProfile();
         fetchDriveStatus();
 
-        const driveParam = searchParams.get("drive") || searchParams.get("googleDrive");
+        const driveParam = searchParams.get("drive") || searchParams.get("googleDrive") || searchParams.get("storage");
         if (driveParam === "connected") {
             toast.success("Penyimpanan dokumen berhasil ditautkan.");
             setSearchParams({});
@@ -870,7 +871,7 @@ function AccountSettings() {
         setConnecting(true);
 
         try {
-            const redirectTo = "/pengaturan-akun?drive=connected";
+            const redirectTo = "/pengaturan-akun?storage=connected";
             const response = await fetch(
                 `${API_BASE_URL}/google-drive/auth-url?redirectTo=${encodeURIComponent(redirectTo)}`,
                 {
@@ -888,7 +889,7 @@ function AccountSettings() {
             }
 
             if (!payload?.url) {
-                throw new Error("URL perizinan Google tidak ditemukan dari backend.");
+                throw new Error("URL perizinan penyimpanan tidak ditemukan dari backend.");
             }
 
             window.location.href = payload.url;
@@ -1400,6 +1401,7 @@ function AccountSettings() {
                             </div>
 
                             <div className="mt-5 space-y-3">
+                                <Field label="Provider Penyimpanan" value="Google Drive" />
                                 <Field label="Email Penyimpanan" value={driveStatus.google_email} />
                                 <Field label="Nama Akun Penyimpanan" value={driveStatus.google_name} />
                                 <Field label="Waktu Tertaut" value={connectedAtLabel} />
@@ -1431,7 +1433,7 @@ function AccountSettings() {
                                         disabled={connecting}
                                         className="h-11 flex-1 rounded-[1.05rem] bg-[#0AC4E0] text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#08B7D1] disabled:opacity-60"
                                     >
-                                        {connecting ? "Menghubungkan" : "Tautkan"}
+                                        {connecting ? "Menghubungkan" : "Tautkan Google Drive"}
                                     </button>
                                 )}
                             </div>

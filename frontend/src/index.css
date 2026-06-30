@@ -848,6 +848,11 @@ html {
   }
 }
 
+.recharts-responsive-container {
+  min-width: 0 !important;
+  min-height: 180px !important;
+}
+
 /* HP kecil */
 @media (max-width: 480px) {
   .app-content {

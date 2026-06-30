@@ -128,9 +128,6 @@ export class SekolahController {
     @Body() updateSekolahDto: any,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    console.log('BODY UPDATE SEKOLAH:', updateSekolahDto);
-    console.log('FILE LOGO DITERIMA:', file);
-
     if (updateSekolahDto.id_wilayah && !updateSekolahDto.id_kabupaten) {
       updateSekolahDto.id_kabupaten = Number(updateSekolahDto.id_wilayah);
     }

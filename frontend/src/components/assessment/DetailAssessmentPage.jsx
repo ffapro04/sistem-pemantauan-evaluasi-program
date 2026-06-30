@@ -50,6 +50,7 @@ import {
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
+import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
 
 const DEFAULT_API_BASE = "";
 const loadXlsx = async () => import("xlsx");
@@ -586,100 +587,17 @@ function AssessmentDetailBase({
         }
 
         const XLSX = await loadXlsx();
-        const workbook = XLSX.utils.book_new();
-        const totalResponden = Number(assessment.total_responden || 0);
-        const sudahMengisi = respondents.length;
-        const belumMengisi = Math.max(totalResponden - sudahMengisi, 0);
-
-        const summarySheet = XLSX.utils.aoa_to_sheet([
-            ["HASIL ASSESSMENT"],
-            ["Nama Assessment", assessment.nama_assessment || "-"],
-            ["Jenis", assessment.jenis || "-"],
-            ["Pilar", getPilarLabel(assessmentPilar) || "-"],
-            ["Total Responden", totalResponden],
-            ["Sudah Mengisi", sudahMengisi],
-            ["Belum Mengisi", belumMengisi],
-            ["Progress", `${completionRate}%`],
-            ["Deadline", assessment.deadline ? formatDate(assessment.deadline) : "-"],
-        ]);
-        summarySheet["!cols"] = [{ wch: 24 }, { wch: 52 }];
-
-        const recapRows = [
-            ["No Pertanyaan", "Pertanyaan", "Opsi Jawaban", "Jumlah", "Persentase"],
-        ];
-
-        questions.forEach((question, questionIndex) => {
-            const questionId = getQuestionId(question);
-            const pilihan = getQuestionOptions(question).slice(0, 4);
-
-            pilihan.forEach((opsi) => {
-                const jumlah = respondents.filter((pengisi) => {
-                    const jawaban = getAnswerForQuestion(pengisi, questionId);
-                    return jawaban?.jawaban === opsi;
-                }).length;
-                const persentase =
-                    respondents.length > 0
-                        ? Math.round((jumlah / respondents.length) * 100)
-                        : 0;
-
-                recapRows.push([
-                    questionIndex + 1,
-                    question.teks || question.pertanyaan || "-",
-                    opsi,
-                    jumlah,
-                    `${persentase}%`,
-                ]);
-            });
-        });
-
-        const recapSheet = XLSX.utils.aoa_to_sheet(recapRows);
-        recapSheet["!cols"] = [
-            { wch: 14 },
-            { wch: 64 },
-            { wch: 26 },
-            { wch: 12 },
-            { wch: 14 },
-        ];
-        recapSheet["!autofilter"] = { ref: `A1:E${Math.max(recapRows.length, 1)}` };
-
-        const rawRows = [
-            ["Nama Pengisi", "Sekolah", "Tanggal Mengisi", "No Pertanyaan", "Pertanyaan", "Jawaban", "Skor"],
-        ];
-
-        respondents.forEach((pengisi) => {
-            (pengisi.jawaban || []).forEach((jawaban) => {
-                const pertanyaan = questions.find(
-                    (item) => Number(getQuestionId(item)) === Number(jawaban.id_pertanyaan),
-                );
-
-                rawRows.push([
-                    pengisi.nama || "-",
-                    pengisi.sekolah || "-",
-                    pengisi.tanggal_mengisi ? formatDate(pengisi.tanggal_mengisi) : "-",
-                    pertanyaan?.nomor || "",
-                    pertanyaan?.teks || pertanyaan?.pertanyaan || "",
-                    jawaban.jawaban || "",
-                    jawaban.skor ?? "",
-                ]);
-            });
-        });
-
-        const rawSheet = XLSX.utils.aoa_to_sheet(rawRows);
-        rawSheet["!cols"] = [
-            { wch: 28 },
-            { wch: 34 },
-            { wch: 18 },
-            { wch: 14 },
-            { wch: 64 },
-            { wch: 26 },
-            { wch: 10 },
-        ];
-        rawSheet["!autofilter"] = { ref: `A1:G${Math.max(rawRows.length, 1)}` };
-
-        XLSX.utils.book_append_sheet(workbook, summarySheet, "Ringkasan");
-        XLSX.utils.book_append_sheet(workbook, recapSheet, "Rekap Diagram");
-        XLSX.utils.book_append_sheet(workbook, rawSheet, "Data Mentah");
-        XLSX.writeFile(workbook, `hasil-assessment-${id}.xlsx`);
+        exportAssessmentResultWorkbook(
+            XLSX,
+            {
+                ...assessment,
+                pilar: assessmentPilar,
+                pertanyaan: questions,
+                pengisi: respondents,
+                sekolah_profile: schools,
+            },
+            { id },
+        );
     };
 
     if (loading) {

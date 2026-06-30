@@ -475,9 +475,6 @@ export class SekolahService {
   // =========================================================
 
   async update(id: number, updateSekolahDto: any, file?: Express.Multer.File) {
-    console.log('UPDATE SEKOLAH ID:', id);
-    console.log('PAYLOAD UPDATE SEKOLAH:', updateSekolahDto);
-    console.log('TAHUN BINAAN MASUK:', updateSekolahDto.tahun_binaan);
     const sekolah = await this.sekolahRepo.findOne({
       where: { id_sekolah: id },
     });

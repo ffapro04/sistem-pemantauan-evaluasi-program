@@ -21,6 +21,9 @@ export class UserGoogleDriveToken {
   @Column({ name: 'owner_type', type: 'varchar', length: 50, default: 'USER' })
   owner_type: string;
 
+  @Column({ name: 'provider', type: 'varchar', length: 30, default: 'GOOGLE' })
+  provider: string;
+
   @Column({
     name: 'google_email',
     type: 'varchar',

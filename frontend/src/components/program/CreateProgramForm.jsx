@@ -769,13 +769,10 @@ function CreateProgramForm({
                         const payload = await res.json().catch(() => []);
                         const normalized = normalizeArray(payload);
                         if (res.ok && normalized.length > 0) {
-                            console.log(` Data ditemukan dari ${url}:`, normalized.length, "items");
                             return normalized;
-                        } else if (res.ok) {
-                            console.log(`âš  ${url} mengembalikan array kosong`);
                         }
                     } catch (error) {
-                        console.log(`âŒ Gagal fetch ${url}:`, error.message);
+                        // Coba endpoint fallback berikutnya.
                     }
                 }
                 return [];
@@ -799,13 +796,6 @@ function CreateProgramForm({
                 fetchSafe([`${API_BASE_URL}/wilayah`]),
             ]);
 
-            console.log(" Raw Data:", {
-                sekolah: rawSekolahList.length,
-                ao: rawAoList.length,
-                vendor: rawVendorList.length,
-                wilayah: rawWilayahList.length,
-            });
-
             //  FILTER VENDOR BERDASARKAN KATEGORI
             const targetCategory = normalizeCategory(kategori);
             const filteredVendorList = rawVendorList.filter(item => {
@@ -815,24 +805,12 @@ function CreateProgramForm({
                 if (!vendorCategory) return true;
                 return vendorCategory === targetCategory;
             });
-            console.log(` Vendor setelah filter kategori ${kategori}: ${filteredVendorList.length} dari ${rawVendorList.length}`);
-
             // Proses Sekolah - strict by HO jenis/sub_jenis
             const activeRawSchools = rawSekolahList
                 .filter((item) => item?.id_sekolah || item?.id)
                 .filter((item) => isActiveValue(item?.status));
 
             const accessibleSchools = filterSchoolsByHoAccess(activeRawSchools, currentHo);
-
-            console.log(" HO ACCESS FILTER", {
-                currentHo,
-                totalSekolah: activeRawSchools.length,
-                sekolahSetelahFilter: accessibleSchools.length,
-                contohJenjang: activeRawSchools.slice(0, 5).map((item) => ({
-                    nama: item?.nama_sekolah || item?.nama,
-                    jenjang: item?.jenjang,
-                })),
-            });
 
             const sekolahList = accessibleSchools
                 .map(normalizeSchool)
@@ -842,7 +820,6 @@ function CreateProgramForm({
             let aoList = [];
             const usersWithId = rawAoList.filter((item) => item?.id_user || item?.id);
             const recognizedAo = usersWithId.filter(isAreaOfficer);
-            console.log(` AO terdeteksi: ${recognizedAo.length} dari ${usersWithId.length} users`);
             const aoSource = recognizedAo.length > 0 ? recognizedAo : usersWithId;
             if (recognizedAo.length === 0 && usersWithId.length > 0) {
                 console.warn("âš  Tidak ada user dengan role AO terdeteksi, menampilkan semua user");
@@ -865,8 +842,6 @@ function CreateProgramForm({
                     totalVendor: rawVendorList.length,
                 });
             }
-
-            console.log(` Final: ${sekolahList.length} sekolah, ${aoList.length} AO, ${vendorList.length} vendor`);
 
             setSekolahOptions(sekolahList);
             setAoOptions(aoList);
@@ -1236,7 +1211,6 @@ function CreateProgramForm({
             toast.success(successMessage);
             navigate(redirectPath);
         } catch (error) {
-            console.error("âŒ Gagal membuat program:", error);
             toast.error(error.message || "Terjadi kesalahan saat membuat program");
         } finally {
             setLoading(false);

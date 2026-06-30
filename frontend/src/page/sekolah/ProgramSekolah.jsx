@@ -89,12 +89,14 @@ const COMMENT_TYPE_COLOR = {
     AO_REVIEW: "border-sky-100 bg-sky-50 text-sky-600",
     HO_APPROVAL: "border-emerald-100 bg-emerald-50 text-emerald-600",
     GURU_RATING: "border-amber-100 bg-amber-50 text-amber-600",
+    VENDOR_RATING: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600",
 };
 
 const COMMENT_TYPE_LABEL = {
     AO_REVIEW: "Review AO",
     HO_APPROVAL: "Keputusan HO",
     GURU_RATING: "Feedback Guru",
+    VENDOR_RATING: "Feedback Vendor",
 };
 
 function normalizeArray(payload) {
@@ -147,6 +149,23 @@ function getRatingStats(activity = {}) {
         total,
         average: average ? Number(average.toFixed(2)) : 0,
     };
+}
+
+function getOwnGuruRating(activity = {}, user = {}) {
+    const guruId = String(getGuruAssessmentId(user) || "");
+    const userId = String(user?.id_user || user?.sub || user?.id || "");
+    const ratings = getArray(activity.ratings, activity.rating_items);
+
+    return ratings.find((item) => {
+        const type = String(item?.rater_type || "").toUpperCase();
+        const itemGuruId = String(item?.id_guru_assessment || "");
+        const itemUserId = String(item?.id_user || "");
+
+        return (
+            type === "GURU" &&
+            ((guruId && itemGuruId === guruId) || (userId && itemUserId === userId))
+        );
+    }) || null;
 }
 
 function formatDate(value) {
@@ -686,9 +705,10 @@ export default function ProgramSekolah() {
     };
 
     const openRating = (activity) => {
+        const ownRating = getOwnGuruRating(activity, user);
         setRatingModal(activity);
-        setRatingValue(activity.guru_rating || 0);
-        setRatingComment(activity.guru_comment || "");
+        setRatingValue(ownRating?.rating || activity.guru_rating || 0);
+        setRatingComment(ownRating?.komentar || activity.guru_comment || "");
     };
 
     const submitRating = async () => {
@@ -814,6 +834,7 @@ export default function ProgramSekolah() {
                                 period={currentPeriod}
                                 periodIndex={activePeriod}
                                 isGuru={isGuru}
+                                user={user}
                                 openComment={openComment}
                                 openRating={openRating}
                             />
@@ -830,6 +851,7 @@ export default function ProgramSekolah() {
 
             <RatingModal
                 ratingModal={ratingModal}
+                isEdit={Boolean(getOwnGuruRating(ratingModal || {}, user))}
                 ratingValue={ratingValue}
                 ratingComment={ratingComment}
                 ratingLoading={ratingLoading}
@@ -999,7 +1021,7 @@ function PeriodTabs({ periods, activePeriod, setActivePeriod }) {
     );
 }
 
-function PeriodContent({ period, periodIndex, isGuru, openComment, openRating }) {
+function PeriodContent({ period, periodIndex, isGuru, user, openComment, openRating }) {
     const openingList = getArray(period.termin, period.termins, period.t_termin);
     const activityList = getArray(period.kegiatans, period.kegiatan, period.t_kegiatans);
     const openingDone = isOpeningCompleted(period);
@@ -1049,6 +1071,7 @@ function PeriodContent({ period, periodIndex, isGuru, openComment, openRating })
                                     activity={activity}
                                     index={index}
                                     isGuru={isGuru}
+                                    user={user}
                                     openComment={openComment}
                                     openRating={openRating}
                                 />
@@ -1149,7 +1172,7 @@ function OpeningCard({ termin, index }) {
     );
 }
 
-function ActivityCard({ period, activity, index, isGuru, openComment, openRating }) {
+function ActivityCard({ period, activity, index, isGuru, user, openComment, openRating }) {
     const activityStatus = getActivityStatus(activity);
     const unlocked = canOpenActivity(period, activity, index);
     const approved = activityStatus === "APPROVED";
@@ -1164,6 +1187,7 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
     const commentCount = Array.isArray(activity.comments) ? activity.comments.length : 0;
     const meetings = normalizeMeetings(activity);
     const ratingStats = getRatingStats(activity);
+    const ownGuruRating = getOwnGuruRating(activity, user);
 
     return (
         <div className={`rounded-[1.35rem] border p-5 transition ${!unlocked ? "border-slate-100 bg-slate-50 opacity-70" : approved ? "border-emerald-100 bg-emerald-50/40" : "border-slate-100 bg-white shadow-sm"}`}>
@@ -1212,19 +1236,21 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
 
                 {unlocked && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => openComment(activity)}
-                            className="relative inline-flex h-10 items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-3 text-[9px] font-black uppercase tracking-widest text-violet-500 transition hover:bg-violet-100"
-                        >
-                            <MessageSquare size={14} />
-                            Komentar
-                            {commentCount > 0 && (
-                                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[8px] font-black text-white">
-                                    {commentCount > 9 ? "9+" : commentCount}
-                                </span>
-                            )}
-                        </button>
+                        {!isGuru && (
+                            <button
+                                type="button"
+                                onClick={() => openComment(activity)}
+                                className="relative inline-flex h-10 items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-3 text-[9px] font-black uppercase tracking-widest text-violet-500 transition hover:bg-violet-100"
+                            >
+                                <MessageSquare size={14} />
+                                Komentar
+                                {commentCount > 0 && (
+                                    <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[8px] font-black text-white">
+                                        {commentCount > 9 ? "9+" : commentCount}
+                                    </span>
+                                )}
+                            </button>
+                        )}
 
                         {isGuru && approved && (
                             <button
@@ -1233,7 +1259,7 @@ function ActivityCard({ period, activity, index, isGuru, openComment, openRating
                                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 text-[9px] font-black uppercase tracking-widest text-amber-500 transition hover:bg-amber-100"
                             >
                                 <Star size={14} />
-                                {activity.guru_rating ? `${activity.guru_rating}/5` : "Rating"}
+                                {ownGuruRating ? `Edit ${ownGuruRating.rating}/5` : "Rating"}
                             </button>
                         )}
                     </div>
@@ -1352,6 +1378,7 @@ function LoadingState({ label }) {
 
 function RatingModal({
     ratingModal,
+    isEdit = false,
     ratingValue,
     ratingComment,
     ratingLoading,
@@ -1374,7 +1401,9 @@ function RatingModal({
                             {ratingModal.nama_kegiatans || ratingModal.nama_kegiatan || "Aktivitas"}
                         </h3>
                         <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                            Berikan penilaian setelah aktivitas selesai.
+                            {isEdit
+                                ? "Ubah penilaian dan komentar Anda untuk aktivitas ini."
+                                : "Berikan penilaian setelah aktivitas selesai."}
                         </p>
                     </div>
                     <button
@@ -1440,7 +1469,7 @@ function RatingModal({
                         className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber-400 py-3 text-[10px] font-black uppercase text-white shadow hover:bg-amber-500 disabled:opacity-40"
                     >
                         {ratingLoading ? <RefreshCw size={14} className="animate-spin" /> : <Star size={14} />}
-                        Simpan Rating
+                        {isEdit ? "Update Rating" : "Simpan Rating"}
                     </button>
                 </div>
             </div>
@@ -1461,7 +1490,7 @@ function CommentDrawer({
 }) {
     if (!open) return null;
 
-    const canGuruComment = isGuru && getActivityStatus(activity) === "APPROVED";
+    const canGuruComment = false;
 
     return (
         <div className="fixed inset-0 z-[90] flex">
@@ -1563,7 +1592,7 @@ function CommentDrawer({
                 ) : (
                     <div className="shrink-0 border-t border-slate-100 px-5 py-4 text-center">
                         <p className="text-[10px] font-semibold text-slate-400">
-                            Feedback guru dibuka setelah aktivitas selesai dan disetujui HO.
+                            Guru memberikan komentar bersamaan dengan rating aktivitas.
                         </p>
                     </div>
                 )}

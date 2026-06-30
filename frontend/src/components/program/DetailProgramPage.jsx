@@ -142,6 +142,49 @@ function getRatingStats(kegiatan = {}) {
     };
 }
 
+function getTokenPayload() {
+    try {
+        const token = localStorage.getItem("token");
+        if (!token) return {};
+        return JSON.parse(atob(token.split(".")[1]));
+    } catch {
+        return {};
+    }
+}
+
+function getOwnRating(row = {}, role = {}) {
+    const payload = getTokenPayload();
+    const ratings = getArray(row.ratings, row.ratingStats?.ratings);
+    const idUser = String(payload.id_user || payload.sub || payload.id || "");
+    const idGuru = String(payload.id_guru_assessment || payload.id_guru || "");
+    const raterType = role?.isVendor ? "VENDOR" : "GURU";
+
+    return ratings.find((item) => {
+        const type = String(item?.rater_type || "").toUpperCase();
+        const itemUserId = String(item?.id_user || "");
+        const itemGuruId = String(item?.id_guru_assessment || "");
+
+        return (
+            type === raterType &&
+            ((idGuru && itemGuruId === idGuru) || (idUser && itemUserId === idUser))
+        );
+    }) || null;
+}
+
+function getActivityKpi(row) {
+    const evidences = Array.isArray(row?.evidences) ? row.evidences : [];
+    const total = evidences.length;
+    const approved = evidences.filter((item) => item.status === "APPROVED").length;
+    const percentage = total ? Math.round((approved / total) * 100) : 0;
+
+    return {
+        total,
+        approved,
+        pending: Math.max(total - approved, 0),
+        percentage,
+    };
+}
+
 async function safeJson(response) {
     try {
         return await response.json();
@@ -1205,6 +1248,7 @@ function DetailProgramPage({
                     statusKegiatan: kegiatan.status_kegiatan || "LOCKED",
                     guruRating: kegiatan.guru_rating || null,
                     guruComment: kegiatan.guru_comment || null,
+                    ratings: ratingStats.ratings,
                     meetings,
                     ratingStats,
                     commentCount: Array.isArray(kegiatan.comments) ? kegiatan.comments.length : 0,
@@ -1525,6 +1569,41 @@ function DetailProgramPage({
             rejected,
             total,
             percentage: total ? Math.round((approved / total) * 100) : 0,
+        };
+    }, [monitoringRows]);
+
+    const activityKpi = useMemo(() => {
+        const activityRows = Object.values(monitoringRows)
+            .flat()
+            .filter((row) => row.type === "kegiatan");
+
+        const totalActivities = activityRows.length;
+        const totalEvidence = activityRows.reduce(
+            (sum, row) => sum + getActivityKpi(row).total,
+            0,
+        );
+        const approvedEvidence = activityRows.reduce(
+            (sum, row) => sum + getActivityKpi(row).approved,
+            0,
+        );
+        const completedActivities = activityRows.filter(
+            (row) => getActivityKpi(row).total > 0 && getActivityKpi(row).percentage >= 100,
+        ).length;
+
+        return {
+            totalActivities,
+            completedActivities,
+            totalEvidence,
+            approvedEvidence,
+            pendingEvidence: Math.max(totalEvidence - approvedEvidence, 0),
+            percentage: totalEvidence
+                ? Math.round((approvedEvidence / totalEvidence) * 100)
+                : 0,
+            activities: activityRows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                ...getActivityKpi(row),
+            })),
         };
     }, [monitoringRows]);
 
@@ -1984,9 +2063,10 @@ function DetailProgramPage({
 
     const openRatingModal = (row) => {
         if (!row?.parentId) return;
+        const ownRating = getOwnRating(row, currentRole);
         setRatingRow(row);
-        setRatingValue(row.guruRating || 0);
-        setRatingComment(row.guruComment || "");
+        setRatingValue(ownRating?.rating || row.guruRating || 0);
+        setRatingComment(ownRating?.komentar || row.guruComment || "");
         setShowRatingModal(true);
     };
 
@@ -2004,7 +2084,12 @@ function DetailProgramPage({
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({ rating: ratingValue, comment: ratingComment }),
+                body: JSON.stringify({
+                    rating: ratingValue,
+                    comment: ratingComment,
+                    rater_type: currentRole.isVendor ? "VENDOR" : "GURU",
+                    id_guru_assessment: getTokenPayload()?.id_guru_assessment || null,
+                }),
             });
             const data = await safeJson(res);
             if (!res.ok) throw new Error(data?.message || "Gagal kirim rating");
@@ -2376,6 +2461,7 @@ function DetailProgramPage({
                             aoName={getAoName()}
                             vendorName={getVendorName()}
                             progress={progress}
+                            activityKpi={activityKpi}
                             assessment={assessment}
                             assessmentChartData={assessmentChartData}
                             ratingSummary={ratingSummary}
@@ -2456,6 +2542,8 @@ function DetailProgramPage({
                                     openChatForRow={openChatForRow}
                                     openCommentForRow={openCommentForRow}
                                     openRatingModal={openRatingModal}
+                                    canRateActivity={currentRole.isGuru || currentRole.isVendor}
+                                    currentRole={currentRole}
                                     readCommentRows={readCommentRows}
                                 />
                             )}
@@ -2474,6 +2562,8 @@ function DetailProgramPage({
                                     openChatForRow={openChatForRow}
                                     openCommentForRow={openCommentForRow}
                                     openRatingModal={openRatingModal}
+                                    canRateActivity={currentRole.isGuru || currentRole.isVendor}
+                                    currentRole={currentRole}
                                     locked={!isPhaseContentOpen(activePhase)}
                                     readCommentRows={readCommentRows}
                                 />
@@ -2544,6 +2634,7 @@ function DetailProgramPage({
             <GuruRatingModal
                 open={showRatingModal}
                 row={ratingRow}
+                isEdit={Boolean(getOwnRating(ratingRow || {}, currentRole))}
                 ratingValue={ratingValue}
                 setRatingValue={setRatingValue}
                 ratingComment={ratingComment}
@@ -2762,6 +2853,7 @@ function ProgramSummaryPanel({
     aoName,
     vendorName,
     progress,
+    activityKpi,
     assessment,
     ratingSummary,
 }) {
@@ -2772,10 +2864,17 @@ function ProgramSummaryPanel({
         { label: "Vendor", value: vendorName },
         {
             label: "KPI",
-            value: `${program?.kpi_nama || "-"}${program?.kpi_target
-                ? ` · Target ${program.kpi_target}${program?.kpi_satuan || ""}`
+            value: `${activityKpi?.percentage ?? 0}% tercapai${program?.kpi_nama
+                ? ` · ${program.kpi_nama}`
                 : ""
+                }${program?.kpi_target
+                    ? ` · Target ${program.kpi_target}${program?.kpi_satuan || ""}`
+                    : ""
                 }`,
+        },
+        {
+            label: "KPI Aktivitas",
+            value: `${activityKpi?.completedActivities || 0}/${activityKpi?.totalActivities || 0} aktivitas selesai · ${activityKpi?.approvedEvidence || 0}/${activityKpi?.totalEvidence || 0} bukti valid`,
         },
         { label: "Anggaran", value: formatCurrency(program?.harga_vendor) },
         { label: "Tahun", value: program?.tahun || "-" },
@@ -2857,9 +2956,13 @@ function ProgramSummaryPanel({
                 <div className="mt-4 h-2 overflow-hidden rounded-full bg-cyan-50">
                     <div
                         className="h-full rounded-full bg-[#0AC4E0] transition-all"
-                        style={{ width: `${progress.percentage}%` }}
+                        style={{ width: `${activityKpi?.percentage ?? progress.percentage}%` }}
                     />
                 </div>
+
+                <p className="mt-2 text-[10px] font-bold text-slate-400">
+                    KPI realtime dihitung dari bukti aktivitas yang sudah disetujui HO.
+                </p>
             </div>
         </section>
     );
@@ -3200,6 +3303,8 @@ function ExecutionTablePanel({
     openChatForRow,
     openCommentForRow,
     openRatingModal,
+    canRateActivity = false,
+    currentRole = {},
     readCommentRows = {},
 }) {
     return (
@@ -3291,6 +3396,7 @@ function ExecutionTablePanel({
                                     const approvedEvidence = (row.evidences || []).filter(
                                         (item) => item.status === "APPROVED",
                                     ).length;
+                                    const rowActivityKpi = row.type === "kegiatan" ? getActivityKpi(row) : null;
 
                                     return (
                                         <tr
@@ -3344,6 +3450,11 @@ function ExecutionTablePanel({
                                                                 <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
                                                                     <Star size={11} />
                                                                     {row.ratingStats?.average || 0}/5 · {row.ratingStats?.total || 0} rating
+                                                                </span>
+
+                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-600">
+                                                                    <Target size={11} />
+                                                                    KPI {rowActivityKpi?.percentage || 0}% · {rowActivityKpi?.approved || 0}/{rowActivityKpi?.total || 0} bukti
                                                                 </span>
                                                             </div>
                                                         )}
@@ -3426,17 +3537,17 @@ function ExecutionTablePanel({
                                                         </button>
                                                     )}
 
-                                                    {row.type === "kegiatan" && status === "APPROVED" && typeof openRatingModal === "function" && (
+                                                    {row.type === "kegiatan" && status === "APPROVED" && canRateActivity && typeof openRatingModal === "function" && (
                                                         <button
                                                             type="button"
                                                             onClick={() => openRatingModal(row)}
                                                             className="relative flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-100 bg-amber-50 px-2 text-[9px] font-black text-amber-500 transition hover:bg-amber-100 hover:text-amber-700"
                                                             title="Rating Guru"
                                                         >
-                                                            {row.guruRating ? (
+                                                            {getOwnRating(row, currentRole) ? (
                                                                 <span className="inline-flex items-center gap-1">
                                                                     <Star size={12} fill="currentColor" />
-                                                                    {row.guruRating}/5
+                                                                    Edit {getOwnRating(row, currentRole)?.rating}/5
                                                                 </span>
                                                             ) : (
                                                                 <span className="inline-flex items-center gap-1">
@@ -3501,6 +3612,9 @@ function SelectedRowDetailPanel({
         );
     }
 
+    const selectedActivityKpi =
+        selectedRow.type === "kegiatan" ? getActivityKpi(selectedRow) : null;
+
     return (
         <section className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
             <div className="border-b border-slate-100 bg-slate-50 px-5 py-4">
@@ -3543,6 +3657,28 @@ function SelectedRowDetailPanel({
 
                 {selectedRow.type === "kegiatan" && (
                     <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+                        <div className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50/50 p-4 xl:col-span-2">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-emerald-600">
+                                    KPI Aktivitas
+                                </p>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-600">
+                                    {selectedActivityKpi?.percentage || 0}%
+                                </span>
+                            </div>
+
+                            <div className="h-2.5 overflow-hidden rounded-full bg-white">
+                                <div
+                                    className="h-full rounded-full bg-emerald-500 transition-all"
+                                    style={{ width: `${selectedActivityKpi?.percentage || 0}%` }}
+                                />
+                            </div>
+
+                            <p className="mt-2 text-[10px] font-bold text-emerald-700/70">
+                                {selectedActivityKpi?.approved || 0}/{selectedActivityKpi?.total || 0} bukti aktivitas sudah sesuai dan disetujui HO.
+                            </p>
+                        </div>
+
                         <div className="rounded-[1.25rem] border border-cyan-100 bg-cyan-50/40 p-4">
                             <div className="mb-3 flex items-center justify-between gap-3">
                                 <p className="text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
@@ -3724,6 +3860,7 @@ const COMMENT_TYPE_LABEL = {
     AO_REVIEW: { label: "Review AO", color: "text-blue-600 bg-blue-50 border-blue-100" },
     HO_APPROVAL: { label: "Keputusan HO", color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
     GURU_RATING: { label: "Feedback Guru", color: "text-amber-600 bg-amber-50 border-amber-100" },
+    VENDOR_RATING: { label: "Feedback Vendor", color: "text-fuchsia-600 bg-fuchsia-50 border-fuchsia-100" },
 };
 
 function CommentDrawer({ open, row, comments, commentText, setCommentText, commentType, setCommentType, loading, onClose, onSubmit }) {
@@ -3821,7 +3958,7 @@ function CommentDrawer({ open, row, comments, commentText, setCommentText, comme
 }
 
 // â”€â”€â”€ Guru Rating Modal Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function GuruRatingModal({ open, row, ratingValue, setRatingValue, ratingComment, setRatingComment, loading, onClose, onSubmit }) {
+function GuruRatingModal({ open, row, isEdit = false, ratingValue, setRatingValue, ratingComment, setRatingComment, loading, onClose, onSubmit }) {
     if (!open) return null;
 
     return (
@@ -3839,7 +3976,9 @@ function GuruRatingModal({ open, row, ratingValue, setRatingValue, ratingComment
                                 {row?.title || "Kegiatan"}
                             </h3>
                             <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                Kegiatan telah selesai. Berikan penilaian Anda.
+                                {isEdit
+                                    ? "Ubah penilaian dan komentar Anda."
+                                    : "Kegiatan telah selesai. Berikan penilaian Anda."}
                             </p>
                         </div>
                         <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 text-slate-400 hover:text-slate-700">
@@ -3912,7 +4051,7 @@ function GuruRatingModal({ open, row, ratingValue, setRatingValue, ratingComment
                         className="flex-1 flex items-center justify-center gap-2 rounded-full bg-amber-400 py-3 text-[10px] font-black uppercase text-white shadow hover:bg-amber-500 disabled:opacity-40"
                     >
                         {loading ? <RefreshCcw size={14} className="animate-spin" /> : <Star size={14} />}
-                        Simpan Rating
+                        {isEdit ? "Update Rating" : "Simpan Rating"}
                     </button>
                 </div>
             </div>

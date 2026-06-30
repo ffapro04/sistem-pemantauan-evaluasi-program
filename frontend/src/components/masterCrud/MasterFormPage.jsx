@@ -461,8 +461,6 @@ export default function MasterFormPage({ config, mode = "create" }) {
         try {
             const payload = buildPayload();
 
-            console.log("Submit payload:", payload);
-
             if (typeof config.beforeSubmit === "function") {
                 await config.beforeSubmit({
                     config,
