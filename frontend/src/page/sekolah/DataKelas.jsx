@@ -47,6 +47,12 @@ const getReadOnlyKelasConfig = () => {
             list: kelasConfig.api.list,
             detail: kelasConfig.api.detail,
         },
+        actions: {
+            detail: true,
+            edit: false,
+            delete: false,
+            status: false,
+        },
         status: null,
         deleteConfirmation: null,
     };

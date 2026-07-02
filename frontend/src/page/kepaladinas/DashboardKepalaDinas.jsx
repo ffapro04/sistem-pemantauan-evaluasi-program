@@ -4746,23 +4746,6 @@ export default function DashboardKepalaDinas() {
             setWilayahList(wilayahList);
             setSchools(visibleSchools);
             setPrograms(visiblePrograms);
-
-            console.log("DASHBOARD KADIN DATA CHECK:", {
-                currentUserId,
-                userDetail,
-                userFromList,
-                storedUser,
-                currentUser: user,
-                currentWilayah,
-                masterWilayahCount: wilayahList.length,
-                provinceSchoolCount: visibleSchools.length,
-                schoolEndpointProgramCount: programsFromSchools.length,
-                masterProgramCount: masterPrograms.length,
-                strictProvinceProgramCount: visiblePrograms.length,
-                schoolIds: [...visibleSchoolIdSet],
-                schools: visibleSchools,
-                programs: visiblePrograms,
-            });
         } catch (error) {
             console.error("Dashboard Kepala Dinas Error:", error);
             setLoadError(error?.message || "Gagal memuat Dashboard Kepala Dinas.");

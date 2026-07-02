@@ -2061,7 +2061,12 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('Teks komentar wajib diisi');
     }
 
-    const validTypes = ['AO_REVIEW', 'HO_APPROVAL', 'GURU_RATING'];
+    const validTypes = [
+      'AO_REVIEW',
+      'HO_APPROVAL',
+      'GURU_RATING',
+      'VENDOR_RATING',
+    ];
     const commentType = validTypes.includes(body.comment_type)
       ? body.comment_type
       : 'AO_REVIEW';
@@ -2168,25 +2173,46 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       }),
     );
 
-    kegiatan.guru_rating = rating;
-    kegiatan.guru_comment =
-      body.comment?.trim() || body.komentar?.trim() || null;
-    kegiatan.guru_rated_by = id_user;
-    kegiatan.guru_rated_at = new Date();
-    await this.kegiatansRepo.save(kegiatan);
+    if (raterType === 'GURU') {
+      kegiatan.guru_rating = rating;
+      kegiatan.guru_comment =
+        body.comment?.trim() || body.komentar?.trim() || null;
+      kegiatan.guru_rated_by = id_user;
+      kegiatan.guru_rated_at = new Date();
+      await this.kegiatansRepo.save(kegiatan);
+    }
 
-    if (body.comment?.trim() || body.komentar?.trim()) {
+    const ratingComment = body.comment?.trim() || body.komentar?.trim() || '';
+    const ratingCommentType =
+      raterType === 'VENDOR' ? 'VENDOR_RATING' : 'GURU_RATING';
+
+    const existingRatingComment = await this.kegiatanCommentRepo.findOne({
+      where: {
+        id_kegiatan,
+        id_user,
+        comment_type: ratingCommentType,
+      },
+      order: { created_at: 'DESC' },
+    });
+
+    if (ratingComment) {
       await this.kegiatanCommentRepo.save(
         this.kegiatanCommentRepo.create({
+          ...(existingRatingComment || {}),
           id_kegiatan,
           id_user,
           nama_user,
           role_user: raterType === 'VENDOR' ? 'Vendor' : 'Guru Assessment',
-          comment_text: body.comment?.trim() || body.komentar?.trim(),
-          comment_type:
-            raterType === 'VENDOR' ? 'VENDOR_RATING' : 'GURU_RATING',
+          comment_text: ratingComment,
+          comment_type: ratingCommentType,
+          attachment_file: null,
+          attachment_original_name: null,
         }),
       );
+    } else if (existingRatingComment?.id_comment) {
+      await this.kegiatanCommentRepo.delete({
+        id_comment: existingRatingComment.id_comment,
+      });
     }
 
     const ratings = await this.kegiatanRatingRepo.find({

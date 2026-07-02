@@ -5,16 +5,16 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
   UploadedFiles,
   UseInterceptors,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { existsSync, mkdirSync } from 'fs';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 
 import { VendorService } from './vendor.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
@@ -26,54 +26,6 @@ export type VendorDocumentFiles = {
   ktp_pj_file?: Express.Multer.File[];
   akta_notaris_file?: Express.Multer.File[];
 };
-
-const vendorUploadPath = './uploads/vendor';
-
-const ensureVendorUploadDirectory = () => {
-  if (!existsSync(vendorUploadPath)) {
-    mkdirSync(vendorUploadPath, {
-      recursive: true,
-    });
-  }
-};
-
-const getDocumentPrefix = (fieldName: string) => {
-  if (fieldName === 'npwp_file') {
-    return 'NPWP';
-  }
-
-  if (fieldName === 'buku_rekening_file') {
-    return 'BUKU-REKENING';
-  }
-
-  if (fieldName === 'ktp_pj_file') {
-    return 'KTP-PJ';
-  }
-
-  if (fieldName === 'akta_notaris_file') {
-    return 'AKTA-NOTARIS';
-  }
-
-  return 'DOKUMEN-VENDOR';
-};
-
-const vendorDocumentStorage = diskStorage({
-  destination: (req, file, callback) => {
-    ensureVendorUploadDirectory();
-
-    callback(null, vendorUploadPath);
-  },
-
-  filename: (req, file, callback) => {
-    const extension = extname(file.originalname).toLowerCase();
-
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-
-    const prefix = getDocumentPrefix(file.fieldname);
-
-    callback(null, `${prefix}-${uniqueSuffix}${extension}`);
-  },
-});
 
 const vendorDocumentFilter = (
   req: any,
@@ -120,7 +72,7 @@ const vendorDocumentInterceptor = FileFieldsInterceptor(
     },
   ],
   {
-    storage: vendorDocumentStorage,
+    storage: memoryStorage(),
     fileFilter: vendorDocumentFilter,
     limits: {
       fileSize: 10 * 1024 * 1024,
@@ -132,13 +84,49 @@ const vendorDocumentInterceptor = FileFieldsInterceptor(
 export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
 
+  private decodeToken(authHeader?: string): {
+    id_user: number | null;
+    id_role: number | null;
+  } {
+    if (!authHeader) {
+      return {
+        id_user: null,
+        id_role: null,
+      };
+    }
+
+    const token = authHeader.split(' ')[1];
+
+    if (!token) {
+      throw new UnauthorizedException('Format token tidak valid');
+    }
+
+    try {
+      const payloadJson = Buffer.from(
+        token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
+        'base64',
+      ).toString('utf-8');
+
+      const payload = JSON.parse(payloadJson);
+
+      return {
+        id_user: Number(payload.sub || payload.id_user || payload.id || 0) || null,
+        id_role: payload.id_role ? Number(payload.id_role) : null,
+      };
+    } catch {
+      throw new UnauthorizedException('Token tidak valid');
+    }
+  }
+
   @Post()
   @UseInterceptors(vendorDocumentInterceptor)
   create(
     @Body() createVendorDto: CreateVendorDto,
     @UploadedFiles() files: VendorDocumentFiles,
+    @Headers('authorization') authHeader?: string,
   ) {
-    return this.vendorService.create(createVendorDto, files);
+    const currentUser = this.decodeToken(authHeader);
+    return this.vendorService.create(createVendorDto, files, currentUser);
   }
 
   @Get()
@@ -162,8 +150,10 @@ export class VendorController {
     @Param('id') id: string,
     @Body() updateVendorDto: UpdateVendorDto,
     @UploadedFiles() files: VendorDocumentFiles,
+    @Headers('authorization') authHeader?: string,
   ) {
-    return this.vendorService.update(+id, updateVendorDto, files);
+    const currentUser = this.decodeToken(authHeader);
+    return this.vendorService.update(+id, updateVendorDto, files, currentUser);
   }
 
   @Delete(':id')

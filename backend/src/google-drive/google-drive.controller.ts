@@ -48,7 +48,11 @@ export class GoogleDriveController {
 
   @UseGuards(JwtAuthGuard)
   @Get('auth-url')
-  async getAuthUrl(@Req() req: any, @Query('redirectTo') redirectTo?: string) {
+  async getAuthUrl(
+    @Req() req: any,
+    @Query('redirectTo') redirectTo?: string,
+    @Query('provider') provider?: string,
+  ) {
     const idUser = this.getCurrentUserId(req);
     const idRole = this.getCurrentUserRoleId(req);
 
@@ -56,6 +60,7 @@ export class GoogleDriveController {
       idUser,
       idRole,
       redirectTo: redirectTo || '/login?drive=connected',
+      provider,
     });
   }
 
@@ -73,7 +78,7 @@ export class GoogleDriveController {
     const separator = redirectPath.includes('?') ? '&' : '?';
 
     return res.redirect(
-      `${frontendUrl}${redirectPath}${separator}googleDrive=connected`,
+      `${frontendUrl}${redirectPath}${separator}storage=connected`,
     );
   }
 

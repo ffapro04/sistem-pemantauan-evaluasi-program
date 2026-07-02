@@ -1,17 +1,9 @@
 ﻿/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
-
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import listPlugin from "@fullcalendar/list";
-import idLocale from "@fullcalendar/core/locales/id";
-import Holidays from "date-holidays";
 
 import {
     AlertTriangle,
@@ -42,8 +34,10 @@ import PageWrapper from "../PageWrapper";
 import Dropdown from "../Dropdown";
 import astraLogo from "../../assets/img/logo-astra.png";
 import satuIndonesiaLogo from "../../assets/img/satu_indonesia.png";
+import INDONESIA_HOLIDAY_EVENTS from "../../data/indonesiaHolidayEvents";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const AgendaFullCalendar = lazy(() => import("./AgendaFullCalendar"));
 
 const AGENDA_LOGO_PATHS = {
     astra: astraLogo,
@@ -604,25 +598,16 @@ function slugText(value) {
 }
 
 function mapIndonesiaHolidaysToEvents(displayYear) {
-    const holidayEngine = new Holidays("ID");
-    const targetYears = [displayYear - 1, displayYear, displayYear + 1]
-        .filter((year) => year >= 2024 && year <= 2030);
+    const targetYears = new Set(
+        [displayYear - 1, displayYear, displayYear + 1]
+            .filter((year) => year >= 2024 && year <= 2030)
+            .map(String),
+    );
 
-    const rows = targetYears.flatMap((year) => {
-        try {
-            return holidayEngine.getHolidays(year) || [];
-        } catch {
-            return [];
-        }
-    });
-
-    const mapped = rows
-        .filter((item) => {
-            const type = String(item?.type || "").toLowerCase();
-            return ["public", "bank", "optional", "observance"].includes(type);
-        })
+    const mapped = INDONESIA_HOLIDAY_EVENTS
+        .filter((item) => targetYears.has(String(item?.date || "").slice(0, 4)))
         .map((item, index) => {
-            const dateKey = formatDateKey(item?.start || item?.date);
+            const dateKey = formatDateKey(item?.date);
             const type = String(item?.type || "").toLowerCase();
             const isPublic = type === "public" || type === "bank";
 
@@ -2401,7 +2386,6 @@ export default function AgendaCalendarBase({
 
     const holidayEvents = useMemo(() => {
         if (!showHoliday) return [];
-
         return mapIndonesiaHolidaysToEvents(displayYear);
     }, [displayYear, showHoliday]);
 
@@ -3284,68 +3268,69 @@ export default function AgendaCalendarBase({
 
                             <div className="min-h-0 flex-1 p-2 sm:p-3 lg:p-4">
                                 <div className="h-full min-h-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white">
-                                    <FullCalendar
-                                        ref={calendarRef}
-                                        plugins={[
-                                            dayGridPlugin,
-                                            timeGridPlugin,
-                                            interactionPlugin,
-                                            listPlugin,
-                                        ]}
-                                        locale={idLocale}
-                                        initialView="dayGridMonth"
-                                        firstDay={0}
-                                        height="100%"
-                                        nowIndicator
-                                        selectable
-                                        showNonCurrentDates={false}
-                                        fixedWeekCount={false}
-                                        dayMaxEvents={2}
-                                        eventOrder="type,start,title"
-                                        moreLinkClick="popover"
-                                        headerToolbar={false}
-                                        events={fullCalendarEvents}
-                                        datesSet={handleCalendarDatesSet}
-                                        dateClick={(info) => {
-                                            setSelectedDateKey(info.dateStr);
-                                        }}
-                                        eventClick={(info) => {
-                                            const originalEvent = info.event.extendedProps.originalEvent;
+                                    <Suspense
+                                        fallback={
+                                            <div className="flex h-full min-h-[420px] items-center justify-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                                                Memuat kalender
+                                            </div>
+                                        }
+                                    >
+                                        <AgendaFullCalendar
+                                            ref={calendarRef}
+                                            initialView="dayGridMonth"
+                                            firstDay={0}
+                                            height="100%"
+                                            nowIndicator
+                                            selectable
+                                            showNonCurrentDates={false}
+                                            fixedWeekCount={false}
+                                            dayMaxEvents={2}
+                                            eventOrder="type,start,title"
+                                            moreLinkClick="popover"
+                                            headerToolbar={false}
+                                            events={fullCalendarEvents}
+                                            datesSet={handleCalendarDatesSet}
+                                            dateClick={(info) => {
+                                                setSelectedDateKey(info.dateStr);
+                                            }}
+                                            eventClick={(info) => {
+                                                const originalEvent = info.event.extendedProps.originalEvent;
 
-                                            if (originalEvent?.date) {
-                                                setSelectedDateKey(originalEvent.date);
-                                            }
+                                                if (originalEvent?.date) {
+                                                    setSelectedDateKey(originalEvent.date);
+                                                }
 
-                                            info.jsEvent?.preventDefault?.();
-                                        }}
-                                        dayCellClassNames={(arg) => {
-                                            const dateKey = formatDateKey(arg.date);
-                                            const isSunday = arg.date.getDay() === 0;
-                                            const isHoliday = holidayDateSet.has(dateKey);
-                                            const classes = [];
+                                                info.jsEvent?.preventDefault?.();
+                                            }}
+                                            dayCellClassNames={(arg) => {
+                                                const dateKey = formatDateKey(arg.date);
+                                                const isSunday = arg.date.getDay() === 0;
+                                                const isHoliday = holidayDateSet.has(dateKey);
+                                                const classes = [];
 
-                                            if (isSunday || isHoliday) classes.push("fc-red-day", "fc-holiday-day");
-                                            if (dateKey === selectedDateKey) classes.push("fc-selected-day");
+                                                if (isSunday || isHoliday) classes.push("fc-red-day", "fc-holiday-day");
+                                                if (dateKey === selectedDateKey) classes.push("fc-selected-day");
 
-                                            return classes;
-                                        }}
-                                        eventContent={(arg) => {
-                                            const count = arg.event.extendedProps.eventCount || 0;
-                                            const isFirstEventOfDate = arg.event.extendedProps.isFirstEventOfDate;
+                                                return classes;
+                                            }}
+                                            eventContent={(arg) => {
+                                                const count = arg.event.extendedProps.eventCount || 0;
+                                                const isFirstEventOfDate = arg.event.extendedProps.isFirstEventOfDate;
 
-                                            if (!isFirstEventOfDate) return null;
+                                                if (!isFirstEventOfDate) return null;
 
-                                            return (
-                                                <div
-                                                    className="mx-auto my-0.5 inline-flex min-w-7 items-center justify-center rounded-full bg-current px-2 py-1 text-[9px] font-black leading-none"
-                                                    title={`${count} agenda`}
-                                                    aria-label={`${count} agenda`}
-                                                >
-                                                    <span className="text-white">{count}</span>
-                                                </div>
-                                            );
-                                        }}
-                                    />
+                                                return (
+                                                    <div
+                                                        className="mx-auto my-0.5 inline-flex min-w-7 items-center justify-center rounded-full bg-current px-2 py-1 text-[9px] font-black leading-none"
+                                                        title={`${count} agenda`}
+                                                        aria-label={`${count} agenda`}
+                                                    >
+                                                        <span className="text-white">{count}</span>
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                    </Suspense>
                                 </div>
                             </div>
 

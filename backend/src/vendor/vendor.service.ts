@@ -14,6 +14,12 @@ import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { Vendor } from './entities/vendor.entity';
 import { UsersService } from '../users/users.service';
 import type { VendorDocumentFiles } from './vendor.controller';
+import { GoogleDriveService } from '../google-drive/google-drive.service';
+
+type CurrentUploadUser = {
+  id_user: number | null;
+  id_role: number | null;
+};
 
 @Injectable()
 export class VendorService {
@@ -22,13 +28,57 @@ export class VendorService {
     private vendorRepo: Repository<Vendor>,
 
     private usersService: UsersService,
+
+    private googleDriveService: GoogleDriveService,
   ) {}
 
-  private getUploadedFilename(
+  private getUploadedFile(
     files: VendorDocumentFiles | undefined,
     fieldName: keyof VendorDocumentFiles,
-  ): string | undefined {
-    return files?.[fieldName]?.[0]?.filename;
+  ): Express.Multer.File | undefined {
+    return files?.[fieldName]?.[0];
+  }
+
+  private hasUploadedFile(files?: VendorDocumentFiles) {
+    return Boolean(
+      files?.npwp_file?.[0] ||
+        files?.buku_rekening_file?.[0] ||
+        files?.ktp_pj_file?.[0] ||
+        files?.akta_notaris_file?.[0],
+    );
+  }
+
+  private async uploadVendorDocument(
+    files: VendorDocumentFiles | undefined,
+    fieldName: keyof VendorDocumentFiles,
+    currentUser?: CurrentUploadUser,
+  ): Promise<string | undefined> {
+    const file = this.getUploadedFile(files, fieldName);
+    if (!file) return undefined;
+
+    if (!currentUser?.id_user) {
+      throw new BadRequestException(
+        'Sesi login tidak ditemukan. Silakan login ulang sebelum mengunggah dokumen vendor.',
+      );
+    }
+
+    const uploaded = await this.googleDriveService.uploadFile({
+      idUser: currentUser.id_user,
+      idRole: currentUser.id_role || null,
+      file,
+      moduleType: `VENDOR_${String(fieldName).toUpperCase()}`,
+      relatedTable: 'm_vendor',
+      relatedId: null,
+    });
+
+    const driveFile = uploaded?.file;
+
+    return (
+      driveFile?.web_view_link ||
+      driveFile?.web_content_link ||
+      driveFile?.drive_file_id ||
+      file.originalname
+    );
   }
 
   private toNumber(value: any, fallback = 0) {
@@ -53,15 +103,23 @@ export class VendorService {
     return 'Berisiko';
   }
 
-  async create(createVendorDto: CreateVendorDto, files?: VendorDocumentFiles) {
+  async create(
+    createVendorDto: CreateVendorDto,
+    files?: VendorDocumentFiles,
+    currentUser?: CurrentUploadUser,
+  ) {
     try {
       const npwpFile =
-        this.getUploadedFilename(files, 'npwp_file') ||
+        (await this.uploadVendorDocument(files, 'npwp_file', currentUser)) ||
         createVendorDto.npwp_file ||
         null;
 
       const bukuRekeningFile =
-        this.getUploadedFilename(files, 'buku_rekening_file') ||
+        (await this.uploadVendorDocument(
+          files,
+          'buku_rekening_file',
+          currentUser,
+        )) ||
         createVendorDto.buku_rekening_file ||
         null;
 
@@ -99,12 +157,20 @@ export class VendorService {
         buku_rekening_file: bukuRekeningFile,
 
         ktp_pj_file:
-          this.getUploadedFilename(files, 'ktp_pj_file') ||
+          (await this.uploadVendorDocument(
+            files,
+            'ktp_pj_file',
+            currentUser,
+          )) ||
           createVendorDto.ktp_pj_file ||
           null,
 
         akta_notaris_file:
-          this.getUploadedFilename(files, 'akta_notaris_file') ||
+          (await this.uploadVendorDocument(
+            files,
+            'akta_notaris_file',
+            currentUser,
+          )) ||
           createVendorDto.akta_notaris_file ||
           null,
       });
@@ -415,6 +481,7 @@ export class VendorService {
     id: number,
     updateVendorDto: UpdateVendorDto,
     files?: VendorDocumentFiles,
+    currentUser?: CurrentUploadUser,
   ) {
     try {
       const vendor = await this.vendorRepo.findOne({
@@ -466,16 +533,35 @@ export class VendorService {
         vendor.status = data.status || 'Bermitra';
       }
 
-      const npwpFilename = this.getUploadedFilename(files, 'npwp_file');
+      if (this.hasUploadedFile(files) && !currentUser?.id_user) {
+        throw new BadRequestException(
+          'Sesi login tidak ditemukan. Silakan login ulang sebelum mengunggah dokumen vendor.',
+        );
+      }
 
-      const bukuRekeningFilename = this.getUploadedFilename(
+      const npwpFilename = await this.uploadVendorDocument(
         files,
-        'buku_rekening_file',
+        'npwp_file',
+        currentUser,
       );
 
-      const ktpFilename = this.getUploadedFilename(files, 'ktp_pj_file');
+      const bukuRekeningFilename = await this.uploadVendorDocument(
+        files,
+        'buku_rekening_file',
+        currentUser,
+      );
 
-      const aktaFilename = this.getUploadedFilename(files, 'akta_notaris_file');
+      const ktpFilename = await this.uploadVendorDocument(
+        files,
+        'ktp_pj_file',
+        currentUser,
+      );
+
+      const aktaFilename = await this.uploadVendorDocument(
+        files,
+        'akta_notaris_file',
+        currentUser,
+      );
 
       if (npwpFilename) {
         vendor.npwp_file = npwpFilename;

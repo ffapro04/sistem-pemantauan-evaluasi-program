@@ -31,6 +31,7 @@ import {
 
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
+import Dropdown from "../Dropdown";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_FALLBACK = "";
@@ -504,16 +505,25 @@ function SearchBox({ value, onChange, placeholder }) {
     );
 }
 
-function SelectFilter({ value, onChange, children, ariaLabel }) {
+function DropdownFilter({
+    value,
+    onChange,
+    items = [],
+    placeholder = "Pilih Filter",
+    ariaLabel = "Filter",
+    width = "w-full sm:w-[170px]",
+}) {
     return (
-        <select
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            aria-label={ariaLabel}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-        >
-            {children}
-        </select>
+        <div aria-label={ariaLabel} className="min-w-[150px]">
+            <Dropdown
+                value={value}
+                onChange={onChange}
+                items={items}
+                placeholder={placeholder}
+                width={width}
+                usePortal
+            />
+        </div>
     );
 }
 
@@ -889,8 +899,8 @@ function DataList({
                                 <div className="flex shrink-0 flex-col items-end gap-2">
                                     <span
                                         className={`inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${bucket === "SELESAI"
-                                                ? "bg-emerald-50 text-emerald-600"
-                                                : "bg-amber-50 text-amber-600"
+                                            ? "bg-emerald-50 text-emerald-600"
+                                            : "bg-amber-50 text-amber-600"
                                             }`}
                                     >
                                         {getProgressLabel(bucket)}
@@ -926,8 +936,8 @@ function DataList({
                             type="button"
                             onClick={() => setPage(pageNumber)}
                             className={`flex h-9 min-w-9 items-center justify-center rounded-xl border px-2 text-[10px] font-black transition ${page === pageNumber
-                                    ? "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-sm"
-                                    : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:text-[#0AC4E0]"
+                                ? "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-sm"
+                                : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:text-[#0AC4E0]"
                                 }`}
                         >
                             {pageNumber}
@@ -1001,6 +1011,44 @@ function AnalyticsSection({
         search,
     ].join("|");
 
+    const groupFilterItems = [
+        { value: "ALL", label: "Semua Kelompok" },
+        { value: normalizeKey(categoryFilter), label: groupLabel },
+    ];
+
+    const pillarFilterItems = [
+        { value: "ALL", label: "Semua Pilar" },
+        ...allowedPillars.map((pillarKey) => ({
+            value: pillarKey,
+            label: PILLAR_META[pillarKey].label,
+        })),
+    ];
+
+    const countyFilterItems = [
+        { value: "ALL", label: "Semua Kabupaten" },
+        ...countyOptions.map((county) => ({
+            value: county,
+            label: county,
+        })),
+    ];
+
+    const groupByItems = [
+        { value: "SEKOLAH", label: "Per Sekolah" },
+        { value: "KABUPATEN", label: "Per Kabupaten" },
+    ];
+
+    const typeFilterItems = [
+        { value: "ALL", label: "Semua Jenis" },
+        { value: "REGULER", label: "Reguler" },
+        { value: "PROJECT", label: "Project" },
+    ];
+
+    const progressFilterItems = [
+        { value: "ALL", label: "Semua Status" },
+        { value: "PROSES", label: "Dalam Proses" },
+        { value: "SELESAI", label: "Selesai" },
+    ];
+
     return (
         <DashboardPanel title={title} subtitle={subtitle}>
             <div className="border-b border-slate-100 bg-slate-50/60 p-4">
@@ -1011,71 +1059,56 @@ function AnalyticsSection({
                         placeholder={`Cari ${type === "PROGRAM" ? "program" : "assessment"}, sekolah, atau kabupaten...`}
                     />
 
-                    <SelectFilter
+                    <DropdownFilter
                         value={groupFilter}
                         onChange={setGroupFilter}
+                        items={groupFilterItems}
+                        placeholder="Semua Kelompok"
                         ariaLabel="Filter kelompok"
-                    >
-                        <option value="ALL">Semua Kelompok</option>
-                        <option value={normalizeKey(categoryFilter)}>{groupLabel}</option>
-                    </SelectFilter>
+                    />
 
-                    <SelectFilter
+                    <DropdownFilter
                         value={pillarFilter}
                         onChange={setPillarFilter}
+                        items={pillarFilterItems}
+                        placeholder="Semua Pilar"
                         ariaLabel="Filter pilar"
-                    >
-                        <option value="ALL">Semua Pilar</option>
-                        {allowedPillars.map((pillarKey) => (
-                            <option key={pillarKey} value={pillarKey}>
-                                {PILLAR_META[pillarKey].label}
-                            </option>
-                        ))}
-                    </SelectFilter>
+                    />
 
-                    <SelectFilter
+                    <DropdownFilter
                         value={countyFilter}
                         onChange={setCountyFilter}
+                        items={countyFilterItems}
+                        placeholder="Semua Kabupaten"
                         ariaLabel="Filter kabupaten"
-                    >
-                        <option value="ALL">Semua Kabupaten</option>
-                        {countyOptions.map((county) => (
-                            <option key={county} value={county}>
-                                {county}
-                            </option>
-                        ))}
-                    </SelectFilter>
+                        width="w-full sm:w-[190px]"
+                    />
 
-                    <SelectFilter
+                    <DropdownFilter
                         value={groupBy}
                         onChange={setGroupBy}
+                        items={groupByItems}
+                        placeholder="Kelompok Diagram"
                         ariaLabel="Kelompok diagram"
-                    >
-                        <option value="SEKOLAH">Per Sekolah</option>
-                        <option value="KABUPATEN">Per Kabupaten</option>
-                    </SelectFilter>
+                    />
 
                     {type === "PROGRAM" && (
-                        <SelectFilter
+                        <DropdownFilter
                             value={typeFilter}
                             onChange={setTypeFilter}
+                            items={typeFilterItems}
+                            placeholder="Semua Jenis"
                             ariaLabel="Filter jenis program"
-                        >
-                            <option value="ALL">Semua Jenis</option>
-                            <option value="REGULER">Reguler</option>
-                            <option value="PROJECT">Project</option>
-                        </SelectFilter>
+                        />
                     )}
 
-                    <SelectFilter
+                    <DropdownFilter
                         value={progressFilter}
                         onChange={setProgressFilter}
+                        items={progressFilterItems}
+                        placeholder="Semua Status"
                         ariaLabel="Filter progres"
-                    >
-                        <option value="ALL">Semua Status</option>
-                        <option value="PROSES">Dalam Proses</option>
-                        <option value="SELESAI">Selesai</option>
-                    </SelectFilter>
+                    />
                 </div>
             </div>
 
@@ -1096,8 +1129,8 @@ function AnalyticsSection({
                                     type="button"
                                     onClick={() => setChartType("BAR")}
                                     className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
-                                            ? "bg-slate-800 text-white"
-                                            : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                                        ? "bg-slate-800 text-white"
+                                        : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
                                         }`}
                                     title="Lihat diagram batang"
                                 >
@@ -1108,8 +1141,8 @@ function AnalyticsSection({
                                     type="button"
                                     onClick={() => setChartType("PIE")}
                                     className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
-                                            ? "bg-slate-800 text-white"
-                                            : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                                        ? "bg-slate-800 text-white"
+                                        : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
                                         }`}
                                     title="Lihat diagram pie"
                                 >
@@ -1751,8 +1784,8 @@ function DashboardBase({
                                                     type="button"
                                                     onClick={() => setActiveView(option.value)}
                                                     className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-black uppercase tracking-wide transition ${active
-                                                            ? "bg-[#0AC4E0] text-white shadow-sm"
-                                                            : "text-slate-400 hover:bg-white hover:text-slate-700"
+                                                        ? "bg-[#0AC4E0] text-white shadow-sm"
+                                                        : "text-slate-400 hover:bg-white hover:text-slate-700"
                                                         }`}
                                                 >
                                                     <Icon size={13} />

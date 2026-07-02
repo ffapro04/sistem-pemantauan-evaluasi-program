@@ -20,6 +20,9 @@ export class GoogleDriveFile {
   @Column({ name: 'module_type', type: 'varchar', length: 100 })
   module_type: string;
 
+  @Column({ name: 'provider', type: 'varchar', length: 30, default: 'GOOGLE' })
+  provider: string;
+
   @Column({
     name: 'related_table',
     type: 'varchar',

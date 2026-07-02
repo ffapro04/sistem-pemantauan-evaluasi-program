@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import Dropdown from "../Dropdown";
-import * as XLSX from "xlsx";
 import {
     Search,
     Plus,
@@ -31,8 +30,10 @@ import Input from "../Input";
 import Button from "../Button";
 import Label from "../Label";
 import { canHoAccessSchool } from "../../utils/hoAccess";
+import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
 
 const API_BASE = "";
+const loadXlsx = async () => import("xlsx");
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -532,13 +533,33 @@ function ReadAssessmentPage({
         }
     };
 
-    const handleExportResult = (row) => {
+    const handleExportResult = async (row) => {
         if (!row?.id) return;
 
-        const apiBaseUrl =
-            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+        try {
+            setRowLoading(row.id, true);
 
-        window.location.href = `${apiBaseUrl}/assessment/${row.id}/hasil/export`;
+            const token = getToken();
+            const response = await fetch(`${API_BASE}/assessment/${row.id}/hasil`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload?.message || "Gagal mengambil hasil assessment");
+            }
+
+            const XLSX = await loadXlsx();
+            exportAssessmentResultWorkbook(XLSX, payload, { id: row.id });
+            toast.success("File hasil assessment berhasil dibuat dalam format XLSX.");
+        } catch (error) {
+            console.error("Gagal export hasil assessment:", error);
+            toast.error(error.message || "Gagal export hasil assessment");
+        } finally {
+            setRowLoading(row.id, false);
+        }
     };
 
     const handleImportResult = async (assessmentId, event) => {
@@ -556,6 +577,7 @@ function ReadAssessmentPage({
         try {
             setRowLoading(assessmentId, true);
 
+            const XLSX = await loadXlsx();
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: "array" });
             const sheetName = workbook.SheetNames[0];

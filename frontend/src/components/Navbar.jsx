@@ -207,6 +207,8 @@ function Navbar({
   isDashboard = false,
   searchValue = "",
   onSearchChange = () => { },
+  onSearchSubmit = () => { },
+  searchPlaceholder = "Cari data...",
 }) {
   const navigate = useNavigate();
 
@@ -274,6 +276,13 @@ function Navbar({
     }
 
     onSearchChange(value?.target?.value || "");
+  };
+
+  const handleSearchKeyDown = (event) => {
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+    onSearchSubmit(searchValue);
   };
 
   const handleMobileNavigation = (href) => {
@@ -371,10 +380,14 @@ function Navbar({
 
             <div className="flex items-center gap-3 lg:gap-4">
               {isDashboard && (
-                <div className="hidden items-center md:flex">
+                <div
+                  className="hidden items-center md:flex"
+                  data-onboarding-search="true"
+                  onKeyDown={handleSearchKeyDown}
+                >
                   <Search
                     variant="transparent"
-                    placeholder="Cari data..."
+                    placeholder={searchPlaceholder}
                     value={searchValue}
                     onChange={handleSearchChange}
                     className="w-56 xl:w-72"
@@ -454,10 +467,14 @@ function Navbar({
                 </div>
 
                 {isDashboard && (
-                  <div className="mb-4 rounded-[1.35rem] border border-white/15 bg-white/10 p-2">
+                  <div
+                    className="mb-4 rounded-[1.35rem] border border-white/15 bg-white/10 p-2"
+                    data-onboarding-search="true"
+                    onKeyDown={handleSearchKeyDown}
+                  >
                     <Search
                       variant="transparent"
-                      placeholder="Cari data..."
+                      placeholder={searchPlaceholder}
                       value={searchValue}
                       onChange={handleSearchChange}
                       className="w-full"

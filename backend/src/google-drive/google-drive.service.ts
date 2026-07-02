@@ -15,6 +15,7 @@ import { GoogleDriveFile } from './entities/google-drive-file.entity';
 
 @Injectable()
 export class GoogleDriveService {
+  private readonly providerGoogle = 'GOOGLE';
   private readonly scopes = [
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/userinfo.email',
@@ -41,6 +42,10 @@ export class GoogleDriveService {
     }
 
     return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  }
+
+  private normalizeProvider(provider?: string | null) {
+    return this.providerGoogle;
   }
 
   private getOwnerTypeByRole(idRole?: number | null) {
@@ -106,21 +111,35 @@ export class GoogleDriveService {
     idUser: number;
     idRole?: number | null;
     redirectTo?: string;
+    provider?: string | null;
   }) {
-    const oauth2Client = this.getOAuthClient();
+    const provider = this.normalizeProvider(params.provider);
     const ownerType = this.getOwnerTypeByRole(params.idRole);
+
+    const oauth2Client = this.getOAuthClient();
+    const previousToken = await this.tokenRepo.findOne({
+      where: {
+        id_user: params.idUser,
+      },
+      order: {
+        id: 'DESC',
+      },
+    });
+
+    const prompt = previousToken?.refresh_token ? 'select_account' : 'consent';
 
     const state = this.createState({
       id_user: params.idUser,
       id_role: params.idRole || null,
       owner_type: ownerType,
+      provider,
       redirect_to: params.redirectTo || '/login?drive=connected',
       created_at: Date.now(),
     });
 
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      prompt: 'consent',
+      prompt,
       scope: this.scopes,
       include_granted_scopes: true,
       state,
@@ -129,6 +148,7 @@ export class GoogleDriveService {
     return {
       url,
       owner_type: ownerType,
+      provider,
     };
   }
 
@@ -142,6 +162,7 @@ export class GoogleDriveService {
     const idUser = Number(payload.id_user);
     const idRole = payload.id_role ? Number(payload.id_role) : null;
     const ownerType = payload.owner_type || this.getOwnerTypeByRole(idRole);
+    const provider = this.normalizeProvider(payload.provider);
 
     if (!idUser) {
       throw new BadRequestException('User OAuth tidak valid.');
@@ -151,7 +172,16 @@ export class GoogleDriveService {
 
     const { tokens } = await oauth2Client.getToken(code);
 
-    if (!tokens.refresh_token) {
+    const previousToken = await this.tokenRepo.findOne({
+      where: {
+        id_user: idUser,
+      },
+      order: {
+        id: 'DESC',
+      },
+    });
+
+    if (!tokens.refresh_token && !previousToken?.refresh_token) {
       throw new BadRequestException(
         'Refresh token Google tidak diterima. Coba hubungkan ulang Google Drive.',
       );
@@ -181,10 +211,11 @@ export class GoogleDriveService {
         id_user: idUser,
         id_role: idRole,
         owner_type: ownerType,
+        provider: this.providerGoogle,
         google_email: profile.data.email || null,
         google_name: profile.data.name || null,
         access_token: tokens.access_token || null,
-        refresh_token: tokens.refresh_token,
+        refresh_token: tokens.refresh_token || previousToken?.refresh_token,
         expiry_date: tokens.expiry_date || null,
         scope: tokens.scope || null,
         is_active: true,
@@ -196,6 +227,7 @@ export class GoogleDriveService {
       id_user: savedToken.id_user,
       id_role: savedToken.id_role,
       owner_type: savedToken.owner_type,
+      provider: savedToken.provider,
       google_email: savedToken.google_email,
       google_name: savedToken.google_name,
       redirect_to: payload.redirect_to || '/login?drive=connected',
@@ -216,6 +248,7 @@ export class GoogleDriveService {
     if (!token) {
       return {
         connected: false,
+        provider: null,
         google_email: null,
         google_name: null,
         owner_type: null,
@@ -224,6 +257,7 @@ export class GoogleDriveService {
 
     return {
       connected: true,
+      provider: token.provider || this.providerGoogle,
       google_email: token.google_email,
       google_name: token.google_name,
       owner_type: token.owner_type,
@@ -276,6 +310,26 @@ export class GoogleDriveService {
     return oauth2Client;
   }
 
+  private async getActiveStorageTokenByUser(idUser: number) {
+    const token = await this.tokenRepo.findOne({
+      where: {
+        id_user: idUser,
+        is_active: true,
+      },
+      order: {
+        id: 'DESC',
+      },
+    });
+
+    if (!token) {
+      throw new UnauthorizedException(
+        'Penyimpanan dokumen belum terhubung. Silakan hubungkan Google Drive terlebih dahulu.',
+      );
+    }
+
+    return token;
+  }
+
   private bufferToStream(buffer: Buffer) {
     const stream = new Readable();
     stream.push(buffer);
@@ -325,56 +379,78 @@ export class GoogleDriveService {
       throw new BadRequestException('File upload tidak ditemukan.');
     }
 
-    const auth = await this.getActiveOAuthClientByUser(params.idUser);
+    try {
+      await this.getActiveStorageTokenByUser(params.idUser);
 
-    const drive = google.drive({
-      version: 'v3',
-      auth,
-    });
+      const auth = await this.getActiveOAuthClientByUser(params.idUser);
 
-    const folderId = await this.getOrCreateFolder({
-      drive,
-      folderName: 'Sistem Monitoring Evaluasi YPA-MDR',
-    });
+      const drive = google.drive({
+        version: 'v3',
+        auth,
+      });
 
-    const uploaded = await drive.files.create({
-      requestBody: {
-        name: params.file.originalname,
-        parents: folderId ? [folderId] : undefined,
-      },
-      media: {
-        mimeType: params.file.mimetype,
-        body: this.bufferToStream(params.file.buffer),
-      },
-      fields: 'id, name, mimeType, size, webViewLink, webContentLink',
-    });
+      const folderId = await this.getOrCreateFolder({
+        drive,
+        folderName: 'Sistem Monitoring Evaluasi YPA-MDR',
+      });
 
-    const data = uploaded.data;
+      const uploaded = await drive.files.create({
+        requestBody: {
+          name: params.file.originalname,
+          parents: folderId ? [folderId] : undefined,
+        },
+        media: {
+          mimeType: params.file.mimetype,
+          body: this.bufferToStream(params.file.buffer),
+        },
+        fields: 'id, name, mimeType, size, webViewLink, webContentLink',
+      });
 
-    if (!data.id) {
-      throw new BadRequestException('Upload ke Google Drive gagal.');
+      const data = uploaded.data;
+
+      if (!data.id) {
+        throw new BadRequestException('Upload ke Google Drive gagal.');
+      }
+
+      const savedFile = await this.fileRepo.save(
+        this.fileRepo.create({
+          id_user: params.idUser,
+          id_role: params.idRole || null,
+          module_type: params.moduleType,
+          provider: this.providerGoogle,
+          related_table: params.relatedTable || null,
+          related_id: params.relatedId || null,
+          drive_file_id: data.id,
+          drive_folder_id: folderId || null,
+          original_name: data.name || params.file.originalname,
+          mime_type: data.mimeType || params.file.mimetype,
+          size_bytes: data.size ? Number(data.size) : params.file.size || null,
+          web_view_link: data.webViewLink || null,
+          web_content_link: data.webContentLink || null,
+        }),
+      );
+
+      return {
+        uploaded: true,
+        provider: this.providerGoogle,
+        file: savedFile,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      const response = (error as any)?.response?.data;
+      const message =
+        response?.error_description ||
+        response?.error ||
+        (error as Error)?.message ||
+        'Upload ke Google Drive gagal.';
+
+      throw new BadRequestException(
+        `Upload ke Google Drive gagal: ${message}. Jika akun sudah pernah ditautkan, putuskan lalu hubungkan ulang Google Drive.`,
+      );
     }
-
-    const savedFile = await this.fileRepo.save(
-      this.fileRepo.create({
-        id_user: params.idUser,
-        id_role: params.idRole || null,
-        module_type: params.moduleType,
-        related_table: params.relatedTable || null,
-        related_id: params.relatedId || null,
-        drive_file_id: data.id,
-        drive_folder_id: folderId || null,
-        original_name: data.name || params.file.originalname,
-        mime_type: data.mimeType || params.file.mimetype,
-        size_bytes: data.size ? Number(data.size) : params.file.size || null,
-        web_view_link: data.webViewLink || null,
-        web_content_link: data.webContentLink || null,
-      }),
-    );
-
-    return {
-      uploaded: true,
-      file: savedFile,
-    };
   }
+
 }
