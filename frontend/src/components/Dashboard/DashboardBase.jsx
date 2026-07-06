@@ -32,6 +32,7 @@ import {
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
 import Dropdown from "../Dropdown";
+import ProgramRatingStars from "../program/ProgramRatingStars";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_FALLBACK = "";
@@ -894,6 +895,14 @@ function DataList({
                                             ? `${getProgramTypeLabel(getProgramType(item))} · Tahun ${item?.tahun || item?.year || "-"}`
                                             : `Target ${targets.length} sekolah · ${meta.group === "AKADEMIK" ? "Akademik" : "Non-Akademik"}`}
                                     </p>
+
+                                    {type === "PROGRAM" && (
+                                        <ProgramRatingStars
+                                            program={item}
+                                            size={13}
+                                            className="mt-2"
+                                        />
+                                    )}
                                 </div>
 
                                 <div className="flex shrink-0 flex-col items-end gap-2">

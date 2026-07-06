@@ -157,8 +157,8 @@ export class UsersService {
   }
 
   private validatePassword(password: string) {
-    if (!password || password.length < 6) {
-      throw new BadRequestException('Password minimal 6 karakter.');
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Password minimal 8 karakter.');
     }
   }
 
@@ -551,15 +551,16 @@ export class UsersService {
       return [];
     }
 
-    const users = await this.userRepo.find({
-      where: {
-        id_role: In(normalizedRoleIds),
-      },
-      relations: ['role', 'wilayah', 'sekolah'],
-      order: {
-        nama: 'ASC',
-      },
-    });
+    const users = await this.userRepo
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.wilayah', 'wilayah')
+      .leftJoinAndSelect('user.sekolah', 'sekolah')
+      .where('role.id_role IN (:...roleIds)', {
+        roleIds: normalizedRoleIds,
+      })
+      .orderBy('user.nama', 'ASC')
+      .getMany();
 
     const hydratedUsers = await Promise.all(
       users.map((user) => this.hydrateKepalaDinasWilayah(user)),
@@ -588,7 +589,18 @@ export class UsersService {
   }
 
   async create(data: any) {
-    const existing = await this.findByEmail(data.email);
+    const email = this.normalizeEmail(data?.email);
+    const password = String(data?.password || '').trim();
+    const nama = this.normalizeProfileText(data?.nama);
+
+    if (!nama) {
+      throw new BadRequestException('Nama pengguna wajib diisi.');
+    }
+
+    this.validateEmail(email);
+    this.validatePassword(password);
+
+    const existing = await this.findByEmail(email);
 
     if (existing) {
       throw new ConflictException('Email sudah terdaftar');
@@ -596,9 +608,9 @@ export class UsersService {
 
     try {
       const newUser = this.userRepo.create({
-        nama: data.nama,
-        email: data.email,
-        password: data.password,
+        nama,
+        email,
+        password,
 
         jabatan: data.jabatan || null,
         no_telp: data.no_telp || null,
@@ -673,15 +685,8 @@ export class UsersService {
       }
 
       if (data.email !== undefined) {
-        const email = this.normalizeProfileText(data.email).toLowerCase();
-
-        if (!email) {
-          throw new BadRequestException('Email tidak boleh kosong.');
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          throw new BadRequestException('Format email tidak valid.');
-        }
+        const email = this.normalizeEmail(data.email);
+        this.validateEmail(email);
 
         if (email !== user.email) {
           const existingEmail = await this.findByEmail(email);
@@ -696,10 +701,7 @@ export class UsersService {
 
       if (data.password !== undefined && String(data.password || '').trim()) {
         const password = String(data.password).trim();
-
-        if (password.length < 6) {
-          throw new BadRequestException('Password minimal 6 karakter.');
-        }
+        this.validatePassword(password);
 
         user.password = password;
       }
@@ -741,7 +743,12 @@ export class UsersService {
     }
 
     try {
-      const email = data.email ? String(data.email).trim() : undefined;
+      const email =
+        data.email !== undefined ? this.normalizeEmail(data.email) : undefined;
+
+      if (email !== undefined) {
+        this.validateEmail(email);
+      }
 
       if (email && email !== user.email) {
         const existingEmail = await this.findByEmail(email);
@@ -752,7 +759,13 @@ export class UsersService {
       }
 
       if (data.nama !== undefined) {
-        user.nama = String(data.nama || '').trim();
+        const nama = String(data.nama || '').trim();
+
+        if (!nama) {
+          throw new BadRequestException('Nama pengguna wajib diisi.');
+        }
+
+        user.nama = nama;
       }
 
       if (email !== undefined) {
@@ -790,7 +803,9 @@ export class UsersService {
       }
 
       if (data.password && String(data.password).trim()) {
-        user.password = String(data.password);
+        const password = String(data.password || '').trim();
+        this.validatePassword(password);
+        user.password = password;
       }
 
       if (data.id_role !== undefined && data.id_role !== '') {
@@ -1090,7 +1105,18 @@ export class UsersService {
   }
 
   async register(data: any) {
-    const existing = await this.findByEmail(data.email);
+    const email = this.normalizeEmail(data?.email);
+    const password = String(data?.password || '').trim();
+    const nama = this.normalizeProfileText(data?.nama);
+
+    if (!nama) {
+      throw new BadRequestException('Nama pengguna wajib diisi.');
+    }
+
+    this.validateEmail(email);
+    this.validatePassword(password);
+
+    const existing = await this.findByEmail(email);
 
     if (existing) {
       throw new ConflictException('Email sudah terdaftar');
@@ -1098,9 +1124,9 @@ export class UsersService {
 
     try {
       const user = this.userRepo.create({
-        nama: data.nama,
-        email: data.email,
-        password: data.password,
+        nama,
+        email,
+        password,
 
         jabatan: data.jabatan || null,
         no_telp: data.no_telp || null,

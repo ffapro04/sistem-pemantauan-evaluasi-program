@@ -87,17 +87,63 @@ const normalizePilar = (value, jenis) => {
   return String(jenis || "").toLowerCase().includes("non") ? "Seni Budaya" : "Akademik";
 };
 
-const buildFileName = (assessment, id) => {
-  const base = safeText(assessment?.nama_assessment || assessment?.nama || `assessment-${id}`)
+const buildFileName = (assessment, id, forcedFileName = "") => {
+  const base = safeText(
+    forcedFileName ||
+      assessment?.nama_assessment ||
+      assessment?.nama ||
+      `assessment-${id}`,
+  )
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\w\s-]/g, "")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
     .trim()
-    .replace(/\s+/g, "-")
-    .toLowerCase()
+    .replace(/\s+/g, " ")
     .slice(0, 120);
 
   return `${base || `assessment-${id}`}.xlsx`;
+};
+
+const downloadWorkbook = (XLSX, workbook, fileName) => {
+  const safeFileName = String(fileName || "hasil-assessment.xlsx").endsWith(".xlsx")
+    ? fileName
+    : `${fileName}.xlsx`;
+  const writeOptions = {
+    bookType: "xlsx",
+    type: "array",
+    compression: true,
+    bookSST: true,
+  };
+
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    XLSX.writeFile(workbook, safeFileName, {
+      bookType: writeOptions.bookType,
+      compression: writeOptions.compression,
+      bookSST: writeOptions.bookSST,
+    });
+    return;
+  }
+
+  const output = XLSX.write(workbook, writeOptions);
+  const binary =
+    output instanceof ArrayBuffer ? new Uint8Array(output) : output;
+
+  const blob = new Blob([binary], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = safeFileName;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => {
+    window.URL.revokeObjectURL(url);
+  }, 3000);
 };
 
 const styleCell = (sheet, address, style) => {
@@ -733,8 +779,5 @@ export function exportAssessmentResultWorkbook(XLSX, assessment, options = {}) {
   XLSX.utils.book_append_sheet(workbook, createGroupedSheet(XLSX, questions, respondents), "Pengelompokan Data");
   XLSX.utils.book_append_sheet(workbook, createRawSheet(XLSX, questions, respondents), "Data Mentah");
 
-  XLSX.writeFile(workbook, buildFileName(assessment, id), {
-    bookType: "xlsx",
-    compression: true,
-  });
+  downloadWorkbook(XLSX, workbook, buildFileName(assessment, id, options.fileName));
 }

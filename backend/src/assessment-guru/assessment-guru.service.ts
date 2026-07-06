@@ -35,6 +35,34 @@ export class AssessmentGuruService {
       .replace(/\s+/g, ' ');
   }
 
+  private validateOptionalEmail(email: string) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Format email guru tidak valid');
+    }
+  }
+
+  private validatePassword(password: string, label = 'Password guru') {
+    if (!password || password.length < 8) {
+      throw new BadRequestException(`${label} minimal 8 karakter`);
+    }
+  }
+
+  private cleanMataPelajaran(value: any) {
+    return String(value || '')
+      .trim()
+      .replace(/\s+/g, ' ');
+  }
+
+  private validateMataPelajaran(value: any) {
+    const mataPelajaran = this.cleanMataPelajaran(value);
+
+    if (!mataPelajaran) {
+      throw new BadRequestException('Mata pelajaran wajib diisi');
+    }
+
+    return mataPelajaran;
+  }
+
   private getIdSekolah(dto: any) {
     const raw =
       dto?.id_sekolah ??
@@ -56,7 +84,7 @@ export class AssessmentGuruService {
     return numberValue;
   }
 
-  private safeGuruResponse(guru: AssessmentGuru) {
+  private safeGuruResponse(guru: AssessmentGuru, includePassword = false) {
     const kelasData: any = (guru as any)?.kelas_data || null;
     const jurusanData: any = (guru as any)?.jurusan_data || null;
 
@@ -68,7 +96,7 @@ export class AssessmentGuruService {
 
     const namaJurusan = jurusanData?.nama_jurusan || jurusanData?.nama || '';
 
-    return {
+    const response: any = {
       id_guru_assessment: guru.id_guru_assessment,
       id_sekolah: guru.id_sekolah,
       nama_guru: guru.nama_guru,
@@ -111,6 +139,13 @@ export class AssessmentGuruService {
       created_at: guru.created_at,
       updated_at: guru.updated_at,
     };
+
+    if (includePassword) {
+      response.password_hash = guru.password_hash || '';
+      response.password = guru.password_hash || '';
+    }
+
+    return response;
   }
 
   async register(dto: RegisterGuruDto) {
@@ -126,9 +161,11 @@ export class AssessmentGuruService {
       throw new BadRequestException('Nama guru wajib diisi');
     }
 
-    if (password.length < 4) {
-      throw new BadRequestException('Password guru minimal 4 karakter');
-    }
+    this.validatePassword(password);
+
+    const emailGuru = dto.email_guru?.trim() || '';
+    this.validateOptionalEmail(emailGuru);
+    const mataPelajaran = this.validateMataPelajaran(dto.mata_pelajaran);
 
     const sekolah = await this.sekolahRepo.findOne({
       where: { id_sekolah: idSekolah },
@@ -158,10 +195,10 @@ export class AssessmentGuruService {
     const guru = await this.guruRepo.save({
       id_sekolah: idSekolah,
       nama_guru: namaGuru,
-      email_guru: dto.email_guru?.trim() || '',
+      email_guru: emailGuru,
       no_telepon: dto.no_telepon?.trim() || '',
       jenis_guru: dto.jenis_guru?.trim() || '',
-      mata_pelajaran: dto.mata_pelajaran?.trim() || '',
+      mata_pelajaran: mataPelajaran,
       id_kelas: idKelas,
       id_jurusan: idJurusan,
       kelas_wali: dto.kelas_wali?.trim() || '',
@@ -259,9 +296,7 @@ export class AssessmentGuruService {
       throw new BadRequestException('Semua field wajib diisi');
     }
 
-    if (passwordBaru.length < 4) {
-      throw new BadRequestException('Password baru minimal 4 karakter');
-    }
+    this.validatePassword(passwordBaru, 'Password baru');
 
     const sekolah = await this.sekolahRepo.findOne({
       where: { id_sekolah: idSekolah },
@@ -351,7 +386,7 @@ export class AssessmentGuruService {
       throw new NotFoundException('Guru tidak ditemukan');
     }
 
-    return this.safeGuruResponse(guru);
+    return this.safeGuruResponse(guru, true);
   }
 
   // ─── UPDATE ───────────────────────────────────────────────────────────────────
@@ -388,7 +423,9 @@ export class AssessmentGuruService {
     }
 
     if (body.email_guru !== undefined) {
-      guru.email_guru = String(body.email_guru || '').trim();
+      const emailGuru = String(body.email_guru || '').trim();
+      this.validateOptionalEmail(emailGuru);
+      guru.email_guru = emailGuru;
     }
 
     if (body.no_telepon !== undefined) {
@@ -400,7 +437,7 @@ export class AssessmentGuruService {
     }
 
     if (body.mata_pelajaran !== undefined) {
-      guru.mata_pelajaran = String(body.mata_pelajaran || '').trim();
+      guru.mata_pelajaran = this.validateMataPelajaran(body.mata_pelajaran);
     }
 
     if (body.id_kelas !== undefined) {
@@ -429,9 +466,7 @@ export class AssessmentGuruService {
     ) {
       const newPass = String(body.password).trim();
 
-      if (newPass.length < 4) {
-        throw new BadRequestException('Password minimal 4 karakter');
-      }
+      this.validatePassword(newPass);
 
       guru.password_hash = newPass;
     }
@@ -473,7 +508,7 @@ export class AssessmentGuruService {
 
     return {
       message: 'Data guru berhasil diperbarui',
-      data: this.safeGuruResponse(savedGuruWithRelations || savedGuru),
+      data: this.safeGuruResponse(savedGuruWithRelations || savedGuru, true),
     };
   }
 

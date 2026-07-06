@@ -37,6 +37,7 @@ import {
 } from "recharts";
 import { toast } from "react-toastify";
 import { Sidebar, PageWrapper } from "../common";
+import ProgramRatingStars from "../program/ProgramRatingStars";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = (
@@ -1723,7 +1724,7 @@ function ProgramTable({
     return (
         <>
             <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] border-collapse">
+                <table className="w-full min-w-[1280px] border-collapse">
                     <thead>
                         <tr className="border-y border-slate-100 bg-slate-50">
                             {[
@@ -1732,6 +1733,7 @@ function ProgramTable({
                                 "Kabupaten/Kota",
                                 "Bidang",
                                 "Pilar",
+                                "Rating Guru",
                                 "Status",
                                 "Progress",
                                 "Detail",
@@ -1802,6 +1804,13 @@ function ProgramTable({
                                                 getProgramPillar(program),
                                             )}
                                         </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-left">
+                                        <ProgramRatingStars
+                                            program={program}
+                                            size={13}
+                                        />
                                     </td>
 
                                     <td className="px-4 py-4 text-left">

@@ -13,6 +13,7 @@ import {
     UploadCloud,
     User,
 } from "lucide-react";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const normalizeVendorStatus = (value) => {
     const raw = String(value || "").toLowerCase();
@@ -33,6 +34,31 @@ const normalizeVendorStatus = (value) => {
 };
 
 const isVendorActive = (value) => normalizeVendorStatus(value) === "Bermitra";
+
+const cleanVendorText = (value) => {
+    const text = String(value ?? "").trim();
+    return text && text !== "-" ? text : "";
+};
+
+const getVendorPjNames = (row) =>
+    [
+        row?.pj_1 ||
+            row?.pj1 ||
+            row?.penanggung_jawab ||
+            row?.nama_pj,
+        row?.pj_2 ||
+            row?.pj2 ||
+            row?.penanggung_jawab_2 ||
+            row?.nama_pj_2 ||
+            row?.nama_pj2,
+    ]
+        .map(cleanVendorText)
+        .filter(Boolean);
+
+const formatVendorPjNames = (row) => {
+    const names = getVendorPjNames(row);
+    return names.length ? names.join(" · ") : "-";
+};
 
 const normalizeVendor = (row) => ({
     ...row,
@@ -78,6 +104,22 @@ const normalizeVendor = (row) => ({
         row?.kontak ||
         row?.no_telp ||
         "-",
+
+    pj_2:
+        row?.pj_2 ||
+        row?.pj2 ||
+        row?.penanggung_jawab_2 ||
+        row?.nama_pj_2 ||
+        row?.nama_pj2 ||
+        "",
+
+    telp_pj_2:
+        row?.telp_pj_2 ||
+        row?.telpPj2 ||
+        row?.telepon_pj_2 ||
+        row?.kontak_pj_2 ||
+        row?.no_telp_2 ||
+        "",
 
     email:
         row?.email ||
@@ -172,6 +214,7 @@ export const vendorConfig = {
         "pilar",
         "alamat",
         "pj_1",
+        "pj_2",
         "telp_pj_1",
         "email",
         "status",
@@ -271,7 +314,7 @@ export const vendorConfig = {
                         </div>
 
                         <p className="text-[9px] font-bold leading-relaxed text-slate-400">
-                            PJ Utama: {row.pj_1 || "-"} · Kontak: {row.telp_pj_1 || "-"}
+                            PJ: {formatVendorPjNames(row)}
                         </p>
                     </div>
                 </div>
@@ -463,19 +506,26 @@ export const vendorConfig = {
             return "Email login vendor wajib diisi.";
         }
 
-        if (
-            mode === "create" &&
-            String(formData.password || "").length < 8
-        ) {
-            return "Password login minimal 8 karakter.";
+        const emailError = validateEmailField(
+            formData.email,
+            "Email login vendor",
+        );
+        if (emailError) return emailError;
+
+        if (mode === "create") {
+            const passwordError = validatePasswordField(
+                formData.password,
+                "Password login",
+            );
+            if (passwordError) return passwordError;
         }
 
-        if (
-            mode === "edit" &&
-            formData.password &&
-            String(formData.password).length < 8
-        ) {
-            return "Password login minimal 8 karakter.";
+        if (mode === "edit" && formData.password) {
+            const passwordError = validatePasswordField(
+                formData.password,
+                "Password login",
+            );
+            if (passwordError) return passwordError;
         }
 
         if (!formData.npwp_file) {
@@ -551,8 +601,8 @@ export const vendorConfig = {
             className: "truncate text-[12px] font-black uppercase text-[#0AC4E0]",
         },
         {
-            label: "PJ Utama",
-            key: "pj_1",
+            label: "Penanggung Jawab",
+            value: ({ formData }) => formatVendorPjNames(formData),
         },
         {
             label: "Email Login",
@@ -607,13 +657,14 @@ export const vendorConfig = {
             },
             {
                 title: "Penanggung Jawab",
-                description: "Kontak utama dan cadangan vendor.",
+                description: "Nama penanggung jawab vendor.",
                 icon: User,
                 items: [
-                    { label: "PJ Utama", key: "pj_1", icon: User },
-                    { label: "Kontak PJ Utama", key: "telp_pj_1", icon: Phone },
-                    { label: "PJ 2", key: "pj_2", icon: User },
-                    { label: "Kontak PJ 2", key: "telp_pj_2", icon: Phone },
+                    {
+                        label: "Nama Penanggung Jawab",
+                        icon: User,
+                        value: (data) => formatVendorPjNames(data),
+                    },
                     { label: "NPWP", key: "npwp_file", icon: UploadCloud },
                     { label: "Buku Rekening", key: "buku_rekening_file", icon: UploadCloud },
                     { label: "KTP PJ", key: "ktp_pj_file", icon: UploadCloud },

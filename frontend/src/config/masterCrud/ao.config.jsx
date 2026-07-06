@@ -15,6 +15,7 @@ import {
     cleanWilayahName,
     isActiveValue,
 } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_AO = 4;
 
@@ -714,16 +715,20 @@ export const aoConfig = {
             return "Email Area Officer wajib diisi.";
         }
 
-        if (mode === "create" && String(formData.password || "").length < 8) {
-            return "Password minimal 8 karakter.";
+        const emailError = validateEmailField(
+            formData.email,
+            "Email Area Officer",
+        );
+        if (emailError) return emailError;
+
+        if (mode === "create") {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
-        if (
-            mode === "edit" &&
-            formData.password &&
-            String(formData.password).length < 8
-        ) {
-            return "Password minimal 8 karakter.";
+        if (mode === "edit" && formData.password) {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         if (

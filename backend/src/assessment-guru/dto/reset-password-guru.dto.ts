@@ -21,6 +21,6 @@ export class ResetPasswordGuruDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(4)
+  @MinLength(8, { message: 'Password baru minimal 8 karakter' })
   password_baru: string;
 }

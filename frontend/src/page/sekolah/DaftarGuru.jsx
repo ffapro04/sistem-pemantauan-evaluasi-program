@@ -11,14 +11,18 @@ import {
     Pencil,
     Phone,
     Plus,
+    Power,
+    PowerOff,
     RefreshCw,
     ShieldCheck,
+    Trash2,
     UserRound,
     Users,
     XCircle,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
+import Dropdown from "../../components/Dropdown";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
 
@@ -131,15 +135,89 @@ function getGuruKelasLabel(item) {
     );
 }
 
-function getGuruJurusanLabel(item) {
+function getGuruRawJurusanLabel(item) {
     return (
         item?.jurusan_data?.nama_jurusan ||
         item?.jurusan_data?.kode_jurusan ||
         item?.nama_jurusan ||
         item?.kode_jurusan ||
         item?.jurusan ||
-        "-"
+        ""
     );
+}
+
+function getGuruJurusanLabel(item) {
+    const jurusanLabel = getGuruRawJurusanLabel(item);
+
+    if (jurusanLabel) return jurusanLabel;
+
+    const hasAcademicSubject =
+        String(item?.mata_pelajaran || item?.mapel || "").trim().length > 0;
+
+    return hasAcademicSubject ? "Bidang Studi Akademik" : "-";
+}
+
+function normalizeFilterValue(value) {
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+}
+
+function getGuruKelasFilterValue(item) {
+    const idKelas =
+        item?.id_kelas ||
+        item?.kelas_data?.id_kelas ||
+        item?.kelas?.id_kelas ||
+        item?.kelas?.id ||
+        "";
+
+    if (idKelas) return `id:${idKelas}`;
+
+    const kelasLabel = getGuruKelasLabel(item);
+    return kelasLabel ? `label:${normalizeFilterValue(kelasLabel)}` : "tanpa-kelas";
+}
+
+function getGuruJurusanFilterValue(item) {
+    const idJurusan =
+        item?.id_jurusan ||
+        item?.jurusan_data?.id_jurusan ||
+        item?.jurusan?.id_jurusan ||
+        "";
+
+    if (idJurusan) return `id:${idJurusan}`;
+
+    const jurusanLabel = getGuruRawJurusanLabel(item);
+    return jurusanLabel
+        ? `label:${normalizeFilterValue(jurusanLabel)}`
+        : "bidang-studi-akademik";
+}
+
+function getGuruBidangStudi(item) {
+    return getGuruJurusanFilterValue(item) === "bidang-studi-akademik"
+        ? "akademik"
+        : "kejuruan";
+}
+
+function buildUniqueOptions(rows, getValue, getLabel, emptyLabel) {
+    const unique = new Map();
+
+    rows.forEach((row) => {
+        const value = getValue(row);
+        const label = getLabel(row);
+
+        if (!value || !label) return;
+        if (!unique.has(value)) {
+            unique.set(value, label);
+        }
+    });
+
+    return [
+        { label: emptyLabel, value: "semua" },
+        ...Array.from(unique.entries())
+            .sort((a, b) => a[1].localeCompare(b[1], "id-ID"))
+            .map(([value, label]) => ({ value, label })),
+    ];
 }
 
 function getGuruSubLabel(item) {
@@ -209,6 +287,13 @@ export default function DaftarGuru() {
     const [list, setList] = useState([]);
     const [kepalaSekolah, setKepalaSekolah] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState({});
+    const [filters, setFilters] = useState({
+        status: "semua",
+        kelas: "semua",
+        jurusan: "semua",
+        bidangStudi: "semua",
+    });
     const [note, setNote] = useState({
         show: false,
         type: null,
@@ -220,6 +305,76 @@ export default function DaftarGuru() {
     const isSmk = getJenjang(user, sekolahDetail) === "SMK";
 
     const currentTitle = activeTab === "kepala-sekolah" ? "Kepala Sekolah" : "Guru";
+
+    const kelasOptions = useMemo(
+        () =>
+            buildUniqueOptions(
+                list,
+                getGuruKelasFilterValue,
+                (item) => getGuruKelasLabel(item) || "Tidak menjadi wali kelas",
+                "Semua Kelas",
+            ),
+        [list],
+    );
+
+    const jurusanOptions = useMemo(
+        () =>
+            buildUniqueOptions(
+                list,
+                getGuruJurusanFilterValue,
+                getGuruJurusanLabel,
+                "Semua Jurusan",
+            ),
+        [list],
+    );
+
+    const filteredList = useMemo(() => {
+        return list.filter((item) => {
+            if (filters.status === "aktif" && !getGuruActive(item)) return false;
+            if (filters.status === "nonaktif" && getGuruActive(item)) return false;
+
+            if (
+                filters.kelas !== "semua" &&
+                getGuruKelasFilterValue(item) !== filters.kelas
+            ) {
+                return false;
+            }
+
+            if (
+                filters.jurusan !== "semua" &&
+                getGuruJurusanFilterValue(item) !== filters.jurusan
+            ) {
+                return false;
+            }
+
+            if (
+                filters.bidangStudi !== "semua" &&
+                getGuruBidangStudi(item) !== filters.bidangStudi
+            ) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [filters, list]);
+
+    const hasActiveFilter = Object.values(filters).some((value) => value !== "semua");
+
+    const handleFilterChange = (key, value) => {
+        setFilters((prev) => ({
+            ...prev,
+            [key]: value,
+        }));
+    };
+
+    const resetFilters = () => {
+        setFilters({
+            status: "semua",
+            kelas: "semua",
+            jurusan: "semua",
+            bidangStudi: "semua",
+        });
+    };
 
     useEffect(() => {
         const decoded = decodeUser();
@@ -326,6 +481,100 @@ export default function DaftarGuru() {
         navigate(`/sekolah/guru/detail/${id}`);
     };
 
+    const setGuruActionLoading = (id, value) => {
+        setActionLoading((prev) => ({
+            ...prev,
+            [id]: value,
+        }));
+    };
+
+    const handleToggleGuruStatus = async (item) => {
+        if (!isOperator) return;
+
+        const id = getGuruId(item);
+        if (!id) return;
+
+        const active = getGuruActive(item);
+        const nextActive = !active;
+        const actionText = active ? "nonaktifkan" : "aktifkan";
+
+        const confirmed = window.confirm(
+            `Yakin ingin ${actionText} guru "${getGuruName(item)}"?`,
+        );
+
+        if (!confirmed) return;
+
+        setGuruActionLoading(id, true);
+
+        try {
+            await axios.patch(
+                `${BASE_URL}/assessment-guru/${id}`,
+                { is_active: nextActive },
+                { headers: getAuthHeaders() },
+            );
+
+            setNote({
+                show: true,
+                type: "success",
+                message: `Guru berhasil di${actionText}.`,
+            });
+
+            fetchData();
+        } catch (error) {
+            console.error("Gagal mengubah status guru:", error);
+            const message =
+                error?.response?.data?.message || "Gagal mengubah status guru.";
+
+            setNote({
+                show: true,
+                type: "error",
+                message: Array.isArray(message) ? message.join(", ") : message,
+            });
+        } finally {
+            setGuruActionLoading(id, false);
+        }
+    };
+
+    const handleDeleteGuru = async (item) => {
+        if (!isOperator) return;
+
+        const id = getGuruId(item);
+        if (!id) return;
+
+        const confirmed = window.confirm(
+            `Yakin ingin menghapus guru "${getGuruName(item)}"? Data yang dihapus tidak bisa dikembalikan.`,
+        );
+
+        if (!confirmed) return;
+
+        setGuruActionLoading(id, true);
+
+        try {
+            await axios.delete(`${BASE_URL}/assessment-guru/${id}`, {
+                headers: getAuthHeaders(),
+            });
+
+            setNote({
+                show: true,
+                type: "success",
+                message: "Guru berhasil dihapus.",
+            });
+
+            fetchData();
+        } catch (error) {
+            console.error("Gagal menghapus guru:", error);
+            const message = error?.response?.data?.message || "Gagal menghapus guru.";
+
+            setNote({
+                show: true,
+                type: "error",
+                message: Array.isArray(message) ? message.join(", ") : message,
+            });
+        } finally {
+            setGuruActionLoading(id, false);
+        }
+    };
+
     const handleCreateKepsek = () => {
         if (!isOperator) return;
         navigate("/sekolah/guru/kepala-sekolah/create");
@@ -346,17 +595,17 @@ export default function DaftarGuru() {
         const id = getKepsekId(kepalaSekolah);
         if (!id) return;
 
-        const password = window.prompt("Masukkan password baru Kepala Sekolah. Minimal 6 karakter:");
+        const password = window.prompt("Masukkan password baru Kepala Sekolah. Minimal 8 karakter:");
 
         if (password === null) return;
 
         const cleanPassword = String(password || "").trim();
 
-        if (cleanPassword.length < 6) {
+        if (cleanPassword.length < 8) {
             setNote({
                 show: true,
                 type: "error",
-                message: "Password minimal 6 karakter.",
+                message: "Password minimal 8 karakter.",
             });
             return;
         }
@@ -644,8 +893,81 @@ export default function DaftarGuru() {
                                 Data Guru
                             </p>
                             <p className="text-sm font-bold text-slate-500">
-                                Total {list.length} guru terdaftar pada sekolah ini.
+                                Menampilkan {filteredList.length} dari {list.length} guru terdaftar pada sekolah ini.
                             </p>
+                        </div>
+
+                        <div className="border-b border-slate-100 bg-white px-6 py-5">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Status
+                                    </p>
+                                    <Dropdown
+                                        value={filters.status}
+                                        onChange={(value) => handleFilterChange("status", value)}
+                                        placeholder="Semua Status"
+                                        items={[
+                                            { label: "Semua Status", value: "semua" },
+                                            { label: "Aktif", value: "aktif" },
+                                            { label: "Nonaktif", value: "nonaktif" },
+                                        ]}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Kelas
+                                    </p>
+                                    <Dropdown
+                                        value={filters.kelas}
+                                        onChange={(value) => handleFilterChange("kelas", value)}
+                                        placeholder="Semua Kelas"
+                                        items={kelasOptions}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Jurusan
+                                    </p>
+                                    <Dropdown
+                                        value={filters.jurusan}
+                                        onChange={(value) => handleFilterChange("jurusan", value)}
+                                        placeholder="Semua Jurusan"
+                                        items={jurusanOptions}
+                                        disabled={!isSmk}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Bidang Studi
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <Dropdown
+                                            value={filters.bidangStudi}
+                                            onChange={(value) => handleFilterChange("bidangStudi", value)}
+                                            placeholder="Semua Bidang"
+                                            items={[
+                                                { label: "Semua Bidang", value: "semua" },
+                                                { label: "Akademik", value: "akademik" },
+                                                { label: "Kejuruan", value: "kejuruan" },
+                                            ]}
+                                        />
+
+                                        {hasActiveFilter && (
+                                            <button
+                                                type="button"
+                                                onClick={resetFilters}
+                                                className="shrink-0 rounded-xl border border-slate-100 bg-slate-50 px-4 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-[#0AC4E0]/30 hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                                            >
+                                                Reset
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -685,12 +1007,14 @@ export default function DaftarGuru() {
                                 </thead>
 
                                 <tbody>
-                                    {list.map((item, idx) => {
+                                    {filteredList.map((item, idx) => {
                                         const active = getGuruActive(item);
+                                        const guruId = getGuruId(item);
+                                        const rowLoading = Boolean(actionLoading[guruId]);
 
                                         return (
                                             <tr
-                                                key={getGuruId(item) || idx}
+                                                key={guruId || idx}
                                                 className="border-b border-slate-50 bg-white transition-colors hover:bg-slate-50/70"
                                             >
                                                 <td className="px-6 py-4 text-[10px] font-bold text-slate-400">
@@ -758,20 +1082,61 @@ export default function DaftarGuru() {
                                                         </button>
 
                                                         {isOperator && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleEditGuru(item)}
-                                                                className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0] transition hover:bg-[#0AC4E0] hover:text-white"
-                                                                title="Edit"
-                                                            >
-                                                                <Pencil size={14} />
-                                                            </button>
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleEditGuru(item)}
+                                                                    disabled={rowLoading}
+                                                                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-50"
+                                                                    title="Edit"
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleToggleGuruStatus(item)}
+                                                                    disabled={rowLoading}
+                                                                    className={`flex h-9 w-9 items-center justify-center rounded-xl transition disabled:opacity-50 ${active
+                                                                        ? "bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white"
+                                                                        : "bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
+                                                                        }`}
+                                                                    title={active ? "Nonaktifkan" : "Aktifkan"}
+                                                                >
+                                                                    {active ? (
+                                                                        <PowerOff size={14} />
+                                                                    ) : (
+                                                                        <Power size={14} />
+                                                                    )}
+                                                                </button>
+
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteGuru(item)}
+                                                                    disabled={rowLoading}
+                                                                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition hover:bg-rose-500 hover:text-white disabled:opacity-50"
+                                                                    title="Hapus"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </>
                                                         )}
                                                     </div>
                                                 </td>
                                             </tr>
                                         );
                                     })}
+
+                                    {filteredList.length === 0 && (
+                                        <tr>
+                                            <td
+                                                colSpan={isSmk ? 9 : 8}
+                                                className="px-6 py-16 text-center text-[10px] font-black uppercase tracking-widest text-slate-300"
+                                            >
+                                                Tidak ada guru yang sesuai dengan filter.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

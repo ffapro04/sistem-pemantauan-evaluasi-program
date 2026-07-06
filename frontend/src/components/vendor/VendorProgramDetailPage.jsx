@@ -406,6 +406,7 @@ function VendorProgramDetailPage({
     const [uploadContext, setUploadContext] = useState(null);
     const [uploadFile, setUploadFile] = useState(null);
     const [uploadNote, setUploadNote] = useState("");
+    const [uploadingEvidence, setUploadingEvidence] = useState(false);
     const uploadInputRef = useRef(null);
 
     const [showChat, setShowChat] = useState(false);
@@ -1471,12 +1472,15 @@ function VendorProgramDetailPage({
     };
 
     const closeUploadModal = () => {
+        if (uploadingEvidence) return;
+
         setUploadContext(null);
         setUploadFile(null);
         setUploadNote("");
     };
 
     const submitUpload = async () => {
+        if (uploadingEvidence) return;
         if (!uploadContext) return;
 
         if (!uploadContext.requirementId) {
@@ -1500,6 +1504,8 @@ function VendorProgramDetailPage({
             uploadContext.parentType === "termin"
                 ? `${API_BASE_URL}/program/persyaratan-termin/${uploadContext.requirementId}/upload`
                 : `${API_BASE_URL}/program/persyaratan-kegiatan/${uploadContext.requirementId}/upload`;
+
+        setUploadingEvidence(true);
 
         try {
             const formData = new FormData();
@@ -1538,6 +1544,8 @@ function VendorProgramDetailPage({
         } catch (error) {
             console.error("Gagal upload bukti:", error);
             toast.error(error.message || "Gagal upload bukti");
+        } finally {
+            setUploadingEvidence(false);
         }
     };
 
@@ -2047,6 +2055,7 @@ function VendorProgramDetailPage({
                 uploadInputRef={uploadInputRef}
                 closeUploadModal={closeUploadModal}
                 submitUpload={submitUpload}
+                uploadingEvidence={uploadingEvidence}
             />
 
             <VendorChatDrawer
@@ -3186,6 +3195,7 @@ function UploadEvidenceModal({
     uploadInputRef,
     closeUploadModal,
     submitUpload,
+    uploadingEvidence,
 }) {
     if (!uploadContext) return null;
 
@@ -3211,7 +3221,8 @@ function UploadEvidenceModal({
                     <button
                         type="button"
                         onClick={closeUploadModal}
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                        disabled={uploadingEvidence}
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         <X size={16} />
                     </button>
@@ -3236,7 +3247,8 @@ function UploadEvidenceModal({
                         <button
                             type="button"
                             onClick={() => uploadInputRef.current?.click()}
-                            className="flex w-full flex-col items-center justify-center rounded-[1.35rem] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center transition hover:border-[#0AC4E0] hover:bg-cyan-50/40"
+                            disabled={uploadingEvidence}
+                            className="flex w-full flex-col items-center justify-center rounded-[1.35rem] border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center transition hover:border-[#0AC4E0] hover:bg-cyan-50/40 disabled:cursor-not-allowed disabled:opacity-70"
                         >
                             <UploadCloud size={26} className="text-[#0AC4E0]" />
 
@@ -3254,6 +3266,7 @@ function UploadEvidenceModal({
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
                             className="hidden"
+                            disabled={uploadingEvidence}
                             onChange={(event) =>
                                 setUploadFile(event.target.files?.[0] || null)
                             }
@@ -3268,8 +3281,9 @@ function UploadEvidenceModal({
                         <textarea
                             value={uploadNote}
                             onChange={(event) => setUploadNote(event.target.value)}
+                            disabled={uploadingEvidence}
                             placeholder="Tambahkan catatan singkat untuk AO/HO..."
-                            className="h-[110px] w-full resize-none rounded-[1.25rem] border border-slate-100 bg-slate-50 px-4 py-3 text-[12px] font-semibold text-slate-700 outline-none transition focus:border-cyan-100 focus:bg-white focus:shadow-[0_0_0_3px_rgba(10,196,224,0.14)]"
+                            className="h-[110px] w-full resize-none rounded-[1.25rem] border border-slate-100 bg-slate-50 px-4 py-3 text-[12px] font-semibold text-slate-700 outline-none transition focus:border-cyan-100 focus:bg-white focus:shadow-[0_0_0_3px_rgba(10,196,224,0.14)] disabled:cursor-not-allowed disabled:opacity-70"
                         />
                     </div>
                 </div>
@@ -3278,7 +3292,8 @@ function UploadEvidenceModal({
                     <button
                         type="button"
                         onClick={closeUploadModal}
-                        className="rounded-2xl border border-slate-100 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition hover:text-slate-700"
+                        disabled={uploadingEvidence}
+                        className="rounded-2xl border border-slate-100 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                         Batal
                     </button>
@@ -3286,10 +3301,15 @@ function UploadEvidenceModal({
                     <button
                         type="button"
                         onClick={submitUpload}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]"
+                        disabled={uploadingEvidence}
+                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0] disabled:cursor-wait disabled:bg-slate-400"
                     >
-                        <UploadCloud size={14} />
-                        Kirim ke HO
+                        {uploadingEvidence ? (
+                            <RefreshCcw size={14} className="animate-spin" />
+                        ) : (
+                            <UploadCloud size={14} />
+                        )}
+                        {uploadingEvidence ? "Mengunggah..." : "Kirim ke HO"}
                     </button>
                 </div>
             </div>

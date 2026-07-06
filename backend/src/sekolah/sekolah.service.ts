@@ -89,6 +89,22 @@ export class SekolahService {
     );
   }
 
+  private validateEmailLogin(email: string) {
+    if (!email) {
+      throw new BadRequestException('Email login sekolah wajib diisi.');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Format email login sekolah tidak valid.');
+    }
+  }
+
+  private validatePasswordLogin(password: string) {
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Password login sekolah minimal 8 karakter.');
+    }
+  }
+
   // =========================================================
   // HELPER SYNC USER SEKOLAH
   // =========================================================
@@ -122,6 +138,8 @@ export class SekolahService {
       );
     }
 
+    this.validateEmailLogin(emailLogin);
+
     if (!namaSekolah) {
       throw new InternalServerErrorException(
         'Nama sekolah wajib diisi agar akun sekolah dapat dibuat.',
@@ -144,6 +162,14 @@ export class SekolahService {
     );
 
     const existingUser = existingUsers?.[0];
+
+    if (passwordLogin) {
+      this.validatePasswordLogin(passwordLogin);
+    }
+
+    if (!existingUser) {
+      this.validatePasswordLogin(passwordLogin);
+    }
 
     if (
       existingUser?.id_sekolah &&
@@ -303,8 +329,12 @@ export class SekolahService {
         sertifikat_iso: createSekolahDto.sertifikat_iso || 'Belum',
         adiwiyata: createSekolahDto.adiwiyata || 'Belum',
 
-        email_login: createSekolahDto.email_login || null,
-        password_login: createSekolahDto.password_login || null,
+        email_login: createSekolahDto.email_login
+          ? String(createSekolahDto.email_login).trim().toLowerCase()
+          : null,
+        password_login: createSekolahDto.password_login
+          ? String(createSekolahDto.password_login).trim()
+          : null,
 
         status:
           createSekolahDto.status === undefined
@@ -325,10 +355,19 @@ export class SekolahService {
        * Ini membuat Create Sekolah tetap bisa tanpa akun login dan tanpa logo.
        */
       if (createSekolahDto.email_login) {
+        this.validateEmailLogin(
+          String(createSekolahDto.email_login || '').trim().toLowerCase(),
+        );
+        this.validatePasswordLogin(
+          String(createSekolahDto.password_login || '').trim(),
+        );
+
         await this.syncUserSekolah(queryRunner.manager, sekolahSaved, {
           nama_sekolah: createSekolahDto.nama_sekolah,
-          email_login: createSekolahDto.email_login,
-          password_login: createSekolahDto.password_login,
+          email_login: String(createSekolahDto.email_login || '')
+            .trim()
+            .toLowerCase(),
+          password_login: String(createSekolahDto.password_login || '').trim(),
           status: sekolahSaved.status,
         });
       }
@@ -340,7 +379,9 @@ export class SekolahService {
       await queryRunner.rollbackTransaction();
       console.error('Create Sekolah Error:', error);
 
-      if (error instanceof ConflictException) throw error;
+      if (error instanceof ConflictException || error instanceof BadRequestException) {
+        throw error;
+      }
 
       throw new InternalServerErrorException(
         error?.message || 'Gagal membuat data sekolah.',
@@ -534,12 +575,12 @@ export class SekolahService {
 
       email_login:
         updateSekolahDto.email_login !== undefined
-          ? updateSekolahDto.email_login
+          ? String(updateSekolahDto.email_login || '').trim().toLowerCase()
           : sekolah.email_login,
 
       password_login:
         updateSekolahDto.password_login !== undefined
-          ? updateSekolahDto.password_login
+          ? String(updateSekolahDto.password_login || '').trim()
           : sekolah.password_login,
 
       id_wilayah: kabupatenWilayah.id_wilayah,
@@ -598,6 +639,17 @@ export class SekolahService {
 
     if (file) {
       dataUpdate.logo_url = `/uploads/sekolah/${file.filename}`;
+    }
+
+    if (updateSekolahDto.email_login !== undefined) {
+      this.validateEmailLogin(dataUpdate.email_login);
+    }
+
+    if (
+      updateSekolahDto.password_login !== undefined &&
+      String(updateSekolahDto.password_login || '').trim()
+    ) {
+      this.validatePasswordLogin(String(updateSekolahDto.password_login).trim());
     }
 
     await this.sekolahRepo.update({ id_sekolah: id }, dataUpdate);

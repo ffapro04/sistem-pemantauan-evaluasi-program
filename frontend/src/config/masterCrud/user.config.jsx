@@ -18,6 +18,7 @@ import {
     cleanWilayahName,
     isActiveValue,
 } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_KEPALA_DINAS_ID = 7;
 
@@ -466,7 +467,14 @@ export const userConfig = {
                     label: "Foto Profile",
                     type: "upload",
                     icon: User,
-                    help: "Upload foto pengguna (png/jpg/jpeg)"
+                    accept: "image/jpeg,image/jpg,image/png,image/webp",
+                    maxSize: 2 * 1024 * 1024,
+                    buttonText: "Pilih Foto Profile",
+                    helperText: "Maks. 2MB · JPG, PNG, atau WEBP",
+                    existingUrlField: "foto_profile_url",
+                    existingNameField: "foto_profile",
+                    previewAsImage: true,
+                    help: "Upload foto pengguna (png/jpg/jpeg/webp)",
                 },
                 {
                     name: "jabatan",
@@ -544,22 +552,22 @@ export const userConfig = {
     validate: ({ mode, formData }) => {
         if (!formData.nama?.trim()) return "Nama pengguna wajib diisi.";
         if (!formData.email?.trim()) return "Email pengguna wajib diisi.";
+        const emailError = validateEmailField(formData.email, "Email pengguna");
+        if (emailError) return emailError;
         if (!formData.id_role) return "Role pengguna wajib dipilih.";
 
         if (isKepalaDinasRole(formData.id_role) && !formData.id_wilayah) {
             return "Wilayah Kepala Dinas wajib dipilih.";
         }
 
-        if (mode === "create" && String(formData.password || "").length < 8) {
-            return "Password minimal 8 karakter.";
+        if (mode === "create") {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
-        if (
-            mode === "edit" &&
-            formData.password &&
-            String(formData.password).length < 8
-        ) {
-            return "Password minimal 8 karakter.";
+        if (mode === "edit" && formData.password) {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         return true;

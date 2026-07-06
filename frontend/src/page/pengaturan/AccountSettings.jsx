@@ -861,9 +861,14 @@ function AccountSettings() {
         const driveParam = searchParams.get("drive") || searchParams.get("googleDrive") || searchParams.get("storage");
         if (driveParam === "connected") {
             toast.success("Penyimpanan dokumen berhasil ditautkan.");
+            const returnTo = searchParams.get("returnTo");
+            if (returnTo && returnTo.startsWith("/")) {
+                navigate(returnTo, { replace: true });
+                return;
+            }
             setSearchParams({});
         }
-    }, [fetchProfile, fetchDriveStatus, searchParams, setSearchParams]);
+    }, [fetchProfile, fetchDriveStatus, navigate, searchParams, setSearchParams]);
 
     const handleConnectDrive = async () => {
         if (!checkAuth()) return;
@@ -871,7 +876,11 @@ function AccountSettings() {
         setConnecting(true);
 
         try {
-            const redirectTo = "/pengaturan-akun?storage=connected";
+            const returnTo = searchParams.get("returnTo");
+            const redirectTo =
+                returnTo && returnTo.startsWith("/")
+                    ? returnTo
+                    : "/pengaturan-akun?storage=connected";
             const response = await fetch(
                 `${API_BASE_URL}/google-drive/auth-url?redirectTo=${encodeURIComponent(redirectTo)}`,
                 {
@@ -1019,8 +1028,8 @@ function AccountSettings() {
         }
 
         if (password || passwordConfirmation) {
-            if (password.length < 6) {
-                toast.error("Password baru minimal 6 karakter.");
+            if (password.length < 8) {
+                toast.error("Password baru minimal 8 karakter.");
                 return;
             }
 

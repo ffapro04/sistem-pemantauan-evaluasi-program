@@ -1,7 +1,7 @@
 ﻿/* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
@@ -40,6 +40,162 @@ import {
 
 const DEFAULT_STATUS_PROGRAM = "Approval";
 const API_BASE_URL = "";
+const PROGRAM_DRAFT_DB_NAME = "sme_program_drafts";
+const PROGRAM_DRAFT_DB_VERSION = 1;
+const PROGRAM_DRAFT_FILE_STORE = "program_files";
+const PROGRAM_DRAFT_STORAGE_PREFIX = "program_create_draft";
+
+function openProgramDraftDb() {
+    if (typeof window === "undefined" || !window.indexedDB) {
+        return Promise.reject(new Error("IndexedDB tidak tersedia di browser ini."));
+    }
+
+    return new Promise((resolve, reject) => {
+        const request = window.indexedDB.open(PROGRAM_DRAFT_DB_NAME, PROGRAM_DRAFT_DB_VERSION);
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(PROGRAM_DRAFT_FILE_STORE)) {
+                db.createObjectStore(PROGRAM_DRAFT_FILE_STORE, { keyPath: "key" });
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error("Gagal membuka penyimpanan draft."));
+    });
+}
+
+async function saveProgramDraftFile(key, file) {
+    if (!key || !file) return null;
+
+    try {
+        const db = await openProgramDraftDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(PROGRAM_DRAFT_FILE_STORE, "readwrite");
+            const store = tx.objectStore(PROGRAM_DRAFT_FILE_STORE);
+            store.put({
+                key,
+                file,
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                lastModified: file.lastModified,
+                savedAt: new Date().toISOString(),
+            });
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error("Gagal menyimpan file draft."));
+        });
+        db.close();
+
+        return {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            lastModified: file.lastModified,
+        };
+    } catch (error) {
+        console.warn("Gagal menyimpan file MOU ke draft browser:", error);
+        return null;
+    }
+}
+
+async function getProgramDraftFile(key) {
+    if (!key) return null;
+
+    try {
+        const db = await openProgramDraftDb();
+        const entry = await new Promise((resolve, reject) => {
+            const tx = db.transaction(PROGRAM_DRAFT_FILE_STORE, "readonly");
+            const store = tx.objectStore(PROGRAM_DRAFT_FILE_STORE);
+            const request = store.get(key);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error || new Error("Gagal membaca file draft."));
+        });
+        db.close();
+
+        if (!entry?.file) return null;
+        if (typeof File !== "undefined" && entry.file instanceof File) return entry.file;
+
+        if (typeof File !== "undefined") {
+            return new File([entry.file], entry.name || "dokumen-mou", {
+                type: entry.type || entry.file?.type || "",
+                lastModified: entry.lastModified || Date.now(),
+            });
+        }
+
+        return entry.file;
+    } catch (error) {
+        console.warn("Gagal memulihkan file MOU dari draft browser:", error);
+        return null;
+    }
+}
+
+async function deleteProgramDraftFile(key) {
+    if (!key) return;
+
+    try {
+        const db = await openProgramDraftDb();
+        await new Promise((resolve, reject) => {
+            const tx = db.transaction(PROGRAM_DRAFT_FILE_STORE, "readwrite");
+            const store = tx.objectStore(PROGRAM_DRAFT_FILE_STORE);
+            store.delete(key);
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error || new Error("Gagal menghapus file draft."));
+        });
+        db.close();
+    } catch (error) {
+        console.warn("Gagal menghapus file draft program:", error);
+    }
+}
+
+function getProgramDraftKey(kategori = "AKADEMIK") {
+    const payload = getTokenPayload() || {};
+    const userId = payload.id_user || payload.sub || payload.id || "anonymous";
+    return `${PROGRAM_DRAFT_STORAGE_PREFIX}:${userId}:${normalizeCategory(kategori) || "PROGRAM"}`;
+}
+
+function toDraftPlainObject(value, fallback = {}) {
+    try {
+        return JSON.parse(JSON.stringify(value ?? fallback));
+    } catch {
+        return fallback;
+    }
+}
+
+function toDraftSelectedItem(item) {
+    return {
+        value: item?.value ?? null,
+        label: item?.label || "",
+        subLabel: item?.subLabel || "",
+        realId: item?.realId ?? null,
+        raw: toDraftPlainObject(item?.raw, {}),
+    };
+}
+
+function readProgramDraft(kategori) {
+    try {
+        const raw = localStorage.getItem(getProgramDraftKey(kategori));
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function hasMeaningfulProgramDraft(draft) {
+    const form = draft?.formData || {};
+
+    return Boolean(
+        String(form?.namaProgram || "").trim() ||
+        String(form?.nomorMou || "").trim() ||
+        String(form?.hargaVendor || "").trim() ||
+        String(form?.tanggalMulaiProgram || "").trim() ||
+        String(form?.tanggalSelesaiProgram || "").trim() ||
+        String(form?.fileName || "").trim() ||
+        normalizeArray(form?.selectedSekolahs).length ||
+        normalizeArray(form?.selectedAOs).length ||
+        normalizeArray(form?.selectedVendors).length
+    );
+}
 
 // =========================================================================
 // STEP CONFIG
@@ -664,6 +820,7 @@ function CreateProgramForm({
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const initialSekolahId = searchParams.get("sekolah");
+    const draftPromptShownRef = useRef(false);
 
     const [activeStep, setActiveStep] = useState("identitas");
     const [activeFaseIndex, setActiveFaseIndex] = useState(0);
@@ -682,6 +839,9 @@ function CreateProgramForm({
     const [driveGuardMessage, setDriveGuardMessage] = useState(
         "Akun Anda belum tertaut ke penyimpanan dokumen. Hubungkan terlebih dahulu untuk mengunggah MOU."
     );
+    const [draftPromptOpen, setDraftPromptOpen] = useState(false);
+    const [draftPromptMissingFile, setDraftPromptMissingFile] = useState(false);
+    const [draftRestoring, setDraftRestoring] = useState(false);
 
     const pilarProgramOptions = useMemo(
         () => getPilarProgramOptions(kategori),
@@ -707,6 +867,89 @@ function CreateProgramForm({
     const [fases, setFases] = useState([createDefaultFase(1, defaultFaseName)]);
 
     const updateForm = (field, value) => setFormData((prev) => ({ ...prev, [field]: value }));
+
+    const saveProgramDraft = async () => {
+        const draftKey = getProgramDraftKey(kategori);
+        const fileMeta = await saveProgramDraftFile(draftKey, formData.fileFinal);
+        const draft = {
+            version: 1,
+            key: draftKey,
+            kategori,
+            title,
+            savedAt: new Date().toISOString(),
+            activeStep,
+            activeFaseIndex,
+            formData: {
+                ...formData,
+                selectedSekolahs: formData.selectedSekolahs.map(toDraftSelectedItem),
+                selectedAOs: formData.selectedAOs.map(toDraftSelectedItem),
+                selectedVendors: formData.selectedVendors.map(toDraftSelectedItem),
+                fileFinal: null,
+                fileName: formData.fileName || fileMeta?.name || "",
+            },
+            fases: toDraftPlainObject(fases, [createDefaultFase(1, defaultFaseName)]),
+            fileMeta: fileMeta || (formData.fileName ? { name: formData.fileName } : null),
+        };
+
+        try {
+            localStorage.setItem(draftKey, JSON.stringify(draft));
+        } catch (error) {
+            console.warn("Gagal menyimpan draft program:", error);
+            toast.warning("Draft form gagal disimpan otomatis. Jangan tutup halaman sebelum program diterbitkan.");
+        }
+
+        return draft;
+    };
+
+    const clearProgramDraft = async () => {
+        const draftKey = getProgramDraftKey(kategori);
+        localStorage.removeItem(draftKey);
+        await deleteProgramDraftFile(draftKey);
+    };
+
+    const restoreProgramDraft = async (draft) => {
+        if (!draft?.formData) return { restoredFile: null };
+
+        const draftKey = draft.key || getProgramDraftKey(kategori);
+        const restoredFile = await getProgramDraftFile(draftKey);
+        const restoredFileName =
+            restoredFile?.name ||
+            draft.formData?.fileName ||
+            draft.fileMeta?.name ||
+            "";
+
+        setFormData((prev) => ({
+            ...prev,
+            ...draft.formData,
+            selectedSekolahs: normalizeArray(draft.formData.selectedSekolahs),
+            selectedAOs: normalizeArray(draft.formData.selectedAOs),
+            selectedVendors: normalizeArray(draft.formData.selectedVendors),
+            fileFinal: restoredFile,
+            fileName: restoredFileName,
+        }));
+        setFases(
+            Array.isArray(draft.fases) && draft.fases.length > 0
+                ? draft.fases
+                : [createDefaultFase(1, defaultFaseName)]
+        );
+        setActiveStep(draft.activeStep || "review");
+        setActiveFaseIndex(Number(draft.activeFaseIndex) || 0);
+
+        return { restoredFile };
+    };
+
+    const hasCurrentFormInput = () =>
+        Boolean(
+            String(formData.namaProgram || "").trim() ||
+            String(formData.nomorMou || "").trim() ||
+            String(formData.hargaVendor || "").trim() ||
+            String(formData.tanggalMulaiProgram || "").trim() ||
+            String(formData.tanggalSelesaiProgram || "").trim() ||
+            String(formData.fileName || "").trim() ||
+            formData.selectedSekolahs.length ||
+            formData.selectedAOs.length ||
+            formData.selectedVendors.length
+        );
 
     useEffect(() => {
         setFormData((prev) => {
@@ -864,6 +1107,50 @@ function CreateProgramForm({
     useEffect(() => {
         fetchMasterData();
     }, [vendorEndpoint, kategori]);
+
+    useEffect(() => {
+        if (masterLoading || draftPromptShownRef.current) return;
+
+        const driveParam =
+            searchParams.get("drive") ||
+            searchParams.get("googleDrive") ||
+            searchParams.get("storage");
+        const draftParam = searchParams.get("programDraft");
+
+        const draft = readProgramDraft(kategori);
+        if (!draft) {
+            if (driveParam === "connected") {
+                draftPromptShownRef.current = true;
+                toast.success("Penyimpanan dokumen berhasil ditautkan.");
+            }
+            return;
+        }
+
+        if (!hasMeaningfulProgramDraft(draft)) return;
+
+        const shouldRestoreDraft =
+            driveParam === "connected" ||
+            draftParam === "saved" ||
+            !hasCurrentFormInput();
+
+        if (!shouldRestoreDraft) return;
+
+        draftPromptShownRef.current = true;
+        setDraftRestoring(true);
+
+        restoreProgramDraft(draft)
+            .then(({ restoredFile }) => {
+                setDraftPromptMissingFile(!restoredFile);
+                setDraftPromptOpen(true);
+                toast.info("Draft program kamu tersimpan. Silakan terbitkan atau lanjutkan edit.");
+            })
+            .catch(() => {
+                toast.warning("Draft program ditemukan, tetapi sebagian data gagal dipulihkan.");
+                setDraftPromptOpen(true);
+                setDraftPromptMissingFile(true);
+            })
+            .finally(() => setDraftRestoring(false));
+    }, [masterLoading, searchParams, kategori]);
 
     useEffect(() => {
         if (!initialSekolahId || sekolahOptions.length === 0) return;
@@ -1087,6 +1374,7 @@ function CreateProgramForm({
         }
 
         if (!payload?.connected) {
+            await saveProgramDraft();
             setDriveGuardMessage(
                 "Akun Anda belum tertaut ke penyimpanan dokumen. Hubungkan Google Drive terlebih dahulu untuk mengunggah MOU."
             );
@@ -1109,6 +1397,7 @@ function CreateProgramForm({
         setDriveGuardLoading(true);
 
         try {
+            await saveProgramDraft();
             const redirectTo = `${getCurrentPagePath()}${getCurrentPagePath().includes("?") ? "&" : "?"}drive=connected`;
 
             const response = await fetch(
@@ -1133,6 +1422,19 @@ function CreateProgramForm({
         } catch (error) {
             toast.error(error.message || "Gagal menautkan penyimpanan dokumen.");
             setDriveGuardLoading(false);
+        }
+    };
+
+    const handleOpenAccountSettingsFromGuard = async () => {
+        try {
+            await saveProgramDraft();
+            setDriveGuardOpen(false);
+            toast.info("Draft program tersimpan. Hubungkan Google Drive, lalu kamu bisa lanjutkan draft ini.");
+
+            const returnTo = `${getCurrentPagePath()}${getCurrentPagePath().includes("?") ? "&" : "?"}drive=connected&programDraft=saved`;
+            navigate(`/pengaturan-akun?returnTo=${encodeURIComponent(returnTo)}&programDraft=saved`);
+        } catch {
+            navigate("/pengaturan-akun");
         }
     };
 
@@ -1198,6 +1500,7 @@ function CreateProgramForm({
                     String(errorMessage).toLowerCase().includes("google drive belum terhubung") ||
                     String(errorMessage).toLowerCase().includes("belum tertaut")
                 ) {
+                    await saveProgramDraft();
                     setDriveGuardMessage(
                         "Akun Anda belum tertaut ke penyimpanan dokumen. Hubungkan Google Drive terlebih dahulu untuk mengunggah MOU."
                     );
@@ -1208,6 +1511,7 @@ function CreateProgramForm({
                 throw new Error(errorMessage);
             }
 
+            await clearProgramDraft();
             toast.success(successMessage);
             navigate(redirectPath);
         } catch (error) {
@@ -1407,6 +1711,70 @@ function CreateProgramForm({
                 </section>
             </main>
 
+            {(draftPromptOpen || draftRestoring) && (
+                <div className="fixed inset-0 z-[998] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+                    <div className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.25)]">
+                        <div className="absolute inset-x-0 top-0 h-2 bg-emerald-400" />
+
+                        <div className="p-7">
+                            <div className="mb-5 inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">
+                                Draft Program Tersimpan
+                            </div>
+
+                            <h2 className="text-2xl font-black tracking-[-0.05em] text-slate-950">
+                                Mau langsung terbitkan program ini?
+                            </h2>
+
+                            <p className="mt-3 text-sm font-semibold leading-7 text-slate-500">
+                                Draft yang kamu isi sebelum menautkan Google Drive sudah dipulihkan. Kamu bisa langsung menerbitkan program, atau lanjut edit dulu kalau masih ada yang ingin ditambahkan.
+                            </p>
+
+                            {draftPromptMissingFile && (
+                                <div className="mt-5 rounded-[1.25rem] border border-amber-100 bg-amber-50 px-5 py-4">
+                                    <p className="text-sm font-bold leading-6 text-amber-700">
+                                        Data form berhasil dipulihkan, tetapi file MOU perlu dipilih ulang karena browser tidak mengizinkan file disimpan otomatis.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDraftPromptOpen(false);
+                                        if (draftPromptMissingFile) {
+                                            setActiveStep("identitas");
+                                            toast.warning("Pilih ulang file MOU terlebih dahulu sebelum program diterbitkan.");
+                                        }
+                                    }}
+                                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-xs font-black uppercase tracking-widest text-slate-500 transition hover:bg-slate-50"
+                                >
+                                    Tambahkan Lagi
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDraftPromptOpen(false);
+                                        saveProgram();
+                                    }}
+                                    disabled={loading || draftRestoring}
+                                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0AC4E0] px-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_32px_rgba(10,196,224,0.28)] transition hover:bg-[#08B7D1] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {loading || draftRestoring ? (
+                                        <>
+                                            <Loader2 size={14} className="mr-2 animate-spin" />
+                                            Memproses
+                                        </>
+                                    ) : (
+                                        "Terbitkan Program"
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {driveGuardOpen && (
                 <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm">
@@ -1428,7 +1796,7 @@ function CreateProgramForm({
 
                             <div className="mt-5 rounded-[1.25rem] border border-cyan-100 bg-[#F6FDFF] px-5 py-4">
                                 <p className="text-sm font-bold leading-6 text-[#5F7E86]">
-                                    Setelah tautan berhasil dibuat, Anda akan diarahkan kembali ke halaman ini. Data yang sudah diisi tetap aman selama halaman tidak ditutup manual.
+                                    Draft program akan disimpan otomatis sebelum kamu diarahkan ke Google. Setelah tautan berhasil, kamu bisa langsung menerbitkan program atau lanjut edit dulu.
                                 </p>
                             </div>
 
@@ -1443,10 +1811,10 @@ function CreateProgramForm({
 
                                 <button
                                     type="button"
-                                    onClick={() => navigate("/pengaturan-akun")}
+                                    onClick={handleOpenAccountSettingsFromGuard}
                                     className="inline-flex h-11 items-center justify-center rounded-2xl border border-cyan-100 bg-[#F6FDFF] px-5 text-xs font-black uppercase tracking-widest text-[#078EA3] transition hover:bg-[#E9FBFF]"
                                 >
-                                    Buka Pengaturan
+                                    Simpan Draft & Buka Pengaturan
                                 </button>
 
                                 <button

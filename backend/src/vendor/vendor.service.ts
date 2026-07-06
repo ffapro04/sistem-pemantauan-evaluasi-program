@@ -21,6 +21,16 @@ type CurrentUploadUser = {
   id_role: number | null;
 };
 
+const VENDOR_DOCUMENT_FIELDS = [
+  'npwp_file',
+  'buku_rekening_file',
+  'ktp_pj_file',
+  'akta_notaris_file',
+] as const;
+
+type VendorDocumentField = (typeof VENDOR_DOCUMENT_FIELDS)[number];
+type VendorDocumentMap = Partial<Record<VendorDocumentField, string>>;
+
 @Injectable()
 export class VendorService {
   constructor(
@@ -39,46 +49,67 @@ export class VendorService {
     return files?.[fieldName]?.[0];
   }
 
-  private hasUploadedFile(files?: VendorDocumentFiles) {
-    return Boolean(
-      files?.npwp_file?.[0] ||
-        files?.buku_rekening_file?.[0] ||
-        files?.ktp_pj_file?.[0] ||
-        files?.akta_notaris_file?.[0],
-    );
-  }
-
-  private async uploadVendorDocument(
-    files: VendorDocumentFiles | undefined,
-    fieldName: keyof VendorDocumentFiles,
-    currentUser?: CurrentUploadUser,
-  ): Promise<string | undefined> {
-    const file = this.getUploadedFile(files, fieldName);
-    if (!file) return undefined;
-
-    if (!currentUser?.id_user) {
-      throw new BadRequestException(
-        'Sesi login tidak ditemukan. Silakan login ulang sebelum mengunggah dokumen vendor.',
-      );
-    }
-
-    const uploaded = await this.googleDriveService.uploadFile({
-      idUser: currentUser.id_user,
-      idRole: currentUser.id_role || null,
-      file,
-      moduleType: `VENDOR_${String(fieldName).toUpperCase()}`,
-      relatedTable: 'm_vendor',
-      relatedId: null,
-    });
-
+  private getDriveFilePath(uploaded: any, fallback: string) {
     const driveFile = uploaded?.file;
 
     return (
       driveFile?.web_view_link ||
       driveFile?.web_content_link ||
       driveFile?.drive_file_id ||
-      file.originalname
+      uploaded?.path ||
+      fallback
     );
+  }
+
+  private async uploadVendorDocuments(
+    files: VendorDocumentFiles | undefined,
+    currentUser?: CurrentUploadUser,
+  ): Promise<VendorDocumentMap> {
+    const uploadItems = VENDOR_DOCUMENT_FIELDS.map((fieldName) => ({
+      fieldName,
+      file: this.getUploadedFile(files, fieldName),
+    })).filter((item) => item.file);
+
+    if (uploadItems.length === 0) return {};
+
+    if (!currentUser?.id_user) {
+      return uploadItems.reduce<VendorDocumentMap>((result, item) => {
+        console.warn(
+          `VENDOR_DOCUMENT_FALLBACK_NO_USER:${String(item.fieldName)}:${item.file?.originalname}`,
+        );
+        result[item.fieldName] = item.file?.originalname || '';
+        return result;
+      }, {});
+    }
+
+    try {
+      const uploadedFiles = await this.googleDriveService.uploadFiles({
+        idUser: currentUser.id_user,
+        idRole: currentUser.id_role || null,
+        files: uploadItems.map((item) => ({
+          file: item.file,
+          moduleType: `VENDOR_${String(item.fieldName).toUpperCase()}`,
+          relatedTable: 'm_vendor',
+          relatedId: null,
+        })),
+      });
+
+      return uploadItems.reduce<VendorDocumentMap>((result, item, index) => {
+        result[item.fieldName] = this.getDriveFilePath(
+          uploadedFiles[index],
+          item.file?.originalname || '',
+        );
+        return result;
+      }, {});
+    } catch (error) {
+      return uploadItems.reduce<VendorDocumentMap>((result, item) => {
+        console.warn(
+          `VENDOR_DOCUMENT_DRIVE_FALLBACK:${String(item.fieldName)}:${(error as Error)?.message || error}`,
+        );
+        result[item.fieldName] = item.file?.originalname || '';
+        return result;
+      }, {});
+    }
   }
 
   private toNumber(value: any, fallback = 0) {
@@ -109,17 +140,18 @@ export class VendorService {
     currentUser?: CurrentUploadUser,
   ) {
     try {
+      const uploadedDocuments = await this.uploadVendorDocuments(
+        files,
+        currentUser,
+      );
+
       const npwpFile =
-        (await this.uploadVendorDocument(files, 'npwp_file', currentUser)) ||
+        uploadedDocuments.npwp_file ||
         createVendorDto.npwp_file ||
         null;
 
       const bukuRekeningFile =
-        (await this.uploadVendorDocument(
-          files,
-          'buku_rekening_file',
-          currentUser,
-        )) ||
+        uploadedDocuments.buku_rekening_file ||
         createVendorDto.buku_rekening_file ||
         null;
 
@@ -157,20 +189,10 @@ export class VendorService {
         buku_rekening_file: bukuRekeningFile,
 
         ktp_pj_file:
-          (await this.uploadVendorDocument(
-            files,
-            'ktp_pj_file',
-            currentUser,
-          )) ||
-          createVendorDto.ktp_pj_file ||
-          null,
+          uploadedDocuments.ktp_pj_file || createVendorDto.ktp_pj_file || null,
 
         akta_notaris_file:
-          (await this.uploadVendorDocument(
-            files,
-            'akta_notaris_file',
-            currentUser,
-          )) ||
+          uploadedDocuments.akta_notaris_file ||
           createVendorDto.akta_notaris_file ||
           null,
       });
@@ -533,35 +555,15 @@ export class VendorService {
         vendor.status = data.status || 'Bermitra';
       }
 
-      if (this.hasUploadedFile(files) && !currentUser?.id_user) {
-        throw new BadRequestException(
-          'Sesi login tidak ditemukan. Silakan login ulang sebelum mengunggah dokumen vendor.',
-        );
-      }
-
-      const npwpFilename = await this.uploadVendorDocument(
+      const uploadedDocuments = await this.uploadVendorDocuments(
         files,
-        'npwp_file',
         currentUser,
       );
 
-      const bukuRekeningFilename = await this.uploadVendorDocument(
-        files,
-        'buku_rekening_file',
-        currentUser,
-      );
-
-      const ktpFilename = await this.uploadVendorDocument(
-        files,
-        'ktp_pj_file',
-        currentUser,
-      );
-
-      const aktaFilename = await this.uploadVendorDocument(
-        files,
-        'akta_notaris_file',
-        currentUser,
-      );
+      const npwpFilename = uploadedDocuments.npwp_file;
+      const bukuRekeningFilename = uploadedDocuments.buku_rekening_file;
+      const ktpFilename = uploadedDocuments.ktp_pj_file;
+      const aktaFilename = uploadedDocuments.akta_notaris_file;
 
       if (npwpFilename) {
         vendor.npwp_file = npwpFilename;

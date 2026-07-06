@@ -17,6 +17,7 @@ import {
     cleanWilayahName,
     isActiveValue,
 } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_KEPALA_DINAS = 7;
 
@@ -397,16 +398,20 @@ export const kepalaDinasConfig = {
             return "Email Kepala Dinas wajib diisi.";
         }
 
-        if (mode === "create" && String(formData.password || "").length < 8) {
-            return "Password minimal 8 karakter.";
+        const emailError = validateEmailField(
+            formData.email,
+            "Email Kepala Dinas",
+        );
+        if (emailError) return emailError;
+
+        if (mode === "create") {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
-        if (
-            mode === "edit" &&
-            formData.password &&
-            String(formData.password).length < 8
-        ) {
-            return "Password minimal 8 karakter.";
+        if (mode === "edit" && formData.password) {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         if (!formData.jabatan?.trim()) {

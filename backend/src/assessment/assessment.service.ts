@@ -36,6 +36,13 @@ function normalizeAssessmentPilar(value?: string, jenis?: string) {
   return jenisRaw.includes('non') ? 'SENI_BUDAYA' : 'AKADEMIK';
 }
 
+function normalizeAssessmentJenisKey(value?: string) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+}
+
 @Injectable()
 export class AssessmentService {
   constructor(
@@ -231,19 +238,23 @@ export class AssessmentService {
         0,
     );
 
-    const currentUserId = Number(
-      currentUser?.id_user ??
-        currentUser?.user_id ??
-        currentUser?.sub ??
-        currentUser?.id ??
-        0,
-    );
-
     const subJenis = String(
       currentUser?.sub_jenis ?? currentUser?.subJenis ?? '',
     )
       .trim()
       .toUpperCase();
+
+    const currentUserJenis = normalizeAssessmentJenisKey(
+      currentUser?.jenis ?? currentUser?.kategori ?? '',
+    );
+
+    const requestedJenis = normalizeAssessmentJenisKey(jenis);
+    const currentHoJenisScope =
+      roleId === 3 && currentUserJenis.includes('non')
+        ? 'non_akademik'
+        : roleId === 3 && currentUserJenis.includes('akademik')
+          ? 'akademik'
+          : '';
 
     const query = this.assessmentRepo
       .createQueryBuilder('a')
@@ -293,15 +304,26 @@ export class AssessmentService {
         'jumlah_guru_target',
       );
 
-    if (jenis) {
-      query.andWhere('a.jenis = :jenis', { jenis });
+    if (requestedJenis) {
+      query.andWhere(
+        `REPLACE(REPLACE(LOWER(TRIM(COALESCE(a.jenis, ''))), '-', '_'), ' ', '_') = :jenis`,
+        { jenis: requestedJenis },
+      );
     }
 
-    if (roleId === 3 && currentUserId > 0) {
-      query.andWhere(
-        '(a.id_ho = :currentUserId OR a.dibuat_oleh = :currentUserId)',
-        { currentUserId },
-      );
+    if (roleId === 3) {
+      if (
+        requestedJenis &&
+        currentHoJenisScope &&
+        requestedJenis !== currentHoJenisScope
+      ) {
+        query.andWhere('1 = 0');
+      } else if (!requestedJenis && currentHoJenisScope) {
+        query.andWhere(
+          `REPLACE(REPLACE(LOWER(TRIM(COALESCE(a.jenis, ''))), '-', '_'), ' ', '_') = :jenisScope`,
+          { jenisScope: currentHoJenisScope },
+        );
+      }
 
       if (subJenis.includes('SMK')) {
         query.andWhere(`

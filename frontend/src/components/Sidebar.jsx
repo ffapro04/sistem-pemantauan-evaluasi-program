@@ -1592,8 +1592,7 @@ const Sidebar = () => {
       }
     }
 
-    setShowNotificationHub(false);
-    if (item?.targetUrl) navigate(item.targetUrl);
+    await fetchNotifications({ silent: true });
   };
 
   const handleMarkAllRead = async () => {

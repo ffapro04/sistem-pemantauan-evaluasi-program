@@ -42,6 +42,7 @@ import "leaflet/dist/leaflet.css";
 import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
 import Dropdown from "../../components/Dropdown";
+import ProgramRatingStars from "../../components/program/ProgramRatingStars";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
@@ -1886,6 +1887,7 @@ function DataTable({
     searchPlaceholder,
     emptyText,
     getSearchText,
+    tableMinWidth = "min-w-[720px]",
 }) {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -1953,7 +1955,7 @@ function DataTable({
                 </div>
             ) : (
                 <div className="min-h-0 flex-1 overflow-x-auto">
-                    <table className="w-full min-w-[720px] border-collapse">
+                    <table className={`w-full ${tableMinWidth} border-collapse`}>
                         <thead>
                             <tr className="border-b border-slate-100 bg-slate-50">
                                 {columns.map((column) => (
@@ -2659,6 +2661,7 @@ export default function DashboardPengurus() {
                         table={
                             <DataTable
                                 data={filteredPrograms}
+                                tableMinWidth="min-w-[980px]"
                                 searchPlaceholder="Cari detail program pada daftar..."
                                 emptyText="Program tidak ditemukan"
                                 getSearchText={(program) =>
@@ -2735,6 +2738,16 @@ export default function DashboardPengurus() {
                                                     program?.waktu_selesai,
                                                 )}
                                             </p>
+                                        ),
+                                    },
+                                    {
+                                        key: "rating",
+                                        label: "Rating Guru",
+                                        render: (program) => (
+                                            <ProgramRatingStars
+                                                program={program}
+                                                size={13}
+                                            />
                                         ),
                                     },
                                     {
