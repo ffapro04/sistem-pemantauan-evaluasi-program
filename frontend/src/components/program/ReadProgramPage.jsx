@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -18,11 +18,7 @@ import {
     Search as SearchIcon,
     BarChart3,
     X,
-    MapPinned,
 } from "lucide-react";
-import { MapContainer, Marker, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
 import {
     Sidebar,
@@ -38,7 +34,7 @@ import {
 } from "../../utils/hoAccess";
 
 const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "";
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const getAssetUrl = (value) => {
     const raw = String(value || "").trim();
@@ -646,6 +642,7 @@ function ReadProgramPage({
     const [filterWilayah, setFilterWilayah] = useState("Semua");
     const [filterPilar, setFilterPilar] = useState("SEMUA");
     const [selectedRegionName, setSelectedRegionName] = useState("");
+    const [page, setPage] = useState(1);
     const [programs, setPrograms] = useState([]);
     const [sekolahs, setSekolahs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -665,12 +662,12 @@ function ReadProgramPage({
             const hoId = getCurrentHoIdFromToken();
 
             const [resSekolah, resProgram, resHo] = await Promise.all([
-                fetch("/sekolah", { headers }),
-                fetch(`/program?kategori=${kategori}`, {
+                fetch(`${API_BASE_URL}/sekolah`, { headers }),
+                fetch(`${API_BASE_URL}/program?kategori=${kategori}`, {
                     headers,
                 }),
                 hoId
-                    ? fetch(`/users/${hoId}`, { headers })
+                    ? fetch(`${API_BASE_URL}/users/${hoId}`, { headers })
                     : Promise.resolve(null),
             ]);
 
@@ -938,6 +935,21 @@ function ReadProgramPage({
         });
     }, [mappedSchools]);
 
+    const limit = 5;
+    const totalPages = Math.ceil(readPanelSchools.length / limit) || 1;
+    const start = (page - 1) * limit;
+    const currentSchools = readPanelSchools.slice(start, start + limit);
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, filterWilayah, filterPilar, kategori]);
+
+    useEffect(() => {
+        if (page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [page, totalPages]);
+
     useEffect(() => {
         if (!selectedRegionName) return;
 
@@ -1110,7 +1122,7 @@ function ReadProgramPage({
                 </section>
 
                 <section className="relative min-h-0 flex-1 overflow-hidden py-5">
-                    <div className="relative h-full overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.07)]">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.07)]">
                         {loading ? (
                             <div className="flex h-full items-center justify-center">
                                 <div className="flex flex-col items-center gap-4">
@@ -1134,93 +1146,74 @@ function ReadProgramPage({
                             </div>
                         ) : (
                             <>
-                                <MapContainer
-                                    center={[-2.5489, 118.0149]}
-                                    zoom={5}
-                                    minZoom={4}
-                                    maxZoom={12}
-                                    zoomControl={false}
-                                    className="h-full w-full"
-                                >
-                                    <ZoomControl position="bottomleft" />
+                                <div className="shrink-0 border-b border-slate-100 bg-white px-6 py-5">
+                                    <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                                        <div className="min-w-0">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                                                Ringkasan Monitoring
+                                            </p>
+                                            <h2 className="mt-1 text-[24px] font-black leading-tight text-slate-950">
+                                                Pilih sekolah untuk melihat daftar program dan progress detail.
+                                            </h2>
+                                            <p className="mt-2 text-[13px] font-semibold text-slate-500">
+                                                Data mengikuti filter pencarian, pilar, dan wilayah pada bagian atas.
+                                            </p>
+                                        </div>
 
-                                    <TileLayer
-                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    />
+                                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:w-[560px]">
+                                            {STATUS_LIST.map((status) => (
+                                                <StatusSummary
+                                                    key={status}
+                                                    status={status}
+                                                    value={visiblePrograms.filter((program) => getProgramStatus(program) === status).length}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
 
-                                    {regionGroups.map((group) => (
-                                        <Marker
-                                            key={group.name}
-                                            position={group.coordinate}
-                                            icon={buildRegionIcon(group)}
-                                            eventHandlers={{
-                                                click: () => handleSelectRegion(group),
-                                            }}
+                                <div className="program-panel-scroll min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {currentSchools.map((school) => (
+                                            <ProgramWideCard
+                                                key={school.id_sekolah}
+                                                school={school}
+                                                onOpen={() => navigate(`${listPathPrefix}/${school.id_sekolah}`)}
+                                                detailButtonText={detailButtonText}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50/80 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Menampilkan {currentSchools.length} dari {readPanelSchools.length} sekolah
+                                    </p>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPage((value) => Math.max(1, value - 1))}
+                                            disabled={page <= 1}
+                                            className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
                                         >
-                                            <Tooltip
-                                                direction="top"
-                                                offset={[0, -18]}
-                                                opacity={1}
-                                                className="program-map-tooltip"
-                                            >
-                                                <div className="text-center">
-                                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-800">
-                                                        {group.name}
-                                                    </p>
+                                            Prev
+                                        </button>
 
-                                                    <p className="mt-1 text-[9px] font-bold text-slate-500">
-                                                        {group.schools.length} sekolah "-{" "}
-                                                        {group.total_program} program
-                                                    </p>
-                                                </div>
-                                            </Tooltip>
-                                        </Marker>
-                                    ))}
-                                </MapContainer>
+                                        <span className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">
+                                            {page} / {totalPages}
+                                        </span>
 
-                                <MapLegend
-                                    regionCount={regionGroups.length}
-                                    schoolCount={mappedSchools.length}
-                                    programCount={visiblePrograms.length}
-                                    pilarLabel={
-                                        filterPilar === "SEMUA"
-                                            ? "Semua Pilar"
-                                            : getPilarMeta(filterPilar).label
-                                    }
-                                />
-
-                                <ProgramReadPanel
-                                    schools={readPanelSchools}
-                                    search={search}
-                                    wilayah={filterWilayah}
-                                    pilarLabel={
-                                        filterPilar === "SEMUA"
-                                            ? "Semua Pilar"
-                                            : getPilarMeta(filterPilar).label
-                                    }
-                                    onOpenSchool={(schoolId) =>
-                                        navigate(`${listPathPrefix}/${schoolId}`)
-                                    }
-                                    detailButtonText={detailButtonText}
-                                />
-
-                                {selectedRegion && (
-                                    <RegionSchoolPanel
-                                        region={selectedRegion}
-                                        schools={selectedRegionSchools}
-                                        search={drawerSearch}
-                                        onSearch={setDrawerSearch}
-                                        onClose={() => {
-                                            setSelectedRegionName("");
-                                            setDrawerSearch("");
-                                        }}
-                                        onOpenSchool={(schoolId) =>
-                                            navigate(`${listPathPrefix}/${schoolId}`)
-                                        }
-                                        detailButtonText={detailButtonText}
-                                    />
-                                )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                                            disabled={page >= totalPages}
+                                            className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
                             </>
                         )}
                     </div>
@@ -1539,6 +1532,114 @@ function ProgramReadCard({ school, onOpen, detailButtonText }) {
                     <ArrowRight size={14} />
                 </span>
             </button>
+        </article>
+    );
+}
+
+function StatusSummary({ status, value }) {
+    return (
+        <div className={`flex h-[72px] flex-col items-center justify-center rounded-2xl border px-3 text-center ${STATUS_STYLE[status] || STATUS_STYLE.Approval}`}>
+            <p className="text-[20px] font-black leading-none">
+                {value}
+            </p>
+            <p className="mt-1 text-[8px] font-black uppercase tracking-widest">
+                {status}
+            </p>
+        </div>
+    );
+}
+
+function ProgramWideCard({ school, onOpen, detailButtonText }) {
+    const hasProgram = Number(school.total_program || 0) > 0;
+    const programs = Array.isArray(school.programs) ? school.programs.slice(0, 3) : [];
+
+    return (
+        <article className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm transition hover:border-[#0AC4E0]/30 hover:shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)] xl:items-stretch">
+                <div className="flex min-w-0 items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-3">
+                    <SchoolLogo
+                        src={school.logo_sekolah}
+                        name={school.nama_sekolah}
+                        size="lg"
+                    />
+
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-lg bg-slate-100 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                {school.jenjang || "-"}
+                            </span>
+                            <span className="rounded-lg bg-cyan-50 px-2 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                {school.wilayah_name || "Wilayah"}
+                            </span>
+                        </div>
+
+                        <h3 className="program-title-clamp mt-2 text-[16px] font-black leading-snug text-slate-950">
+                            {school.nama_sekolah || "-"}
+                        </h3>
+
+                        <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            NPSN: {school.npsn || "-"}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex min-w-0 flex-col rounded-2xl border border-slate-100 bg-white px-3 py-3">
+                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                Program Terbaru
+                            </p>
+                            <span className={`inline-flex h-7 min-w-[84px] shrink-0 items-center justify-center rounded-lg px-2.5 text-[9px] font-black uppercase tracking-widest text-white ${hasProgram ? "bg-[#0AC4E0]" : "bg-slate-300"}`}>
+                                {school.total_program || 0} Program
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={onOpen}
+                            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white shadow-[0_10px_22px_rgba(10,196,224,0.18)] transition hover:bg-cyan-500"
+                        >
+                            {detailButtonText}
+                            <ArrowRight size={13} />
+                        </button>
+                    </div>
+
+                    {programs.length > 0 ? (
+                        <div className="grid flex-1 grid-cols-1 gap-2 lg:grid-cols-3">
+                            {programs.map((program) => {
+                                const status = getProgramStatus(program);
+                                const pilar = getPilarMeta(program);
+
+                                return (
+                                    <div
+                                        key={getProgramId(program)}
+                                        className="flex min-h-[92px] min-w-0 flex-col justify-between rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3"
+                                    >
+                                        <p className="program-title-clamp text-[12px] font-black leading-snug text-slate-800">
+                                            {getProgramName(program)}
+                                        </p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                            <span className={`inline-flex h-6 items-center rounded-lg border px-2 text-[7px] font-black uppercase tracking-widest ${pilar.className}`}>
+                                                {pilar.label}
+                                            </span>
+                                            <span className={`inline-flex h-6 items-center rounded-lg border px-2 text-[7px] font-black uppercase tracking-widest ${STATUS_STYLE[status] || STATUS_STYLE.Approval}`}>
+                                                {status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+                            <p className="text-[12px] font-bold text-slate-400">
+                                Belum ada program pada filter ini.
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+            </div>
         </article>
     );
 }

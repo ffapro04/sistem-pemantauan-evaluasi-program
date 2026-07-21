@@ -358,6 +358,7 @@ export const pengurusConfig = {
                     label: "Password Login",
                     type: "password",
                     icon: Lock,
+                    hidden: ({ mode }) => mode === "edit",
                     requiredOnCreate: true,
                     minLength: 8,
                     placeholder: "Minimal 8 karakter",

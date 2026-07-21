@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -31,8 +31,11 @@ import {
     PageWrapper,
     Input,
 } from "../common";
+import { normalizeTerminChatMessage } from "../../utils/chatIdentity";
+import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const STATUS_STYLE = {
     APPROVED: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -101,6 +104,29 @@ function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
 }
 
+function getProgramFases(detail = {}) {
+    return getArray(
+        detail?.fases,
+        detail?.fase,
+        detail?.phases,
+        detail?.program?.fases,
+        detail?.program?.fase,
+        detail?.data?.fases,
+    );
+}
+
+function normalizeProgramDetailPayload(payload = {}) {
+    const detail =
+        payload?.program && typeof payload.program === "object"
+            ? { ...payload.program, ...payload }
+            : payload;
+
+    return {
+        ...detail,
+        fases: getProgramFases(detail),
+    };
+}
+
 function normalizeMeetings(kegiatan = {}) {
     return getArray(
         kegiatan.pertemuan,
@@ -137,7 +163,7 @@ function getRatingStats(kegiatan = {}) {
 
 function getTokenPayload() {
     try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return {};
         return JSON.parse(atob(token.split(".")[1]));
     } catch {
@@ -248,7 +274,7 @@ function saveCommentReadRows(programId, value) {
 }
 
 function getCurrentUserIdFromToken() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -478,7 +504,7 @@ function VendorProgramDetailPage({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -510,7 +536,7 @@ function VendorProgramDetailPage({
                 );
             }
 
-            const detail = dataProgram?.data || dataProgram;
+            const detail = normalizeProgramDetailPayload(dataProgram?.data || dataProgram);
 
             const normalizedHo = normalizeArray(dataHo);
             const normalizedAo = normalizeArray(dataAo);
@@ -823,10 +849,7 @@ function VendorProgramDetailPage({
     };
 
     const buildMonitoringRows = (detail) => {
-        const sourceFases =
-            Array.isArray(detail?.fases) && detail.fases.length > 0
-                ? detail.fases
-                : [];
+        const sourceFases = getProgramFases(detail);
 
         const result = {};
 
@@ -981,8 +1004,10 @@ function VendorProgramDetailPage({
     };
 
     const phases = useMemo(() => {
-        if (Array.isArray(program?.fases) && program.fases.length > 0) {
-            return program.fases.map((fase, index) => ({
+        const sourceFases = getProgramFases(program);
+
+        if (sourceFases.length > 0) {
+            return sourceFases.map((fase, index) => ({
                 id: fase.id_fase || fase.id || index,
                 nama: fase.nama_fase || fase.nama || `Periode ${index + 1}`,
                 deskripsi: fase.deskripsi || fase.description || "",
@@ -1341,7 +1366,7 @@ function VendorProgramDetailPage({
     // Vendor hanya bisa LIHAT komentar (read-only), tidak bisa tambah
     const fetchComments = async (idKegiatan) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const res = await fetch(`${API_BASE_URL}/program/kegiatan/${idKegiatan}/comments`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -1386,7 +1411,7 @@ function VendorProgramDetailPage({
         setRatingLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const res = await fetch(`${API_BASE_URL}/program/kegiatan/${ratingRow.parentId}/rating`, {
                 method: "POST",
                 headers: {
@@ -1498,7 +1523,7 @@ function VendorProgramDetailPage({
             return;
         }
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
 
         const endpoint =
             uploadContext.parentType === "termin"
@@ -1578,25 +1603,18 @@ function VendorProgramDetailPage({
     const normalizeChatFromBackend = (items = []) => {
         const currentUserId = getCurrentUserIdFromToken();
 
-        return items.map((item) => {
-            const formatted = formatChatDateTime(item.created_at);
-
-            return {
-                id_chat: item.id_chat,
-                sender: item.nama_user || "User",
-                role: item.role_user || "",
-                text: item.pesan,
-                self: String(item.id_user) === String(currentUserId),
-                dateLabel: formatted.label,
-                time: formatted.time,
-                createdAt: item.created_at,
-            };
-        });
+        return items.map((item) =>
+            normalizeTerminChatMessage(item, {
+                currentUserId,
+                formatDateTime: formatChatDateTime,
+                fallbackName: "Vendor",
+            }),
+        );
     };
 
     const fetchChats = async (context = chatContext, silent = false) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const query = buildChatQuery(context);
 
             if (!query) return;
@@ -1664,9 +1682,13 @@ function VendorProgramDetailPage({
 
     const sendChatToBackend = async () => {
         if (!message.trim()) return;
+        if (!chatContext || !program?.id_program) {
+            toast.error("Konteks chat belum siap. Buka ulang ruang diskusi.");
+            return;
+        }
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             const payload = {
                 id_program: program?.id_program,
@@ -1717,7 +1739,7 @@ function VendorProgramDetailPage({
         if (!uploadContext || !program?.id_program) return;
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             const payload = {
                 id_program: program?.id_program,
@@ -1837,7 +1859,7 @@ function VendorProgramDetailPage({
 
             <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden px-6 py-6">
                 <header className="shrink-0">
-                    <div className="flex min-h-[94px] items-center justify-between rounded-[1.8rem] border border-slate-100 bg-white px-6 py-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+                    <div className="flex min-h-[94px] items-center justify-between rounded-[1.6rem] border border-cyan-100 bg-white px-6 py-4 shadow-[0_16px_46px_rgba(10,196,224,0.10)]">
                         <div className="flex min-w-0 items-center gap-4">
                             <button
                                 type="button"
@@ -1849,30 +1871,30 @@ function VendorProgramDetailPage({
                             </button>
 
                             <div className="min-w-0">
-                                <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                                    <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
                                         {badgeText}
                                     </span>
 
-                                    <span className="text-[8px] font-black uppercase tracking-[0.24em] text-slate-400">
+                                    <span className="hidden text-[8px] font-black uppercase tracking-[0.24em] text-slate-400">
                                         Vendor / Narasumber Execution
                                     </span>
 
-                                    <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                    <span className="hidden h-1 w-1 rounded-full bg-slate-300" />
 
-                                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                    <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-amber-600">
                                         {program?.status_program || "Approval"}
                                     </span>
                                 </div>
 
-                                <h1 className="truncate text-[25px] font-black leading-none tracking-[-0.055em] text-slate-950">
+                                <h1 className="truncate text-[30px] font-black leading-none text-slate-950">
                                     {program?.nama_program || "Detail Program"}{" "}
                                     <span className="text-[#0AC4E0]">
                                         {titleHighlight}
                                     </span>
                                 </h1>
 
-                                <p className="mt-2 truncate text-[11px] font-bold text-slate-400">
+                                <p className="mt-2 truncate text-[13px] font-bold text-slate-500">
                                     {getSchoolName()} · {getHoName()} · {getAoName()}
                                 </p>
                             </div>
@@ -1882,7 +1904,7 @@ function VendorProgramDetailPage({
                             <button
                                 type="button"
                                 onClick={fetchProgramDetail}
-                                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition hover:bg-white hover:text-[#0AC4E0]"
+                                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-100 bg-cyan-50 text-[#0AC4E0] transition hover:bg-white"
                                 title="Refresh"
                             >
                                 <RefreshCcw size={15} />
@@ -1891,7 +1913,7 @@ function VendorProgramDetailPage({
                             <button
                                 type="button"
                                 onClick={() => handleOpenChat()}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-100 bg-white px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
+                                className="inline-flex items-center gap-2 rounded-2xl border border-cyan-100 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#0A9FBA] transition hover:bg-cyan-50"
                             >
                                 <MessageSquare size={15} />
                                 Chat Koordinasi
@@ -1900,7 +1922,7 @@ function VendorProgramDetailPage({
                             <button
                                 type="button"
                                 onClick={() => navigate(listPath)}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]"
+                                className="inline-flex items-center gap-2 rounded-2xl bg-[#0AC4E0] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_14px_28px_rgba(10,196,224,0.22)] transition hover:bg-[#08AFC7]"
                             >
                                 <FolderOpen size={15} />
                                 Daftar Program
@@ -1936,7 +1958,7 @@ function VendorProgramDetailPage({
                                 getRowStatus={getRowStatus}
                             />
 
-                            <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
+                            <div className="hidden rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div className="min-w-0">
                                         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
@@ -1996,6 +2018,8 @@ function VendorProgramDetailPage({
                                     openFile={openFile}
                                     handleOpenChat={handleOpenChat}
                                     openCommentForRow={openCommentForRow}
+                                    openRatingModal={openRatingModal}
+                                    currentVendorId={currentVendorId}
                                     readCommentRows={readCommentRows}
                                 />
                             )}
@@ -2015,6 +2039,8 @@ function VendorProgramDetailPage({
                                     openFile={openFile}
                                     handleOpenChat={handleOpenChat}
                                     openCommentForRow={openCommentForRow}
+                                    openRatingModal={openRatingModal}
+                                    currentVendorId={currentVendorId}
                                     locked={!isPhaseContentOpen(activePhase)}
                                     readCommentRows={readCommentRows}
                                 />
@@ -2032,19 +2058,22 @@ function VendorProgramDetailPage({
                                 </section>
                             )}
 
-                            <VendorSelectedRowPanel
-                                selectedRow={selectedRow}
-                                selectedRowStatus={selectedRowStatus}
-                                selectedRowLocked={selectedRowLocked}
-                                selectedRowProgress={selectedRowProgress}
-                                selectedApprovedCount={selectedApprovedCount}
-                                selectedRowEvidences={selectedRowEvidences}
-                                openUploadModal={openUploadModal}
-                                openFile={openFile}
-                                handleOpenChat={handleOpenChat}
-                            />
+                            <div className="hidden">
+                                <VendorSelectedRowPanel
+                                    selectedRow={selectedRow}
+                                    selectedRowStatus={selectedRowStatus}
+                                    selectedRowLocked={selectedRowLocked}
+                                    selectedRowProgress={selectedRowProgress}
+                                    selectedApprovedCount={selectedApprovedCount}
+                                    selectedRowEvidences={selectedRowEvidences}
+                                    openUploadModal={openUploadModal}
+                                    openFile={openFile}
+                                    handleOpenChat={handleOpenChat}
+                                />
+                            </div>
                         </section>
-                    </div>                </section>
+                    </div>
+                </section>
             </main>
             <UploadEvidenceModal
                 uploadContext={uploadContext}
@@ -2299,23 +2328,20 @@ function VendorSummaryPanel({
     ];
 
     return (
-        <section className="overflow-hidden rounded-[1.6rem] border-2 border-[#0AC4E0]/70 bg-white shadow-[0_18px_55px_rgba(10,196,224,0.10)]">
+        <section className="overflow-hidden rounded-[1.4rem] border border-cyan-100 bg-white shadow-[0_14px_42px_rgba(10,196,224,0.08)]">
             <div className="flex flex-col gap-5 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
                             Ringkasan Program
                         </span>
-                        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-slate-400">
-                            Vendor Execution View
-                        </span>
                     </div>
 
-                    <h2 className="mt-2 truncate text-[20px] font-black tracking-[-0.05em] text-slate-950">
+                    <h2 className="mt-2 truncate text-[23px] font-black tracking-[-0.05em] text-slate-950">
                         {program?.nama_program || "Detail Program"}
                     </h2>
 
-                    <div className="mt-3 grid gap-x-5 gap-y-2 text-[11px] font-semibold text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="mt-3 grid gap-x-5 gap-y-2 text-[12px] font-semibold text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
                         {infoItems.map((item) => (
                             <div key={item.label} className="min-w-0">
                                 <span className="font-black uppercase tracking-[0.14em] text-slate-400">
@@ -2329,17 +2355,17 @@ function VendorSummaryPanel({
                     </div>
                 </div>
 
-                <div className="w-full shrink-0 rounded-[1.25rem] border border-cyan-100 bg-cyan-50/50 px-4 py-3 lg:w-[250px]">
+                <div className="w-full shrink-0 rounded-[1.25rem] border border-cyan-100 bg-cyan-50/50 px-4 py-3 lg:w-[270px]">
                     <div className="flex items-center justify-between gap-3">
                         <div>
-                            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
                                 Progress Bukti
                             </p>
-                            <p className="mt-1 text-[11px] font-bold text-slate-500">
+                            <p className="mt-1 text-[12px] font-bold text-slate-500">
                                 {progress.approved}/{progress.total || 0} bukti disetujui
                             </p>
                         </div>
-                        <p className="text-2xl font-black tracking-[-0.06em] text-slate-950">
+                        <p className="text-3xl font-black tracking-[-0.06em] text-slate-950">
                             {progress.percentage}%
                         </p>
                     </div>
@@ -2382,53 +2408,70 @@ function VendorArrowPhaseSteps({
     const getFlowTone = ({ active, completed, locked, rowStatus, type }) => {
         if (locked) {
             return {
-                wrapper: "border-slate-200 bg-slate-50 text-slate-400",
-                icon: "bg-white text-slate-300",
+                wrapper: "bg-white text-slate-400",
+                icon: "bg-cyan-50 text-cyan-300",
             };
         }
 
         if (active) {
             return {
-                wrapper: "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-[0_16px_35px_rgba(10,196,224,0.22)]",
-                icon: "bg-white/20 text-white",
+                wrapper: "bg-white text-slate-950 shadow-[0_14px_30px_rgba(10,196,224,0.20)]",
+                icon: "bg-cyan-50 text-[#0AC4E0]",
             };
         }
 
         if (completed || rowStatus === "APPROVED") {
             return {
-                wrapper: "border-emerald-100 bg-emerald-50 text-emerald-700 hover:border-emerald-200 hover:bg-white",
-                icon: "bg-white text-emerald-600",
+                wrapper: "bg-white text-slate-800 hover:bg-cyan-50/40",
+                icon: "bg-cyan-50 text-[#0AC4E0]",
             };
         }
 
         if (rowStatus === "WAITING_HO" || rowStatus === "WAITING_AO") {
             return {
-                wrapper: "border-amber-100 bg-amber-50 text-amber-700 hover:border-amber-200 hover:bg-white",
-                icon: "bg-white text-amber-600",
+                wrapper: "bg-white text-slate-800 hover:bg-cyan-50/40",
+                icon: "bg-cyan-50 text-[#0AC4E0]",
             };
         }
 
         if (type === "termin") {
             return {
-                wrapper: "border-blue-100 bg-blue-50 text-blue-700 hover:border-blue-200 hover:bg-white",
-                icon: "bg-white text-blue-600",
+                wrapper: "bg-white text-slate-800 hover:bg-cyan-50/40",
+                icon: "bg-cyan-50 text-[#0AC4E0]",
             };
         }
 
         return {
-            wrapper: "border-slate-100 bg-white text-slate-700 hover:border-cyan-100 hover:bg-cyan-50",
-            icon: "bg-slate-50 text-[#0AC4E0]",
+            wrapper: "bg-white text-slate-800 hover:bg-cyan-50/40",
+            icon: "bg-cyan-50 text-[#0AC4E0]",
         };
     };
 
-    const arrowStyle = {
+    const arrowInnerStyle = {
         clipPath:
-            "polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%)",
+            "polygon(0 0, calc(100% - 33px) 0, 100% 50%, calc(100% - 33px) 100%, 0 100%, 25px 50%)",
     };
+
+    const ChevronBorder = () => (
+        <svg
+            className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+            preserveAspectRatio="none"
+            viewBox="0 0 236 82"
+            aria-hidden="true"
+        >
+            <polygon
+                points="1,1 202,1 235,41 202,81 1,81 26,41"
+                fill="none"
+                stroke="#67E8F9"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
 
     return (
         <div className="rounded-[1.6rem] border border-slate-100 bg-white px-5 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.05)]">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
                         Periode Program
@@ -2439,18 +2482,19 @@ function VendorArrowPhaseSteps({
                     </h3>
 
                     <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                        Klik shape fase, administrasi, atau aktivitas untuk memfilter tabel upload di bawah.
+                        Klik shape fase, administrasi, aktivitas, atau pertemuan untuk memfilter tabel upload di bawah.
                     </p>
                 </div>
 
-                <p className="w-fit rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    Geser horizontal jika alur panjang
+                <p className="w-fit rounded-full bg-cyan-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                    Geser jika alur panjang
                 </p>
             </div>
 
-            <div className="simple-scroll overflow-x-auto pb-2">
-                <div className="flex min-w-max items-stretch gap-2 pr-4">
-                    {phases.length === 0 && (
+            <div className="pb-1">
+                <div className="simple-scroll overflow-x-auto overflow-y-hidden pb-2">
+                    <div className="flex min-w-max items-stretch gap-2">
+                        {phases.length === 0 && (
                         <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
                             <p className="text-[12px] font-bold text-slate-400">
                                 Belum ada periode pada program ini.
@@ -2458,7 +2502,7 @@ function VendorArrowPhaseSteps({
                         </div>
                     )}
 
-                    {phases.map((phase, index) => {
+                        {phases.map((phase, index) => {
                         const phaseRows = getFlowRows(index);
                         const unlocked = checkPhaseUnlocked(index);
                         const completed = isPhaseCompleted(index);
@@ -2483,34 +2527,39 @@ function VendorArrowPhaseSteps({
                                 <button
                                     type="button"
                                     onClick={() => onPhaseClick(index)}
-                                    style={arrowStyle}
-                                    className={`min-h-[86px] w-[210px] border px-7 py-3 text-left transition ${phaseTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                    className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
                                 >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span
-                                            className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
-                                        >
-                                            {!unlocked ? (
-                                                <Lock size={14} />
-                                            ) : completed ? (
-                                                    <CheckCircle2 size={14} />
-                                                ) : (
-                                                <Layers3 size={14} />
-                                            )}
-                                        </span>
+                                    <div
+                                        style={arrowInnerStyle}
+                                        className={`min-h-[82px] py-3 pl-9 pr-10 ${phaseTone.wrapper}`}
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span
+                                                className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
+                                            >
+                                                {!unlocked ? (
+                                                    <Lock size={14} />
+                                                ) : completed ? (
+                                                        <CheckCircle2 size={14} />
+                                                    ) : (
+                                                    <Layers3 size={14} />
+                                                )}
+                                            </span>
 
-                                        <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
-                                            Fase {String(index + 1).padStart(2, "0")}
-                                        </span>
+                                            <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                Fase {String(index + 1).padStart(2, "0")}
+                                            </span>
+                                        </div>
+
+                                        <h4 className="mt-2 truncate text-[12px] font-black">
+                                            {phase.nama || `Periode ${index + 1}`}
+                                        </h4>
+
+                                        <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                            {status.label}
+                                        </p>
                                     </div>
-
-                                    <h4 className="mt-2 truncate text-[12px] font-black">
-                                        {phase.nama || `Periode ${index + 1}`}
-                                    </h4>
-
-                                    <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
-                                        {status.label}
-                                    </p>
+                                    <ChevronBorder />
                                 </button>
 
                                 {openingRows.map((row) => {
@@ -2531,28 +2580,33 @@ function VendorArrowPhaseSteps({
                                             key={row.id}
                                             type="button"
                                             onClick={() => onRowClick(row, index)}
-                                            style={arrowStyle}
-                                            className={`min-h-[86px] w-[230px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                                            className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
                                         >
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span
-                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
-                                                >
-                                                    <UploadCloud size={14} />
-                                                </span>
+                                            <div
+                                                style={arrowInnerStyle}
+                                                className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span
+                                                        className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                    >
+                                                        <UploadCloud size={14} />
+                                                    </span>
 
-                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                    Administrasi
-                                                </span>
+                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                        Administrasi
+                                                    </span>
+                                                </div>
+
+                                                <h4 className="mt-2 truncate text-[12px] font-black">
+                                                    {row.title}
+                                                </h4>
+
+                                                <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    {STATUS_LABEL[rowStatus] || rowStatus}
+                                                </p>
                                             </div>
-
-                                            <h4 className="mt-2 truncate text-[12px] font-black">
-                                                {row.title}
-                                            </h4>
-
-                                            <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                {STATUS_LABEL[rowStatus] || rowStatus}
-                                            </p>
+                                            <ChevronBorder />
                                         </button>
                                     );
                                 })}
@@ -2576,10 +2630,13 @@ function VendorArrowPhaseSteps({
                                             key={row.id}
                                             type="button"
                                             onClick={() => onRowClick(row, index)}
-                                            style={arrowStyle}
-                                            className={`min-h-[86px] w-[245px] border px-7 py-3 text-left transition ${rowTone.wrapper} ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
+                                            className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
                                         >
-                                            <div className="flex items-center justify-between gap-3">
+                                            <div
+                                                style={arrowInnerStyle}
+                                                className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
                                                 <span
                                                     className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
                                                 >
@@ -2600,12 +2657,15 @@ function VendorArrowPhaseSteps({
                                                 <span>·</span>
                                                 <span>{STATUS_LABEL[rowStatus] || rowStatus}</span>
                                             </div>
+                                        </div>
+                                            <ChevronBorder />
                                         </button>
                                     );
                                 })}
                             </div>
                         );
                     })}
+                    </div>
                 </div>
             </div>
         </div>
@@ -2627,6 +2687,8 @@ function VendorExecutionTablePanel({
     openFile,
     handleOpenChat,
     openCommentForRow,
+    openRatingModal,
+    currentVendorId,
     readCommentRows = {},
 }) {
     return (
@@ -2672,26 +2734,26 @@ function VendorExecutionTablePanel({
                 </div>
             ) : (
                 <div className="simple-scroll overflow-x-auto">
-                    <table className="w-full min-w-[920px] border-collapse">
+                    <table className="w-full min-w-[620px] table-fixed border-collapse xl:min-w-0">
                         <thead>
                             <tr className="border-b border-slate-100 bg-white">
-                                <th className="w-[70px] px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="w-[52px] px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
                                     No
                                 </th>
 
-                                <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="w-[40%] px-3 py-4 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
                                     Step Eksekusi
                                 </th>
 
-                                <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="w-[26%] px-3 py-4 text-left text-[9px] font-black uppercase tracking-widest text-slate-400">
                                     Upload / Bukti
                                 </th>
 
-                                <th className="w-[150px] px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="w-[112px] px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
                                     Status
                                 </th>
 
-                                <th className="w-[200px] px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <th className="w-[150px] px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-slate-400">
                                     Aksi
                                 </th>
                             </tr>
@@ -2735,11 +2797,11 @@ function VendorExecutionTablePanel({
                                             className={`border-b border-slate-100 transition ${active ? "bg-cyan-50/50" : "hover:bg-slate-50"
                                                 }`}
                                         >
-                                            <td className="px-5 py-4 text-center text-[12px] font-black text-slate-300">
+                                            <td className="px-3 py-4 text-center text-[12px] font-black text-slate-300">
                                                 {String(index + 1).padStart(2, "0")}
                                             </td>
 
-                                            <td className="px-5 py-4">
+                                            <td className="px-3 py-4">
                                                 <div className="flex items-start gap-3">
                                                     <div
                                                         className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${row.type === "termin"
@@ -2767,67 +2829,55 @@ function VendorExecutionTablePanel({
                                                                 : "Kegiatan Dalam Fase"}
                                                         </p>
 
-                                                        <p className="mt-2 line-clamp-2 text-[11px] font-semibold leading-relaxed text-slate-400">
-                                                            {row.description || "-"}
-                                                        </p>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                                <UploadCloud size={11} />
+                                                                {approvedEvidence}/{totalEvidence || 0} bukti
+                                                            </span>
 
-                                                        {row.type === "kegiatan" && (
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                                                    <Calendar size={11} />
-                                                                    {(row.meetings || []).length} Pertemuan
-                                                                </span>
-                                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
-                                                                    <Star size={11} />
-                                                                    {row.ratingStats?.average || 0}/5 · {row.ratingStats?.total || 0}
-                                                                </span>
-                                                            </div>
-                                                        )}
+                                                            {row.type === "kegiatan" && (
+                                                                <>
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                                        <Calendar size={11} />
+                                                                        {(row.meetings || []).length} pertemuan
+                                                                    </span>
+                                                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-100 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-amber-600">
+                                                                        <Star size={11} />
+                                                                        {row.ratingStats?.average || 0}/5
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            <td className="px-5 py-4">
-                                                <div className="space-y-2">
-                                                    {(row.evidences || [])
-                                                        .slice(0, 3)
-                                                        .map((item, reqIndex) => (
-                                                            <div
-                                                                key={`${item.id}-${reqIndex}`}
-                                                                className="rounded-xl border border-slate-100 bg-white px-3 py-2"
-                                                            >
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <p className="truncate text-[11px] font-black text-slate-700">
-                                                                        {item.name}
-                                                                    </p>
-
-                                                                    <StatusBadge status={item.status} />
-                                                                </div>
-
-                                                                <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-400">
-                                                                    {item.purpose}
-                                                                </p>
-                                                            </div>
-                                                        ))}
-
-                                                    {(row.evidences || []).length > 3 && (
-                                                        <p className="text-[10px] font-black text-slate-400">
-                                                            +{row.evidences.length - 3} upload lainnya
+                                            <td className="px-3 py-4">
+                                                {row.evidences?.[0] ? (
+                                                    <div className="rounded-xl border border-slate-100 bg-white px-3 py-2">
+                                                        <p className="truncate text-[11px] font-black text-slate-800">
+                                                            {row.evidences[0].name}
                                                         </p>
-                                                    )}
 
-                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                                        Approved {approvedEvidence}/{totalEvidence}
+                                                        <p className="mt-1 truncate text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                                            {totalEvidence > 1
+                                                                ? `+${totalEvidence - 1} bukti lain`
+                                                                : row.evidences[0].fileName || "Belum ada file"}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[11px] font-bold text-slate-400">
+                                                        Belum ada bukti
                                                     </p>
-                                                </div>
+                                                )}
                                             </td>
 
-                                            <td className="px-5 py-4 text-center">
+                                            <td className="px-3 py-4 text-center">
                                                 <StatusBadge status={status} />
                                             </td>
 
-                                            <td className="px-5 py-4">
-                                                <div className="flex justify-end gap-2">
+                                            <td className="px-3 py-4">
+                                                <div className="flex justify-center gap-1.5">
                                                     <button
                                                         type="button"
                                                         onClick={() => setSelectedRow(active ? null : row)}
@@ -2878,13 +2928,10 @@ function VendorExecutionTablePanel({
                                                             type="button"
                                                             onClick={() => openRatingModal(row)}
                                                             disabled={rowLocked}
-                                                            className="flex h-9 items-center justify-center gap-1 rounded-xl border border-amber-100 bg-amber-50 px-2 text-[9px] font-black text-amber-500 transition hover:bg-amber-100 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-amber-100 bg-amber-50 text-amber-500 transition hover:bg-amber-100 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
                                                             title="Rating Vendor"
                                                         >
                                                             <Star size={12} fill={getOwnVendorRating(row, currentVendorId) ? "currentColor" : "none"} />
-                                                            {getOwnVendorRating(row, currentVendorId)
-                                                                ? `Edit ${getOwnVendorRating(row, currentVendorId)?.rating}/5`
-                                                                : "Rating"}
                                                         </button>
                                                     )}
 

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -12,7 +12,6 @@ import {
     UserCheck,
     Calendar,
     Loader2,
-    DollarSign,
     RefreshCw,
     ShieldCheck,
 } from "lucide-react";
@@ -34,9 +33,11 @@ import {
     filterSchoolsByHoAccess,
     canHoAccessSchool,
 } from "../../utils/hoAccess";
+import { getAuthToken } from "../../utils/authSession";
 
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const PROGRAM_STATUSES = [
     "Approval",
@@ -79,18 +80,6 @@ function getPilarOptions(kategori) {
 
 function getDefaultPilar(kategori) {
     return getPilarOptions(kategori)[0]?.value || "";
-}
-
-function formatRupiah(value) {
-    const number = String(value || "").replace(/\D/g, "");
-
-    if (!number) return "";
-
-    return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-    }).format(Number(number));
 }
 
 function cleanNumber(value) {
@@ -138,7 +127,7 @@ function cleanWilayahName(value) {
 }
 
 function getTokenPayload() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -607,7 +596,7 @@ function EditProgramForm({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -788,7 +777,7 @@ function EditProgramForm({
                 namaProgram: detail.nama_program || detail.nama || "",
                 deskripsi: detail.deskripsi || "",
                 nomorMou: detail.nomor_mou || "",
-                hargaVendor: cleanNumber(detail.harga_vendor || ""),
+                hargaVendor: "",
                 kpiNama: detail.kpi_nama || "",
                 kpiTarget: detail.kpi_target || "",
                 kpiSatuan: detail.kpi_satuan || "%",
@@ -986,12 +975,13 @@ function EditProgramForm({
     };
 
     const saveProgram = async () => {
+        if (saving) return;
         if (!validateForm()) return;
 
         setSaving(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -1007,7 +997,7 @@ function EditProgramForm({
             payload.append("nama_program", formData.namaProgram.trim());
             payload.append("deskripsi", formData.deskripsi || "");
             payload.append("nomor_mou", formData.nomorMou || "");
-            payload.append("harga_vendor", cleanNumber(formData.hargaVendor) || "0");
+            payload.append("harga_vendor", "0");
 
             payload.append("kpi_nama", formData.kpiNama || "");
             payload.append("kpi_target", String(Number(formData.kpiTarget || 0)));
@@ -1080,9 +1070,7 @@ function EditProgramForm({
         <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0 font-sans text-slate-800">
             <Sidebar />
 
-            <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="pointer-events-none absolute -right-40 -top-40 h-[430px] w-[430px] rounded-full bg-cyan-200/40 blur-[120px]" />
-                <div className="pointer-events-none absolute -left-36 bottom-0 h-[380px] w-[380px] rounded-full bg-sky-100/70 blur-[110px]" />
+            <main className="program-form-shell relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
 
                 <header className="relative z-10 shrink-0 px-7 pt-7">
                     <div className="flex min-h-[96px] items-center justify-between rounded-[2rem] border border-white bg-white/95 px-7 py-5 shadow-[0_22px_70px_rgba(15,23,42,0.10)]">
@@ -1216,7 +1204,7 @@ function EditProgramForm({
                                 </FormField>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <FormField label="Tahun Anggaran">
+                                    <FormField label="Tahun Program">
                                         <Input
                                             value={formData.tahun}
                                             onChange={(event) => updateForm("tahun", event.target.value)}
@@ -1285,23 +1273,6 @@ function EditProgramForm({
                                     />
                                 </FormField>
 
-                                <FormField label="Anggaran Vendor">
-                                    <div className="relative">
-                                        <DollarSign
-                                            size={15}
-                                            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                                        />
-
-                                        <Input
-                                            value={formatRupiah(formData.hargaVendor)}
-                                            onChange={(event) =>
-                                                updateForm("hargaVendor", cleanNumber(event.target.value))
-                                            }
-                                            placeholder="Rp 0"
-                                            className="input-clean !pl-10"
-                                        />
-                                    </div>
-                                </FormField>
                             </FormSection>
 
                             <FormSection
@@ -1478,3 +1449,4 @@ function EditProgramForm({
 }
 
 export default EditProgramForm;
+

@@ -1,4 +1,5 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
+/* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -11,20 +12,16 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Activity,
   LogIn,
   ArrowLeft,
   ChevronDown,
   School,
   User,
   Search,
+  KeyRound,
+  X,
 } from "lucide-react";
 
-// ASSETS
-import pilar1 from "../../assets/img/1.png";
-import pilar2 from "../../assets/img/2.png";
-import pilar3 from "../../assets/img/3.png";
-import pilar4 from "../../assets/img/4.png";
 import logo_ypamdr_blue from "../../assets/img/YPA-MDR-LOGO.png";
 import library_YPAMDR from "../../assets/img/library_YPAMDR.optimized.jpg";
 
@@ -33,22 +30,16 @@ import PageWrapper from "../../components/PageWrapper";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Label from "../../components/Label";
+import { setAuthSession } from "../../utils/authSession";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 // =========================================================================
-// DAFTAR ROLE UNTUK DROPDOWN
+// DAFTAR JENIS LOGIN
 // =========================================================================
 const ROLE_OPTIONS = [
-  { value: "sistem", label: "Admin" },
-  { value: "sistem", label: "Pengurus" },
-  { value: "sistem", label: "Head Office" },
-  { value: "sistem", label: "Area Officer" },
-  { value: "sistem", label: "Sekolah" },
-  { value: "sistem", label: "Kepala Sekolah" },
-  { value: "sistem", label: "Vendor" },
-  { value: "sistem", label: "Kepala Dinas" },
-  { value: "sistem", label: "Operator Sekolah" },
+  { value: "sistem", label: "Akun Sistem" },
   { value: "guru", label: "Guru Assessment" },
 ];
 
@@ -68,20 +59,38 @@ const showValidationError = (message) => {
 };
 
 const getLoginErrorMessage = (err) => {
-  if (err?.isRoleMismatch) {
-    return err.message;
-  }
-
   const serverMessage =
     err?.response?.data?.message ||
     err?.response?.data?.error ||
     err?.message;
 
+  if (err?.response?.status === 400) {
+    return serverMessage || "Data login belum sesuai.";
+  }
+
   if (err?.response?.status === 401 || err?.response?.status === 403) {
-    return "Email, password, atau role tidak sesuai.";
+    return "Email atau password salah.";
   }
 
   return serverMessage || "Gagal masuk. Periksa kembali kredensial Anda.";
+};
+
+const getResetPasswordErrorMessage = (error) => {
+  const message =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    "";
+
+  if (error?.response?.status === 503) {
+    return message || "Email OTP belum siap. Periksa konfigurasi Gmail pengirim di backend .env.";
+  }
+
+  if (error?.response?.status >= 500) {
+    return message || "Server belum bisa mengirim OTP. Periksa konfigurasi email backend.";
+  }
+
+  return message || "Gagal memproses lupa password.";
 };
 
 const getDecodedRoleInfo = (decoded = {}) => {
@@ -123,6 +132,7 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
       return idRole === 8 || role.includes("guru");
     case "Operator Sekolah":
       return (
+        idRole === 5 ||
         idRole === 9 ||
         jabatan.includes("operator sekolah") ||
         jabatan.includes("operator")
@@ -131,9 +141,6 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
       return false;
   }
 };
-
-const getRoleMismatchMessage = (selectedRole) =>
-  `Akun yang digunakan tidak sesuai dengan role ${selectedRole}. Silakan pilih role yang benar atau gunakan akun yang sesuai.`;
 
 // =========================================================================
 // REDIRECT BERDASARKAN JWT
@@ -186,6 +193,7 @@ const getRedirectPath = (decoded) => {
 
   // Operator Sekolah
   if (
+    idRole === 5 ||
     idRole === 9 ||
     role.includes("operator") ||
     jabatan.includes("operator sekolah") ||
@@ -232,7 +240,7 @@ const RoleDropdown = ({ selectedRole, onSelect }) => {
         className="flex w-full items-center justify-between rounded-[0.9rem] border border-slate-200 bg-white/70 px-4 py-3 text-left text-[13px] font-black text-slate-700 shadow-sm transition hover:border-[#0AC4E0]/40 hover:bg-white"
       >
         <span className={selected ? "text-slate-800" : "text-slate-400"}>
-          {selected ? selected.label : "Pilih peran Anda"}
+          {selected ? selected.label : "Pilih jenis login"}
         </span>
         <ChevronDown
           size={16}
@@ -265,9 +273,14 @@ const RoleDropdown = ({ selectedRole, onSelect }) => {
                   {role.value === "guru" ? (
                     <School size={13} className="shrink-0 text-[#0AC4E0]" />
                   ) : (
-                    <User size={13} className="shrink-0 text-slate-300" />
+                    <User size={13} className="shrink-0 text-[#0AC4E0]" />
                   )}
                   {role.label}
+                  {role.value === "sistem" && (
+                    <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                      Role otomatis
+                    </span>
+                  )}
                   {role.value === "guru" && (
                     <span className="ml-auto rounded-full bg-[#0AC4E0]/10 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
                       Guru
@@ -282,6 +295,32 @@ const RoleDropdown = ({ selectedRole, onSelect }) => {
     </div>
   );
 };
+
+const RoleSuggestion = ({ selectedRole, onSelect }) => (
+  <div className="grid grid-cols-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
+    {ROLE_OPTIONS.map((role) => {
+      const active = selectedRole === role.label;
+      const isGuruRole = role.value === "guru";
+
+      return (
+        <button
+          key={role.value}
+          type="button"
+          onClick={() => onSelect(role.label)}
+          className={`group flex h-12 items-center justify-center gap-2 rounded-xl px-3 text-center transition ${active
+            ? "bg-white text-[#0AC4E0] shadow-[0_10px_22px_rgba(15,23,42,0.08)]"
+            : "text-slate-500 hover:bg-white/70 hover:text-slate-800"
+            }`}
+        >
+          {isGuruRole ? <School size={16} /> : <User size={16} />}
+          <span className="truncate text-[11px] font-black uppercase tracking-widest">
+            {role.label}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+);
 
 // =========================================================================
 // KOMPONEN DROPDOWN SEKOLAH UNTUK LOGIN GURU
@@ -322,7 +361,7 @@ const SekolahDropdown = ({
           if (!loading) setOpen(!open);
         }}
         disabled={loading}
-        className="flex w-full items-center justify-between rounded-[0.9rem] border border-slate-200 bg-white/70 px-4 py-3 text-left text-[13px] font-black text-slate-700 shadow-sm transition hover:border-[#0AC4E0]/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-12 w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 text-left text-[13px] font-black text-slate-700 shadow-sm transition hover:border-[#0AC4E0]/50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className={selected ? "text-slate-800" : "text-slate-400"}>
           {loading
@@ -415,7 +454,7 @@ const SekolahDropdown = ({
 // KOMPONEN UTAMA LOGIN
 // =========================================================================
 const Login = () => {
-  const [selectedRole, setSelectedRole] = useState("");
+  const [selectedRole, setSelectedRole] = useState("Akun Sistem");
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -427,11 +466,21 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetForm, setResetForm] = useState({
+    email: "",
+    otp: "",
+    password: "",
+    password_confirmation: "",
+  });
+  const [resetOtpSent, setResetOtpSent] = useState(false);
+  const [resetExpiresIn, setResetExpiresIn] = useState(null);
   const [focused, setFocused] = useState(null);
   const navigate = useNavigate();
 
   const isGuru = selectedRole === "Guru Assessment";
-  const isSistem = selectedRole && !isGuru;
+  const isSistem = selectedRole === "Akun Sistem";
 
   useEffect(() => {
     if (!isGuru) return;
@@ -469,7 +518,6 @@ const Login = () => {
 
         setSekolahList(normalized);
       } catch (error) {
-        console.error("GAGAL MEMUAT SEKOLAH:", error);
         toast.error("Gagal memuat daftar sekolah.", {
           position: "top-right",
           autoClose: 2200,
@@ -491,24 +539,19 @@ const Login = () => {
     const passwordValue = String(formData.password || "").trim();
     const guruNameValue = String(formData.nama_guru || "").trim();
 
-    if (!selectedRole) {
-      showValidationError("Role harus dipilih.");
-      return;
-    }
-
     if (isSistem) {
       if (!emailValue) {
-        showValidationError("Email harus di isi");
-        return;
-      }
-
-      if (!passwordValue) {
-        showValidationError("Password harus di isi");
+        showValidationError("Email wajib diisi.");
         return;
       }
 
       if (!isValidEmailFormat(emailValue)) {
-        showValidationError("Format email tidak valid.");
+        showValidationError("Format email tidak sesuai.");
+        return;
+      }
+
+      if (!passwordValue) {
+        showValidationError("Password wajib diisi.");
         return;
       }
     }
@@ -525,7 +568,7 @@ const Login = () => {
       }
 
       if (!passwordValue) {
-        showValidationError("Password harus di isi");
+        showValidationError("Password wajib diisi.");
         return;
       }
     }
@@ -554,17 +597,7 @@ const Login = () => {
 
       const decoded = jwtDecode(token);
 
-      if (!isRoleMatch(selectedRole, decoded)) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        throw {
-          isRoleMismatch: true,
-          message: getRoleMismatchMessage(selectedRole),
-        };
-      }
-
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(decoded));
+      setAuthSession(token, decoded);
 
       const redirectPath = getRedirectPath(decoded);
 
@@ -578,7 +611,6 @@ const Login = () => {
         navigate(redirectPath, { replace: true });
       }, 900);
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
       setLoading(false);
       setIsSuccess(false);
       toast.error(getLoginErrorMessage(err), {
@@ -587,6 +619,153 @@ const Login = () => {
         pauseOnHover: true,
         draggable: true,
       });
+    }
+  };
+
+  const openResetPassword = () => {
+    setResetForm({
+      email: formData.email || "",
+      otp: "",
+      password: "",
+      password_confirmation: "",
+    });
+    setResetOtpSent(false);
+    setResetExpiresIn(null);
+    setShowResetPassword(true);
+  };
+
+  const requestResetOtp = async () => {
+    if (resetLoading) return;
+
+    const email = String(resetForm.email || "").trim();
+
+    if (!email) {
+      showValidationError("Email wajib diisi.");
+      return;
+    }
+
+    if (!isValidEmailFormat(email)) {
+      showValidationError("Format email tidak valid.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/auth/forgot-password/request`,
+        { email }
+      );
+
+      setResetOtpSent(true);
+      setResetExpiresIn(data?.expires_in_minutes || null);
+      setResetForm((prev) => ({
+        ...prev,
+        email,
+        otp: "",
+        password: "",
+        password_confirmation: "",
+      }));
+
+      toast.success(data?.message || "OTP reset password sudah dikirim.", {
+        position: "top-right",
+        autoClose: 2600,
+      });
+    } catch (error) {
+      toast.error(getResetPasswordErrorMessage(error), {
+        position: "top-right",
+        autoClose: 3600,
+      });
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (event) => {
+    if (event) event.preventDefault();
+    if (resetLoading) return;
+
+    const email = String(resetForm.email || "").trim();
+    const otp = String(resetForm.otp || "").trim();
+    const password = String(resetForm.password || "").trim();
+    const passwordConfirmation = String(
+      resetForm.password_confirmation || ""
+    ).trim();
+
+    if (!resetOtpSent) {
+      showValidationError("Kirim OTP ke email terlebih dahulu.");
+      return;
+    }
+
+    if (!email) {
+      showValidationError("Email wajib diisi.");
+      return;
+    }
+
+    if (!isValidEmailFormat(email)) {
+      showValidationError("Format email tidak valid.");
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otp)) {
+      showValidationError("Kode OTP harus 6 digit.");
+      return;
+    }
+
+    if (password.length < 8) {
+      showValidationError("Password baru minimal 8 karakter.");
+      return;
+    }
+
+    if (password !== passwordConfirmation) {
+      showValidationError("Konfirmasi password tidak sama.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      const { data } = await axios.post(
+        `${API_BASE_URL}/auth/forgot-password/verify`,
+        {
+          email,
+          otp,
+          password,
+          password_confirmation: passwordConfirmation,
+        }
+      );
+
+      toast.success(
+        data?.message ||
+        "Password berhasil diperbarui. Silakan login dengan password baru.",
+        {
+          position: "top-right",
+          autoClose: 2600,
+        }
+      );
+
+      setFormData((prev) => ({
+        ...prev,
+        email,
+        password: "",
+      }));
+      setSelectedRole("Akun Sistem");
+      setResetForm({
+        email,
+        otp: "",
+        password: "",
+        password_confirmation: "",
+      });
+      setResetOtpSent(false);
+      setResetExpiresIn(null);
+      setShowResetPassword(false);
+    } catch (error) {
+      toast.error(getResetPasswordErrorMessage(error), {
+        position: "top-right",
+        autoClose: 3600,
+      });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -617,19 +796,15 @@ const Login = () => {
           }
           onFocus={() => setFocused("password")}
           onBlur={() => setFocused(null)}
-          className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !pr-10 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
+          className="!h-12 !rounded-2xl !border !border-slate-200 !bg-white !px-4 !pr-12 !text-[14px] !font-bold !text-slate-800 !shadow-sm !outline-none transition focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/10"
         />
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-0 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
+          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
         >
           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
-        <span
-          className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "password" ? "w-full" : "w-0"
-            }`}
-        />
       </div>
     </div>
   );
@@ -648,9 +823,8 @@ const Login = () => {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.2 }}
-          className="space-y-7"
+          className="space-y-5"
         >
-          {/* Pilih Sekolah */}
           <div>
             <div className="mb-2 flex items-center gap-3">
               <School
@@ -677,7 +851,6 @@ const Login = () => {
             />
           </div>
 
-          {/* Nama Guru */}
           <div>
             <div className="mb-2 flex items-center gap-3">
               <User
@@ -704,16 +877,11 @@ const Login = () => {
                 }
                 onFocus={() => setFocused("nama_guru")}
                 onBlur={() => setFocused(null)}
-                className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
-              />
-              <span
-                className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "nama_guru" ? "w-full" : "w-0"
-                  }`}
+                className="!h-12 !rounded-2xl !border !border-slate-200 !bg-white !px-4 !text-[14px] !font-bold !text-slate-800 !shadow-sm !outline-none transition focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/10"
               />
             </div>
           </div>
 
-          {/* Password */}
           {renderPasswordField()}
         </motion.div>
       );
@@ -726,9 +894,8 @@ const Login = () => {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 8 }}
         transition={{ duration: 0.2 }}
-        className="space-y-7"
+        className="space-y-5"
       >
-        {/* Email */}
         <div>
           <div className="mb-2 flex items-center gap-3">
             <Mail
@@ -744,7 +911,8 @@ const Login = () => {
           </div>
           <div className="relative">
             <Input
-              type="email"
+              type="text"
+              inputMode="email"
               placeholder="nama@ypamdr.or.id"
               value={formData.email}
               onChange={(e) =>
@@ -755,17 +923,22 @@ const Login = () => {
               }
               onFocus={() => setFocused("email")}
               onBlur={() => setFocused(null)}
-              className="paper-line-input !h-11 !rounded-none !border-0 !border-b !bg-transparent !px-0 !pb-3 !text-[14px] !font-bold !text-slate-700 !shadow-none !outline-none"
-            />
-            <span
-              className={`absolute bottom-0 left-0 h-[2px] rounded-full bg-[#0AC4E0] transition-all duration-300 ${focused === "email" ? "w-full" : "w-0"
-                }`}
+              className="!h-12 !rounded-2xl !border !border-slate-200 !bg-white !px-4 !text-[14px] !font-bold !text-slate-800 !shadow-sm !outline-none transition focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/10"
             />
           </div>
         </div>
 
-        {/* Password */}
         {renderPasswordField()}
+
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={openResetPassword}
+            className="text-[11px] font-black text-[#0AC4E0] transition hover:text-[#078EA3]"
+          >
+            Lupa password?
+          </button>
+        </div>
       </motion.div>
     );
   };
@@ -778,17 +951,9 @@ const Login = () => {
             key="login-view"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{
-              opacity: 0,
-              filter: "blur(10px)",
-              transition: {
-                duration: 0.45,
-                ease: [0.16, 1, 0.3, 1],
-              },
-            }}
+            exit={{ opacity: 0, filter: "blur(10px)" }}
             className="relative h-full w-full overflow-hidden"
           >
-            {/* BACKGROUND SPLIT */}
             <div className="absolute inset-0 flex">
               <div className="h-full w-[48%] bg-[#F6F8FB]" />
               <div className="relative hidden h-full flex-1 overflow-hidden lg:block">
@@ -797,11 +962,11 @@ const Login = () => {
                   className="h-full w-full object-cover"
                   alt="Library YPA-MDR"
                   decoding="async"
-                  fetchpriority="high"
+                  fetchPriority="high"
                 />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-950/45 via-[#0AC4E0]/10 to-slate-950/65" />
-                <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.18)_0%,transparent_36%,rgba(15,23,42,0.25)_100%)]" />
-                <div className="absolute right-10 top-10 grid grid-cols-6 gap-2 opacity-45">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-950/35 via-[#0AC4E0]/10 to-slate-950/55" />
+                <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.14)_0%,transparent_38%,rgba(15,23,42,0.25)_100%)]" />
+                <div className="absolute right-10 top-10 grid grid-cols-6 gap-2 opacity-35">
                   {Array.from({ length: 36 }).map((_, index) => (
                     <span
                       key={index}
@@ -809,40 +974,16 @@ const Login = () => {
                     />
                   ))}
                 </div>
-                <div className="absolute bottom-10 right-12 max-w-[510px] text-right text-white">
-                  <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">
-                    Yayasan Pendidikan Astra Michael D. Ruslim
-                  </p>
-                  <h2 className="mt-4 text-[35px] font-black leading-tight tracking-[-0.055em]">
-                    Monitoring program yang lebih terarah dan terukur.
-                  </h2>
-                  <p className="ml-auto mt-4 max-w-[420px] text-[13px] font-semibold leading-6 text-white/70">
-                    Progres program, dokumen, validasi, dan evaluasi dapat
-                    dipantau dalam satu alur kerja.
-                  </p>
-                  <div className="mt-7 flex justify-end gap-5">
-                    {[pilar1, pilar2, pilar3, pilar4].map((src, index) => (
-                      <img
-                        key={index}
-                        src={src}
-                        className="h-9 w-9 object-contain brightness-0 invert opacity-55 transition hover:opacity-100"
-                        alt="pilar"
-                      />
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* FORM PANEL */}
             <div className="relative z-10 flex h-full w-full">
               <section className="flex h-full w-full items-center justify-center px-7 py-7 lg:w-[48%]">
-                <div className="paper-sheet relative w-full max-w-[500px] px-9 py-9 lg:px-11 lg:py-10">
+                <div className="paper-sheet relative w-full max-w-[500px] px-8 py-8 lg:px-10 lg:py-9">
                   <div className="absolute left-1/2 top-0 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#0AC4E0] shadow-[0_12px_22px_rgba(10,196,224,0.32)] ring-4 ring-white/80" />
 
-                  {/* HEADER */}
-                  <div className="mb-8 flex items-center gap-5">
-                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] bg-white/40">
+                  <div className="mb-7 flex items-center gap-5">
+                    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[1.35rem] bg-white/45">
                       <img
                         src={logo_ypamdr_blue}
                         className="h-14 object-contain"
@@ -863,41 +1004,29 @@ const Login = () => {
                     </div>
                   </div>
 
-                  {/* TITLE */}
-                  <div className="mb-6">
+                  <div className="mb-5">
                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                       Login Sistem
                     </p>
                     <h1 className="mt-2 text-[42px] font-black leading-none tracking-[-0.06em] text-slate-900">
                       Masuk
                     </h1>
-                    <p className="mt-3 max-w-sm text-[12px] font-semibold leading-6 text-slate-500">
-                      Pilih peran Anda terlebih dahulu, lalu masukkan
-                      kredensial yang sesuai.
-                    </p>
                   </div>
 
-                  <form onSubmit={handleLogin} className="space-y-6">
-                    {/* DROPDOWN ROLE */}
-                    <div>
-                      <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                        Peran / Role
-                      </p>
-                      <RoleDropdown
-                        selectedRole={selectedRole}
-                        onSelect={(label) => {
-                          setSelectedRole(label);
-                          setFormData({
-                            email: "",
-                            password: "",
-                            id_sekolah: "",
-                            nama_guru: "",
-                          });
-                        }}
-                      />
-                    </div>
+                  <form onSubmit={handleLogin} noValidate className="space-y-6">
+                    <RoleSuggestion
+                      selectedRole={selectedRole}
+                      onSelect={(label) => {
+                        setSelectedRole(label);
+                        setFormData({
+                          email: "",
+                          password: "",
+                          id_sekolah: "",
+                          nama_guru: "",
+                        });
+                      }}
+                    />
 
-                    {/* FIELDS */}
                     <AnimatePresence mode="wait">
                       {selectedRole && (
                         <motion.div
@@ -912,76 +1041,238 @@ const Login = () => {
                       )}
                     </AnimatePresence>
 
-                    {/* TOMBOL */}
-                    <div className="space-y-3 pt-1">
-                      <Button
-                        text={loading ? "Proses..." : "Masuk"}
-                        icon={
-                          loading ? (
-                            <Loader2 size={18} className="animate-spin" />
-                          ) : (
-                            <LogIn size={18} />
-                          )
-                        }
-                        type="submit"
-                        disabled={loading || !selectedRole}
-                        className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-40"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => navigate("/")}
-                        className="mx-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[12px] font-black text-slate-500 transition hover:bg-white/60 hover:text-[#0AC4E0]"
-                      >
-                        <ArrowLeft size={16} />
-                        Kembali
-                      </button>
-                    </div>
-                  </form>
+                    <Button
+                      text={loading ? "Proses..." : "Masuk"}
+                      icon={
+                        loading ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <LogIn size={18} />
+                        )
+                      }
+                      type="submit"
+                      disabled={loading || !selectedRole}
+                      className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-40"
+                    />
 
-                  <div className="mt-6 flex items-center justify-center gap-3 text-center opacity-55">
-                    <Activity size={14} className="text-[#0AC4E0]" />
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
-                      Yayasan Pendidikan Astra
-                    </span>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/")}
+                      className="mx-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[12px] font-black text-slate-500 transition hover:bg-white/60 hover:text-[#0AC4E0]"
+                    >
+                      <ArrowLeft size={16} />
+                      Kembali
+                    </button>
+                  </form>
                 </div>
               </section>
             </div>
           </motion.div>
         ) : (
           <motion.div
-              key="success"
+            key="success"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-              className="flex h-full w-full flex-col items-center justify-center bg-white"
+            className="flex h-full w-full flex-col items-center justify-center bg-white"
           >
-              <motion.h2
-                initial={{ y: 18, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.12, duration: 0.5 }}
-                className="px-6 text-center text-3xl font-black tracking-tight text-slate-900 md:text-4xl"
+            <img
+              src={logo_ypamdr_blue}
+              className="h-20 object-contain"
+              alt="Logo YPA-MDR"
+            />
+            <Loader2
+              className="mt-8 h-11 w-11 animate-spin text-[#0AC4E0]"
+              strokeWidth={3}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showResetPassword && (
+          <motion.div
+            key="reset-password-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ y: 16, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 12, opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-[460px] overflow-hidden rounded-[1.4rem] border border-slate-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.24)]"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5">
+                <div>
+                  <div className="flex items-center gap-2 text-[#0AC4E0]">
+                    <KeyRound size={18} />
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em]">
+                      Reset Password
+                    </p>
+                  </div>
+                  <h2 className="mt-2 text-xl font-black tracking-tight text-slate-900">
+                    Lupa Password
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowResetPassword(false)}
+                  disabled={resetLoading}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={handleResetPassword}
+                noValidate
+                className="space-y-4 px-6 py-5"
               >
-                Sistem Pemantauan dan Evaluasi Program
-              </motion.h2>
-              <motion.p
-                initial={{ y: 14, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.22, duration: 0.5 }}
-                className="mt-3 text-center text-sm font-semibold text-slate-400"
-              >
-                Login berhasil, mengarahkan ke dashboard...
-              </motion.p>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.42, duration: 0.35 }}
-                className="mt-10"
-              >
-                <Loader2
-                  className="h-12 w-12 animate-spin text-[#0AC4E0]"
-                  strokeWidth={3}
-                />
-              </motion.div>
+                <div>
+                  <Label
+                    text="Email Akun"
+                    className="!mb-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      inputMode="email"
+                      value={resetForm.email}
+                      onChange={(event) => {
+                        setResetForm((prev) => ({
+                          ...prev,
+                          email: event.target.value,
+                          otp: "",
+                          password: "",
+                          password_confirmation: "",
+                        }));
+                        setResetOtpSent(false);
+                        setResetExpiresIn(null);
+                      }}
+                      placeholder="nama@ypamdr.or.id"
+                      className="!h-12 !rounded-2xl !border-slate-200 !bg-white !text-sm !font-bold !shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={requestResetOtp}
+                      disabled={resetLoading}
+                      className="inline-flex h-12 shrink-0 items-center gap-2 rounded-2xl border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 px-4 text-[10px] font-black uppercase tracking-widest text-[#078EA3] transition hover:bg-[#0AC4E0]/15 disabled:opacity-60"
+                    >
+                      {resetLoading && !resetOtpSent ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Mail size={14} />
+                      )}
+                      {resetOtpSent ? "Kirim Ulang" : "Kirim OTP"}
+                    </button>
+                  </div>
+                </div>
+
+                {resetOtpSent && (
+                  <>
+                    <div className="flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                        OTP Terkirim
+                      </span>
+                      {resetExpiresIn && (
+                        <span className="rounded-full bg-white px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                          {resetExpiresIn} Menit
+                        </span>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label
+                        text="Kode OTP"
+                        className="!mb-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                      />
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={resetForm.otp}
+                        onChange={(event) =>
+                          setResetForm((prev) => ({
+                            ...prev,
+                            otp: event.target.value.replace(/\D/g, "").slice(0, 6),
+                          }))
+                        }
+                        placeholder="6 digit OTP"
+                        className="!h-12 !rounded-2xl !border-slate-200 !bg-white !text-center !text-lg !font-black !tracking-[0.35em] !shadow-sm"
+                        autoComplete="one-time-code"
+                      />
+                    </div>
+
+                    <div>
+                      <Label
+                        text="Password Baru"
+                        className="!mb-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                      />
+                      <Input
+                        type="password"
+                        value={resetForm.password}
+                        onChange={(event) =>
+                          setResetForm((prev) => ({
+                            ...prev,
+                            password: event.target.value,
+                          }))
+                        }
+                        placeholder="Minimal 8 karakter"
+                        className="!h-12 !rounded-2xl !border-slate-200 !bg-white !text-sm !font-bold !shadow-sm"
+                        autoComplete="new-password"
+                      />
+                    </div>
+
+                    <div>
+                      <Label
+                        text="Konfirmasi Password"
+                        className="!mb-2 !text-[10px] !font-black !uppercase !tracking-widest !text-slate-400"
+                      />
+                      <Input
+                        type="password"
+                        value={resetForm.password_confirmation}
+                        onChange={(event) =>
+                          setResetForm((prev) => ({
+                            ...prev,
+                            password_confirmation: event.target.value,
+                          }))
+                        }
+                        placeholder="Ulangi password baru"
+                        className="!h-12 !rounded-2xl !border-slate-200 !bg-white !text-sm !font-bold !shadow-sm"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(false)}
+                    disabled={resetLoading}
+                    className="h-11 rounded-xl border border-slate-100 bg-white px-5 text-[11px] font-black uppercase tracking-widest text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Batal
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={resetLoading || !resetOtpSent}
+                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-[#08AFC8] disabled:opacity-60"
+                  >
+                    {resetLoading ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <KeyRound size={14} />
+                    )}
+                    {resetLoading ? "Menyimpan" : "Reset Password"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1004,11 +1295,11 @@ const Login = () => {
           inset: 0;
           pointer-events: none;
           border-radius: inherit;
-          opacity: 0.45;
+          opacity: 0.42;
           background-image:
-            linear-gradient(115deg, transparent 0%, rgba(15,23,42,0.04) 18%, transparent 32%),
+            linear-gradient(115deg, transparent 0%, rgba(15,23,42,0.035) 18%, transparent 32%),
             linear-gradient(72deg, transparent 0%, rgba(255,255,255,0.55) 36%, transparent 51%),
-            repeating-linear-gradient(0deg, rgba(15,23,42,0.035) 0px, rgba(15,23,42,0.035) 1px, transparent 1px, transparent 7px);
+            repeating-linear-gradient(0deg, rgba(15,23,42,0.026) 0px, rgba(15,23,42,0.026) 1px, transparent 1px, transparent 7px);
           mix-blend-mode: multiply;
         }
         .paper-sheet::after {
@@ -1018,20 +1309,9 @@ const Login = () => {
           pointer-events: none;
           border-radius: inherit;
           background:
-            linear-gradient(90deg, rgba(255,255,255,0.92), transparent 12%, transparent 88%, rgba(15,23,42,0.04)),
-            linear-gradient(0deg, rgba(15,23,42,0.06), transparent 10%, transparent 90%, rgba(255,255,255,0.72));
-          opacity: 0.45;
-        }
-        .paper-line-input {
-          border-bottom-color: rgba(51,65,85,0.55) !important;
-        }
-        .paper-line-input::placeholder {
-          color: rgba(100,116,139,0.52) !important;
-          font-weight: 600 !important;
-        }
-        .paper-line-input:focus {
-          box-shadow: none !important;
-          border-bottom-color: rgba(51,65,85,0.55) !important;
+            linear-gradient(90deg, rgba(255,255,255,0.88), transparent 12%, transparent 88%, rgba(15,23,42,0.035)),
+            linear-gradient(0deg, rgba(15,23,42,0.045), transparent 10%, transparent 90%, rgba(255,255,255,0.72));
+          opacity: 0.4;
         }
         @media (max-height: 760px) {
           .paper-sheet {

@@ -23,7 +23,6 @@ import {
     Cell,
     Pie,
     PieChart,
-    ResponsiveContainer,
     Tooltip as RechartsTooltip,
     XAxis,
     YAxis,
@@ -32,11 +31,15 @@ import {
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
 import Dropdown from "../Dropdown";
+import ResponsiveContainer from "../charts/SafeResponsiveContainer";
 import ProgramRatingStars from "../program/ProgramRatingStars";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_FALLBACK = "";
 const ITEMS_PER_PAGE = 5;
+const DASHBOARD_YEAR_OPTIONS = Array.from({ length: 21 }, (_, index) =>
+    String(2015 + index),
+);
 
 const PILLAR_META = {
     AKADEMIK: {
@@ -382,6 +385,29 @@ function getCreatedDate(item) {
     );
 }
 
+function getItemYear(item) {
+    const explicitYear =
+        item?.tahun ||
+        item?.year ||
+        item?.tahun_anggaran ||
+        item?.tahunAnggaran ||
+        item?.periode_tahun ||
+        item?.periodeTahun;
+
+    if (explicitYear) return String(explicitYear);
+
+    const dateValue =
+        item?.tanggal_mulai ||
+        item?.tanggalMulai ||
+        item?.start_date ||
+        item?.startDate ||
+        getCreatedDate(item);
+    const date = dateValue ? new Date(dateValue) : null;
+
+    if (date && !Number.isNaN(date.getTime())) return String(date.getFullYear());
+    return "Belum Ada Tahun";
+}
+
 function formatDate(value) {
     if (!value) return "-";
     const date = new Date(value);
@@ -528,16 +554,13 @@ function DropdownFilter({
     );
 }
 
-function EmptyState({ title, description }) {
+function EmptyState({ title }) {
     return (
         <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
                 <BarChart3 size={24} />
             </div>
             <h3 className="mt-4 text-[14px] font-black text-slate-700">{title}</h3>
-            <p className="mt-2 max-w-[320px] text-[11px] font-semibold leading-5 text-slate-400">
-                {description}
-            </p>
         </div>
     );
 }
@@ -595,7 +618,6 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
         return (
             <EmptyState
                 title="Data diagram belum tersedia"
-                description="Ubah filter atau pastikan data memiliki relasi sekolah dan pilar."
             />
         );
     }
@@ -623,86 +645,126 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
             return (
                 <EmptyState
                     title="Komposisi pilar belum tersedia"
-                    description="Pilih filter lain atau pastikan pilar sudah tersimpan pada data."
                 />
             );
         }
 
         return (
-            <div className="min-w-0">
-                <div className="mb-4 flex flex-wrap gap-3">
-                    {pieRows.map((item) => (
-                        <span
-                            key={item.key}
-                            className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-wide text-slate-500"
-                        >
-                            <span
-                                className="h-2.5 w-2.5 rounded-full"
-                                style={{ backgroundColor: item.color }}
-                            />
-                            {item.name} ({item.value})
-                        </span>
-                    ))}
-                </div>
-
-                <div className="relative h-[420px] min-h-[360px] min-w-0">
+            <div className="grid min-h-[360px] min-w-0 items-center gap-5 lg:grid-cols-[minmax(320px,0.62fr)_minmax(240px,0.38fr)]">
+                <div className="relative flex min-h-[320px] min-w-0 items-center justify-center rounded-2xl bg-slate-50/60">
                     <ResponsiveContainer
                         width="100%"
                         height="100%"
                         minWidth={0}
-                        minHeight={0}
+                        minHeight={300}
                         debounce={50}
                     >
-                        <PieChart>
-                            <Pie
-                                data={pieRows}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={86}
-                                outerRadius={142}
-                                paddingAngle={4}
-                                stroke="#ffffff"
-                                strokeWidth={4}
-                                labelLine={false}
-                                label={({ percent }) =>
-                                    percent >= 0.08
-                                        ? `${Math.round(percent * 100)}%`
-                                        : ""
-                                }
-                            >
-                                {pieRows.map((item) => (
-                                    <Cell key={item.key} fill={item.color} />
-                                ))}
-                            </Pie>
+                        {({ width, height }) => {
+                            const radiusBase = Math.min(width, height);
+                            const outerRadius = Math.max(
+                                104,
+                                Math.min(136, Math.round(radiusBase * 0.38)),
+                            );
 
-                            <RechartsTooltip
-                                formatter={(value, name) => [
-                                    `${value} data`,
-                                    name,
-                                ]}
-                            />
-                        </PieChart>
+                            return (
+                                <PieChart>
+                                    <Pie
+                                        data={pieRows}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={0}
+                                        outerRadius={outerRadius}
+                                        paddingAngle={2}
+                                        stroke="#ffffff"
+                                        strokeWidth={3}
+                                        labelLine={false}
+                                        label={({ percent }) =>
+                                            percent >= 0.08
+                                                ? `${Math.round(percent * 100)}%`
+                                                : ""
+                                        }
+                                    >
+                                        {pieRows.map((item) => (
+                                            <Cell key={item.key} fill={item.color} />
+                                        ))}
+                                    </Pie>
+
+                                    <RechartsTooltip
+                                        formatter={(value, name) => [
+                                            `${value} data`,
+                                            name,
+                                        ]}
+                                    />
+                                </PieChart>
+                            );
+                        }}
                     </ResponsiveContainer>
+                </div>
 
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                        <span className="text-[34px] font-black leading-none tracking-[-0.06em] text-slate-800">
-                            {totalPie}
-                        </span>
-                        <span className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                <div className="grid content-center gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                    <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-500">
                             Total Data
-                        </span>
+                        </p>
+                        <p className="mt-2 text-[34px] font-black leading-none text-slate-900">
+                            {totalPie}
+                        </p>
+                        <p className="mt-2 text-[11px] font-semibold text-slate-500">
+                            Komposisi mengikuti filter aktif.
+                        </p>
                     </div>
+
+                    {pieRows.map((item) => {
+                        const percent = totalPie
+                            ? Math.round((item.value / totalPie) * 100)
+                            : 0;
+
+                        return (
+                            <div
+                                key={item.key}
+                                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-100/70"
+                            >
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="flex min-w-0 items-center gap-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                                        <span
+                                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                            style={{ backgroundColor: item.color }}
+                                        />
+                                        {item.name}
+                                    </span>
+                                    <span
+                                        className="rounded-full px-2.5 py-1 text-[10px] font-black"
+                                        style={{
+                                            color: item.color,
+                                            backgroundColor: `${item.color}14`,
+                                        }}
+                                    >
+                                        {percent}%
+                                    </span>
+                                </div>
+                                <p className="mt-3 text-[26px] font-black leading-none text-slate-900">
+                                    {item.value}
+                                </p>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         );
     }
 
-    const chartHeight = Math.max(360, rows.length * 52);
+    const rowCount = rows.length;
+    const chartHeight = rowCount <= 8 ? 390 : 430;
+    const barSize = rowCount <= 3 ? 58 : rowCount <= 8 ? 48 : 34;
+    const chartWidth =
+        rowCount <= 8 ? "100%" : `${Math.max(1280, rowCount * 136)}px`;
+    const maxTotal = Math.max(...rows.map((row) => Number(row.total || 0)), 0);
+    const yAxisMax = Math.max(3, Math.ceil(maxTotal * 1.2));
 
     return (
-        <div className="min-w-0">
+        <div className="flex min-h-full min-w-0 flex-col">
             <div className="mb-4 flex flex-wrap gap-3">
                 {visiblePillars.map((pillarKey) => {
                     const meta = PILLAR_META[pillarKey];
@@ -722,8 +784,15 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
                 })}
             </div>
 
-            <div className="max-h-[520px] min-w-0 overflow-y-auto overflow-x-hidden pr-2">
-                <div className="min-w-0" style={{ height: chartHeight }}>
+            <div className="flex min-h-[430px] flex-1 min-w-0 items-stretch overflow-x-auto overflow-y-hidden pb-1">
+                <div
+                    className="min-w-0"
+                    style={{
+                        height: chartHeight,
+                        width: chartWidth,
+                        minWidth: rowCount <= 8 ? 0 : 920,
+                    }}
+                >
                     <ResponsiveContainer
                         width="100%"
                         height="100%"
@@ -733,33 +802,32 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
                     >
                         <BarChart
                             data={rows}
-                            layout="vertical"
-                            margin={{ top: 8, right: 20, left: 10, bottom: 8 }}
+                            margin={{ top: 24, right: 18, left: -8, bottom: 38 }}
                         >
                             <CartesianGrid
                                 strokeDasharray="3 3"
-                                horizontal={false}
+                                vertical={false}
                                 stroke="#E2E8F0"
                             />
                             <XAxis
-                                type="number"
+                                dataKey="name"
+                                axisLine={false}
+                                tickLine={false}
+                                interval={0}
+                                tick={{ fontSize: 10, fontWeight: 900, fill: "#475569" }}
+                                tickMargin={14}
+                                tickFormatter={(value) =>
+                                    String(value || "").length > 16
+                                        ? `${String(value).slice(0, 16)}...`
+                                        : value
+                                }
+                            />
+                            <YAxis
                                 allowDecimals={false}
+                                domain={[0, yAxisMax]}
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 10, fontWeight: 800, fill: "#94A3B8" }}
-                            />
-                            <YAxis
-                                type="category"
-                                dataKey="name"
-                                width={160}
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 10, fontWeight: 900, fill: "#475569" }}
-                                tickFormatter={(value) =>
-                                    String(value || "").length > 23
-                                        ? `${String(value).slice(0, 23)}"¦`
-                                        : value
-                                }
                             />
                             <RechartsTooltip content={<CoverageTooltip />} />
 
@@ -773,10 +841,10 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
                                         name={meta.label}
                                         stackId="total"
                                         fill={meta.color}
-                                        barSize={24}
+                                        barSize={barSize}
                                         radius={
                                             pillarKey === visiblePillars.at(-1)
-                                                ? [0, 8, 8, 0]
+                                                ? [8, 8, 0, 0]
                                                 : 0
                                         }
                                     />
@@ -925,9 +993,9 @@ function DataList({
             )}
 
             <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                    Maksimal {ITEMS_PER_PAGE} data per halaman
-                </p>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    {ITEMS_PER_PAGE} data per halaman
+                </span>
 
                 <div className="flex flex-wrap items-center justify-center gap-1.5">
                     <button
@@ -972,7 +1040,6 @@ function DataList({
 function AnalyticsSection({
     type,
     title,
-    subtitle,
     rows,
     chartRows,
     visiblePillars,
@@ -983,6 +1050,9 @@ function AnalyticsSection({
     countyFilter,
     setCountyFilter,
     countyOptions,
+    yearFilter,
+    setYearFilter,
+    yearOptions,
     groupBy,
     setGroupBy,
     typeFilter,
@@ -1014,6 +1084,7 @@ function AnalyticsSection({
         groupFilter,
         pillarFilter,
         countyFilter,
+        yearFilter,
         groupBy,
         typeFilter,
         progressFilter,
@@ -1041,9 +1112,17 @@ function AnalyticsSection({
         })),
     ];
 
+    const yearFilterItems = [
+        { value: "ALL", label: "Semua Tahun" },
+        ...yearOptions.map((year) => ({
+            value: year,
+            label: year,
+        })),
+    ];
+
     const groupByItems = [
-        { value: "SEKOLAH", label: "Per Sekolah" },
-        { value: "KABUPATEN", label: "Per Kabupaten" },
+        { value: "WILAYAH", label: "Per Wilayah" },
+        { value: "STATUS", label: "Per Status" },
     ];
 
     const typeFilterItems = [
@@ -1057,10 +1136,12 @@ function AnalyticsSection({
         { value: "PROSES", label: "Dalam Proses" },
         { value: "SELESAI", label: "Selesai" },
     ];
-
     return (
-        <DashboardPanel title={title} subtitle={subtitle}>
-            <div className="border-b border-slate-100 bg-slate-50/60 p-4">
+        <DashboardPanel
+            title={title}
+            className="flex min-h-[calc(100vh-292px)] flex-1 flex-col shadow-none"
+        >
+            <div className="border-b border-slate-100 bg-slate-50/60 px-4 py-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <SearchBox
                         value={search}
@@ -1085,11 +1166,20 @@ function AnalyticsSection({
                     />
 
                     <DropdownFilter
+                        value={yearFilter}
+                        onChange={setYearFilter}
+                        items={yearFilterItems}
+                        placeholder="Semua Tahun"
+                        ariaLabel="Filter tahun"
+                        width="w-full sm:w-[160px]"
+                    />
+
+                    <DropdownFilter
                         value={countyFilter}
                         onChange={setCountyFilter}
                         items={countyFilterItems}
-                        placeholder="Semua Kabupaten"
-                        ariaLabel="Filter kabupaten"
+                        placeholder="Semua Wilayah"
+                        ariaLabel="Filter wilayah"
                         width="w-full sm:w-[190px]"
                     />
 
@@ -1121,41 +1211,41 @@ function AnalyticsSection({
                 </div>
             </div>
 
-            <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                <div className="min-w-0 border-b border-slate-100 p-5 xl:border-b-0 xl:border-r">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="grid min-w-0 flex-1 grid-cols-1">
+                <div className="flex min-h-0 min-w-0 flex-col px-5 py-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                Diagram {groupBy === "SEKOLAH" ? "Per Sekolah" : "Per Kabupaten"}
+                                Diagram {groupBy === "STATUS" ? "Per Status" : "Per Wilayah"}
                             </p>
                             <p className="mt-1 text-[12px] font-bold text-slate-600">
                                 {chartRows.length} kelompok dari {rows.length} data terfilter
                             </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                            <div className="inline-flex rounded-xl border border-cyan-100 bg-white p-1 shadow-sm shadow-cyan-50">
                                 <button
                                     type="button"
                                     onClick={() => setChartType("BAR")}
-                                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
-                                        ? "bg-slate-800 text-white"
-                                        : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                                    className={`inline-flex h-9 items-center rounded-lg px-4 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
+                                        ? "bg-[#0AC4E0] text-white shadow-sm shadow-cyan-200"
+                                        : "text-slate-500 hover:bg-cyan-50 hover:text-[#0AC4E0]"
                                         }`}
                                     title="Lihat diagram batang"
                                 >
-                                    <BarChart3 size={14} /> Batang
+                                    Batang
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => setChartType("PIE")}
-                                    className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
-                                        ? "bg-slate-800 text-white"
-                                        : "text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                                    className={`inline-flex h-9 items-center rounded-lg px-4 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
+                                        ? "bg-[#0AC4E0] text-white shadow-sm shadow-cyan-200"
+                                        : "text-slate-500 hover:bg-cyan-50 hover:text-[#0AC4E0]"
                                         }`}
                                     title="Lihat diagram pie"
                                 >
-                                    <ChartPie size={14} /> Pie
+                                    Pie
                                 </button>
                             </div>
 
@@ -1174,28 +1264,6 @@ function AnalyticsSection({
                         rows={chartRows}
                         visiblePillars={visiblePillars}
                         chartType={chartType}
-                    />
-                </div>
-
-                <div className="min-w-0">
-                    <div className="border-b border-slate-100 px-4 py-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                            Daftar {type === "PROGRAM" ? "Program" : "Assessment"}
-                        </p>
-                        <p className="mt-1 text-[11px] font-semibold text-slate-500">
-                            Data mengikuti seluruh filter pada bagian atas.
-                        </p>
-                    </div>
-
-                    <DataList
-                        rows={rows}
-                        type={type}
-                        getTitle={getTitle}
-                        getCode={getCode}
-                        getStatus={getStatus}
-                        resolveTargets={resolveTargets}
-                        onItemClick={onItemClick}
-                        filterSignature={filterSignature}
                     />
                 </div>
             </div>
@@ -1248,7 +1316,8 @@ function DashboardBase({
     const [programGroupFilter, setProgramGroupFilter] = useState("ALL");
     const [programPillarFilter, setProgramPillarFilter] = useState("ALL");
     const [programCountyFilter, setProgramCountyFilter] = useState("ALL");
-    const [programGroupBy, setProgramGroupBy] = useState("SEKOLAH");
+    const [programYearFilter, setProgramYearFilter] = useState("ALL");
+    const [programGroupBy, setProgramGroupBy] = useState("WILAYAH");
     const [programTypeFilter, setProgramTypeFilter] = useState("ALL");
     const [programProgressFilter, setProgramProgressFilter] = useState("ALL");
 
@@ -1256,7 +1325,8 @@ function DashboardBase({
     const [assessmentGroupFilter, setAssessmentGroupFilter] = useState("ALL");
     const [assessmentPillarFilter, setAssessmentPillarFilter] = useState("ALL");
     const [assessmentCountyFilter, setAssessmentCountyFilter] = useState("ALL");
-    const [assessmentGroupBy, setAssessmentGroupBy] = useState("SEKOLAH");
+    const [assessmentYearFilter, setAssessmentYearFilter] = useState("ALL");
+    const [assessmentGroupBy, setAssessmentGroupBy] = useState("WILAYAH");
     const [assessmentProgressFilter, setAssessmentProgressFilter] = useState("ALL");
 
     const fetchDashboardData = async () => {
@@ -1421,6 +1491,10 @@ function DashboardBase({
         [assessments, schoolById, schoolByName],
     );
 
+    const programYearOptions = DASHBOARD_YEAR_OPTIONS;
+
+    const assessmentYearOptions = DASHBOARD_YEAR_OPTIONS;
+
     const filterRows = ({
         source,
         type,
@@ -1428,6 +1502,7 @@ function DashboardBase({
         groupFilter,
         pillarFilter,
         countyFilter,
+        yearFilter,
         typeFilter,
         progressFilter,
         getTitle,
@@ -1449,6 +1524,8 @@ function DashboardBase({
                     pillarFilter === "ALL" || pillarKey === pillarFilter;
                 const matchCounty =
                     countyFilter === "ALL" || counties.includes(countyFilter);
+                const matchYear =
+                    yearFilter === "ALL" || getItemYear(item) === yearFilter;
                 const matchType =
                     type !== "PROGRAM" ||
                     typeFilter === "ALL" ||
@@ -1477,6 +1554,7 @@ function DashboardBase({
                     matchGroup &&
                     matchPillar &&
                     matchCounty &&
+                    matchYear &&
                     matchType &&
                     matchProgress &&
                     matchSearch
@@ -1498,6 +1576,7 @@ function DashboardBase({
                 groupFilter: programGroupFilter,
                 pillarFilter: programPillarFilter,
                 countyFilter: programCountyFilter,
+                yearFilter: programYearFilter,
                 typeFilter: programTypeFilter,
                 progressFilter: programProgressFilter,
                 getTitle: getProgramTitle,
@@ -1510,6 +1589,7 @@ function DashboardBase({
             programGroupFilter,
             programPillarFilter,
             programCountyFilter,
+            programYearFilter,
             programTypeFilter,
             programProgressFilter,
             schoolById,
@@ -1526,6 +1606,7 @@ function DashboardBase({
                 groupFilter: assessmentGroupFilter,
                 pillarFilter: assessmentPillarFilter,
                 countyFilter: assessmentCountyFilter,
+                yearFilter: assessmentYearFilter,
                 typeFilter: "ALL",
                 progressFilter: assessmentProgressFilter,
                 getTitle: getAssessmentTitle,
@@ -1538,13 +1619,14 @@ function DashboardBase({
             assessmentGroupFilter,
             assessmentPillarFilter,
             assessmentCountyFilter,
+            assessmentYearFilter,
             assessmentProgressFilter,
             schoolById,
             schoolByName,
         ],
     );
 
-    const buildChartRows = (source, groupBy) => {
+    const buildChartRows = (source, groupBy, type, getStatus) => {
         const counter = new Map();
 
         source.forEach((item) => {
@@ -1552,11 +1634,13 @@ function DashboardBase({
             const chartKey = PILLAR_META[pillarKey].chartKey;
             const uniqueGroups = new Set();
 
-            resolveTargets(item).forEach((target) => {
-                const groupName =
-                    groupBy === "KABUPATEN" ? target.county : target.name;
-                if (groupName) uniqueGroups.add(groupName);
-            });
+            if (groupBy === "STATUS") {
+                uniqueGroups.add(getProgressLabel(getProgressBucket(item, getStatus, type)));
+            } else {
+                resolveTargets(item).forEach((target) => {
+                    if (target.county) uniqueGroups.add(target.county);
+                });
+            }
 
             uniqueGroups.forEach((name) => {
                 if (!counter.has(name)) {
@@ -1582,12 +1666,24 @@ function DashboardBase({
     };
 
     const programChartRows = useMemo(
-        () => buildChartRows(filteredPrograms, programGroupBy),
+        () =>
+            buildChartRows(
+                filteredPrograms,
+                programGroupBy,
+                "PROGRAM",
+                getProgramStatus,
+            ),
         [filteredPrograms, programGroupBy, schoolById, schoolByName],
     );
 
     const assessmentChartRows = useMemo(
-        () => buildChartRows(filteredAssessments, assessmentGroupBy),
+        () =>
+            buildChartRows(
+                filteredAssessments,
+                assessmentGroupBy,
+                "ASSESSMENT",
+                getAssessmentStatus,
+            ),
         [filteredAssessments, assessmentGroupBy, schoolById, schoolByName],
     );
 
@@ -1743,8 +1839,8 @@ function DashboardBase({
             <Sidebar />
 
             <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="flex-1 overflow-y-auto px-4 py-5 md:px-6">
-                    <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5">
+                <div className="flex-1 overflow-y-auto px-3 py-4 md:px-4 xl:px-5">
+                    <div className="flex min-h-full w-full flex-col gap-4">
                         <DashboardPanel>
                             <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                                 <div className="min-w-0">
@@ -1765,9 +1861,6 @@ function DashboardBase({
                                             {titleHighlight}
                                         </span>
                                     </h1>
-                                    <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-5 text-slate-400">
-                                        {subtitle}
-                                    </p>
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-2">
@@ -1825,7 +1918,6 @@ function DashboardBase({
                             <AnalyticsSection
                                 type="ASSESSMENT"
                                 title="Monitoring Assessment"
-                                subtitle="Satu diagram per sekolah atau kabupaten dan daftar assessment dalam satu panel."
                                 rows={filteredAssessments}
                                 chartRows={assessmentChartRows}
                                 visiblePillars={visiblePillars}
@@ -1836,6 +1928,9 @@ function DashboardBase({
                                 countyFilter={assessmentCountyFilter}
                                 setCountyFilter={setAssessmentCountyFilter}
                                 countyOptions={assessmentCountyOptions}
+                                yearFilter={assessmentYearFilter}
+                                setYearFilter={setAssessmentYearFilter}
+                                yearOptions={assessmentYearOptions}
                                 groupBy={assessmentGroupBy}
                                 setGroupBy={setAssessmentGroupBy}
                                 typeFilter="ALL"
@@ -1857,7 +1952,6 @@ function DashboardBase({
                             <AnalyticsSection
                                 type="PROGRAM"
                                 title="Monitoring Program"
-                                subtitle="Satu diagram per sekolah atau kabupaten dan daftar program dalam satu panel."
                                 rows={filteredPrograms}
                                 chartRows={programChartRows}
                                 visiblePillars={visiblePillars}
@@ -1868,6 +1962,9 @@ function DashboardBase({
                                 countyFilter={programCountyFilter}
                                 setCountyFilter={setProgramCountyFilter}
                                 countyOptions={programCountyOptions}
+                                yearFilter={programYearFilter}
+                                setYearFilter={setProgramYearFilter}
+                                yearOptions={programYearOptions}
                                 groupBy={programGroupBy}
                                 setGroupBy={setProgramGroupBy}
                                 typeFilter={programTypeFilter}

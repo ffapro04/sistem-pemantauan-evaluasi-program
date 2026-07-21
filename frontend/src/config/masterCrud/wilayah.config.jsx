@@ -515,7 +515,9 @@ export const wilayahConfig = {
                         <p className="text-[11px] font-black uppercase text-slate-800">
                             {row.nama_wilayah || "-"}
                         </p>
-                        <p className="text-[9px] text-slate-400">{row.kode_wilayah || "-"}</p>
+                        <p className="text-[9px] font-bold text-slate-400">
+                            {row.parent?.nama_wilayah || row.provinsi || "-"}
+                        </p>
                     </div>
                 </div>
             ),

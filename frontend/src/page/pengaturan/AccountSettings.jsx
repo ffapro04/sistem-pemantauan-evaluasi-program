@@ -9,6 +9,8 @@ import { Camera, Loader2, Pencil, Save, X } from "lucide-react";
 import Sidebar from "../../components/Sidebar";
 import LanguageSwitcher from "../../components/LanguageSwitcher";
 import { useUiAutoTranslate } from "../../i18n/localUiTranslator";
+import { showConfirmDialog } from "../../utils/popup";
+import { GoogleDriveLogo } from "../../components/ui";
 
 const API_BASE_URL = (
     import.meta.env.VITE_API_URL ||
@@ -911,9 +913,11 @@ function AccountSettings() {
     const handleDisconnectDrive = async () => {
         if (!checkAuth()) return;
 
-        const confirmed = window.confirm(
-            "Putuskan tautan penyimpanan dokumen dari akun ini?",
-        );
+        const confirmed = await showConfirmDialog({
+            title: "Putuskan Penyimpanan?",
+            text: "Tautan penyimpanan dokumen akan dilepas dari akun ini.",
+            confirmButtonText: "Putuskan",
+        });
 
         if (!confirmed) return;
 
@@ -1390,13 +1394,19 @@ function AccountSettings() {
                     <aside className="grid min-h-0 grid-rows-[0.9fr_1.1fr] gap-7">
                         <div className="rounded-[2rem] border border-[#DFF8FC] bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
                             <div className="flex items-start justify-between gap-4">
-                                <div>
-                                    <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#103F49]">
-                                        Penyimpanan Dokumen
-                                    </h2>
-                                    <p className="mt-2 text-[13px] font-semibold leading-6 text-[#5F7E86]">
-                                        Dipakai ketika user mengunggah MOU, bukti termin, dan bukti kegiatan.
-                                    </p>
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-[#DFF8FC] bg-white shadow-[0_12px_30px_rgba(10,196,224,0.10)]">
+                                        <GoogleDriveLogo size={28} />
+                                    </div>
+
+                                    <div className="min-w-0">
+                                        <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#103F49]">
+                                            Penyimpanan Dokumen
+                                        </h2>
+                                        <p className="mt-2 text-[13px] font-semibold leading-6 text-[#5F7E86]">
+                                            Dipakai ketika user mengunggah MOU, bukti termin, dan bukti kegiatan.
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <span

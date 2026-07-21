@@ -30,8 +30,8 @@ import { Footer, Navbar } from "../../components/common";
 import {
   LoadingScreen,
   SchoolDetailModal,
-  SchoolMapPanel,
 } from "../../components/onboarding";
+import AdminSchoolBinaanMap from "../../components/maps/AdminSchoolBinaanMap";
 
 import picturependidikan from "../../assets/img/pichture_pendidikan 1.png";
 
@@ -953,15 +953,16 @@ function MapSection({
             <div className="pointer-events-none absolute -left-20 bottom-0 h-56 w-56 rounded-full bg-[#0AC4E0]/10 blur-[55px]" />
 
             <div className="relative overflow-hidden rounded-[2.25rem] border border-[#DFF8FC] bg-[#F8FEFF]">
-              <SchoolMapPanel
+              <div className="p-5 sm:p-6 lg:p-7">
+                <AdminSchoolBinaanMap
                 wilayahList={wilayahList}
                 selectedWilayah={selectedWilayah}
                 schools={sekolahList}
-                totalSchools={sekolahList.length}
                 onSelectWilayah={onSelectWilayah}
                 onResetFilter={onResetFilter}
                 onOpenSchool={onOpenSchool}
-              />
+                />
+              </div>
             </div>
           </div>
         </div>

@@ -12,6 +12,16 @@ import "react-toastify/dist/ReactToastify.css";
 createRoot(document.getElementById("root")).render(
   <>
     <App />
-    <ToastContainer position="top-right" autoClose={3000} />
+    <ToastContainer
+      position="top-center"
+      autoClose={3200}
+      newestOnTop
+      closeOnClick
+      pauseOnFocusLoss={false}
+      pauseOnHover
+      draggable={false}
+      limit={3}
+      theme="light"
+    />
   </>,
 );

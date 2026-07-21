@@ -1,6 +1,7 @@
 ﻿/* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
 import {
+    GeoJSON,
     MapContainer,
     Marker,
     Popup,
@@ -22,12 +23,24 @@ import {
 import "leaflet/dist/leaflet.css";
 
 import OnboardingLeafletStyle from "./OnboardingLeafletStyle";
+import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
 const INDONESIA_CENTER = [-2.5, 118];
 const INDONESIA_BOUNDS = [
     [-11.2, 94.5],
     [6.5, 141.5],
 ];
+const INDONESIA_MAX_BOUNDS = [
+    [-13.0, 92.0],
+    [8.2, 143.5],
+];
+const INDONESIA_GEOJSON_STYLE = {
+    color: "#0AC4E0",
+    weight: 1.25,
+    opacity: 0.82,
+    fillColor: "#0AC4E0",
+    fillOpacity: 0.08,
+};
 const ITEMS_PER_PAGE = 5;
 
 const PROVINCE_FALLBACKS = {
@@ -435,10 +448,10 @@ function MapViewportController({ provinceGroup, countyGroup }) {
     const map = useMap();
 
     useEffect(() => {
-        map.stop();
-        map.invalidateSize();
+        const applyViewport = () => {
+            map.stop();
+            map.invalidateSize({ pan: false });
 
-        const timer = window.setTimeout(() => {
             if (countyGroup) {
                 const points = countyGroup.schools.map(getCoordinate).filter(Boolean);
 
@@ -476,9 +489,18 @@ function MapViewportController({ provinceGroup, countyGroup }) {
                 padding: [18, 18],
                 animate: true,
             });
-        }, 80);
+        };
 
-        return () => window.clearTimeout(timer);
+        applyViewport();
+        const timers = [80, 240, 520, 900].map((delay) =>
+            window.setTimeout(applyViewport, delay),
+        );
+        window.addEventListener("resize", applyViewport);
+
+        return () => {
+            timers.forEach((timer) => window.clearTimeout(timer));
+            window.removeEventListener("resize", applyViewport);
+        };
     }, [map, provinceGroup?.key, countyGroup?.key]);
 
     return null;
@@ -578,11 +600,19 @@ function SchoolMap({
                 zoom={5}
                 style={{ height: "100%", width: "100%", background: "#F1F5F9" }}
                 zoomControl={false}
+                maxBounds={INDONESIA_MAX_BOUNDS}
+                maxBoundsViscosity={1}
                 scrollWheelZoom
             >
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
+                <GeoJSON
+                    data={indonesiaGeoJson}
+                    style={INDONESIA_GEOJSON_STYLE}
+                    interactive={false}
                 />
 
                 <ZoomControl position="bottomright" />

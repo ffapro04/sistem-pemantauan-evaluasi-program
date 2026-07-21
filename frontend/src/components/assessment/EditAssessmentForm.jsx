@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -16,8 +16,10 @@ import {
 } from "../common";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
+import { getAuthToken } from "../../utils/authSession";
 
-const DEFAULT_API_BASE = "";
+const DEFAULT_API_BASE =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -61,7 +63,7 @@ const getPilarTone = (value) => {
 };
 
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => getAuthToken();
 
 const normalizeOption = (option) => {
     if (typeof option === "string") return option;
@@ -360,6 +362,7 @@ function AssessmentEditBase({
     };
 
     const handleSave = async () => {
+        if (saving) return;
         if (!validateQuestions()) return;
 
         try {

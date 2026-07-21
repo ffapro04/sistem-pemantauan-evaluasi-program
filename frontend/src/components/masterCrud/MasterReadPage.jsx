@@ -28,6 +28,7 @@ import Dropdown from "../Dropdown";
 
 import MasterPageShell from "./MasterPageShell";
 import MasterStatusSwitch from "./MasterStatusSwitch";
+import { getAuthToken } from "../../utils/authSession";
 import {
     buildApiUrl,
     buildFreshApiUrl,
@@ -339,7 +340,7 @@ export default function MasterReadPage({ config }) {
         try {
             setLoading(true);
 
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -602,21 +603,25 @@ export default function MasterReadPage({ config }) {
             "data";
 
         const result = await Swal.fire({
-            title: "Hapus Data?",
-            text: `${name} akan dihapus dari sistem.`,
+            title: "Konfirmasi Hapus Data",
+            text: `${name} akan dihapus dari daftar. Pastikan data ini memang sudah tidak digunakan.`,
             icon: "warning",
             showCancelButton: true,
-            confirmButtonColor: "#F43F5E",
-            cancelButtonColor: "#CBD5E1",
-            confirmButtonText: "Ya, Hapus",
-            cancelButtonText: "Batal",
+            confirmButtonColor: "#0AC4E0",
+            cancelButtonColor: "#FFFFFF",
+            confirmButtonText: "Hapus Data",
+            cancelButtonText: "Batalkan",
             reverseButtons: true,
+            focusCancel: true,
             customClass: {
-                popup: "rounded-[2.5rem] border-none shadow-2xl",
+                popup: "app-confirm-popup",
+                title: "app-confirm-title",
+                htmlContainer: "app-confirm-text",
+                actions: "app-confirm-actions",
                 confirmButton:
-                    "rounded-full px-8 py-3 text-[10px] font-black uppercase",
+                    "app-confirm-button app-confirm-button-primary",
                 cancelButton:
-                    "rounded-full px-8 py-3 text-[10px] font-black uppercase",
+                    "app-confirm-button app-confirm-button-secondary",
             },
         });
 

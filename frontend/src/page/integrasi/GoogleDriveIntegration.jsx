@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import {
     AlertCircle,
     CheckCircle2,
-    Cloud,
     ExternalLink,
     FileUp,
     Loader2,
@@ -16,8 +15,10 @@ import {
     UploadCloud,
     UserRound,
 } from "lucide-react";
+import { showConfirmDialog } from "../../utils/popup";
 
 import Sidebar from "../../components/Sidebar";
+import { GoogleDriveLogo } from "../../components/ui";
 
 const API_BASE_URL = (
     import.meta.env.VITE_API_URL ||
@@ -142,9 +143,11 @@ const GoogleDriveIntegration = () => {
     const handleDisconnect = async () => {
         if (!checkAuth()) return;
 
-        const confirmed = window.confirm(
-            "Putuskan koneksi Google Drive dari akun ini?",
-        );
+        const confirmed = await showConfirmDialog({
+            title: "Putuskan Google Drive?",
+            text: "Koneksi Google Drive akan dilepas dari akun ini.",
+            confirmButtonText: "Putuskan",
+        });
 
         if (!confirmed) return;
 
@@ -236,7 +239,7 @@ const GoogleDriveIntegration = () => {
                         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                             <div>
                                 <div className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
-                                    <Cloud size={15} />
+                                    <GoogleDriveLogo size={17} />
                                     Integrasi Akun
                                 </div>
 
@@ -373,7 +376,7 @@ const GoogleDriveIntegration = () => {
                                         {connecting ? (
                                             <Loader2 size={17} className="animate-spin" />
                                         ) : (
-                                            <Cloud size={17} />
+                                            <GoogleDriveLogo size={18} />
                                         )}
                                         Hubungkan Google Drive
                                     </button>

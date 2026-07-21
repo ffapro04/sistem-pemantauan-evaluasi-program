@@ -1,4 +1,4 @@
-﻿// src/config/masterCrud/sekolah.config.jsx
+// src/config/masterCrud/sekolah.config.jsx
 /* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import React from "react";
@@ -27,7 +27,8 @@ import {
 } from "../../components/masterCrud";
 import { validateEmailField, validatePasswordField } from "./validation";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const AKREDITASI_INTERNAL_OPTIONS = [
     { value: "Unggul", label: "Unggul" },
@@ -247,7 +248,7 @@ const normalizeSekolah = (row) => {
         jumlah_guru: Number(row?.jumlah_guru || row?.jumlahGuru || 0),
         jumlah_siswa: Number(row?.jumlah_siswa || row?.jumlahSiswa || 0),
         email_login: row?.email_login || "",
-        password_login: row?.password_login || "",
+        password_login: "",
 
         alamat: row?.alamat || "",
         latitude: row?.latitude ?? row?.lat ?? "",
@@ -368,7 +369,6 @@ export const sekolahConfig = {
 
     normalizeDetail: (payload) => {
         const normalized = normalizeSekolah(payload);
-        const passwordLoginValue = payload?.password_login || normalized.password_login || "";
 
         return {
             ...normalized,
@@ -389,8 +389,8 @@ export const sekolahConfig = {
                 "",
             logo: null,
             logo_url: normalized.logo_url || "",
-            password_login: passwordLoginValue,
-            password_login_original: passwordLoginValue,
+            password_login: "",
+            password_login_original: "",
             password_login_changed: false,
         };
     },
@@ -711,15 +711,16 @@ export const sekolahConfig = {
                 },
                 {
                     name: "password_login",
-                    label: "Password",
+                    label: "Password Baru",
                     type: "password",
                     icon: Lock,
+                    hidden: ({ mode }) => mode === "edit",
                     requiredOnCreate: true,
                     minLength: 8,
                     placeholder: "Minimal 8 karakter",
                     help: ({ mode }) =>
                         mode === "edit"
-                            ? "Password lama sudah tersimpan. Isi field ini hanya jika ingin mengganti password."
+                            ? "Kosongkan jika tidak ingin mengganti password sekolah."
                             : "Password digunakan sekolah untuk masuk ke sistem.",
                 },
                 {

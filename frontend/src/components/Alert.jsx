@@ -2,14 +2,16 @@
 export default function Alert({ message, type = "error" }) {
   if (!message) return null;
 
-  const styles =
-    type === "error"
-      ? "bg-red-500/20 border-red-500 text-red-300"
-      : "bg-green-500/20 border-green-500 text-green-300";
+  const styles = {
+    error: "border-rose-200 bg-rose-50 text-rose-700",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warning: "border-amber-200 bg-amber-50 text-amber-700",
+    info: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  };
 
   return (
     <div
-      className={`border p-3 rounded-lg text-sm mb-4 ${styles} animate-fadeInUp`}
+      className={`mb-4 rounded-2xl border px-4 py-3 text-sm font-semibold leading-relaxed shadow-sm ${styles[type] || styles.error} animate-fadeInUp`}
     >
       {message}
     </div>

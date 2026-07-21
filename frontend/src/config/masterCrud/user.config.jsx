@@ -451,15 +451,16 @@ export const userConfig = {
                 },
                 {
                     name: "password",
-                    label: "Password Login",
+                    label: "Password Baru",
                     type: "password",
                     icon: Lock,
+                    hidden: ({ mode }) => mode === "edit",
                     requiredOnCreate: true,
                     minLength: 8,
                     placeholder: "Minimal 8 karakter",
                     help: ({ mode }) =>
                         mode === "edit"
-                            ? "Kosongkan jika password tidak ingin diubah."
+                            ? "Kosongkan jika tidak ingin mengganti password pengguna."
                             : "Password digunakan pengguna untuk masuk ke sistem.",
                 },
                 {

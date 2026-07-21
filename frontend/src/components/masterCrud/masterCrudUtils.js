@@ -1,6 +1,9 @@
-﻿// src/components/masterCrud/masterCrudUtils.js
+// src/components/masterCrud/masterCrudUtils.js
 
-export const API_BASE_URL = "";
+import { getAuthToken } from "../../utils/authSession";
+
+export const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 export const buildApiUrl = (endpoint) => {
     if (!endpoint) return API_BASE_URL;
@@ -15,7 +18,7 @@ export const buildFreshApiUrl = (endpoint) => {
 };
 
 export const getTokenHeader = () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     return {
         Authorization: `Bearer ${token}`,

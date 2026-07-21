@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,8 +16,8 @@ import {
     Database,
     RotateCcw,
     ClipboardCheck,
-    Power,
-    PowerOff,
+    PauseCircle,
+    PlayCircle,
     Loader2,
     Upload,
     Download,
@@ -31,8 +31,10 @@ import Button from "../Button";
 import Label from "../Label";
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
+import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE = "";
+const API_BASE =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const loadXlsx = async () => import("xlsx");
 
 const ASSESSMENT_PILAR_OPTIONS = {
@@ -87,7 +89,7 @@ const normalizeArray = (payload) => {
     return [];
 };
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => getAuthToken();
 
 const getHoIdFromToken = () => {
     const token = getToken();
@@ -436,8 +438,8 @@ function ReadAssessmentPage({
     const filteredData = useMemo(() => {
         return assessments
             .filter((item) => {
-                if (statusFilter === "aktif") return isActiveValue(item.aktif);
-                if (statusFilter === "nonaktif") return !isActiveValue(item.aktif);
+                if (statusFilter === "lanjut") return isActiveValue(item.aktif);
+                if (statusFilter === "pending") return !isActiveValue(item.aktif);
                 if (statusFilter === "terkirim") return Boolean(item.sent_at);
                 if (statusFilter === "draft") return !item.sent_at;
                 return true;
@@ -516,7 +518,7 @@ function ReadAssessmentPage({
             const payload = await res.json().catch(() => ({}));
 
             if (!res.ok) {
-                throw new Error(payload?.message || "Gagal mengubah status aktif");
+                throw new Error(payload?.message || "Gagal mengubah status assessment");
             }
 
             setAssessments((prev) =>
@@ -525,9 +527,9 @@ function ReadAssessmentPage({
                 ),
             );
 
-            toast.success("Status assessment berhasil diperbarui");
+            toast.success(payload?.message || "Status assessment berhasil diperbarui");
         } catch (error) {
-            toast.error(error.message || "Gagal mengubah status aktif");
+            toast.error(error.message || "Gagal mengubah status assessment");
         } finally {
             setRowLoading(id, false);
         }
@@ -661,13 +663,13 @@ function ReadAssessmentPage({
         return assessments.reduce(
             (acc, item) => {
                 acc.total += 1;
-                if (isActiveValue(item.aktif)) acc.aktif += 1;
-                else acc.nonaktif += 1;
+                if (isActiveValue(item.aktif)) acc.lanjut += 1;
+                else acc.pending += 1;
                 if (item.sent_at) acc.terkirim += 1;
                 else acc.draft += 1;
                 return acc;
             },
-            { total: 0, aktif: 0, nonaktif: 0, terkirim: 0, draft: 0 },
+            { total: 0, lanjut: 0, pending: 0, terkirim: 0, draft: 0 },
         );
     }, [assessments]);
 
@@ -713,7 +715,7 @@ function ReadAssessmentPage({
                             />
                         </header>
 
-                        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
                             <div className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4">
                                 <p className="text-[8px] font-black uppercase tracking-widest text-cyan-600">
                                     Total Data
@@ -726,11 +728,21 @@ function ReadAssessmentPage({
 
                             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
                                 <p className="text-[8px] font-black uppercase tracking-widest text-emerald-600">
-                                    Aktif
+                                    Lanjut
                                 </p>
 
                                 <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.aktif}
+                                    {summary.lanjut}
+                                </p>
+                            </div>
+
+                            <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
+                                <p className="text-[8px] font-black uppercase tracking-widest text-orange-600">
+                                    Pending
+                                </p>
+
+                                <p className="mt-2 text-2xl font-black text-slate-900">
+                                    {summary.pending}
                                 </p>
                             </div>
 
@@ -776,8 +788,8 @@ function ReadAssessmentPage({
                                 className="h-10 rounded-xl border border-gray-100 bg-gray-50/70 px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 outline-none"
                             >
                                 <option value="semua">Semua Status</option>
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
+                                <option value="lanjut">Lanjut</option>
+                                <option value="pending">Pending</option>
                                 <option value="draft">Belum Dikirim</option>
                                 <option value="terkirim">Terkirim</option>
                             </select>
@@ -806,18 +818,18 @@ function ReadAssessmentPage({
                         </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-auto px-10 pb-5">
+                    <div className="min-h-0 flex-1 overflow-auto px-5 pb-5 md:px-8">
                         <div className="overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm custom-scrollbar">
-                            <table className="w-full min-w-[1320px] table-fixed border-collapse text-left">
+                            <table className="w-full min-w-[1060px] table-fixed border-collapse text-left">
                                 <colgroup>
-                                    <col className="w-[52px]" />
-                                    <col className="w-[360px]" />
-                                    <col className="w-[110px]" />
-                                    <col className="w-[165px]" />
-                                    <col className="w-[190px]" />
-                                    <col className="w-[125px]" />
-                                    <col className="w-[135px]" />
-                                    <col className="w-[145px]" />
+                                    <col className="w-[48px]" />
+                                    <col className="w-[292px]" />
+                                    <col className="w-[104px]" />
+                                    <col className="w-[140px]" />
+                                    <col className="w-[162px]" />
+                                    <col className="w-[118px]" />
+                                    <col className="w-[124px]" />
+                                    <col className="w-[112px]" />
                                 </colgroup>
                                 <thead>
                                     <tr className="border-b border-gray-100 bg-gray-50/70">
@@ -849,7 +861,7 @@ function ReadAssessmentPage({
                                             Deadline
                                         </th>
 
-                                        <th className="sticky right-0 z-10 w-[180px] bg-gray-50/70 px-5 py-4 text-right text-[9px] font-black uppercase tracking-widest text-gray-400">
+                                        <th className="px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
                                             Aksi
                                         </th>
                                     </tr>
@@ -877,18 +889,18 @@ function ReadAssessmentPage({
                                                 key={row.id}
                                                 className="border-b border-gray-50 transition hover:bg-cyan-50/30 last:border-b-0"
                                             >
-                                                <td className="px-5 py-5 text-center font-mono text-[10px] font-bold text-gray-400">
+                                                <td className="px-2 py-4 text-center font-mono text-[10px] font-bold text-gray-400">
                                                     {String(start + index + 1).padStart(2, "0")}
                                                 </td>
 
-                                                <td className="px-5 py-5">
+                                                <td className="px-4 py-4">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
-                                                            <ClipboardCheck size={18} />
+                                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
+                                                            <ClipboardCheck size={16} />
                                                         </div>
 
                                                         <div className="min-w-0">
-                                                            <p className="truncate text-[12px] font-black uppercase text-slate-800">
+                                                            <p className="line-clamp-2 text-[12px] font-black uppercase leading-snug text-slate-800">
                                                                 {row.nama}
                                                             </p>
 
@@ -904,34 +916,34 @@ function ReadAssessmentPage({
                                                                 <span
                                                                     className={`rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${active
                                                                         ? "border-emerald-100 bg-emerald-50 text-emerald-600"
-                                                                        : "border-rose-100 bg-rose-50 text-rose-600"
+                                                                        : "border-orange-100 bg-orange-50 text-orange-600"
                                                                         }`}
                                                                 >
-                                                                    {active ? "Aktif" : "Nonaktif"}
+                                                                    {active ? "Lanjut" : "Pending"}
                                                                 </span>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-5">
+                                                <td className="px-3 py-4">
                                                     <span className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${getPilarTone(row.pilar)}`}>
                                                         {getPilarLabel(row.pilar)}
                                                     </span>
                                                 </td>
 
-                                                <td className="px-5 py-5">
+                                                <td className="px-3 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <Users size={14} className="text-[#0AC4E0]" />
 
-                                                        <span className="text-[11px] font-bold text-slate-600">
+                                                        <span className="line-clamp-2 text-[11px] font-bold leading-snug text-slate-600">
                                                             {row.ho}
                                                         </span>
                                                     </div>
                                                 </td>
 
-                                                <td className="px-3 py-5 align-top">
-                                                    <div className="w-[180px]">
+                                                <td className="px-3 py-4 align-top">
+                                                    <div className="w-full">
                                                         {sekolahList.length > 0 ? (
                                                             <Dropdown
                                                                 placeholder={`${sekolahList.length} Target Sekolah`}
@@ -952,7 +964,7 @@ function ReadAssessmentPage({
                                                     </div>
                                                 </td>
 
-                                                <td className="px-5 py-5 text-center">
+                                                <td className="px-3 py-4 text-center">
                                                     <p className="text-[12px] font-black text-slate-700">
                                                         {row.jumlah_pengisi}/{row.jumlah_guru_target || 0} Guru
                                                     </p>
@@ -976,8 +988,8 @@ function ReadAssessmentPage({
                                                     </p>
                                                 </td>
 
-                                                <td className="px-5 py-5 text-center">
-                                                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 px-3 py-1.5">
+                                                <td className="px-3 py-4 text-center">
+                                                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1.5">
                                                         <Clock
                                                             size={12}
                                                             className={
@@ -995,8 +1007,8 @@ function ReadAssessmentPage({
                                                     </p>
                                                 </td>
 
-                                                <td className="sticky right-0 z-10 w-[180px] bg-white px-5 py-5">
-                                                    <div className="flex min-w-max justify-end gap-1.5">
+                                                <td className="px-3 py-4">
+                                                    <div className="flex justify-center gap-1">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -1050,15 +1062,15 @@ function ReadAssessmentPage({
                                                             onClick={() => handleToggleAktif(row.id)}
                                                             disabled={actionLoading[row.id]}
                                                             className={`flex h-8 w-8 items-center justify-center rounded-lg border disabled:opacity-50 ${active
-                                                                ? "border-rose-100 bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white"
+                                                                ? "border-orange-100 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white"
                                                                 : "border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
                                                                 }`}
-                                                            title={active ? "Nonaktifkan" : "Aktifkan"}
+                                                            title={active ? "Pending-kan assessment" : "Lanjutkan assessment"}
                                                         >
                                                             {active ? (
-                                                                <PowerOff size={14} />
+                                                                <PauseCircle size={14} />
                                                             ) : (
-                                                                <Power size={14} />
+                                                                <PlayCircle size={14} />
                                                             )}
                                                         </button>
                                                     </div>

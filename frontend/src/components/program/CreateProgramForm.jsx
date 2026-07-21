@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,7 +11,6 @@ import {
     Building2,
     UserCheck,
     Loader2,
-    DollarSign,
     RefreshCw,
     ChevronLeft,
     ChevronRight,
@@ -37,9 +36,11 @@ import {
 import {
     filterSchoolsByHoAccess,
 } from "../../utils/hoAccess";
+import { getAuthToken } from "../../utils/authSession";
 
 const DEFAULT_STATUS_PROGRAM = "Approval";
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const PROGRAM_DRAFT_DB_NAME = "sme_program_drafts";
 const PROGRAM_DRAFT_DB_VERSION = 1;
 const PROGRAM_DRAFT_FILE_STORE = "program_files";
@@ -187,7 +188,6 @@ function hasMeaningfulProgramDraft(draft) {
     return Boolean(
         String(form?.namaProgram || "").trim() ||
         String(form?.nomorMou || "").trim() ||
-        String(form?.hargaVendor || "").trim() ||
         String(form?.tanggalMulaiProgram || "").trim() ||
         String(form?.tanggalSelesaiProgram || "").trim() ||
         String(form?.fileName || "").trim() ||
@@ -227,16 +227,6 @@ const MAIN_STEPS = [
 // =========================================================================
 // HELPERS
 // =========================================================================
-function formatRupiah(value) {
-    const number = String(value || "").replace(/\D/g, "");
-    if (!number) return "";
-    return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-    }).format(Number(number));
-}
-
 function cleanNumber(value) {
     return String(value || "").replace(/\D/g, "");
 }
@@ -323,7 +313,7 @@ function getPilarProgramLabel(value) {
 }
 
 function getTokenPayload() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return null;
     try {
         return jwtDecode(token);
@@ -942,7 +932,6 @@ function CreateProgramForm({
         Boolean(
             String(formData.namaProgram || "").trim() ||
             String(formData.nomorMou || "").trim() ||
-            String(formData.hargaVendor || "").trim() ||
             String(formData.tanggalMulaiProgram || "").trim() ||
             String(formData.tanggalSelesaiProgram || "").trim() ||
             String(formData.fileName || "").trim() ||
@@ -970,7 +959,7 @@ function CreateProgramForm({
     const fetchMasterData = async () => {
         setMasterLoading(true);
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             if (!token) {
                 navigate("/login");
                 return;
@@ -1080,7 +1069,7 @@ function CreateProgramForm({
                 .sort((a, b) => a.label.localeCompare(b.label));
 
             if (filteredVendorList.length === 0 && rawVendorList.length > 0) {
-                console.warn(`️ Filter kategori vendor [${kategori}] tidak ditemukan, dropdown vendor akan kosong`, {
+                console.warn(`? Filter kategori vendor [${kategori}] tidak ditemukan, dropdown vendor akan kosong`, {
                     kategori,
                     totalVendor: rawVendorList.length,
                 });
@@ -1386,7 +1375,7 @@ function CreateProgramForm({
     };
 
     const handleConnectDriveFromGuard = async () => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
 
         if (!token) {
             toast.error("Sesi login tidak ditemukan. Silakan login ulang.");
@@ -1440,10 +1429,11 @@ function CreateProgramForm({
 
     // â”€â”€ SAVE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const saveProgram = async () => {
+        if (loading) return;
         if (!validateForm()) return;
         setLoading(true);
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             if (!token) {
                 navigate("/login");
                 return;
@@ -1461,7 +1451,7 @@ function CreateProgramForm({
             const submission = new FormData();
             submission.append("nama_program", formData.namaProgram.trim());
             submission.append("nomor_mou", formData.nomorMou.trim() || "");
-            submission.append("harga_vendor", cleanNumber(formData.hargaVendor) || "0");
+            submission.append("harga_vendor", "0");
             submission.append("kategori", kategori);
             submission.append("pilar_program", formData.pilarProgram || "");
             submission.append("jenis_program", formData.jenisProgram || "PROJECT");
@@ -1565,24 +1555,24 @@ function CreateProgramForm({
         <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0 font-sans text-slate-800">
             <Sidebar />
 
-            <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden px-4 py-4">
+            <main className="program-form-shell flex h-full min-w-0 flex-1 flex-col overflow-hidden px-7 py-6">
                 {/* HEADER */}
                 <header className="shrink-0">
-                    <div className="flex min-h-[72px] items-center justify-between rounded-[1.8rem] border border-slate-100 bg-white px-4 py-3 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
-                        <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex min-h-[96px] items-center justify-between rounded-[2rem] border border-slate-100 bg-white px-7 py-5 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+                        <div className="flex min-w-0 items-center gap-4">
                             <button type="button" onClick={() => navigate(-1)}
-                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-500 transition hover:bg-white hover:text-[#0AC4E0]">
-                                <ArrowLeft size={16} />
+                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-500 transition hover:bg-white hover:text-[#0AC4E0]">
+                                <ArrowLeft size={18} />
                             </button>
                             <div className="min-w-0">
-                                <div className="mb-1 flex flex-wrap items-center gap-2">
-                                    <span className="text-[8px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">Buat Program</span>
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">Buat Program</span>
                                     <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                    <span className="text-[8px] font-black uppercase tracking-[0.24em] text-slate-400">{kategori}</span>
+                                    <span className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">{kategori}</span>
                                     <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                    <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[7px] font-black uppercase tracking-widest text-amber-600">{DEFAULT_STATUS_PROGRAM}</span>
+                                    <span className="rounded-full bg-amber-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-amber-600">{DEFAULT_STATUS_PROGRAM}</span>
                                 </div>
-                                <h1 className="text-[22px] font-black leading-none tracking-[-0.055em] text-slate-950">
+                                <h1 className="text-[32px] font-black leading-none tracking-[-0.045em] text-slate-950">
                                     Inisiasi <span className="text-[#0AC4E0]">{title}</span>
                                 </h1>
                             </div>
@@ -1598,23 +1588,23 @@ function CreateProgramForm({
                                 ))}
                             </div>
                             <button type="button" onClick={fetchMasterData}
-                                className="flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition hover:bg-white hover:text-[#0AC4E0]">
-                                <RefreshCw size={14} />
+                                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-400 transition hover:bg-white hover:text-[#0AC4E0]">
+                                <RefreshCw size={16} />
                             </button>
                             <Button
                                 text={loading ? "Memproses..." : "Simpan Program"}
-                                icon={loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                icon={loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                 onClick={saveProgram}
                                 disabled={loading}
-                                className="!rounded-2xl !bg-[#0AC4E0] !px-4 !py-2 !text-[10px] !font-black !uppercase !tracking-widest !text-white shadow-lg shadow-cyan-100 hover:!bg-cyan-500"
+                                className="!rounded-2xl !bg-[#0AC4E0] !px-6 !py-3.5 !text-[11px] !font-black !uppercase !tracking-widest !text-white shadow-lg shadow-cyan-100 hover:!bg-cyan-500"
                             />
                         </div>
                     </div>
                 </header>
 
                 {/* STEP TABS */}
-                <div className="mt-3 shrink-0">
-                    <div className="grid grid-cols-3 gap-2">
+                <div className="mt-4 shrink-0">
+                    <div className="grid grid-cols-3 gap-4">
                         {MAIN_STEPS.map((step, index) => {
                             const Icon = step.icon;
                             const active = activeStep === step.key;
@@ -1630,15 +1620,15 @@ function CreateProgramForm({
                                             setActiveStep(step.key);
                                         }
                                     }}
-                                    className={`rounded-[1.2rem] border px-4 py-3 text-left transition ${active ? "border-[#0AC4E0]/30 bg-white shadow-[0_8px_25px_rgba(10,196,224,0.12)]" : "border-slate-100 bg-white/60 hover:bg-white"}`}
+                                    className={`rounded-[1.5rem] border px-5 py-4 text-left transition ${active ? "border-[#0AC4E0]/30 bg-white shadow-[0_8px_25px_rgba(10,196,224,0.12)]" : "border-slate-100 bg-white/60 hover:bg-white"}`}
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-[#0AC4E0]/10 text-[#0AC4E0]" : done ? "bg-emerald-50 text-emerald-500" : "bg-slate-50 text-slate-300"}`}>
-                                            <Icon size={15} />
+                                    <div className="flex items-center gap-3">
+                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${active ? "bg-[#0AC4E0]/10 text-[#0AC4E0]" : done ? "bg-emerald-50 text-emerald-500" : "bg-slate-50 text-slate-300"}`}>
+                                            <Icon size={18} />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className={`text-[8px] font-black uppercase tracking-widest ${active ? "text-[#0AC4E0]" : "text-slate-400"}`}>{step.label}</p>
-                                            <p className="truncate text-[11px] font-black text-slate-800">{step.title}</p>
+                                            <p className={`text-[9px] font-black uppercase tracking-widest ${active ? "text-[#0AC4E0]" : "text-slate-400"}`}>{step.label}</p>
+                                            <p className="truncate text-[14px] font-black text-slate-800">{step.title}</p>
                                         </div>
                                     </div>
                                 </button>
@@ -1648,8 +1638,8 @@ function CreateProgramForm({
                 </div>
 
                 {/* CONTENT */}
-                <section className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.8rem] border border-slate-100 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
-                    <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                <section className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.06)]">
+                    <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-7 py-6">
                         {activeStep === "identitas" && (
                             <IdentitasTimStep
                                 formData={formData}
@@ -1686,24 +1676,24 @@ function CreateProgramForm({
                     </div>
 
                     {/* FOOTER NAVIGATION */}
-                    <div className="shrink-0 border-t border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <div className="shrink-0 border-t border-slate-100 bg-slate-50/70 px-7 py-5">
                         <div className="flex items-center justify-between gap-3">
                             <button type="button" onClick={goPrev} disabled={currentStepIndex === 0}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
-                                <ChevronLeft size={13} /> Sebelumnya
+                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-100 bg-white px-5 py-3 text-[11px] font-black uppercase tracking-widest text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                                <ChevronLeft size={16} /> Sebelumnya
                             </button>
                             {activeStep === "review" ? (
                                 <Button
                                     text={loading ? "Memproses..." : "Terbitkan Program"}
-                                    icon={loading ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                    icon={loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                     onClick={saveProgram}
                                     disabled={loading}
-                                    className="!rounded-xl !bg-[#0AC4E0] !px-5 !py-2 !text-xs !font-bold !text-white hover:!bg-cyan-500"
+                                    className="!rounded-2xl !bg-[#0AC4E0] !px-6 !py-3 !text-xs !font-bold !text-white hover:!bg-cyan-500"
                                 />
                             ) : (
                                 <button type="button" onClick={goNext}
-                                    className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-800">
-                                    Lanjut <ChevronRight size={13} />
+                                    className="inline-flex items-center gap-2 rounded-2xl bg-[#2563EB] px-5 py-3 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]">
+                                    Lanjut <ChevronRight size={16} />
                                 </button>
                             )}
                         </div>
@@ -1838,7 +1828,25 @@ function CreateProgramForm({
                 </div>
             )}
 
-            <style dangerouslySetInnerHTML={{ __html: `.no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}` }} />
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                    .no-scrollbar::-webkit-scrollbar{display:none}
+                    .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+                    .program-form-shell .form-input{
+                        min-height:46px!important;
+                        font-size:14px!important;
+                        font-weight:700!important;
+                        color:#0f172a!important;
+                    }
+                    .program-form-shell label{
+                        font-size:11px!important;
+                    }
+                    .program-form-shell button,
+                    .program-form-shell .dropdown-trigger{
+                        font-size:12px;
+                    }
+                `,
+            }} />
         </PageWrapper>
     );
 }
@@ -1851,16 +1859,16 @@ function IdentitasTimStep({
     addSelectedItem, removeSelectedItem, handleMouUpload, hoUser, programPlaceholder, title,
 }) {
     return (
-        <div className="mx-auto w-full max-w-7xl">
+        <div className="w-full max-w-none">
             <SectionCard
-                icon={<Building2 size={16} />}
+                icon={<Building2 size={20} />}
                 title="Data Program & Periode"
-                desc="Nama program, periode, tim pelaksana, MOU, dan anggaran."
-                className="!p-5"
+                desc="Nama program, periode, tim pelaksana, dan dokumen MOU."
+                className="!p-7"
             >
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.05fr_1fr]">
-                    <div className="space-y-4">
-                        <p className="border-b border-slate-100 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
+                <div className="grid grid-cols-1 gap-7 xl:grid-cols-[1.05fr_1fr]">
+                    <div className="space-y-5">
+                        <p className="border-b border-slate-100 pb-3 text-[13px] font-black uppercase tracking-[0.16em] text-slate-800">
                             Data Program
                         </p>
 
@@ -1880,7 +1888,7 @@ function IdentitasTimStep({
                                         key={pilar.value}
                                         type="button"
                                         onClick={() => updateForm("pilarProgram", pilar.value)}
-                                        className={`rounded-xl border px-3 py-2.5 text-[10px] font-black uppercase tracking-widest transition ${formData.pilarProgram === pilar.value
+                                        className={`rounded-2xl border px-4 py-3.5 text-[12px] font-black uppercase tracking-widest transition ${formData.pilarProgram === pilar.value
                                             ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
                                             : "border-slate-100 bg-slate-50 text-slate-400 hover:border-[#0AC4E0]/30 hover:text-slate-600"
                                             }`}
@@ -1891,8 +1899,8 @@ function IdentitasTimStep({
                             </div>
                         </FormField>
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <FormField label="Tahun Anggaran">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <FormField label="Tahun Program">
                                 <Input
                                     value={formData.tahun}
                                     onChange={(e) => updateForm("tahun", e.target.value)}
@@ -1901,13 +1909,13 @@ function IdentitasTimStep({
                             </FormField>
 
                             <FormField label="Jenis Program">
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     {["PROJECT", "REGULER"].map((jenis) => (
                                         <button
                                             key={jenis}
                                             type="button"
                                             onClick={() => updateForm("jenisProgram", jenis)}
-                                            className={`flex-1 rounded-xl border px-2 py-2.5 text-[10px] font-black uppercase tracking-widest transition ${formData.jenisProgram === jenis
+                                            className={`flex-1 rounded-2xl border px-3 py-3.5 text-[12px] font-black uppercase tracking-widest transition ${formData.jenisProgram === jenis
                                                 ? "border-[#0AC4E0] bg-[#0AC4E0]/10 text-[#0AC4E0]"
                                                 : "border-slate-100 bg-slate-50 text-slate-400"
                                                 }`}
@@ -1919,7 +1927,7 @@ function IdentitasTimStep({
                             </FormField>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <FormField label="Tanggal Mulai Program">
                                 <Input
                                     type="date"
@@ -1939,38 +1947,38 @@ function IdentitasTimStep({
                         </div>
 
                         {formData.tanggalMulaiProgram && formData.tanggalSelesaiProgram && (
-                            <div className="rounded-xl border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 px-3 py-2">
+                            <div className="rounded-2xl border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 px-4 py-3">
                                 <div className="flex items-center gap-2">
-                                    <CalendarDays size={13} className="text-[#0AC4E0]" />
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">Periode Program</p>
+                                    <CalendarDays size={16} className="text-[#0AC4E0]" />
+                                    <p className="text-[11px] font-black uppercase tracking-widest text-[#0AC4E0]">Periode Program</p>
                                 </div>
-                                <p className="mt-1 text-[11px] font-bold text-slate-700">
+                                <p className="mt-1 text-[13px] font-bold text-slate-700">
                                     {getMonthPeriodName(formData.tanggalMulaiProgram)} sampai {getMonthPeriodName(formData.tanggalSelesaiProgram)}
                                 </p>
                             </div>
                         )}
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <FormField label="Head Office">
-                                <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-[12px] font-bold text-slate-600">
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3.5 text-[14px] font-bold text-slate-600">
                                     {hoUser.nama}
                                 </div>
                             </FormField>
 
                             <FormField label="Status Awal">
-                                <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-amber-600">
+                                <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3.5 text-[12px] font-black uppercase tracking-widest text-amber-600">
                                     Approval
                                 </div>
                             </FormField>
                         </div>
                     </div>
 
-                    <div className="space-y-4">
-                        <p className="border-b border-slate-100 pb-2 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
+                    <div className="space-y-5">
+                        <p className="border-b border-slate-100 pb-3 text-[13px] font-black uppercase tracking-[0.16em] text-slate-800">
                             Tim Pelaksana
                         </p>
 
-                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                             <FormField label="Sekolah Sasaran">
                                 <div className="relative z-30">
                                     <Dropdown
@@ -2007,7 +2015,7 @@ function IdentitasTimStep({
                                     onRemove={(value) => removeSelectedItem("selectedAOs", value)}
                                 />
                                 {formData.selectedSekolahs.length > 0 && filteredAoOptions.length === 0 && (
-                                    <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-bold leading-relaxed text-amber-700">
+                                    <p className="mt-2 rounded-xl bg-amber-50 px-4 py-3 text-[12px] font-bold leading-relaxed text-amber-700">
                                         Belum ada AO yang memiliki wilayah sama dengan sekolah sasaran.
                                     </p>
                                 )}
@@ -2030,11 +2038,11 @@ function IdentitasTimStep({
                             />
                         </FormField>
 
-                        <p className="border-b border-slate-100 pb-2 pt-1 text-[11px] font-black uppercase tracking-[0.18em] text-slate-800">
-                            Legalitas & Anggaran
+                        <p className="border-b border-slate-100 pb-3 pt-1 text-[13px] font-black uppercase tracking-[0.16em] text-slate-800">
+                            Legalitas & Dokumen
                         </p>
 
-                        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4">
                             <FormField label="Nomor MOU">
                                 <Input
                                     value={formData.nomorMou}
@@ -2042,17 +2050,6 @@ function IdentitasTimStep({
                                     placeholder="088/MOU/..."
                                     className="form-input"
                                 />
-                            </FormField>
-                            <FormField label="Anggaran Vendor">
-                                <div className="relative">
-                                    <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <Input
-                                        value={formatRupiah(formData.hargaVendor)}
-                                        onChange={(e) => updateForm("hargaVendor", cleanNumber(e.target.value))}
-                                        placeholder="Rp 0"
-                                        className="form-input !pl-9"
-                                    />
-                                </div>
                             </FormField>
                         </div>
 
@@ -2359,9 +2356,55 @@ function WorkflowFaseStep({
 
     const activeAdmin = activePeriod?.termin?.[0];
 
+    const totalAdministrasi = fases.reduce(
+        (total, period) => total + (period.termin?.[0]?.persyaratan || []).length,
+        0,
+    );
+    const totalAktivitas = fases.reduce(
+        (total, period) => total + (period.kegiatans || []).length,
+        0,
+    );
+    const totalBuktiAktivitas = fases.reduce(
+        (total, period) =>
+            total +
+            (period.kegiatans || []).reduce(
+                (sum, aktivitas) => sum + (aktivitas.persyaratan?.length || 0),
+                0,
+            ),
+        0,
+    );
+
     return (
-        <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 rounded-[1.2rem] border border-slate-100 bg-slate-50 p-2">
+        <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto]">
+                <div className="rounded-[1.4rem] border border-cyan-100 bg-[#F6FDFF] p-5 shadow-[0_16px_35px_rgba(10,196,224,0.10)]">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#078EA3]">
+                        Blueprint Progress Program
+                    </p>
+                    <h2 className="mt-2 text-[22px] font-black leading-tight text-slate-950">
+                        Susun alur bukti, aktivitas, review AO, dan keputusan HO per periode.
+                    </h2>
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-4">
+                        <BlueprintStat label="Periode" value={fases.length} />
+                        <BlueprintStat label="Administrasi" value={totalAdministrasi} />
+                        <BlueprintStat label="Aktivitas" value={totalAktivitas} />
+                        <BlueprintStat label="Bukti Aktivitas" value={totalBuktiAktivitas} />
+                    </div>
+                </div>
+
+                <div className="rounded-[1.4rem] border border-slate-100 bg-white p-5 shadow-sm xl:w-[340px]">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">
+                        Pola Monitoring
+                    </p>
+                    <div className="mt-3 space-y-2 text-[13px] font-bold leading-relaxed text-slate-600">
+                        <p>1. Vendor upload administrasi pembuka.</p>
+                        <p>2. AO review dan memberi catatan.</p>
+                        <p>3. HO ACC atau revisi, lalu aktivitas terbuka.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 rounded-[1.2rem] border border-cyan-100 bg-[#F6FDFF] p-2">
                 {fases.map((period, index) => {
                     const error = validateFase(period, kategori);
                     const active = activeFaseIndex === index;
@@ -2370,9 +2413,9 @@ function WorkflowFaseStep({
                             key={index}
                             type="button"
                             onClick={() => setActiveFaseIndex(index)}
-                            className={`rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${active
-                                ? "bg-[#0AC4E0] text-white shadow-sm"
-                                : "bg-white text-slate-400 hover:text-slate-700"
+                            className={`rounded-xl px-4 py-2 text-[11px] font-black uppercase tracking-widest transition ${active
+                                ? "bg-[#0AC4E0] text-white shadow-[0_10px_24px_rgba(10,196,224,0.22)]"
+                                : "bg-white text-slate-500 ring-1 ring-slate-100 hover:text-slate-900"
                                 }`}
                         >
                             {period.nama_fase || `Periode ${index + 1}`}
@@ -2387,14 +2430,14 @@ function WorkflowFaseStep({
                 <button
                     type="button"
                     onClick={addPeriod}
-                    className="inline-flex items-center gap-1 rounded-lg bg-slate-950 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white"
+                    className="inline-flex items-center gap-1 rounded-xl bg-[#0AC4E0] px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_10px_24px_rgba(10,196,224,0.22)]"
                 >
                     <Plus size={11} />
                     Periode
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px]">
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
                 <div className="space-y-4">
                     <SectionCard
                         icon={<CalendarDays size={16} />}
@@ -2664,7 +2707,7 @@ function WorkflowFaseStep({
                             <button
                                 type="button"
                                 onClick={addAktivitas}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-slate-800"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_10px_24px_rgba(10,196,224,0.20)] transition hover:bg-[#08B7D1]"
                             >
                                 <Plus size={11} />
                                 Tambah Aktivitas
@@ -2724,6 +2767,19 @@ function WorkflowFaseStep({
     );
 }
 
+function BlueprintStat({ label, value }) {
+    return (
+        <div className="rounded-2xl border border-cyan-100 bg-white px-4 py-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                {label}
+            </p>
+            <p className="mt-1 text-[24px] font-black leading-none text-[#0AC4E0]">
+                {value}
+            </p>
+        </div>
+    );
+}
+
 // =========================================================================
 // STEP 3 - REVIEW (tidak diubah)
 // =========================================================================
@@ -2751,7 +2807,6 @@ function ReviewStep({ title, formData, hoUser, fases }) {
                             : "-"],
                         ["Head Office", hoUser.nama || "-"],
                         ["Nomor MOU", formData.nomorMou || "-"],
-                        ["Anggaran Vendor", formatRupiah(formData.hargaVendor) || "Rp 0"],
                         ["Dokumen MOU", formData.fileName || "-"],
                     ]} />
                 </SectionCard>
@@ -2849,15 +2904,15 @@ function ReviewStep({ title, formData, hoUser, fases }) {
 // =========================================================================
 function SectionCard({ icon, title, desc, children, className = "" }) {
     return (
-        <div className={`rounded-[1.2rem] border border-slate-100 bg-white p-4 shadow-sm ${className}`}>
-            <div className="mb-3 flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">{icon}</div>
+        <div className={`rounded-[1.6rem] border border-slate-100 bg-white p-6 shadow-sm ${className}`}>
+            <div className="mb-5 flex items-center gap-3.5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0AC4E0]/10 text-[#0AC4E0]">{icon}</div>
                 <div>
-                    <p className="text-[12px] font-black text-slate-900">{title}</p>
-                    <p className="text-[9px] font-semibold text-slate-400">{desc}</p>
+                    <p className="text-[16px] font-black text-slate-900">{title}</p>
+                    <p className="text-[12px] font-semibold text-slate-400">{desc}</p>
                 </div>
             </div>
-            <div className="space-y-3">{children}</div>
+            <div className="space-y-5">{children}</div>
         </div>
     );
 }
@@ -2866,9 +2921,9 @@ function ReviewGrid({ items }) {
     return (
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             {items.map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                    <p className="text-[7px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-                    <p className="mt-0.5 truncate text-[11px] font-black text-slate-800">{value}</p>
+                <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+                    <p className="mt-1 truncate text-[14px] font-black text-slate-800">{value}</p>
                 </div>
             ))}
         </div>
@@ -2876,3 +2931,4 @@ function ReviewGrid({ items }) {
 }
 
 export default CreateProgramForm;
+

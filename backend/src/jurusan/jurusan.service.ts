@@ -4,6 +4,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,7 +16,7 @@ import { UpdateJurusanDto } from './dto/update-jurusan.dto';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 
 @Injectable()
-export class JurusanService {
+export class JurusanService implements OnModuleInit {
   constructor(
     @InjectRepository(Jurusan)
     private readonly jurusanRepo: Repository<Jurusan>,
@@ -25,6 +26,12 @@ export class JurusanService {
 
     private readonly notifikasiService: NotifikasiService,
   ) {}
+
+  async onModuleInit() {
+    await this.jurusanRepo.query(
+      'ALTER TABLE "m_jurusan" ADD COLUMN IF NOT EXISTS "gambar_jurusan" character varying(255)',
+    );
+  }
 
   private normalizeKode(value: any) {
     return String(value || '')
@@ -37,6 +44,11 @@ export class JurusanService {
   }
 
   private normalizeDeskripsi(value: any) {
+    const text = String(value || '').trim();
+    return text || null;
+  }
+
+  private normalizeGambar(value: any) {
     const text = String(value || '').trim();
     return text || null;
   }
@@ -111,6 +123,7 @@ export class JurusanService {
     const namaJurusan = this.normalizeNama(dto.nama_jurusan);
     const kodeJurusan = this.normalizeKode(dto.kode_jurusan);
     const deskripsiJurusan = this.normalizeDeskripsi(dto.deskripsi);
+    const gambarJurusan = this.normalizeGambar(dto.gambar_jurusan);
 
     if (!namaJurusan) {
       throw new BadRequestException('Nama jurusan wajib diisi.');
@@ -139,6 +152,7 @@ export class JurusanService {
       nama_jurusan: namaJurusan,
       kode_jurusan: kodeJurusan,
       deskripsi: deskripsiJurusan,
+      gambar_jurusan: gambarJurusan,
       status: this.parseStatus(dto.status),
     });
 
@@ -189,6 +203,11 @@ export class JurusanService {
         ? this.normalizeDeskripsi(dto.deskripsi)
         : jurusan.deskripsi;
 
+    const nextGambar =
+      dto.gambar_jurusan !== undefined
+        ? this.normalizeGambar(dto.gambar_jurusan)
+        : jurusan.gambar_jurusan;
+
     if (!nextNama) {
       throw new BadRequestException('Nama jurusan wajib diisi.');
     }
@@ -216,6 +235,7 @@ export class JurusanService {
     jurusan.nama_jurusan = nextNama;
     jurusan.kode_jurusan = nextKode;
     jurusan.deskripsi = nextDeskripsi;
+    jurusan.gambar_jurusan = nextGambar;
 
     if (dto.status !== undefined) {
       jurusan.status = this.parseStatus(dto.status);

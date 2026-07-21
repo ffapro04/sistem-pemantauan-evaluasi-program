@@ -197,9 +197,9 @@ export class ProgramController {
     @Param('id') id: string,
     @Headers('authorization') authHeader: string,
   ) {
-    const { id_user } = this.decodeToken(authHeader);
+    const { id_user, role } = this.decodeToken(authHeader);
 
-    return this.programService.approvePersyaratanTermin(+id, id_user);
+    return this.programService.approvePersyaratanTermin(+id, id_user, role);
   }
 
   @Patch('persyaratan-termin/:id/reject')
@@ -208,9 +208,9 @@ export class ProgramController {
     @Body() body: any,
     @Headers('authorization') authHeader: string,
   ) {
-    const { id_user } = this.decodeToken(authHeader);
+    const { id_user, role } = this.decodeToken(authHeader);
 
-    return this.programService.rejectPersyaratanTermin(+id, id_user, body);
+    return this.programService.rejectPersyaratanTermin(+id, id_user, role, body);
   }
 
   // ─── UPLOAD BUKTI KEGIATAN / AKTIVITAS ──────────────────────────────────────
@@ -286,9 +286,9 @@ export class ProgramController {
     @Param('id') id: string,
     @Headers('authorization') authHeader: string,
   ) {
-    const { id_user } = this.decodeToken(authHeader);
+    const { id_user, role } = this.decodeToken(authHeader);
 
-    return this.programService.approvePersyaratanKegiatan(+id, id_user);
+    return this.programService.approvePersyaratanKegiatan(+id, id_user, role);
   }
 
   @Patch('persyaratan-kegiatan/:id/reject')
@@ -297,9 +297,9 @@ export class ProgramController {
     @Body() body: any,
     @Headers('authorization') authHeader: string,
   ) {
-    const { id_user } = this.decodeToken(authHeader);
+    const { id_user, role } = this.decodeToken(authHeader);
 
-    return this.programService.rejectPersyaratanKegiatan(+id, id_user, body);
+    return this.programService.rejectPersyaratanKegiatan(+id, id_user, role, body);
   }
 
   // ─── COMMENT PER KEGIATAN ───────────────────────────────────────────────────

@@ -1,9 +1,25 @@
 ﻿/* eslint-disable react/prop-types */
-import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { clearAuthSession, getAuthSessionExpiresAt, getAuthToken } from "../../utils/authSession";
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+  const token = getAuthToken();
+
+  useEffect(() => {
+    if (!token) return undefined;
+
+    const expiresAt = getAuthSessionExpiresAt();
+    const delay = Math.max(0, expiresAt - Date.now());
+    const timer = window.setTimeout(() => {
+      clearAuthSession();
+      navigate("/login", { replace: true });
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [navigate, token]);
 
   if (!token) {
     return <Navigate to="/login" replace />;
@@ -15,6 +31,7 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     const decoded = jwtDecode(token);
     role = decoded.role.toLowerCase();
   } catch (err) {
+    clearAuthSession();
     return <Navigate to="/login" replace />;
   }
 

@@ -197,15 +197,16 @@ export const kepalaSekolahOperatorConfig = {
       fields: [
         {
           name: "password",
-          label: "Password",
+          label: "Password Baru",
           type: "password",
           placeholder: "Minimal 6 karakter",
+          hidden: ({ mode }) => mode === "edit",
           requiredOnCreate: true,
           minLength: 6,
           icon: KeyRound,
           help: ({ mode }) =>
             mode === "edit"
-              ? "Kosongkan password jika tidak ingin mengganti password."
+              ? "Kosongkan jika tidak ingin mengganti password kepala sekolah."
               : "Password wajib diisi saat membuat akun Kepala Sekolah.",
         },
         {

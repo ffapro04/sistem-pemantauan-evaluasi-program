@@ -1,6 +1,9 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Component, lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 import { ENABLE_UI_TRANSLATOR } from "./config/features";
+import { PageState } from "./components/common";
+import { clearAuthSession, getAuthToken, getAuthUser } from "./utils/authSession";
 
 const Onboarding = lazy(() => import("./page/onboarding/OnBoarding"));
 const Login = lazy(() => import("./page/otorisasi/Login"));
@@ -112,22 +115,168 @@ const AOProgramDetailPage = lazy(() => import("./components/ao/AOProgramDetailPa
 
 function RouteLoadingFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#F5FBFF] px-6 text-center">
-      <div>
-        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-cyan-100 border-t-[#0AC4E0]" />
-        <p className="mt-4 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">
-          Memuat halaman
-        </p>
-      </div>
-    </div>
+    <PageState
+      loading
+      title="Memuat halaman"
+      description="Mohon tunggu sebentar."
+      eyebrow="Sistem Monitoring Evaluasi"
+    />
   );
+}
+
+function getDecodedUser() {
+  const token = getAuthToken();
+  if (!token) return null;
+
+  try {
+    const decoded = jwtDecode(token);
+
+    if (decoded?.exp && decoded.exp * 1000 < Date.now()) {
+      clearAuthSession();
+      return null;
+    }
+
+    getAuthUser();
+    return decoded;
+  } catch {
+    clearAuthSession();
+    return null;
+  }
+}
+
+function getDefaultRoute(user = {}) {
+  const roleId = Number(user.id_role || user.role_id || 0);
+  const role = String(user.role || user.nama_role || "").toLowerCase();
+  const jabatan = String(user.jabatan || "").toLowerCase();
+  const jenis = String(user.jenis || "").toLowerCase();
+
+  if (roleId === 1 || role === "admin") return "/admin/dashboard";
+  if (roleId === 2 || role === "pengurus") return "/pengurus/dashboard";
+  if (roleId === 3 || role.includes("head office")) {
+    return jenis.includes("non")
+      ? "/ho/dashboard/non-akademik"
+      : "/ho/dashboard/akademik";
+  }
+  if (roleId === 4 || role.includes("area officer")) return "/ao/dashboard";
+  if (roleId === 6 || role.includes("vendor")) return "/vendor/dashboard";
+  if (roleId === 7 || role.includes("kepala dinas")) return "/kepala-dinas/dashboard";
+  if (roleId === 10 || role.includes("kepala sekolah") || jabatan.includes("kepala sekolah")) {
+    return "/kepala-sekolah/dashboard";
+  }
+  if (roleId === 5 || roleId === 8 || roleId === 9 || role.includes("sekolah") || role.includes("guru")) {
+    return "/sekolah/dashboard";
+  }
+
+  return "/login";
+}
+
+function getAllowedPrefixes(user = {}) {
+  const roleId = Number(user.id_role || user.role_id || 0);
+  const role = String(user.role || user.nama_role || "").toLowerCase();
+  const jabatan = String(user.jabatan || "").toLowerCase();
+  const common = ["/pengaturan-akun", "/integrasi/google-drive"];
+
+  if (roleId === 1 || role === "admin") return ["/admin", ...common];
+  if (roleId === 2 || role === "pengurus") return ["/pengurus", ...common];
+  if (roleId === 3 || role.includes("head office")) return ["/ho", ...common];
+  if (roleId === 4 || role.includes("area officer")) return ["/ao", ...common];
+  if (roleId === 6 || role.includes("vendor")) return ["/vendor", ...common];
+  if (roleId === 7 || role.includes("kepala dinas")) return ["/kepala-dinas", ...common];
+  if (roleId === 10 || role.includes("kepala sekolah") || jabatan.includes("kepala sekolah")) {
+    return ["/kepala-sekolah", "/sekolah", ...common];
+  }
+  if (roleId === 5 || roleId === 8 || roleId === 9 || role.includes("sekolah") || role.includes("guru")) {
+    return ["/sekolah", ...common];
+  }
+
+  return common;
+}
+
+function RouteAccessGuard({ children }) {
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  useEffect(() => {
+    document.title = "Yayasan Pendidikan Astra Michael D. Ruslim";
+    document.body.dataset.appRoute = pathname;
+
+    return () => {
+      delete document.body.dataset.appRoute;
+    };
+  }, [pathname]);
+
+  if (pathname === "/" || pathname === "/login") {
+    const user = getDecodedUser();
+
+    if (user && pathname === "/login") {
+      return <Navigate to={getDefaultRoute(user)} replace />;
+    }
+
+    return children;
+  }
+
+  const user = getDecodedUser();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const allowed = getAllowedPrefixes(user).some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+
+  if (!allowed) {
+    return <Navigate to={getDefaultRoute(user)} replace />;
+  }
+
+  return children;
+}
+
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Halaman gagal dirender:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <PageState
+          tone="error"
+          title="Halaman gagal dimuat"
+          description="Terjadi kendala saat membuka halaman ini. Silakan refresh, atau kembali ke halaman login jika sesi sudah habis."
+          primaryAction={{
+            label: "Refresh",
+            onClick: () => window.location.reload(),
+          }}
+          secondaryAction={{
+            label: "Login",
+            onClick: () => {
+              window.location.href = "/login";
+            },
+          }}
+        />
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <Suspense fallback={<RouteLoadingFallback />}>
+      <AppErrorBoundary>
+        <Suspense fallback={<RouteLoadingFallback />}>
         {ENABLE_UI_TRANSLATOR && <GlobalUiTranslator />}
+        <RouteAccessGuard>
         <Routes>
         {/* OTORISASI */}
         <Route path="/" element={<Onboarding />} />
@@ -395,7 +544,9 @@ function App() {
         {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
-      </Suspense>
+        </RouteAccessGuard>
+        </Suspense>
+      </AppErrorBoundary>
     </BrowserRouter>
   );
 }

@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 
 import logo_ypamdr from "../assets/img/logo_ypamdr.png";
 import Search from "../components/Search";
+import { clearAuthSession } from "../utils/authSession";
 
 const ChevronDown = ({ size = 16, className = "" }) => (
   <svg
@@ -142,7 +143,7 @@ function ProfileMenu({ profileOpen, setProfileOpen, navigate }) {
               <button
                 type="button"
                 onClick={() => {
-                  localStorage.clear();
+                  clearAuthSession();
                   navigate("/login");
                 }}
                 className="flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-[11px] font-black uppercase tracking-[0.14em] text-rose-500 transition-all hover:bg-rose-50"
@@ -536,7 +537,7 @@ function Navbar({
                           <button
                             type="button"
                             onClick={() => {
-                              localStorage.clear();
+                              clearAuthSession();
                               navigate("/login");
                             }}
                             className="rounded-xl bg-white py-3 text-[10px] font-black uppercase tracking-widest text-rose-500"

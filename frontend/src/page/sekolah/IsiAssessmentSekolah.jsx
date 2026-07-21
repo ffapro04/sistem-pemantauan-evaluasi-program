@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
@@ -13,8 +13,49 @@ import {
 } from "lucide-react";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import { getAuthToken } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const getAssessmentDeadlineDate = (assessment = {}) => {
+    if (assessment.deadline || assessment.tanggal_tenggat || assessment.due_date) {
+        const fixedDeadline = new Date(
+            assessment.deadline || assessment.tanggal_tenggat || assessment.due_date,
+        );
+
+        return Number.isNaN(fixedDeadline.getTime()) ? null : fixedDeadline;
+    }
+
+    const startDate =
+        assessment.sent_at ||
+        assessment.tanggal_kirim ||
+        assessment.created_at ||
+        assessment.createdAt ||
+        null;
+
+    const tenggat = Number(assessment.tenggat || 0);
+    if (!startDate || !tenggat) return null;
+
+    const deadline = new Date(startDate);
+    if (Number.isNaN(deadline.getTime())) return null;
+
+    deadline.setDate(deadline.getDate() + tenggat);
+    return deadline;
+};
+
+const isAssessmentExpired = (assessment = {}) => {
+    if (assessment.is_expired !== undefined && assessment.is_expired !== null) {
+        return Boolean(assessment.is_expired);
+    }
+
+    if (assessment.sisa_hari !== undefined && assessment.sisa_hari !== null) {
+        return Number(assessment.sisa_hari) <= 0;
+    }
+
+    const deadline = getAssessmentDeadlineDate(assessment);
+    return Boolean(deadline && Date.now() > deadline.getTime());
+};
 
 export default function IsiAssessmentSekolah() {
     const { id } = useParams();
@@ -29,21 +70,45 @@ export default function IsiAssessmentSekolah() {
     const [note, setNote] = useState({ show: false, type: null, message: "" });
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (token) setUser(jwtDecode(token));
     }, []);
 
     const fetchAssessment = useCallback(async () => {
         setLoading(true);
         try {
-            const { data } = await axios.get(`${BASE_URL}/assessment/${id}`);
+            const token = getAuthToken();
+            const { data } = await axios.get(`${BASE_URL}/assessment/${id}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+
+            if (data?.aktif === false || data?.status_pengisian === "Pending") {
+                setNote({
+                    show: true,
+                    type: "error",
+                    message: "Assessment sedang pending. Pengisian belum dibuka kembali.",
+                });
+                setTimeout(() => navigate("/sekolah/assessment"), 1200);
+                return;
+            }
+
+            if (isAssessmentExpired(data)) {
+                setNote({
+                    show: true,
+                    type: "error",
+                    message: "Tenggat assessment sudah selesai. Jawaban tidak bisa dikirim lagi.",
+                });
+                setTimeout(() => navigate("/sekolah/assessment"), 1200);
+                return;
+            }
+
             setAssessment(data);
         } catch {
             setNote({ show: true, type: "error", message: "Gagal memuat assessment." });
         } finally {
             setLoading(false);
         }
-    }, [id]);
+    }, [id, navigate]);
 
     useEffect(() => {
         fetchAssessment();
@@ -62,6 +127,14 @@ export default function IsiAssessmentSekolah() {
             setNote({ show: true, type: "error", message: "Harap jawab semua pertanyaan sebelum mengirim." });
             return;
         }
+        if (isAssessmentExpired(assessment)) {
+            setNote({
+                show: true,
+                type: "error",
+                message: "Tenggat assessment sudah selesai. Jawaban tidak bisa dikirim lagi.",
+            });
+            return;
+        }
         setSubmitting(true);
         try {
             const payload = {
@@ -73,10 +146,19 @@ export default function IsiAssessmentSekolah() {
                     jawaban,
                 })),
             };
-            await axios.post(`${BASE_URL}/assessment/${id}/jawab`, payload);
+            const token = getAuthToken();
+            await axios.post(`${BASE_URL}/assessment/${id}/jawab`, payload, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
             setDone(true);
-        } catch {
-            setNote({ show: true, type: "error", message: "Gagal mengirim jawaban. Coba lagi." });
+        } catch (error) {
+            setNote({
+                show: true,
+                type: "error",
+                message:
+                    error?.response?.data?.message ||
+                    "Gagal mengirim jawaban. Coba lagi.",
+            });
         } finally {
             setSubmitting(false);
         }

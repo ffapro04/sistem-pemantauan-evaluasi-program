@@ -30,13 +30,13 @@ import {
     Cell,
     Pie,
     PieChart,
-    ResponsiveContainer,
     Tooltip as RechartsTooltip,
     XAxis,
     YAxis,
 } from "recharts";
 import { toast } from "react-toastify";
 import { Sidebar, PageWrapper } from "../common";
+import ResponsiveContainer from "../charts/SafeResponsiveContainer";
 import ProgramRatingStars from "../program/ProgramRatingStars";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
@@ -2909,28 +2909,6 @@ function AODashboardPage({
                             />
                         </div>
 
-                        <div className="border-t border-slate-100">
-                            <div className="flex flex-col gap-1 px-5 py-4">
-                                <h3 className="text-sm font-black text-slate-800">
-                                    Daftar Program
-                                </h3>
-                                <p className="text-[10px] font-semibold text-slate-400">
-                                    {filteredPrograms.length} program sesuai filter · maksimal {PAGE_SIZE} baris per halaman
-                                </p>
-                            </div>
-
-                            <ProgramTable
-                                rows={programPageRows}
-                                totalRows={filteredPrograms.length}
-                                page={programPage}
-                                totalPages={programTotalPages}
-                                onPageChange={setProgramPage}
-                                navigate={navigate}
-                                detailPathPrefix={detailPathPrefix}
-                                schoolMap={scopedSchoolMap}
-                                wilayahMap={wilayahMap}
-                            />
-                        </div>
                     </section>
                 </section>
             </main>

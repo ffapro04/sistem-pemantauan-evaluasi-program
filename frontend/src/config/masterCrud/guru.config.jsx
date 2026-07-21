@@ -359,7 +359,6 @@ export const guruConfig = {
 
     normalizeDetail: (payload) => {
         const data = payload?.data || payload || {};
-        const passwordValue = data.password_hash || data.password || "";
         const guruJurusan =
             data.nama_jurusan ||
             data.jurusan_data?.nama_jurusan ||
@@ -397,8 +396,8 @@ export const guruConfig = {
                 "",
             guru_jurusan: guruJurusan,
             nip: data.nip || "",
-            password: passwordValue,
-            password_original: passwordValue,
+            password: "",
+            password_original: "",
             password_changed: false,
             is_active:
                 data.is_active === undefined || data.is_active === null
@@ -659,15 +658,20 @@ export const guruConfig = {
         },
         {
             title: "Akses Guru",
-            description: "Password digunakan guru untuk masuk assessment.",
+            description: "Gunakan hanya untuk reset password akses assessment guru.",
             fields: [
                 {
                     name: "password",
-                    label: "Password",
+                    label: "Password Baru",
                     type: "password",
                     placeholder: "Minimal 8 karakter",
+                    hidden: ({ mode }) => mode === "edit",
                     requiredOnCreate: true,
                     minLength: 8,
+                    help: ({ mode }) =>
+                        mode === "edit"
+                            ? "Kosongkan jika tidak ingin mengganti password guru."
+                            : "Password digunakan guru untuk masuk assessment.",
                 },
                 {
                     name: "is_active",

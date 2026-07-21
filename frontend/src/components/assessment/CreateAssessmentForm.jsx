@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -27,8 +27,10 @@ import Input from "../Input";
 import Button from "../Button";
 import Label from "../Label";
 import { filterSchoolsByHoAccess } from "../../utils/hoAccess";
+import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE = "";
+const API_BASE =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -82,7 +84,7 @@ const normalizeArray = (payload) => {
     return [];
 };
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => getAuthToken();
 
 const getHoIdFromToken = () => {
     const token = getToken();
@@ -592,6 +594,7 @@ function CreateAssessmentForm({
 
     const handleSubmit = async (event) => {
         if (event) event.preventDefault();
+        if (saving) return;
 
         if (!validateForm()) return;
 

@@ -8,6 +8,180 @@ body {
   font-family: "Poppins", sans-serif;
 }
 
+body[data-app-route^="/admin"] main {
+  --admin-content-font-size: 13px;
+}
+
+body[data-app-route^="/admin"] main :is(
+  [class*="text-[7px]"],
+  [class*="text-[8px]"],
+  [class*="text-[9px]"],
+  [class*="text-[10px]"],
+  [class*="text-[11px]"],
+  [class*="text-[12px]"],
+  .text-xs
+) {
+  font-size: var(--admin-content-font-size) !important;
+  line-height: 1.45 !important;
+}
+
+body[data-app-route^="/admin"] main :is(
+  table th,
+  table td,
+  input,
+  select,
+  textarea,
+  button
+) {
+  font-size: var(--admin-content-font-size) !important;
+}
+
+body[data-app-route^="/admin"] main :is(
+  .admin-province-marker,
+  .admin-province-marker__count,
+  .admin-kabupaten-marker__dot span,
+  .admin-kabupaten-marker__label
+) {
+  font-size: var(--admin-content-font-size) !important;
+}
+
+@media (min-width: 1280px) {
+  .dashboard-analytics-grid {
+    grid-template-columns: var(--chart-column, minmax(0, 0.95fr))
+      var(--list-column, minmax(0, 1.05fr));
+  }
+}
+
+.Toastify__toast-container {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  top: 20px;
+}
+
+.Toastify__toast {
+  min-height: 64px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 14px 16px;
+  color: #0f172a;
+  box-shadow: 0 18px 55px rgba(15, 23, 42, 0.14);
+  font-family: "Poppins", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.Toastify__toast-body {
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.55;
+}
+
+.Toastify__toast-icon {
+  margin-top: 2px;
+}
+
+.Toastify__close-button {
+  align-self: center;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.Toastify__progress-bar {
+  height: 3px;
+}
+
+.Toastify__toast--success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.Toastify__toast--error {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.Toastify__toast--warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.Toastify__toast--info {
+  background: #ecfeff;
+  border-color: #a5f3fc;
+}
+
+.app-confirm-popup {
+  width: min(430px, calc(100vw - 32px));
+  border-radius: 24px;
+  border: 1px solid #e2e8f0;
+  padding: 28px;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+}
+
+.app-confirm-title {
+  padding: 0;
+  color: #0f172a;
+  font-family: "Poppins", sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.app-confirm-text {
+  margin: 12px 0 0;
+  color: #64748b;
+  font-family: "Poppins", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.app-confirm-actions {
+  margin-top: 24px;
+  gap: 10px;
+}
+
+.app-confirm-button {
+  min-width: 128px;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-family: "Poppins", sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    transform 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.app-confirm-button:active {
+  transform: scale(0.98);
+}
+
+.app-confirm-button-primary {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.app-confirm-button-primary:hover {
+  background: #0ac4e0;
+}
+
+.app-confirm-button-secondary {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.app-confirm-button-secondary:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+}
+
 /*  Fade + Slide masuk */
 @keyframes fadeInUp {
   from {
@@ -849,8 +1023,52 @@ html {
 }
 
 .recharts-responsive-container {
-  min-width: 0 !important;
+  width: 100% !important;
+  min-width: 1px !important;
   min-height: 180px !important;
+}
+
+.safe-chart-container {
+  display: block;
+  position: relative;
+  overflow: visible;
+  flex: 1 1 auto;
+}
+
+.safe-chart-container .recharts-responsive-container,
+.safe-chart-container .recharts-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+.safe-chart-container svg {
+  max-width: 100%;
+  overflow: visible;
+}
+
+body[data-app-route*="program"] .text-slate-950,
+body[data-app-route*="program"] .text-slate-900 {
+  color: #1e293b !important;
+}
+
+body[data-app-route*="program"] .bg-slate-950,
+body[data-app-route*="program"] .hover\:bg-slate-900:hover {
+  background-color: #2563eb !important;
+}
+
+body[data-app-route*="program"] .border-slate-900,
+body[data-app-route*="program"] .ring-slate-900 {
+  border-color: #bae6fd !important;
+  --tw-ring-color: #bae6fd !important;
+}
+
+body[data-app-route*="program"] [class*="rgba(15,23,42"],
+body[data-app-route*="program"] [class*="rgba(2,6,23"] {
+  box-shadow: 0 14px 38px rgba(14, 165, 233, 0.12) !important;
+}
+
+body[data-app-route*="program"] .simple-scroll {
+  scrollbar-color: #67e8f9 transparent;
 }
 
 /* HP kecil */
@@ -1026,6 +1244,73 @@ div {
   min-height: 96px !important;
 }
 
+/* =========================================================
+   PROGRAM CREATE / EDIT SCALE
+   ========================================================= */
+.program-form-shell label,
+.program-form-shell [class*="!text-[10px]"],
+.program-form-shell [class*="text-[10px]"] {
+  font-size: 12px !important;
+}
+
+.program-form-shell input,
+.program-form-shell textarea,
+.program-form-shell select,
+.program-form-shell .form-input,
+.program-form-shell .input-clean {
+  min-height: 52px !important;
+  padding: 0.9rem 1rem !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+  border-radius: 1rem !important;
+}
+
+.program-form-shell textarea {
+  min-height: 118px !important;
+}
+
+.program-form-shell button {
+  line-height: 1.15 !important;
+}
+
+.program-form-shell [class*="tracking-widest"] {
+  letter-spacing: 0.08em !important;
+}
+
+.program-form-shell [class*="text-[7px]"],
+.program-form-shell [class*="text-[8px]"],
+.program-form-shell [class*="text-[9px]"] {
+  font-size: 11px !important;
+}
+
+.program-form-shell [class*="!text-[11px]"],
+.program-form-shell [class*="text-[11px]"] {
+  font-size: 13px !important;
+}
+
+.program-form-shell [class*="!text-[12px]"],
+.program-form-shell [class*="text-[12px]"] {
+  font-size: 14px !important;
+}
+
+.program-form-shell [class*="!py-1.5"] {
+  padding-top: 0.7rem !important;
+  padding-bottom: 0.7rem !important;
+}
+
+.program-form-shell [class*="rounded-lg"] {
+  border-radius: 0.9rem !important;
+}
+
+.program-form-shell .custom-scrollbar button,
+.program-form-shell [role="option"] {
+  min-height: 42px;
+}
+
+.program-form-shell [class*="max-w-7xl"] {
+  max-width: none !important;
+}
+
 /* Laptop kecil / tablet besar */
 @media (max-width: 1280px) {
   main {
@@ -1192,5 +1477,444 @@ div {
 
   .fc .fc-scroller {
     overflow: auto !important;
+  }
+}
+
+@keyframes jurusanCarouselIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.jurusan-carousel-card {
+  animation: jurusanCarouselIn 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body[data-app-route^="/sekolah"] main,
+body[data-app-route^="/kepala-sekolah"] main {
+  font-size: 15px;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[7px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[7px]"] {
+  font-size: 0.625rem !important;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[8px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[8px]"] {
+  font-size: 0.6875rem !important;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[9px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[9px]"] {
+  font-size: 0.75rem !important;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[10px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[10px]"] {
+  font-size: 0.8125rem !important;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[11px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[11px]"] {
+  font-size: 0.875rem !important;
+}
+
+body[data-app-route^="/sekolah"] [class*="text-[12px]"],
+body[data-app-route^="/kepala-sekolah"] [class*="text-[12px]"] {
+  font-size: 0.9375rem !important;
+}
+
+body[data-app-route^="/sekolah"] .text-xs,
+body[data-app-route^="/kepala-sekolah"] .text-xs {
+  font-size: 0.875rem !important;
+  line-height: 1.35rem !important;
+}
+
+body[data-app-route^="/sekolah"] .text-sm,
+body[data-app-route^="/kepala-sekolah"] .text-sm {
+  font-size: 0.96875rem !important;
+  line-height: 1.5rem !important;
+}
+
+/* =========================================================
+   GLOBAL READABILITY SCALE - ALL ROLES
+   ========================================================= */
+html {
+  font-size: 16.5px;
+}
+
+body {
+  color: #020617;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+button,
+input,
+select,
+textarea,
+[role="button"],
+[role="option"] {
+  font-family: "Poppins", sans-serif !important;
+}
+
+body [class*="text-[5"],
+body [class*="text-[6"],
+body [class*="text-[7px]"],
+body [class*="text-[8px]"] {
+  font-size: 0.75rem !important;
+  line-height: 1.05rem !important;
+}
+
+body [class*="text-[8.5px]"],
+body [class*="text-[9px]"] {
+  font-size: 0.8125rem !important;
+  line-height: 1.15rem !important;
+}
+
+body [class*="text-[10px]"],
+body [class*="!text-[10px]"],
+body .text-xs {
+  font-size: 0.875rem !important;
+  line-height: 1.35rem !important;
+}
+
+body [class*="text-[11px]"],
+body [class*="!text-[11px]"] {
+  font-size: 0.9375rem !important;
+  line-height: 1.45rem !important;
+}
+
+body [class*="text-[12px]"],
+body [class*="!text-[12px]"],
+body .text-sm {
+  font-size: 1rem !important;
+  line-height: 1.55rem !important;
+}
+
+body [class*="text-[13px]"],
+body [class*="text-[13.5px]"],
+body [class*="!text-[13px]"],
+body .text-base {
+  font-size: 1.0625rem !important;
+  line-height: 1.65rem !important;
+}
+
+body [class*="text-[14px]"],
+body [class*="!text-[14px]"] {
+  font-size: 1.125rem !important;
+  line-height: 1.75rem !important;
+}
+
+body [class*="text-[15px]"],
+body [class*="!text-[15px]"] {
+  font-size: 1.1875rem !important;
+  line-height: 1.8rem !important;
+}
+
+body [class*="text-[16px]"],
+body [class*="!text-[16px]"],
+body .text-lg {
+  font-size: 1.25rem !important;
+  line-height: 1.9rem !important;
+}
+
+body input,
+body textarea,
+body select,
+body .form-input,
+body .input-clean {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+}
+
+body button,
+body a[role="button"] {
+  font-size: max(0.875rem, 1em);
+}
+
+body th,
+body td {
+  font-size: max(0.875rem, 1em);
+  line-height: 1.45;
+}
+
+.Toastify__toast {
+  font-size: 0.9375rem !important;
+}
+
+.app-confirm-text {
+  font-size: 0.9375rem !important;
+}
+
+.app-confirm-button {
+  font-size: 0.875rem !important;
+}
+
+/* =========================================================
+   DASHBOARD COCKPIT THEME - ALL ROLES
+   Compact executive view inspired by vehicle instrument panels.
+   ========================================================= */
+body[data-app-route*="/dashboard"] main {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(34, 211, 238, 0.18), transparent 28%),
+    radial-gradient(circle at 86% 10%, rgba(16, 185, 129, 0.14), transparent 24%),
+    linear-gradient(135deg, #f8fdff 0%, #eefaff 42%, #f7fbff 100%) !important;
+  color: #020617 !important;
+}
+
+body[data-app-route*="/dashboard"] main > div,
+body[data-app-route*="/dashboard"] main > section {
+  gap: 0.85rem !important;
+}
+
+body[data-app-route*="/dashboard"] h1,
+body[data-app-route*="/dashboard"] .text-4xl,
+body[data-app-route*="/dashboard"] .text-5xl,
+body[data-app-route*="/dashboard"] [class*="text-[40px]"],
+body[data-app-route*="/dashboard"] [class*="text-[44px]"],
+body[data-app-route*="/dashboard"] [class*="text-[48px]"] {
+  font-size: clamp(1.6rem, 2.2vw, 2.15rem) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+}
+
+body[data-app-route*="/dashboard"] h2,
+body[data-app-route*="/dashboard"] .text-2xl,
+body[data-app-route*="/dashboard"] .text-3xl,
+body[data-app-route*="/dashboard"] [class*="text-[28px]"],
+body[data-app-route*="/dashboard"] [class*="text-[32px]"],
+body[data-app-route*="/dashboard"] [class*="text-[36px]"] {
+  font-size: clamp(1.25rem, 1.55vw, 1.65rem) !important;
+  line-height: 1.18 !important;
+}
+
+body[data-app-route*="/dashboard"] p,
+body[data-app-route*="/dashboard"] span,
+body[data-app-route*="/dashboard"] li {
+  letter-spacing: 0 !important;
+  overflow-wrap: anywhere;
+}
+
+body[data-app-route*="/dashboard"] p {
+  max-width: 72ch;
+}
+
+body[data-app-route*="/dashboard"] p[class*="max-w-"][class*="text-slate-400"],
+body[data-app-route*="/dashboard"] p[class*="max-w-"][class*="text-slate-500"],
+body[data-app-route*="/dashboard"] p[class*="leading-"][class*="text-slate-400"][class*="font-semibold"],
+body[data-app-route*="/dashboard"] p[class*="leading-"][class*="text-slate-500"][class*="font-semibold"] {
+  display: none !important;
+}
+
+body[data-app-route*="/dashboard"] .tracking-\[0\.28em\],
+body[data-app-route*="/dashboard"] .tracking-\[0\.24em\],
+body[data-app-route*="/dashboard"] .tracking-\[0\.2em\],
+body[data-app-route*="/dashboard"] .tracking-\[0\.18em\],
+body[data-app-route*="/dashboard"] .tracking-widest {
+  letter-spacing: 0.08em !important;
+}
+
+body[data-app-route*="/dashboard"] .rounded-\[2rem\],
+body[data-app-route*="/dashboard"] .rounded-\[28px\],
+body[data-app-route*="/dashboard"] .rounded-\[32px\],
+body[data-app-route*="/dashboard"] .rounded-3xl {
+  border-radius: 18px !important;
+}
+
+body[data-app-route*="/dashboard"] .shadow-2xl,
+body[data-app-route*="/dashboard"] .shadow-xl,
+body[data-app-route*="/dashboard"] .shadow-lg,
+body[data-app-route*="/dashboard"] [class*="shadow-["] {
+  box-shadow: 0 18px 42px rgba(14, 116, 144, 0.12) !important;
+}
+
+body[data-app-route*="/dashboard"] section,
+body[data-app-route*="/dashboard"] article,
+body[data-app-route*="/dashboard"] .bg-white,
+body[data-app-route*="/dashboard"] .bg-white\/90,
+body[data-app-route*="/dashboard"] .bg-white\/95 {
+  border-color: rgba(125, 211, 252, 0.42) !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="p-10"],
+body[data-app-route*="/dashboard"] [class*="p-9"],
+body[data-app-route*="/dashboard"] [class*="p-8"],
+body[data-app-route*="/dashboard"] [class*="px-10"],
+body[data-app-route*="/dashboard"] [class*="px-9"],
+body[data-app-route*="/dashboard"] [class*="px-8"] {
+  padding-left: clamp(1rem, 1.6vw, 1.55rem) !important;
+  padding-right: clamp(1rem, 1.6vw, 1.55rem) !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="p-10"],
+body[data-app-route*="/dashboard"] [class*="p-9"],
+body[data-app-route*="/dashboard"] [class*="p-8"],
+body[data-app-route*="/dashboard"] [class*="py-10"],
+body[data-app-route*="/dashboard"] [class*="py-9"],
+body[data-app-route*="/dashboard"] [class*="py-8"] {
+  padding-top: clamp(1rem, 1.45vw, 1.45rem) !important;
+  padding-bottom: clamp(1rem, 1.45vw, 1.45rem) !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="gap-10"],
+body[data-app-route*="/dashboard"] [class*="gap-9"],
+body[data-app-route*="/dashboard"] [class*="gap-8"],
+body[data-app-route*="/dashboard"] [class*="gap-7"] {
+  gap: clamp(0.75rem, 1.2vw, 1.15rem) !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="mb-10"],
+body[data-app-route*="/dashboard"] [class*="mb-9"],
+body[data-app-route*="/dashboard"] [class*="mb-8"],
+body[data-app-route*="/dashboard"] [class*="mt-10"],
+body[data-app-route*="/dashboard"] [class*="mt-9"],
+body[data-app-route*="/dashboard"] [class*="mt-8"] {
+  margin-top: clamp(0.75rem, 1.1vw, 1.1rem) !important;
+  margin-bottom: clamp(0.75rem, 1.1vw, 1.1rem) !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="grid-cols-4"],
+body[data-app-route*="/dashboard"] [class*="grid-cols-5"],
+body[data-app-route*="/dashboard"] [class*="grid-cols-6"] {
+  align-items: stretch !important;
+}
+
+body[data-app-route*="/dashboard"] input,
+body[data-app-route*="/dashboard"] select,
+body[data-app-route*="/dashboard"] button,
+body[data-app-route*="/dashboard"] [role="button"] {
+  min-height: 2.55rem !important;
+  border-radius: 14px !important;
+}
+
+body[data-app-route*="/dashboard"] .truncate {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="line-clamp"] {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 4 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+body[data-app-route*="/dashboard"] table {
+  table-layout: auto;
+}
+
+body[data-app-route*="/dashboard"] th,
+body[data-app-route*="/dashboard"] td {
+  padding-top: 0.7rem !important;
+  padding-bottom: 0.7rem !important;
+}
+
+body[data-app-route*="/dashboard"] .recharts-wrapper,
+body[data-app-route*="/dashboard"] .recharts-responsive-container {
+  max-height: 560px !important;
+}
+
+body[data-app-route*="/dashboard"] .leaflet-container {
+  height: 100% !important;
+  min-height: 260px !important;
+  max-height: none !important;
+  border-radius: 18px !important;
+}
+
+body[data-app-route*="/dashboard"] .leaflet-map-pane,
+body[data-app-route*="/dashboard"] .leaflet-tile-pane,
+body[data-app-route*="/dashboard"] .leaflet-overlay-pane,
+body[data-app-route*="/dashboard"] .leaflet-marker-pane {
+  min-height: 100%;
+}
+
+body[data-app-route*="/dashboard"] [class*="min-h-[600px]"],
+body[data-app-route*="/dashboard"] [class*="min-h-[560px]"],
+body[data-app-route*="/dashboard"] [class*="min-h-[520px]"],
+body[data-app-route*="/dashboard"] [class*="min-h-[500px]"] {
+  min-height: 360px !important;
+}
+
+body[data-app-route*="/dashboard"] [class*="h-[620px]"],
+body[data-app-route*="/dashboard"] [class*="h-[600px]"],
+body[data-app-route*="/dashboard"] [class*="h-[560px]"],
+body[data-app-route*="/dashboard"] [class*="h-[520px]"],
+body[data-app-route*="/dashboard"] [class*="h-[500px]"] {
+  height: 360px !important;
+}
+
+body[data-app-route^="/admin/dashboard"] .admin-dashboard-visual-panel {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+body[data-app-route^="/admin/dashboard"] .admin-dashboard-visual-grid {
+  align-items: start !important;
+}
+
+body[data-app-route^="/admin/dashboard"] .admin-dashboard-visual-tile {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+body[data-app-route*="/dashboard"] .overflow-x-auto {
+  scrollbar-width: thin;
+}
+
+body[data-app-route*="/dashboard"] .overflow-y-auto,
+body[data-app-route*="/dashboard"] .overflow-auto {
+  scrollbar-width: thin;
+}
+
+body[data-app-route*="/dashboard"] .text-slate-400,
+body[data-app-route*="/dashboard"] .text-slate-500,
+body[data-app-route*="/dashboard"] .text-slate-600 {
+  color: #475569 !important;
+}
+
+body[data-app-route*="/dashboard"] .text-slate-900,
+body[data-app-route*="/dashboard"] .text-slate-950 {
+  color: #020617 !important;
+}
+
+body[data-app-route*="/dashboard"] .bg-cyan-500,
+body[data-app-route*="/dashboard"] .bg-sky-500,
+body[data-app-route*="/dashboard"] .bg-blue-600 {
+  background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
+}
+
+body[data-app-route*="/dashboard"] .border-cyan-100,
+body[data-app-route*="/dashboard"] .border-sky-100,
+body[data-app-route*="/dashboard"] .border-blue-100 {
+  border-color: rgba(103, 232, 249, 0.55) !important;
+}
+
+@media (min-width: 1280px) {
+  body[data-app-route*="/dashboard"] main {
+    overflow-y: auto;
+  }
+
+  body[data-app-route*="/dashboard"] main > div {
+    max-width: none;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 1024px) {
+  body[data-app-route*="/dashboard"] main {
+    padding: 0.85rem !important;
   }
 }

@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 
 import { getHoAllowedJenjang, normalizeValue } from "../utils/hoAccess";
+import { clearAuthSession, getAuthToken } from "../utils/authSession";
 
 const API_BASE_URL = (
   import.meta.env.VITE_API_URL ||
@@ -119,7 +120,16 @@ const isOperatorSekolahUser = (user = {}) => {
   const role = String(user?.role || user?.nama_role || "").toLowerCase();
   const jabatan = String(user?.jabatan || "").toLowerCase();
 
+  if (
+    idRole === 10 ||
+    role.includes("kepala sekolah") ||
+    jabatan.includes("kepala sekolah")
+  ) {
+    return false;
+  }
+
   return (
+    idRole === 5 ||
     idRole === 9 ||
     role.includes("operator") ||
     jabatan.includes("operator sekolah") ||
@@ -396,19 +406,6 @@ const getRoleMenus = (idRole, hoUser) => {
       items: [
         { label: "Assessment", path: "/sekolah/assessment", icon: ClipboardList },
         { label: "Program Sekolah", path: "/sekolah/program", icon: FileCheck2 },
-        { label: "Daftar Guru", path: "/sekolah/daftar-guru", icon: GraduationCap },
-        { label: "Daftar Kelas", path: "/sekolah/daftar-kelas", icon: School },
-
-        ...(getUserJenjang(hoUser) === "SMK"
-          ? [
-            {
-              label: "Daftar Jurusan",
-              path: "/sekolah/daftar-jurusan",
-              icon: Layers,
-            },
-          ]
-          : []),
-
         { label: "Berita Acara", path: "/sekolah/berita-acara", icon: Newspaper },
       ],
     },
@@ -1064,23 +1061,23 @@ const NotchNavigation = ({
 
   return (
     <>
-      <div className="fixed left-2 right-2 top-3 z-[9999] sm:left-4 sm:right-4 lg:left-1/2 lg:right-auto lg:top-2 lg:w-[min(1120px,calc(100vw-2rem))] lg:-translate-x-1/2">
-        <div className="relative mx-auto overflow-hidden rounded-[1.55rem] border border-cyan-100/80 bg-white/92 p-2 text-slate-800 shadow-[0_22px_70px_rgba(15,23,42,0.14)] backdrop-blur-2xl lg:rounded-[1.9rem]">
+      <div className="fixed left-2 right-2 top-3 z-[9999] sm:left-4 sm:right-4 lg:sticky lg:left-auto lg:right-auto lg:top-0 lg:z-[70] lg:h-screen lg:w-[292px] lg:shrink-0 lg:translate-x-0 lg:p-3 xl:w-[304px]">
+        <div className="relative mx-auto overflow-hidden rounded-[1.55rem] border border-cyan-100/80 bg-white/92 p-2 text-slate-800 shadow-[0_22px_70px_rgba(15,23,42,0.14)] backdrop-blur-2xl lg:flex lg:h-full lg:flex-col lg:rounded-[1.45rem] lg:shadow-[0_18px_44px_rgba(14,116,144,0.10)]">
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#0AC4E0]/35 to-transparent" />
           <div className="pointer-events-none absolute -left-20 top-0 h-24 w-48 rounded-full bg-[#0AC4E0]/12 blur-3xl" />
 
-          <div className="relative flex items-center gap-2">
-            <div className="flex min-w-0 shrink-0 items-center gap-2 rounded-[1.15rem] bg-cyan-50/70 px-2 py-2 ring-1 ring-cyan-100 sm:px-3">
+          <div className="relative flex items-center gap-2 lg:h-full lg:flex-col lg:items-stretch">
+            <div className="flex min-w-0 shrink-0 items-center gap-2 rounded-[1.15rem] bg-cyan-50/70 px-2 py-2 ring-1 ring-cyan-100 sm:px-3 lg:w-full lg:px-3 lg:py-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] text-white shadow-[0_8px_18px_rgba(10,196,224,0.28)]">
                 <Home size={16} />
               </div>
-              <div className="hidden min-w-0 sm:block">
-                <p className="max-w-[150px] truncate text-[11px] font-black leading-none tracking-tight text-slate-950 lg:max-w-[190px]">{brandTitle}</p>
-                <p className="mt-1 max-w-[150px] truncate text-[8px] font-bold uppercase tracking-wider text-slate-400 lg:max-w-[190px]">{brandSubtitle}</p>
+              <div className="hidden min-w-0 sm:block lg:block">
+                <p className="max-w-[150px] text-[11px] font-black leading-tight tracking-tight text-slate-950 lg:max-w-none">{brandTitle}</p>
+                <p className="mt-1 max-w-[150px] text-[8px] font-bold uppercase tracking-wider text-slate-400 lg:max-w-none">{brandSubtitle}</p>
               </div>
             </div>
 
-            <nav className="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-[1.15rem] bg-slate-50/80 p-1 ring-1 ring-slate-100">
+            <nav className="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-[1.15rem] bg-slate-50/80 p-1 ring-1 ring-slate-100 lg:w-full lg:flex-none lg:flex-col lg:items-stretch lg:overflow-x-hidden lg:overflow-y-auto lg:bg-transparent lg:p-0 lg:ring-0">
               {menuItems.map((item) => {
                 const Icon = item.icon || LayoutDashboard;
                 const isActive = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
@@ -1089,7 +1086,7 @@ const NotchNavigation = ({
                     key={item.path}
                     to={item.path}
                     title={item.label}
-                    className={`group relative isolate flex h-11 shrink-0 items-center gap-2.5 overflow-hidden rounded-[0.95rem] px-3 text-[12px] font-black transition-all duration-200 sm:px-4 lg:px-5 ${isActive
+                    className={`group relative isolate flex min-h-11 shrink-0 items-center gap-2.5 overflow-hidden rounded-[0.95rem] px-3 py-2 text-[13px] font-black transition-all duration-200 sm:px-4 lg:w-full lg:px-3 ${isActive
                       ? "text-slate-950 shadow-[0_12px_28px_rgba(10,196,224,0.18)]"
                       : "text-slate-500 hover:bg-white hover:text-slate-900"
                       }`}
@@ -1108,13 +1105,13 @@ const NotchNavigation = ({
                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all ${isActive ? "bg-white text-[#0AC4E0] shadow-sm" : "bg-white text-slate-400 ring-1 ring-slate-100 group-hover:text-[#0AC4E0]"}`}>
                       <Icon size={15} />
                     </span>
-                    <span className="whitespace-nowrap leading-none">{item.label}</span>
+                    <span className="min-w-0 flex-1 whitespace-normal break-words leading-tight">{item.label}</span>
                   </NavLink>
                 );
               })}
             </nav>
 
-            <div className="flex shrink-0 items-center gap-1.5 rounded-[1.15rem] bg-slate-50/80 p-1.5 ring-1 ring-slate-100">
+            <div className="flex shrink-0 items-center gap-1.5 rounded-[1.15rem] bg-slate-50/80 p-1.5 ring-1 ring-slate-100 lg:mt-auto lg:w-full lg:justify-between">
               <div className="hidden items-center gap-1.5 rounded-full px-2 text-[10px] font-bold text-slate-400 xl:flex">
                 <Clock3 size={12} className="text-[#0AC4E0]" />
                 <span>{now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -1200,7 +1197,7 @@ const RightPoniNavigation = ({
 
   return (
     <>
-      <aside className="group fixed right-4 top-1/2 z-[9999] w-[78px] -translate-y-1/2 overflow-hidden rounded-l-[2rem] border border-cyan-100/80 bg-white/95 p-2 text-slate-800 shadow-[0_24px_80px_rgba(15,23,42,0.18)] backdrop-blur-2xl transition-all duration-300 hover:w-[270px] max-lg:right-2 max-lg:w-[70px] max-lg:hover:w-[235px]">
+      <aside className="group fixed right-3 top-1/2 z-[70] w-[68px] -translate-y-1/2 overflow-hidden rounded-l-[1.45rem] border border-cyan-100/80 bg-white/95 p-2 text-slate-800 shadow-[0_18px_52px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition-all duration-300 hover:w-[238px] max-lg:right-2 max-lg:w-[64px] max-lg:hover:w-[220px]">
         <div className="pointer-events-none absolute -left-20 top-0 h-40 w-40 rounded-full bg-[#0AC4E0]/15 blur-3xl" />
 
         <div className="relative mb-2 flex items-center gap-3 rounded-[1.25rem] bg-cyan-50/80 p-2 ring-1 ring-cyan-100">
@@ -1230,7 +1227,7 @@ const RightPoniNavigation = ({
                 key={item.path}
                 to={item.path}
                 title={item.label}
-                className={`group/item flex h-12 items-center gap-3 rounded-[1.15rem] px-2 text-[11px] font-black transition-all duration-200 ${isActive
+                className={`group/item flex h-12 items-center gap-3 rounded-[1.15rem] px-2 text-[12px] font-black transition-all duration-200 ${isActive
                   ? "bg-cyan-50 text-slate-950 shadow-[0_12px_28px_rgba(10,196,224,0.18)]"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                   }`}
@@ -1374,7 +1371,7 @@ const Sidebar = () => {
     let isMounted = true;
 
     const loadUser = async () => {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       if (!token) {
         navigate("/login");
         return;
@@ -1385,7 +1382,7 @@ const Sidebar = () => {
       try {
         decoded = jwtDecode(token);
       } catch (error) {
-        localStorage.clear();
+        clearAuthSession();
         navigate("/login");
         return;
       }
@@ -1507,7 +1504,7 @@ const Sidebar = () => {
 
   const menuGroups = useMemo(
     () => getRoleMenus(user.id_role, user),
-    [user.id_role, user],
+    [user],
   );
 
   const staticMenuGroups = useMemo(
@@ -1520,7 +1517,7 @@ const Sidebar = () => {
   );
 
   const fetchNotifications = useCallback(async ({ silent = false } = {}) => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return;
 
     if (!silent) setNotificationLoading(true);
@@ -1568,7 +1565,7 @@ const Sidebar = () => {
   );
 
   const handleNotificationClick = async (item) => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (item?.unread && item?.id && token) {
       try {
@@ -1596,7 +1593,7 @@ const Sidebar = () => {
   };
 
   const handleMarkAllRead = async () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token || unreadNotificationCount === 0) return;
 
     setMarkingAll(true);
@@ -1617,7 +1614,7 @@ const Sidebar = () => {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    clearAuthSession();
     navigate("/login");
   };
 
@@ -1634,7 +1631,7 @@ const Sidebar = () => {
         onClick={() => setMobileSidebarOpen(false)}
         className={({ isActive: navActive }) => {
           const active = navActive || isActive;
-          return `group flex items-center gap-3 rounded-r-[1.3rem] px-3.5 py-2.5 text-[11px] font-black transition-all ${active
+          return `group flex min-h-12 items-center gap-3 rounded-[1.15rem] px-3.5 py-2.5 text-[13px] font-black leading-tight transition-all ${active
             ? "bg-[#0AC4E0] text-white shadow-[0_14px_30px_rgba(10,196,224,0.24)]"
             : "text-slate-500 hover:bg-[#0AC4E0]/5 hover:text-slate-900"
             }`;
@@ -1644,11 +1641,11 @@ const Sidebar = () => {
           const active = navActive || isActive;
           return (
             <>
-              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all ${active ? "bg-white/15 text-white" : "bg-slate-50 text-slate-300 group-hover:bg-white group-hover:text-[#0AC4E0]"}`}>
-                <Icon size={15} />
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${active ? "bg-white/15 text-white" : "bg-slate-50 text-slate-300 group-hover:bg-white group-hover:text-[#0AC4E0]"}`}>
+                <Icon size={16} />
               </div>
-              <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {active && <ChevronRight size={12} />}
+              <span className="min-w-0 flex-1 whitespace-normal break-words">{item.label}</span>
+              {active && <ChevronRight size={13} />}
             </>
           );
         }}
@@ -1656,9 +1653,8 @@ const Sidebar = () => {
     );
   };
 
-  // ===== ROLE DENGAN NAVIGASI PONI =====
-  // Pengurus, AO, dan Kepala Sekolah tetap memakai poni atas.
-  // Kepala Dinas memakai poni khusus di sisi kanan agar tidak menutup konten atas.
+  // ===== ROLE DENGAN NAVIGASI KHUSUS =====
+  // Seluruh role eksekutif memakai dock kiri agar main content tidak tertutup.
   if ([2, 4, 7, 10].includes(Number(user.id_role)) || isKepalaSekolahUser(user)) {
     const currentRoleId = Number(user.id_role);
     const isKepsek = currentRoleId === 10 || isKepalaSekolahUser(user);
@@ -1703,35 +1699,20 @@ const Sidebar = () => {
 
     return (
       <>
-        {currentRoleId === 7 ? (
-          <RightPoniNavigation
-            menuGroups={staticMenuGroups}
-            location={location}
-            onLogout={handleLogout}
-            user={user}
-            unreadCount={unreadNotificationCount}
-            onProfileClick={openProfileHub}
-            onNotificationClick={openNotificationHub}
-            onSettingsClick={openSettingsPage}
-            brandTitle={notchBrand.title}
-            brandSubtitle={notchBrand.subtitle}
-          />
-        ) : (
-            <NotchNavigation
-              menuGroups={staticMenuGroups}
-              location={location}
-              onLogout={handleLogout}
-              user={user}
-              roleLabel={roleLabel}
-              unreadCount={unreadNotificationCount}
-              onProfileClick={openProfileHub}
-              onNotificationClick={openNotificationHub}
-              onSettingsClick={openSettingsPage}
-              now={now}
-              brandTitle={notchBrand.title}
-              brandSubtitle={notchBrand.subtitle}
-            />
-        )}
+        <NotchNavigation
+          menuGroups={staticMenuGroups}
+          location={location}
+          onLogout={handleLogout}
+          user={user}
+          roleLabel={roleLabel}
+          unreadCount={unreadNotificationCount}
+          onProfileClick={openProfileHub}
+          onNotificationClick={openNotificationHub}
+          onSettingsClick={openSettingsPage}
+          now={now}
+          brandTitle={notchBrand.title}
+          brandSubtitle={notchBrand.subtitle}
+        />
 
         <UserNotificationModal
           open={showNotificationHub}
@@ -1788,9 +1769,9 @@ const Sidebar = () => {
         )}
       </AnimatePresence>
 
-      <div className="hidden w-[280px] shrink-0 lg:block" aria-hidden="true" />
+      <div className="hidden w-[304px] shrink-0 lg:block" aria-hidden="true" />
 
-      <aside className={`fixed inset-y-0 left-0 z-[220] flex h-dvh w-[min(300px,86vw)] shrink-0 flex-col overflow-hidden rounded-r-[2rem] border-r border-slate-100 bg-white px-4 py-5 font-inter text-slate-800 shadow-[14px_0_45px_rgba(15,23,42,0.16)] transition-transform duration-300 ease-out lg:z-[80] lg:h-screen lg:w-[280px] lg:translate-x-0 lg:shadow-[14px_0_45px_rgba(15,23,42,0.06)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-[220] flex h-dvh w-[min(320px,88vw)] shrink-0 flex-col overflow-hidden rounded-r-[1.55rem] border-r border-cyan-100/70 bg-white px-4 py-5 font-inter text-slate-800 shadow-[16px_0_48px_rgba(14,116,144,0.12)] transition-transform duration-300 ease-out lg:z-[80] lg:h-screen lg:w-[304px] lg:translate-x-0 lg:shadow-[14px_0_38px_rgba(14,116,144,0.08)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div>
@@ -1823,7 +1804,7 @@ const Sidebar = () => {
           <div className="space-y-5 pb-4 shrink-0">
             {staticMenuGroups.map((group) => (
               <div key={group.label}>
-                <p className="mb-2 flex items-center gap-2 text-[8px] font-black uppercase tracking-[0.25em] text-slate-400">
+                <p className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
                   <Database size={10} className="text-[#0AC4E0]" />
                   {group.label}
                 </p>
@@ -1836,7 +1817,7 @@ const Sidebar = () => {
 
           {managementMenuGroups.map((group) => (
             <div key={group.label} className="flex flex-1 flex-col min-h-0 border-t border-slate-100 pt-3">
-              <p className="mb-2 flex shrink-0 items-center gap-2 text-[8px] font-black uppercase tracking-[0.25em] text-slate-400">
+              <p className="mb-2 flex shrink-0 items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
                 <Database size={10} className="text-[#0AC4E0]" />
                 {group.label}
               </p>

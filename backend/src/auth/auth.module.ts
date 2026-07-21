@@ -10,11 +10,14 @@ import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './jwt/jwt.strategy';
 import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.entity';
+import { NotifikasiModule } from '../notifikasi/notifikasi.module';
+import { EmailService } from './email.service';
 
 @Module({
   imports: [
     ConfigModule,
     UsersModule,
+    NotifikasiModule,
     PassportModule,
 
     JwtModule.registerAsync({
@@ -43,7 +46,7 @@ import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.enti
     TypeOrmModule.forFeature([AssessmentGuru]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, EmailService],
   exports: [JwtModule, AuthService],
 })
 export class AuthModule {}

@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useMemo, useState } from "react";
 import {
     ArrowLeft,
@@ -18,7 +18,8 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import Sidebar from "../../components/Sidebar";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 function normalizeArray(payload) {
     if (Array.isArray(payload)) return payload;

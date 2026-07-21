@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,8 +26,10 @@ import {
     PageWrapper,
     Button,
 } from "../common";
+import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const STATUS_STYLE = {
     APPROVED: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -218,7 +220,7 @@ function AOProgramDetailPage({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -395,7 +397,7 @@ function AOProgramDetailPage({
         if (row.parentType !== "kegiatan" || !row.parentId) return;
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             await fetch(`${API_BASE_URL}/program/kegiatan/${row.parentId}/comment`, {
                 method: "POST",
@@ -450,7 +452,7 @@ function AOProgramDetailPage({
         setCommentLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             const response = await fetch(
                 `${API_BASE_URL}/program/kegiatan/${commentModal.row.parentId}/comment`,
@@ -509,7 +511,7 @@ function AOProgramDetailPage({
             if (reason === null) return;
         }
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
 
         const endpointBase =
             row.parentType === "termin"

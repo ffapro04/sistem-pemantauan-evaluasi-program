@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -36,7 +36,7 @@ import astraLogo from "../../assets/img/logo-astra.png";
 import satuIndonesiaLogo from "../../assets/img/satu_indonesia.png";
 import INDONESIA_HOLIDAY_EVENTS from "../../data/indonesiaHolidayEvents";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const AgendaFullCalendar = lazy(() => import("./AgendaFullCalendar"));
 
 const AGENDA_LOGO_PATHS = {
@@ -330,10 +330,18 @@ function getRoleId(user = {}) {
 function getSchoolId(user = {}) {
     return (
         user?.id_sekolah ??
+        user?.idSekolah ??
         user?.sekolah_id ??
+        user?.schoolId ??
         user?.school_id ??
+        user?.user?.id_sekolah ??
+        user?.user?.sekolah_id ??
+        user?.operator?.id_sekolah ??
+        user?.kepala_sekolah?.id_sekolah ??
+        user?.guru?.id_sekolah ??
         user?.sekolah?.id_sekolah ??
         user?.sekolah?.id ??
+        user?.sekolah?.idSekolah ??
         user?.school?.id_sekolah ??
         user?.school?.id ??
         ""

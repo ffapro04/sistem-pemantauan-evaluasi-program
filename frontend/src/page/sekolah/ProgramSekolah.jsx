@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
@@ -23,8 +23,10 @@ import {
 } from "lucide-react";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import { getAuthToken } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+const PROGRAM_PAGE_SIZE = 6;
 
 const PROGRAM_STATUS_COLOR = {
     aktif: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -154,6 +156,12 @@ function getRatingStats(activity = {}) {
 function getOwnGuruRating(activity = {}, user = {}) {
     const guruId = String(getGuruAssessmentId(user) || "");
     const userId = String(user?.id_user || user?.sub || user?.id || "");
+    const roleId = Number(user?.id_role || 0);
+    const roleText = String(user?.role || user?.nama_role || "").toLowerCase();
+    const expectedType =
+        roleId === 10 || roleText.includes("kepala sekolah")
+            ? "KEPALA_SEKOLAH"
+            : "GURU";
     const ratings = getArray(activity.ratings, activity.rating_items);
 
     return ratings.find((item) => {
@@ -162,7 +170,7 @@ function getOwnGuruRating(activity = {}, user = {}) {
         const itemUserId = String(item?.id_user || "");
 
         return (
-            type === "GURU" &&
+            type === expectedType &&
             ((guruId && itemGuruId === guruId) || (userId && itemUserId === userId))
         );
     }) || null;
@@ -439,20 +447,16 @@ function ProgramCard({ program, onClick }) {
         <button
             type="button"
             onClick={onClick}
-            className="group w-full overflow-hidden rounded-[1.7rem] border border-slate-100 bg-white text-left shadow-[0_16px_45px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-1 hover:border-[#0AC4E0]/30 hover:shadow-[0_22px_55px_rgba(15,23,42,0.08)] active:scale-[0.99]"
+            className="group w-full overflow-hidden rounded-[1.25rem] border border-slate-100 bg-white text-left shadow-[0_12px_34px_rgba(15,23,42,0.045)] transition-all hover:-translate-y-0.5 hover:border-[#0AC4E0]/30 hover:shadow-[0_18px_44px_rgba(15,23,42,0.07)] active:scale-[0.99]"
         >
-            <div className="p-5">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1.2rem] bg-[#0AC4E0]/10 text-[#0AC4E0]">
-                        <BookOpen size={20} />
-                    </div>
-
+            <div className="p-4">
+                <div className="mb-3 flex items-start justify-end gap-3">
                     <span className={`rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${PROGRAM_STATUS_COLOR[statusKey] || "border-slate-100 bg-slate-50 text-slate-400"}`}>
                         {derivedStatus || "-"}
                     </span>
                 </div>
 
-                <p className="line-clamp-2 text-[15px] font-black leading-snug text-slate-950">
+                <p className="line-clamp-2 text-[14px] font-black leading-snug text-slate-950">
                     {program.nama_program || program.nama || "Program"}
                 </p>
 
@@ -473,7 +477,7 @@ function ProgramCard({ program, onClick }) {
                     )}
                 </div>
 
-                <div className="mt-5 rounded-[1.2rem] border border-slate-100 bg-slate-50 px-4 py-3">
+                <div className="mt-4 rounded-[1rem] border border-slate-100 bg-slate-50 px-3.5 py-3">
                     <div className="mb-2 flex items-center justify-between">
                         <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
                             Progress Bukti
@@ -499,7 +503,7 @@ function ProgramCard({ program, onClick }) {
                 </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-[9px] font-black uppercase tracking-widest text-slate-400 transition group-hover:text-[#0AC4E0]">
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-cyan-50/40 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-500 transition group-hover:text-[#0AC4E0]">
                 Lihat Detail
                 <ChevronRight size={13} />
             </div>
@@ -570,7 +574,7 @@ export default function ProgramSekolah() {
     const [commentText, setCommentText] = useState("");
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return;
 
         try {
@@ -581,7 +585,10 @@ export default function ProgramSekolah() {
     }, []);
 
     const idRole = Number(user?.id_role || 0);
-    const isGuru = idRole === 8;
+    const roleText = String(user?.role || user?.nama_role || "").toLowerCase();
+    const isGuru = idRole === 8 || user?.type === "guru-assessment";
+    const isKepalaSekolah = idRole === 10 || roleText.includes("kepala sekolah");
+    const canRateProgram = isGuru || isKepalaSekolah;
 
     const fetchList = useCallback(async () => {
         if (!user?.id_sekolah) return;
@@ -589,28 +596,12 @@ export default function ProgramSekolah() {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const { data } = await axios.get(`${BASE_URL}/program/sekolah/${user.id_sekolah}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            const basePrograms = normalizeArray(data);
-
-            const detailedPrograms = await Promise.all(
-                basePrograms.map(async (program) => {
-                    try {
-                        const response = await axios.get(`${BASE_URL}/program/${program.id_program}`, {
-                            headers: { Authorization: `Bearer ${token}` },
-                        });
-
-                        return response.data?.data || response.data || program;
-                    } catch {
-                        return program;
-                    }
-                }),
-            );
-
-            setList(detailedPrograms);
+            setList(normalizeArray(data));
         } catch {
             setNote({
                 show: true,
@@ -630,7 +621,7 @@ export default function ProgramSekolah() {
         setDetailLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const { data } = await axios.get(`${BASE_URL}/program/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -652,7 +643,7 @@ export default function ProgramSekolah() {
 
     const fetchComments = async (idKegiatan) => {
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const { data } = await axios.get(`${BASE_URL}/program/kegiatan/${idKegiatan}/comments`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
@@ -676,7 +667,7 @@ export default function ProgramSekolah() {
         setCommentLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             await axios.post(
                 `${BASE_URL}/program/kegiatan/${commentDrawer.id_kegiatans}/comment`,
@@ -724,15 +715,15 @@ export default function ProgramSekolah() {
         setRatingLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             await axios.post(
                 `${BASE_URL}/program/kegiatan/${ratingModal.id_kegiatans}/rating`,
                 {
                     rating: ratingValue,
                     comment: ratingComment,
-                    rater_type: "GURU",
-                    id_guru_assessment: getGuruAssessmentId(user),
+                    rater_type: isKepalaSekolah ? "KEPALA_SEKOLAH" : "GURU",
+                    id_guru_assessment: isGuru ? getGuruAssessmentId(user) : null,
                     id_sekolah: user?.id_sekolah || ratingModal?.id_sekolah || selectedProgram?.id_sekolah,
                 },
                 { headers: { Authorization: `Bearer ${token}` } },
@@ -795,7 +786,7 @@ export default function ProgramSekolah() {
         >
             <MasterAlert note={note} setNote={setNote} />
 
-            <div className="h-full overflow-y-auto px-8 py-6 no-scrollbar">
+            <div className="h-full overflow-y-auto px-6 py-6 no-scrollbar md:px-8">
                 {!selectedProgram && (
                     <ProgramListView
                         list={list}
@@ -823,28 +814,12 @@ export default function ProgramSekolah() {
                             <DetailMetric label="Ditolak" value={progress.rejected} tone="red" helper="Perlu revisi vendor" />
                         </div>
 
-                        <PeriodTabs
-                            periods={periods}
-                            activePeriod={activePeriod}
-                            setActivePeriod={setActivePeriod}
+                        <SimpleProgramFeedbackPanel
+                            program={selectedProgram}
+                            canRate={canRateProgram}
+                            user={user}
+                            openRating={openRating}
                         />
-
-                        {currentPeriod ? (
-                            <PeriodContent
-                                period={currentPeriod}
-                                periodIndex={activePeriod}
-                                isGuru={isGuru}
-                                user={user}
-                                openComment={openComment}
-                                openRating={openRating}
-                            />
-                        ) : (
-                            <EmptyState
-                                icon={<Layers3 size={38} />}
-                                title="Belum ada periode"
-                                description="Program ini belum memiliki periode, administrasi, atau aktivitas."
-                            />
-                        )}
                     </div>
                 )}
             </div>
@@ -881,6 +856,16 @@ export default function ProgramSekolah() {
 }
 
 function ProgramListView({ list, loading, onOpenDetail }) {
+    const [page, setPage] = useState(1);
+    const totalPages = Math.max(1, Math.ceil(list.length / PROGRAM_PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * PROGRAM_PAGE_SIZE;
+    const visibleList = list.slice(startIndex, startIndex + PROGRAM_PAGE_SIZE);
+
+    useEffect(() => {
+        setPage(1);
+    }, [list.length]);
+
     if (loading) {
         return <LoadingState label="Memuat program..." />;
     }
@@ -896,14 +881,48 @@ function ProgramListView({ list, loading, onOpenDetail }) {
     }
 
     return (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {list.map((program) => (
-                <ProgramCard
-                    key={program.id_program}
-                    program={program}
-                    onClick={() => onOpenDetail(program.id_program)}
-                />
-            ))}
+        <div className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {visibleList.map((program) => (
+                    <ProgramCard
+                        key={program.id_program}
+                        program={program}
+                        onClick={() => onOpenDetail(program.id_program)}
+                    />
+                ))}
+            </div>
+
+            <div className="flex flex-col gap-3 rounded-[1.25rem] border border-slate-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    Menampilkan {startIndex + 1}-{Math.min(startIndex + visibleList.length, list.length)} dari {list.length} program
+                </p>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        disabled={safePage <= 1}
+                        onClick={() => setPage((current) => Math.max(1, current - 1))}
+                        className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        <ChevronRight size={13} className="rotate-180" />
+                        Prev
+                    </button>
+
+                    <span className="inline-flex h-9 min-w-14 items-center justify-center rounded-xl bg-[#0AC4E0] px-3 text-[10px] font-black text-white">
+                        {safePage} / {totalPages}
+                    </span>
+
+                    <button
+                        type="button"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                        className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        Next
+                        <ChevronRight size={13} />
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -974,6 +993,126 @@ function InfoLine({ icon, label, value }) {
     );
 }
 
+function getProgramFeedbackActivities(program = {}) {
+    return getArray(program?.fases).flatMap((period, periodIndex) => {
+        const periodName = period.nama_fase || period.nama || `Periode ${periodIndex + 1}`;
+        return getArray(period.kegiatans, period.kegiatan, period.t_kegiatans).map(
+            (activity, activityIndex) => ({
+                ...activity,
+                periodName,
+                activityIndex,
+                unlocked: canOpenActivity(period, activity, activityIndex),
+                activityStatus: getActivityStatus(activity),
+            }),
+        );
+    });
+}
+
+function SimpleProgramFeedbackPanel({ program, canRate, user, openRating }) {
+    const activities = getProgramFeedbackActivities(program);
+    const approvedActivities = activities.filter(
+        (activity) => activity.unlocked && activity.activityStatus === "APPROVED",
+    );
+    const pendingActivities = activities.filter(
+        (activity) => activity.activityStatus !== "APPROVED",
+    );
+
+    if (!activities.length) {
+        return (
+            <EmptyState
+                icon={<Layers3 size={38} />}
+                title="Belum ada aktivitas"
+                description="Program ini belum memiliki aktivitas yang bisa ditampilkan."
+            />
+        );
+    }
+
+    return (
+        <section className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                        Feedback Program
+                    </p>
+                    <h3 className="mt-1 text-[18px] font-black text-slate-950">
+                        Rating aktivitas selesai
+                    </h3>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                        Halaman ini dibuat ringkas untuk melihat status dan memberi rating saja.
+                    </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-emerald-600">
+                        {approvedActivities.length} bisa dinilai
+                    </span>
+                    <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-[8px] font-black uppercase tracking-widest text-slate-400">
+                        {pendingActivities.length} belum selesai
+                    </span>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 p-5 lg:grid-cols-2">
+                {approvedActivities.map((activity) => {
+                    const ratingStats = getRatingStats(activity);
+                    const ownRating = getOwnGuruRating(activity, user);
+
+                    return (
+                        <div
+                            key={activity.id_kegiatans || `${activity.periodName}-${activity.activityIndex}`}
+                            className="rounded-[1.25rem] border border-emerald-100 bg-emerald-50/40 p-4"
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                    <span className="rounded-full border border-cyan-100 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                        {activity.periodName}
+                                    </span>
+                                    <h4 className="mt-3 text-[14px] font-black leading-snug text-slate-950">
+                                        {activity.nama_kegiatans ||
+                                            activity.nama_kegiatan ||
+                                            activity.nama ||
+                                            `Aktivitas ${activity.activityIndex + 1}`}
+                                    </h4>
+                                    <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Rating rata-rata {ratingStats.average || 0}/5 dari {ratingStats.total || 0} penilaian
+                                    </p>
+                                </div>
+
+                                {canRate ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => openRating(activity)}
+                                        className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 text-[9px] font-black uppercase tracking-widest text-amber-500 transition hover:bg-amber-100"
+                                    >
+                                        <Star size={14} />
+                                        {ownRating ? `Edit ${ownRating.rating}/5` : "Rating"}
+                                    </button>
+                                ) : (
+                                    <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        Lihat saja
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+
+                {approvedActivities.length === 0 && (
+                    <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center lg:col-span-2">
+                        <CheckCircle2 size={30} className="mx-auto text-slate-300" />
+                        <p className="mt-3 text-[13px] font-black text-slate-800">
+                            Belum ada aktivitas selesai
+                        </p>
+                        <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                            Rating akan tersedia setelah aktivitas disetujui HO.
+                        </p>
+                    </div>
+                )}
+            </div>
+        </section>
+    );
+}
+
 function PeriodTabs({ periods, activePeriod, setActivePeriod }) {
     if (!periods.length) return null;
 
@@ -1027,8 +1166,8 @@ function PeriodContent({ period, periodIndex, isGuru, user, openComment, openRat
     const openingDone = isOpeningCompleted(period);
 
     return (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-            <section className="space-y-5 xl:col-span-5">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+            <section className="space-y-4 xl:col-span-5">
                 <SectionCard
                     title="Administrasi Pembuka"
                     subtitle="Bukti administratif sebelum aktivitas dibuka"
@@ -1051,7 +1190,7 @@ function PeriodContent({ period, periodIndex, isGuru, user, openComment, openRat
                 </SectionCard>
             </section>
 
-            <section className="space-y-5 xl:col-span-7">
+            <section className="space-y-4 xl:col-span-7">
                 <SectionCard
                     title="Aktivitas Program"
                     subtitle="Aktivitas berjalan setelah administrasi disetujui"

@@ -1,23 +1,32 @@
 /* eslint-disable prettier/prettier */
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GoogleDriveService } from '../google-drive/google-drive.service';
+import { Vendor } from '../vendor/entities/vendor.entity';
+import { Program } from './entities/program.entity';
 import { Termin } from './entities/termin.entity';
 import { TerminChat } from './entities/termin-chat.entity';
 
 @Injectable()
 export class TerminService {
   constructor(
+    @InjectRepository(Program)
+    private readonly programRepo: Repository<Program>,
+
     @InjectRepository(Termin)
     private readonly terminRepo: Repository<Termin>,
 
     @InjectRepository(TerminChat)
     private readonly chatRepo: Repository<TerminChat>,
+
+    @InjectRepository(Vendor)
+    private readonly vendorRepo: Repository<Vendor>,
 
     private readonly googleDriveService: GoogleDriveService,
   ) {}
@@ -28,6 +37,253 @@ export class TerminService {
     const numberValue = Number(value);
 
     return Number.isNaN(numberValue) ? null : numberValue;
+  }
+
+  private toNumberArray(value: any) {
+    if (!value) return [];
+
+    if (Array.isArray(value)) {
+      return value.map((item) => Number(item)).filter(Number.isFinite);
+    }
+
+    return String(value)
+      .replace(/[{}[\]]/g, '')
+      .split(',')
+      .map((item) => Number(String(item).trim()))
+      .filter(Number.isFinite);
+  }
+
+  private isElevatedChatUser(user: any) {
+    const idRole = Number(user?.id_role || 0);
+    const roleText = String(user?.role_user || '').toLowerCase();
+
+    return (
+      [1, 2, 3, 4].includes(idRole) ||
+      roleText.includes('admin') ||
+      roleText.includes('pengurus') ||
+      roleText.includes('head office') ||
+      roleText === 'ho' ||
+      roleText.includes('area officer') ||
+      roleText === 'ao'
+    );
+  }
+
+  private isVendorChatUser(user: any) {
+    const idRole = Number(user?.id_role || 0);
+    const roleText = String(user?.role_user || '').toLowerCase();
+
+    return (
+      idRole === 6 ||
+      roleText.includes('vendor') ||
+      roleText.includes('narasumber')
+    );
+  }
+
+  private getProgramVendorIds(program: Program) {
+    return [
+      ...this.toNumberArray((program as any).vendor_ids),
+      ...this.toNumberArray((program as any).id_vendor),
+    ].filter((value, index, array) => array.indexOf(value) === index);
+  }
+
+  private getProgramSchoolIds(program: Program) {
+    const sekolahIds = this.toNumberArray((program as any).sekolah_ids);
+    const primarySchoolId = this.toNumberOrNull((program as any).id_sekolah);
+
+    return [
+      ...sekolahIds,
+      ...(primarySchoolId ? [primarySchoolId] : []),
+    ].filter((value, index, array) => array.indexOf(value) === index);
+  }
+
+  private async getProgramIdFromFase(id_fase: number) {
+    const rows = await this.programRepo.manager.query(
+      'SELECT id_program FROM t_fase WHERE id_fase = $1 LIMIT 1',
+      [id_fase],
+    );
+
+    return this.toNumberOrNull(rows?.[0]?.id_program);
+  }
+
+  private async getProgramIdFromKegiatan(id_kegiatans: number) {
+    const rows = await this.programRepo.manager.query(
+      `
+        SELECT f.id_program
+        FROM t_kegiatans k
+        JOIN t_fase f ON f.id_fase = k.id_fase
+        WHERE k.id_kegiatans = $1
+        LIMIT 1
+      `,
+      [id_kegiatans],
+    );
+
+    return this.toNumberOrNull(rows?.[0]?.id_program);
+  }
+
+  private async getProgramIdFromTermin(id_termin: number) {
+    const rows = await this.programRepo.manager.query(
+      `
+        SELECT COALESCE(tf.id_program, kf.id_program) AS id_program
+        FROM t_termin t
+        LEFT JOIN t_fase tf ON tf.id_fase = t.id_fase
+        LEFT JOIN t_kegiatans k ON k.id_kegiatans = t.id_kegiatans
+        LEFT JOIN t_fase kf ON kf.id_fase = k.id_fase
+        WHERE t.id_termin = $1
+        LIMIT 1
+      `,
+      [id_termin],
+    );
+
+    return this.toNumberOrNull(rows?.[0]?.id_program);
+  }
+
+  private async getProgramIdsFromRequirement(
+    id_persyaratan: number,
+    context: { id_termin?: number | null; id_kegiatans?: number | null },
+  ) {
+    const programIds = new Set<number>();
+
+    if (!context.id_kegiatans) {
+      const terminRows = await this.programRepo.manager.query(
+        `
+          SELECT COALESCE(tf.id_program, kf.id_program) AS id_program
+          FROM t_persyaratan_termin p
+          JOIN t_termin t ON t.id_termin = p.id_termin
+          LEFT JOIN t_fase tf ON tf.id_fase = t.id_fase
+          LEFT JOIN t_kegiatans k ON k.id_kegiatans = t.id_kegiatans
+          LEFT JOIN t_fase kf ON kf.id_fase = k.id_fase
+          WHERE p.id_persyaratan = $1
+            AND ($2::int IS NULL OR p.id_termin = $2::int)
+        `,
+        [id_persyaratan, context.id_termin || null],
+      );
+
+      terminRows.forEach((row) => {
+        const idProgram = this.toNumberOrNull(row?.id_program);
+        if (idProgram) programIds.add(idProgram);
+      });
+    }
+
+    if (!context.id_termin) {
+      const kegiatanRows = await this.programRepo.manager.query(
+        `
+          SELECT f.id_program
+          FROM t_persyaratan_kegiatan p
+          JOIN t_kegiatans k ON k.id_kegiatans = p.id_kegiatans
+          JOIN t_fase f ON f.id_fase = k.id_fase
+          WHERE p.id_persyaratan = $1
+            AND ($2::int IS NULL OR p.id_kegiatans = $2::int)
+        `,
+        [id_persyaratan, context.id_kegiatans || null],
+      );
+
+      kegiatanRows.forEach((row) => {
+        const idProgram = this.toNumberOrNull(row?.id_program);
+        if (idProgram) programIds.add(idProgram);
+      });
+    }
+
+    return Array.from(programIds);
+  }
+
+  private async resolveProgramForChatContext(context: any) {
+    const id_program = this.toNumberOrNull(context.id_program);
+    const id_fase = this.toNumberOrNull(context.id_fase);
+    const id_termin = this.toNumberOrNull(context.id_termin);
+    const id_kegiatans = this.toNumberOrNull(context.id_kegiatans);
+    const id_persyaratan = this.toNumberOrNull(context.id_persyaratan);
+
+    const contextProgramIds = new Set<number>();
+
+    if (id_program) contextProgramIds.add(id_program);
+
+    if (id_fase) {
+      const fromFase = await this.getProgramIdFromFase(id_fase);
+      if (!fromFase) throw new BadRequestException('Fase chat tidak ditemukan.');
+      contextProgramIds.add(fromFase);
+    }
+
+    if (id_kegiatans) {
+      const fromKegiatan = await this.getProgramIdFromKegiatan(id_kegiatans);
+      if (!fromKegiatan) {
+        throw new BadRequestException('Aktivitas chat tidak ditemukan.');
+      }
+      contextProgramIds.add(fromKegiatan);
+    }
+
+    if (id_termin) {
+      const fromTermin = await this.getProgramIdFromTermin(id_termin);
+      if (!fromTermin) {
+        throw new BadRequestException('Termin chat tidak ditemukan.');
+      }
+      contextProgramIds.add(fromTermin);
+    }
+
+    if (id_persyaratan) {
+      const requirementProgramIds = await this.getProgramIdsFromRequirement(
+        id_persyaratan,
+        { id_termin, id_kegiatans },
+      );
+
+      if (!requirementProgramIds.length) {
+        throw new BadRequestException('Bukti chat tidak ditemukan.');
+      }
+
+      requirementProgramIds.forEach((programId) =>
+        contextProgramIds.add(programId),
+      );
+    }
+
+    if (!contextProgramIds.size) {
+      throw new BadRequestException(
+        'Konteks chat tidak valid. Kirim id_program atau id_termin/id_kegiatans/id_persyaratan.',
+      );
+    }
+
+    if (contextProgramIds.size > 1) {
+      throw new BadRequestException(
+        'Konteks chat tidak sesuai dengan program yang dipilih.',
+      );
+    }
+
+    const [programId] = Array.from(contextProgramIds);
+    const program = await this.programRepo.findOne({
+      where: { id_program: programId },
+    });
+
+    if (!program) {
+      throw new BadRequestException('Program chat tidak ditemukan.');
+    }
+
+    return program;
+  }
+
+  private async ensureChatAccess(context: any, user: any) {
+    const program = await this.resolveProgramForChatContext(context);
+
+    if (this.isElevatedChatUser(user)) return program;
+
+    if (this.isVendorChatUser(user)) {
+      const vendor = await this.vendorRepo.findOne({
+        where: { id_user: Number(user.id_user) },
+      });
+      const programVendorIds = this.getProgramVendorIds(program);
+
+      if (vendor && programVendorIds.includes(Number(vendor.id_vendor))) {
+        return program;
+      }
+    }
+
+    const userSchoolId = this.toNumberOrNull(user?.id_sekolah);
+    const programSchoolIds = this.getProgramSchoolIds(program);
+
+    if (userSchoolId && programSchoolIds.includes(userSchoolId)) {
+      return program;
+    }
+
+    throw new ForbiddenException(
+      'Anda tidak memiliki akses ke chat program ini.',
+    );
   }
 
   private async ensureGoogleDriveConnected(id_user: number) {
@@ -127,6 +383,7 @@ export class TerminService {
     id_user: number,
     nama_user: string,
     role_user: string,
+    userContext: any = {},
   ) {
     try {
       if (!createDto.pesan || !String(createDto.pesan).trim()) {
@@ -157,6 +414,12 @@ export class TerminService {
         );
       }
 
+      await this.ensureChatAccess(createDto, {
+        ...userContext,
+        id_user,
+        role_user,
+      });
+
       const chat = this.chatRepo.create({
         pesan: String(createDto.pesan).trim(),
         id_user,
@@ -172,24 +435,28 @@ export class TerminService {
 
       return await this.chatRepo.save(chat);
     } catch (error) {
-      console.error('Error saat save chat:', error);
-
-      if (error instanceof BadRequestException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
       }
 
+      console.error('Error saat save chat:', error);
       throw new InternalServerErrorException('Gagal mengirim pesan!');
     }
   }
 
-  async getChatsByTermin(id_termin: number) {
+  async getChatsByTermin(id_termin: number, userContext: any) {
+    await this.ensureChatAccess({ id_termin }, userContext);
+
     return await this.chatRepo.find({
       where: { id_termin },
       order: { created_at: 'ASC' },
     });
   }
 
-  async getChatsByContext(query: any) {
+  async getChatsByContext(query: any, userContext: any) {
     const id_program = this.toNumberOrNull(query.id_program);
     const id_fase = this.toNumberOrNull(query.id_fase);
     const id_termin = this.toNumberOrNull(query.id_termin);
@@ -227,6 +494,8 @@ export class TerminService {
         'Konteks chat tidak valid. Minimal kirim id_program atau id_termin/id_kegiatans/id_persyaratan.',
       );
     }
+
+    await this.ensureChatAccess(query, userContext);
 
     return await builder.getMany();
   }

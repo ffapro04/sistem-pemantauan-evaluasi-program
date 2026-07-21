@@ -1,7 +1,5 @@
 ﻿// src/config/masterCrud/operatorSekolah.config.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
 import {
     Building2,
     Database,
@@ -16,8 +14,8 @@ import {
 import { isActiveValue } from "../../components/masterCrud";
 import { validateEmailField, validatePasswordField } from "./validation";
 
-const ROLE_OPERATOR_SEKOLAH = 5;
-const ROLE_OPERATOR_SEKOLAH_LEGACY = 9;
+const ROLE_OPERATOR_SEKOLAH = 9;
+const ROLE_OPERATOR_SEKOLAH_LEGACY = 5;
 const ROLE_KEPALA_SEKOLAH = 10;
 
 const getRoleId = (row) =>
@@ -343,15 +341,16 @@ export const operatorSekolahConfig = {
                 },
                 {
                     name: "password",
-                    label: "Password Login",
+                    label: "Password Baru",
                     type: "password",
                     icon: Lock,
+                    hidden: ({ mode }) => mode === "edit",
                     requiredOnCreate: true,
                     minLength: 8,
                     placeholder: "Minimal 8 karakter",
                     help: ({ mode }) =>
                         mode === "edit"
-                            ? "Kosongkan jika password tidak ingin diubah."
+                            ? "Kosongkan jika tidak ingin mengganti password operator."
                             : "Password digunakan operator untuk masuk ke dashboard sekolah.",
                 },
             ],
