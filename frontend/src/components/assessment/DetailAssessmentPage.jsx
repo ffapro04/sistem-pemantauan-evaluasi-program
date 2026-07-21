@@ -366,10 +366,13 @@ function AssessmentDetailBase({
                 const hoId = getCurrentHoIdFromToken();
 
                 const [res, resSchools, resHo] = await Promise.all([
-                    fetch(`${apiBase}/assessment/${id}/hasil`, {
+                    fetch(`${apiBase}/assessment/${id}/hasil?_ts=${Date.now()}`, {
                         headers: {
                             Authorization: `Bearer ${token}`,
+                            "Cache-Control": "no-store",
+                            Pragma: "no-cache",
                         },
+                        cache: "no-store",
                     }),
 
                     fetch(`${apiBase}/sekolah`, {
@@ -596,7 +599,13 @@ function AssessmentDetailBase({
                 pengisi: respondents,
                 sekolah_profile: schools,
             },
-            { id },
+            {
+                id,
+                fileName:
+                    assessment?.nama_assessment ||
+                    assessment?.nama ||
+                    `assessment-${id}`,
+            },
         );
     };
 

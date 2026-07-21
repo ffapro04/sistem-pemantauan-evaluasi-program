@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { isActiveValue } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_ADMIN = 1;
 const ROLE_PENGURUS = 2;
@@ -374,6 +375,9 @@ export const pengurusConfig = {
                     maxSize: 2 * 1024 * 1024,
                     buttonText: "Pilih Foto Profile",
                     helperText: "Maks. 2MB · JPG, PNG, atau WEBP",
+                    existingUrlField: "foto_profile_url",
+                    existingNameField: "foto_profile",
+                    previewAsImage: true,
                     help: "Foto akan digunakan sebagai avatar Pengurus.",
                     wrapperClassName: "space-y-2 md:col-span-2",
                 },
@@ -422,17 +426,21 @@ export const pengurusConfig = {
             return "Email Pengurus wajib diisi.";
         }
 
-        if (mode === "create" && String(formData.password || "").length < 8) {
-            return "Password minimal 8 karakter.";
+        const emailError = validateEmailField(formData.email, "Email Pengurus");
+        if (emailError) return emailError;
+
+        if (mode === "create") {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         if (
             mode === "edit" &&
             formData.password_changed &&
-            formData.password &&
-            String(formData.password).length < 8
+            formData.password
         ) {
-            return "Password minimal 8 karakter.";
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         if (!formData.jabatan) {

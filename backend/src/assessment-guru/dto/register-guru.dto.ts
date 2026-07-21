@@ -2,6 +2,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
+  IsEmail,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -26,6 +27,7 @@ export class RegisterGuruDto {
 
   @IsString()
   @IsOptional()
+  @IsEmail({}, { message: 'Format email guru tidak valid' })
   email_guru?: string;
 
   @IsString()
@@ -72,6 +74,6 @@ export class RegisterGuruDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(4)
+  @MinLength(8, { message: 'Password guru minimal 8 karakter' })
   password: string;
 }

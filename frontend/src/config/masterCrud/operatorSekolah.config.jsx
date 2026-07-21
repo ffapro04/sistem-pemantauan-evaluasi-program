@@ -14,8 +14,11 @@ import {
 } from "lucide-react";
 
 import { isActiveValue } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_OPERATOR_SEKOLAH = 5;
+const ROLE_OPERATOR_SEKOLAH_LEGACY = 9;
+const ROLE_KEPALA_SEKOLAH = 10;
 
 const getRoleId = (row) =>
     Number(row?.id_role || row?.role_id || row?.role?.id_role || 0);
@@ -24,11 +27,24 @@ const isOperatorSekolah = (row) => {
     const roleName = String(row?.role?.nama_role || row?.nama_role || "")
         .toLowerCase()
         .trim();
+    const jabatan = String(row?.jabatan || "")
+        .toLowerCase()
+        .trim();
+    const roleId = getRoleId(row);
+
+    if (
+        roleId === ROLE_KEPALA_SEKOLAH ||
+        roleName.includes("kepala sekolah") ||
+        jabatan.includes("kepala sekolah")
+    ) {
+        return false;
+    }
 
     return (
-        getRoleId(row) === ROLE_OPERATOR_SEKOLAH ||
-        roleName.includes("sekolah") ||
-        roleName.includes("operator")
+        roleId === ROLE_OPERATOR_SEKOLAH ||
+        roleId === ROLE_OPERATOR_SEKOLAH_LEGACY ||
+        roleName.includes("operator") ||
+        jabatan.includes("operator")
     );
 };
 
@@ -116,8 +132,8 @@ export const operatorSekolahConfig = {
     },
 
     api: {
-        list: "/users",
-        fallbackList: ["/users/sekolah", "/users/operator-sekolah"],
+        list: "/users/operator-sekolah",
+        fallbackList: ["/users/sekolah"],
         detail: (id) => `/users/${id}`,
         create: "/users/register",
         update: (id) => `/users/${id}`,
@@ -368,19 +384,22 @@ export const operatorSekolahConfig = {
     validate: ({ mode, formData }) => {
         if (!formData.nama?.trim()) return "Nama Operator Sekolah wajib diisi.";
         if (!formData.email?.trim()) return "Email Operator Sekolah wajib diisi.";
+        const emailError = validateEmailField(
+            formData.email,
+            "Email Operator Sekolah",
+        );
+        if (emailError) return emailError;
         if (!formData.jabatan?.trim()) return "Jabatan Operator Sekolah wajib diisi.";
         if (!formData.id_sekolah) return "Pilih sekolah yang terhubung dengan operator.";
 
-        if (mode === "create" && String(formData.password || "").length < 8) {
-            return "Password minimal 8 karakter.";
+        if (mode === "create") {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
-        if (
-            mode === "edit" &&
-            formData.password &&
-            String(formData.password).length < 8
-        ) {
-            return "Password minimal 8 karakter.";
+        if (mode === "edit" && formData.password) {
+            const passwordError = validatePasswordField(formData.password);
+            if (passwordError) return passwordError;
         }
 
         return true;

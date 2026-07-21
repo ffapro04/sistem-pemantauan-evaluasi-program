@@ -444,71 +444,95 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       ]),
     );
 
-    const [hoRows, aoRows, vendorRows, sekolahRows] = await Promise.all([
-      hoIds.length
-        ? this.programRepo.manager.query(
-            `
-              SELECT
-                id_user,
-                nama,
-                email,
-                jabatan,
-                id_role
-              FROM m_users
-              WHERE id_user = ANY($1::int[])
-            `,
-            [hoIds],
-          )
-        : Promise.resolve([]),
+    const programIds = uniqueNumbers(
+      programs.flatMap((program) => [program?.id_program, program?.id]),
+    );
 
-      aoIds.length
-        ? this.programRepo.manager.query(
-            `
-              SELECT
-                id_user,
-                nama,
-                email,
-                jabatan,
-                id_role
-              FROM m_users
-              WHERE id_user = ANY($1::int[])
-            `,
-            [aoIds],
-          )
-        : Promise.resolve([]),
+    const [hoRows, aoRows, vendorRows, sekolahRows, ratingRows] =
+      await Promise.all([
+        hoIds.length
+          ? this.programRepo.manager.query(
+              `
+                SELECT
+                  id_user,
+                  nama,
+                  email,
+                  jabatan,
+                  id_role
+                FROM m_users
+                WHERE id_user = ANY($1::int[])
+              `,
+              [hoIds],
+            )
+          : Promise.resolve([]),
 
-      vendorIds.length
-        ? this.programRepo.manager.query(
-            `
-              SELECT
-                id_vendor,
-                nama_vendor,
-                no_register,
-                pilar,
-                id_user
-              FROM m_vendor
-              WHERE id_vendor = ANY($1::int[])
-            `,
-            [vendorIds],
-          )
-        : Promise.resolve([]),
+        aoIds.length
+          ? this.programRepo.manager.query(
+              `
+                SELECT
+                  id_user,
+                  nama,
+                  email,
+                  jabatan,
+                  id_role
+                FROM m_users
+                WHERE id_user = ANY($1::int[])
+              `,
+              [aoIds],
+            )
+          : Promise.resolve([]),
 
-      sekolahIds.length
-        ? this.programRepo.manager.query(
-            `
-              SELECT
-                id_sekolah,
-                nama_sekolah,
-                npsn,
-                jenjang,
-                id_wilayah
-              FROM m_sekolah
-              WHERE id_sekolah = ANY($1::int[])
-            `,
-            [sekolahIds],
-          )
-        : Promise.resolve([]),
-    ]);
+        vendorIds.length
+          ? this.programRepo.manager.query(
+              `
+                SELECT
+                  id_vendor,
+                  nama_vendor,
+                  no_register,
+                  pilar,
+                  id_user
+                FROM m_vendor
+                WHERE id_vendor = ANY($1::int[])
+              `,
+              [vendorIds],
+            )
+          : Promise.resolve([]),
+
+        sekolahIds.length
+          ? this.programRepo.manager.query(
+              `
+                SELECT
+                  id_sekolah,
+                  nama_sekolah,
+                  npsn,
+                  jenjang,
+                  id_wilayah
+                FROM m_sekolah
+                WHERE id_sekolah = ANY($1::int[])
+              `,
+              [sekolahIds],
+            )
+          : Promise.resolve([]),
+
+        programIds.length
+          ? this.programRepo.manager.query(
+              `
+                SELECT
+                  f.id_program,
+                  AVG(kr.rating)::numeric AS average_rating,
+                  COUNT(*)::int AS total_rating,
+                  COUNT(DISTINCT kr.id_guru_assessment)::int AS guru_count
+                FROM t_kegiatan_rating kr
+                JOIN t_kegiatans k ON k.id_kegiatans = kr.id_kegiatans
+                JOIN t_fase f ON f.id_fase = k.id_fase
+                WHERE f.id_program = ANY($1::int[])
+                  AND UPPER(COALESCE(kr.rater_type, '')) = 'GURU'
+                GROUP BY f.id_program
+              `,
+              [programIds],
+            )
+          : Promise.resolve([]),
+      ]);
 
     const hoMap = new Map(hoRows.map((row: any) => [Number(row.id_user), row]));
     const aoMap = new Map(aoRows.map((row: any) => [Number(row.id_user), row]));
@@ -518,8 +542,34 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     const sekolahMap = new Map(
       sekolahRows.map((row: any) => [Number(row.id_sekolah), row]),
     );
+    const ratingMap = new Map<
+      number,
+      {
+        average_rating: number;
+        total_rating: number;
+        guru_rating_count: number;
+        source: string;
+      }
+    >(
+      ratingRows.map((row: any) => {
+        const averageRating = Number(row.average_rating || 0);
+        const totalRating = Number(row.total_rating || 0);
+        const guruCount = Number(row.guru_count || 0);
+
+        return [
+          Number(row.id_program),
+          {
+            average_rating: Number(averageRating.toFixed(2)),
+            total_rating: totalRating,
+            guru_rating_count: guruCount || totalRating,
+            source: 'GURU',
+          },
+        ];
+      }),
+    );
 
     programs.forEach((program) => {
+      const programId = Number(program?.id_program ?? program?.id ?? 0);
       const programHoIds = uniqueNumbers([
         program?.id_ho,
         program?.ho_id,
@@ -576,13 +626,32 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       program.sekolahList = sekolahs;
       program.sekolah = program.sekolah || sekolahs[0] || null;
       program.target_sekolahs = sekolahs;
+
+      const guruRating = ratingMap.get(programId) || {
+        average_rating: 0,
+        total_rating: 0,
+        guru_rating_count: 0,
+        source: 'GURU',
+      };
+
+      program.guru_average_rating = guruRating.average_rating;
+      program.average_guru_rating = guruRating.average_rating;
+      program.rating_guru_average = guruRating.average_rating;
+      program.guru_rating_count = guruRating.guru_rating_count;
+      program.rating_guru_count = guruRating.guru_rating_count;
+      program.guru_rating_submission_count = guruRating.total_rating;
+      program.program_guru_rating = guruRating;
+      program.guru_rating_summary = guruRating;
     });
 
     return isArrayPayload ? programs : programs[0];
   }
 
-  private async getProgramNotificationTargets(program: Program) {
-    const userIds = new Set<number>();
+  private async getProgramNotificationAudience(program: Program | any) {
+    const hoUserIds = new Set<number>();
+    const aoUserIds = new Set<number>();
+    const vendorUserIds = new Set<number>();
+    const schoolUserIds = new Set<number>();
     const guruIds = new Set<number>();
 
     const sekolahIds = this.toArray(program?.sekolah_ids).length
@@ -601,8 +670,79 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       ? this.toArray(program.vendor_ids)
       : this.toArray(program?.id_vendor);
 
-    if (program?.dibuat_oleh) userIds.add(Number(program.dibuat_oleh));
-    aoIds.forEach((id) => id && userIds.add(Number(id)));
+    if (program?.dibuat_oleh) hoUserIds.add(Number(program.dibuat_oleh));
+    aoIds.forEach((id) => id && aoUserIds.add(Number(id)));
+
+    let schoolJenjangs: string[] = [];
+
+    if (sekolahIds.length > 0) {
+      const schoolRows = await this.programRepo.manager.query(
+        `
+          SELECT jenjang
+          FROM m_sekolah
+          WHERE id_sekolah = ANY($1::int[])
+        `,
+        [sekolahIds],
+      );
+
+      schoolJenjangs = Array.from(
+        new Set(
+          schoolRows
+            .map((row: any) => String(row.jenjang || '').toUpperCase())
+            .filter(Boolean),
+        ),
+      );
+    }
+
+    const hoRows = await this.programRepo.manager.query(
+      `
+        SELECT id_user, jenis, sub_jenis, jabatan
+        FROM m_users
+        WHERE id_role = 3
+          AND status = true
+      `,
+    );
+
+    const programCategory = this.normalizeProgramCategory(program?.kategori);
+    const programPilar = String(program?.pilar_program || '')
+      .trim()
+      .toUpperCase();
+    const isNonAkademik =
+      programCategory === 'NON_AKADEMIK' ||
+      ['SENI_BUDAYA', 'KECAKAPAN_HIDUP'].includes(programPilar);
+    const hasSmk = schoolJenjangs.includes('SMK');
+    const hasSdSmp =
+      schoolJenjangs.includes('SD') || schoolJenjangs.includes('SMP');
+
+    hoRows.forEach((row: any) => {
+      const idUser = Number(row.id_user || 0);
+      if (!idUser) return;
+
+      const jenis = String(row.jenis || row.jabatan || '').toLowerCase();
+      const subJenis = String(row.sub_jenis || '').toUpperCase();
+
+      if (isNonAkademik) {
+        if (
+          jenis.includes('non') ||
+          jenis.includes('seni') ||
+          jenis.includes('kecakapan')
+        ) {
+          hoUserIds.add(idUser);
+        }
+        return;
+      }
+
+      if (!jenis.includes('akademik') || jenis.includes('non')) return;
+
+      if (
+        !schoolJenjangs.length ||
+        subJenis.includes('SEMUA') ||
+        (hasSmk && subJenis.includes('SMK')) ||
+        (hasSdSmp && (subJenis.includes('SD') || subJenis.includes('SMP')))
+      ) {
+        hoUserIds.add(idUser);
+      }
+    });
 
     if (vendorIds.length > 0) {
       const vendors = await this.programRepo.manager.query(
@@ -616,7 +756,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
 
       vendors.forEach((row: any) => {
-        if (row.id_user) userIds.add(Number(row.id_user));
+        if (row.id_user) vendorUserIds.add(Number(row.id_user));
       });
     }
 
@@ -633,7 +773,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
 
       schoolUsers.forEach((row: any) => {
-        if (row.id_user) userIds.add(Number(row.id_user));
+        if (row.id_user) schoolUserIds.add(Number(row.id_user));
       });
 
       const gurus = await this.programRepo.manager.query(
@@ -654,15 +794,184 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
 
     return {
-      userIds: Array.from(userIds).filter(Boolean),
+      hoUserIds: Array.from(hoUserIds).filter(Boolean),
+      aoUserIds: Array.from(aoUserIds).filter(Boolean),
+      vendorUserIds: Array.from(vendorUserIds).filter(Boolean),
+      schoolUserIds: Array.from(schoolUserIds).filter(Boolean),
       guruIds: Array.from(guruIds).filter(Boolean),
     };
+  }
+
+  private async getProgramNotificationTargets(program: Program | any) {
+    const audience = await this.getProgramNotificationAudience(program);
+
+    return {
+      userIds: Array.from(
+        new Set([
+          ...audience.hoUserIds,
+          ...audience.aoUserIds,
+          ...audience.vendorUserIds,
+          ...audience.schoolUserIds,
+        ]),
+      ).filter(Boolean),
+      guruIds: audience.guruIds,
+    };
+  }
+
+  private getHoProgramTargetUrl(program: Program | any) {
+    const kategori = this.normalizeProgramCategory(program?.kategori);
+    const base =
+      kategori === 'NON_AKADEMIK'
+        ? '/ho/program/non-akademik'
+        : '/ho/program/akademik';
+
+    return `${base}/detail/${program.id_program}`;
+  }
+
+  private async getProgramByTermin(id_termin: number) {
+    const rows = await this.programRepo.manager.query(
+      `
+        SELECT
+          p.*,
+          f.id_fase,
+          f.nama_fase,
+          t.nama_termin
+        FROM t_program p
+        JOIN t_fase f ON f.id_program = p.id_program
+        JOIN t_termin t ON t.id_fase = f.id_fase
+        WHERE t.id_termin = $1
+        LIMIT 1
+      `,
+      [id_termin],
+    );
+
+    return rows?.[0] || null;
+  }
+
+  private async notifyProgramEvidenceWorkflow(
+    program: Program | any,
+    options: {
+      audience: 'UPLOAD' | 'AO_APPROVED' | 'AO_REJECTED' | 'HO_APPROVED' | 'HO_REJECTED';
+      idPersyaratan: number;
+      evidenceType: 'ADMINISTRASI' | 'KEGIATAN';
+      requirementName?: string;
+      contextName?: string;
+      actorUserId?: number | null;
+      reason?: string | null;
+      idTermin?: number | null;
+      idKegiatans?: number | null;
+    },
+  ) {
+    if (!program?.id_program) return;
+
+    const audience = await this.getProgramNotificationAudience(program);
+    const rows: any[] = [];
+    const pushed = new Set<string>();
+    const programName = program.nama_program || 'Program';
+    const requirementName = options.requirementName || 'Bukti program';
+    const contextName = options.contextName ? ` (${options.contextName})` : '';
+    const reasonText = options.reason ? ` Alasan: ${options.reason}` : '';
+    const targetUrls = {
+      ho: this.getHoProgramTargetUrl(program),
+      ao: `/ao/program/detail/${program.id_program}`,
+      vendor: `/vendor/program/detail/${program.id_program}`,
+    };
+
+    const payloadMap = {
+      UPLOAD: {
+        judul: 'Bukti program baru diupload',
+        pesan: `Vendor mengupload "${requirementName}"${contextName} pada program "${programName}". Menunggu review AO dan HO.`,
+        tipe: 'PROGRAM_EVIDENCE_UPLOADED',
+      },
+      AO_APPROVED: {
+        judul: 'Bukti diteruskan AO ke HO',
+        pesan: `AO menyetujui "${requirementName}"${contextName} pada program "${programName}". Menunggu validasi HO.`,
+        tipe: 'PROGRAM_EVIDENCE_AO_APPROVED',
+      },
+      AO_REJECTED: {
+        judul: 'Bukti ditolak AO',
+        pesan: `AO menolak "${requirementName}"${contextName} pada program "${programName}".${reasonText}`,
+        tipe: 'PROGRAM_EVIDENCE_AO_REJECTED',
+      },
+      HO_APPROVED: {
+        judul: 'Bukti di-ACC HO',
+        pesan: `HO menyetujui "${requirementName}"${contextName} pada program "${programName}".`,
+        tipe: 'PROGRAM_EVIDENCE_HO_APPROVED',
+      },
+      HO_REJECTED: {
+        judul: 'Bukti ditolak HO',
+        pesan: `HO menolak "${requirementName}"${contextName} pada program "${programName}". Vendor perlu upload ulang.${reasonText}`,
+        tipe: 'PROGRAM_EVIDENCE_HO_REJECTED',
+      },
+    };
+
+    const pushUserRows = (
+      ids: number[],
+      scope: 'ho' | 'ao' | 'vendor',
+      payload: any,
+    ) => {
+      ids.forEach((idUser) => {
+        const id = Number(idUser);
+        if (!id || id === Number(options.actorUserId || 0)) return;
+
+        const pushKey = `${scope}:${id}`;
+        if (pushed.has(pushKey)) return;
+        pushed.add(pushKey);
+
+        rows.push({
+          recipientType: NotificationRecipientType.USER,
+          recipientId: id,
+          legacyUserId: id,
+          judul: payload.judul,
+          pesan: payload.pesan,
+          tipe: payload.tipe,
+          targetUrl: targetUrls[scope],
+          metadata: {
+            id_program: program.id_program,
+            id_persyaratan: options.idPersyaratan,
+            evidence_type: options.evidenceType,
+            workflow_action: options.audience,
+            id_termin: options.idTermin || null,
+            id_kegiatans: options.idKegiatans || null,
+            reason: options.reason || null,
+          },
+        });
+      });
+    };
+
+    const payload = payloadMap[options.audience];
+
+    if (options.audience === 'UPLOAD') {
+      pushUserRows(audience.aoUserIds, 'ao', payload);
+      pushUserRows(audience.hoUserIds, 'ho', payload);
+    }
+
+    if (options.audience === 'AO_APPROVED') {
+      pushUserRows(audience.hoUserIds, 'ho', payload);
+      pushUserRows(audience.vendorUserIds, 'vendor', payload);
+    }
+
+    if (options.audience === 'AO_REJECTED') {
+      pushUserRows(audience.hoUserIds, 'ho', payload);
+      pushUserRows(audience.vendorUserIds, 'vendor', payload);
+    }
+
+    if (options.audience === 'HO_APPROVED' || options.audience === 'HO_REJECTED') {
+      pushUserRows(audience.aoUserIds, 'ao', payload);
+      pushUserRows(audience.vendorUserIds, 'vendor', payload);
+    }
+
+    await this.notifikasiService.createMany(rows);
   }
 
   private async getProgramByKegiatan(id_kegiatans: number) {
     const rows = await this.programRepo.manager.query(
       `
-        SELECT p.*
+        SELECT
+          p.*,
+          f.id_fase,
+          f.nama_fase,
+          k.nama_kegiatans
         FROM t_program p
         JOIN t_fase f ON f.id_program = p.id_program
         JOIN t_kegiatans k ON k.id_fase = f.id_fase
@@ -675,16 +984,39 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     return rows?.[0] || null;
   }
 
+  private isAfterProgramDeadline(program: Program | any) {
+    if (!program?.tanggal_selesai) return false;
+
+    const deadline = new Date(program.tanggal_selesai);
+    if (Number.isNaN(deadline.getTime())) return false;
+
+    deadline.setHours(23, 59, 59, 999);
+
+    return new Date() > deadline;
+  }
+
+  private async ensureProgramFeedbackOpenByKegiatan(id_kegiatans: number) {
+    const program = await this.getProgramByKegiatan(id_kegiatans);
+
+    if (this.isAfterProgramDeadline(program)) {
+      throw new BadRequestException(
+        'Periode program sudah berakhir. Komentar dan rating sudah ditutup.',
+      );
+    }
+
+    return program;
+  }
+
   private async notifyActivityRatingRequest(kegiatan: Kegiatans) {
     const program = await this.getProgramByKegiatan(kegiatan.id_kegiatans);
     if (!program) return;
 
-    const targets = await this.getProgramNotificationTargets(program);
-    const targetUrlSekolah = `/sekolah/program`;
+    const audience = await this.getProgramNotificationAudience(program);
+    const targetUrlSekolah = '/sekolah/program';
     const targetUrlVendor = `/vendor/program/detail/${program.id_program}`;
 
     const rows = [
-      ...targets.guruIds.map((idGuru) => ({
+      ...audience.guruIds.map((idGuru) => ({
         recipientType: NotificationRecipientType.GURU_ASSESSMENT,
         recipientId: idGuru,
         judul: 'Rating aktivitas program',
@@ -697,19 +1029,19 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         },
         dedupeKey: `program-rating:guru:${kegiatan.id_kegiatans}:${idGuru}`,
       })),
-      ...targets.userIds.map((idUser) => ({
+      ...audience.vendorUserIds.map((idUser) => ({
         recipientType: NotificationRecipientType.USER,
         recipientId: idUser,
         legacyUserId: idUser,
-        judul: 'Aktivitas program selesai',
-        pesan: `Aktivitas "${kegiatan.nama_kegiatans}" pada program "${program.nama_program}" sudah selesai.`,
-        tipe: 'PROGRAM_ACTIVITY_DONE',
+        judul: 'Rating aktivitas program',
+        pesan: `Aktivitas "${kegiatan.nama_kegiatans}" pada program "${program.nama_program}" sudah selesai. Silakan beri rating dan feedback.`,
+        tipe: 'PROGRAM_RATING',
         targetUrl: targetUrlVendor,
         metadata: {
           id_program: program.id_program,
           id_kegiatans: kegiatan.id_kegiatans,
         },
-        dedupeKey: `program-rating:user:${kegiatan.id_kegiatans}:${idUser}`,
+        dedupeKey: `program-rating:vendor:${kegiatan.id_kegiatans}:${idUser}`,
       })),
     ];
 
@@ -775,28 +1107,41 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     const rows: any[] = [];
 
     for (const item of activityRows) {
-      const targets = await this.getProgramNotificationTargets(item);
-      const targetUrl = `/vendor/program/detail/${item.id_program}`;
-
-      targets.userIds.forEach((idUser) => {
-        rows.push({
-          recipientType: NotificationRecipientType.USER,
-          recipientId: idUser,
-          legacyUserId: idUser,
-          judul: 'Reminder tenggat aktivitas',
-          pesan: `Besok adalah tenggat aktivitas "${item.nama_kegiatans}" pada program "${item.nama_program}". Pastikan bukti sudah lengkap.`,
-          tipe: 'PROGRAM_ACTIVITY_DEADLINE',
-          targetUrl,
-          metadata: {
-            id_program: item.id_program,
-            id_kegiatans: item.id_kegiatans,
-            due_date: date,
-          },
-          dedupeKey: `program-deadline:activity:${item.id_kegiatans}:${idUser}:${date}`,
+      const audience = await this.getProgramNotificationAudience(item);
+      const pushUserRows = (
+        ids: number[],
+        scope: string,
+        targetUrl: string,
+      ) => {
+        ids.forEach((idUser) => {
+          rows.push({
+            recipientType: NotificationRecipientType.USER,
+            recipientId: idUser,
+            legacyUserId: idUser,
+            judul: 'Reminder tenggat aktivitas',
+            pesan: `Besok adalah tenggat aktivitas "${item.nama_kegiatans}" pada program "${item.nama_program}". Pastikan bukti sudah lengkap.`,
+            tipe: 'PROGRAM_ACTIVITY_DEADLINE',
+            targetUrl,
+            metadata: {
+              id_program: item.id_program,
+              id_kegiatans: item.id_kegiatans,
+              due_date: date,
+            },
+            dedupeKey: `program-deadline:activity:${scope}:${item.id_kegiatans}:${idUser}:${date}`,
+          });
         });
-      });
+      };
 
-      targets.guruIds.forEach((idGuru) => {
+      pushUserRows(audience.hoUserIds, 'ho', this.getHoProgramTargetUrl(item));
+      pushUserRows(audience.aoUserIds, 'ao', `/ao/program/detail/${item.id_program}`);
+      pushUserRows(
+        audience.vendorUserIds,
+        'vendor',
+        `/vendor/program/detail/${item.id_program}`,
+      );
+      pushUserRows(audience.schoolUserIds, 'school', '/sekolah/program');
+
+      audience.guruIds.forEach((idGuru) => {
         rows.push({
           recipientType: NotificationRecipientType.GURU_ASSESSMENT,
           recipientId: idGuru,
@@ -815,27 +1160,41 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
 
     for (const item of openingRows) {
-      const targets = await this.getProgramNotificationTargets(item);
-
-      targets.userIds.forEach((idUser) => {
-        rows.push({
-          recipientType: NotificationRecipientType.USER,
-          recipientId: idUser,
-          legacyUserId: idUser,
-          judul: 'Reminder administrasi pembuka',
-          pesan: `Administrasi pembuka periode "${item.nama_fase}" pada program "${item.nama_program}" belum lengkap. Aktivitas dimulai besok.`,
-          tipe: 'PROGRAM_OPENING_DEADLINE',
-          targetUrl: `/ho/program/akademik/detail/${item.id_program}`,
-          metadata: {
-            id_program: item.id_program,
-            id_fase: item.id_fase,
-            due_date: date,
-          },
-          dedupeKey: `program-deadline:opening:${item.id_fase}:${idUser}:${date}`,
+      const audience = await this.getProgramNotificationAudience(item);
+      const pushUserRows = (
+        ids: number[],
+        scope: string,
+        targetUrl: string,
+      ) => {
+        ids.forEach((idUser) => {
+          rows.push({
+            recipientType: NotificationRecipientType.USER,
+            recipientId: idUser,
+            legacyUserId: idUser,
+            judul: 'Reminder administrasi pembuka',
+            pesan: `Administrasi pembuka periode "${item.nama_fase}" pada program "${item.nama_program}" belum lengkap. Aktivitas dimulai besok.`,
+            tipe: 'PROGRAM_OPENING_DEADLINE',
+            targetUrl,
+            metadata: {
+              id_program: item.id_program,
+              id_fase: item.id_fase,
+              due_date: date,
+            },
+            dedupeKey: `program-deadline:opening:${scope}:${item.id_fase}:${idUser}:${date}`,
+          });
         });
-      });
+      };
 
-      targets.guruIds.forEach((idGuru) => {
+      pushUserRows(audience.hoUserIds, 'ho', this.getHoProgramTargetUrl(item));
+      pushUserRows(audience.aoUserIds, 'ao', `/ao/program/detail/${item.id_program}`);
+      pushUserRows(
+        audience.vendorUserIds,
+        'vendor',
+        `/vendor/program/detail/${item.id_program}`,
+      );
+      pushUserRows(audience.schoolUserIds, 'school', '/sekolah/program');
+
+      audience.guruIds.forEach((idGuru) => {
         rows.push({
           recipientType: NotificationRecipientType.GURU_ASSESSMENT,
           recipientId: idGuru,
@@ -1371,11 +1730,6 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (file) {
-      await this.ensureGoogleDriveConnected(
-        id_user,
-        'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti administratif termin.',
-      );
-
       const uploaded = await this.googleDriveService.uploadFile({
         idUser: id_user,
         idRole: id_role || null,
@@ -1383,6 +1737,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         moduleType: 'PROGRAM_TERMIN',
         relatedTable: 't_persyaratan_termin',
         relatedId: persyaratan.id_persyaratan,
+        notConnectedMessage:
+          'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti administratif termin.',
       });
 
       persyaratan.file_path = this.getDriveFilePath(
@@ -1406,6 +1762,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
+
+    const program = await this.getProgramByTermin(persyaratan.id_termin);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'UPLOAD',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'ADMINISTRASI',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_termin || program?.nama_fase,
+      actorUserId: id_user,
+      idTermin: persyaratan.id_termin,
+    });
 
     return {
       message: 'Upload bukti administratif berhasil, menunggu review AO',
@@ -1448,6 +1815,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
+
+    const program = await this.getProgramByTermin(persyaratan.id_termin);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'AO_APPROVED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'ADMINISTRASI',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_termin || program?.nama_fase,
+      actorUserId: id_user,
+      idTermin: persyaratan.id_termin,
+    });
 
     return {
       message: 'Review AO disetujui, bukti administratif diteruskan ke HO',
@@ -1504,6 +1882,18 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     await this.persyaratanTerminRepo.save(persyaratan);
 
+    const program = await this.getProgramByTermin(persyaratan.id_termin);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'AO_REJECTED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'ADMINISTRASI',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_termin || program?.nama_fase,
+      actorUserId: id_user,
+      reason: persyaratan.rejected_reason,
+      idTermin: persyaratan.id_termin,
+    });
+
     return {
       message: 'Bukti administratif ditolak AO, narasumber perlu upload ulang',
       data: persyaratan,
@@ -1531,6 +1921,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanTerminRepo.save(persyaratan);
+
+    const program = await this.getProgramByTermin(persyaratan.id_termin);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'HO_APPROVED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'ADMINISTRASI',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_termin || program?.nama_fase,
+      actorUserId: id_user,
+      idTermin: persyaratan.id_termin,
+    });
 
     await this.checkAndUnlockKegiatanAfterTerminApproval(persyaratan.id_termin);
 
@@ -1591,6 +1992,18 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     await this.persyaratanTerminRepo.save(persyaratan);
 
+    const program = await this.getProgramByTermin(persyaratan.id_termin);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'HO_REJECTED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'ADMINISTRASI',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_termin || program?.nama_fase,
+      actorUserId: id_user,
+      reason: persyaratan.rejected_reason,
+      idTermin: persyaratan.id_termin,
+    });
+
     return {
       message: 'Bukti administratif ditolak HO, narasumber perlu upload ulang',
       data: persyaratan,
@@ -1635,11 +2048,6 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (file) {
-      await this.ensureGoogleDriveConnected(
-        id_user,
-        'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti kegiatan.',
-      );
-
       const uploaded = await this.googleDriveService.uploadFile({
         idUser: id_user,
         idRole: id_role || null,
@@ -1647,6 +2055,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         moduleType: 'PROGRAM_KEGIATAN',
         relatedTable: 't_persyaratan_kegiatan',
         relatedId: persyaratan.id_persyaratan,
+        notConnectedMessage:
+          'Akun Anda belum tertaut ke Google Drive. Hubungkan Google Drive terlebih dahulu untuk mengunggah bukti kegiatan.',
       });
 
       persyaratan.file_path = this.getDriveFilePath(
@@ -1673,6 +2083,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    const program = await this.getProgramByKegiatan(persyaratan.id_kegiatans);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'UPLOAD',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'KEGIATAN',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_kegiatans || program?.nama_fase,
+      actorUserId: id_user,
+      idKegiatans: persyaratan.id_kegiatans,
+    });
 
     return {
       message: 'Upload bukti kegiatan berhasil, menunggu review AO',
@@ -1717,6 +2138,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    const program = await this.getProgramByKegiatan(persyaratan.id_kegiatans);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'AO_APPROVED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'KEGIATAN',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_kegiatans || program?.nama_fase,
+      actorUserId: id_user,
+      idKegiatans: persyaratan.id_kegiatans,
+    });
 
     return {
       message: 'Review AO disetujui, bukti kegiatan diteruskan ke HO',
@@ -1776,6 +2208,18 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
 
+    const program = await this.getProgramByKegiatan(persyaratan.id_kegiatans);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'AO_REJECTED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'KEGIATAN',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_kegiatans || program?.nama_fase,
+      actorUserId: id_user,
+      reason: persyaratan.rejected_reason,
+      idKegiatans: persyaratan.id_kegiatans,
+    });
+
     return {
       message: 'Bukti kegiatan ditolak AO, narasumber perlu upload ulang',
       data: persyaratan,
@@ -1803,6 +2247,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    const program = await this.getProgramByKegiatan(persyaratan.id_kegiatans);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'HO_APPROVED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'KEGIATAN',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_kegiatans || program?.nama_fase,
+      actorUserId: id_user,
+      idKegiatans: persyaratan.id_kegiatans,
+    });
 
     await this.checkAndFinalizeKegiatan(persyaratan.id_kegiatans, id_user);
 
@@ -1861,6 +2316,18 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     persyaratan.updated_at = new Date();
 
     await this.persyaratanKegiatanRepo.save(persyaratan);
+
+    const program = await this.getProgramByKegiatan(persyaratan.id_kegiatans);
+    await this.notifyProgramEvidenceWorkflow(program, {
+      audience: 'HO_REJECTED',
+      idPersyaratan: persyaratan.id_persyaratan,
+      evidenceType: 'KEGIATAN',
+      requirementName: persyaratan.nama,
+      contextName: program?.nama_kegiatans || program?.nama_fase,
+      actorUserId: id_user,
+      reason: persyaratan.rejected_reason,
+      idKegiatans: persyaratan.id_kegiatans,
+    });
 
     return {
       message: 'Bukti kegiatan ditolak HO, narasumber perlu upload ulang',
@@ -2071,6 +2538,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       ? body.comment_type
       : 'AO_REVIEW';
 
+    if (['GURU_RATING', 'VENDOR_RATING'].includes(commentType)) {
+      await this.ensureProgramFeedbackOpenByKegiatan(id_kegiatan);
+    }
+
     const comment = this.kegiatanCommentRepo.create({
       id_kegiatan,
       id_persyaratan: body.id_persyaratan ? Number(body.id_persyaratan) : null,
@@ -2125,6 +2596,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         'Kegiatan belum selesai, guru belum bisa memberi rating',
       );
     }
+
+    await this.ensureProgramFeedbackOpenByKegiatan(id_kegiatan);
 
     const rating = Number(body.rating);
     if (!rating || rating < 1 || rating > 5) {

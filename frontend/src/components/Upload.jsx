@@ -46,9 +46,33 @@ const formatFileSize = (size) => {
   return `${(size / 1024).toFixed(1)} KB`;
 };
 
+const getFileNameFromPath = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    const pathname = /^https?:\/\//i.test(raw)
+      ? new URL(raw).pathname
+      : raw.split("?")[0];
+
+    const fileName = pathname.split("/").filter(Boolean).pop() || raw;
+    return decodeURIComponent(fileName);
+  } catch {
+    return raw.split("?")[0].split("/").filter(Boolean).pop() || raw;
+  }
+};
+
+const isImagePath = (value) => {
+  const cleanValue = String(value || "").split("?")[0].toLowerCase();
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(cleanValue);
+};
+
 const Upload = ({
   label,
   file,
+  existingUrl = "",
+  existingName = "",
+  previewAsImage = false,
   onFileSelect,
   required = false,
   disabled = false,
@@ -76,10 +100,17 @@ const Upload = ({
   }, [file]);
 
   const activeFile = file instanceof File ? file : internalFile;
+  const existingFileUrl =
+    !(activeFile instanceof File) && existingUrl
+      ? String(existingUrl).trim()
+      : "";
+  const cleanExistingName = existingName
+    ? getFileNameFromPath(existingName)
+    : "";
   const existingFileName =
     typeof file === "string" && file.trim()
-      ? file.split("/").pop()
-      : "";
+      ? getFileNameFromPath(file)
+      : cleanExistingName || getFileNameFromPath(existingFileUrl);
   const displayedFileName = activeFile?.name || existingFileName || "";
 
   const previewUrl = useMemo(() => {
@@ -88,6 +119,15 @@ const Upload = ({
 
     return URL.createObjectURL(activeFile);
   }, [activeFile]);
+
+  const existingPreviewUrl =
+    !previewUrl &&
+    existingFileUrl &&
+    (previewAsImage || isImagePath(existingFileUrl))
+      ? existingFileUrl
+      : "";
+
+  const displayedPreviewUrl = previewUrl || existingPreviewUrl;
 
   useEffect(() => {
     return () => {
@@ -171,10 +211,10 @@ const Upload = ({
           <div className="flex flex-col items-center justify-center p-5 text-center">
             {displayedFileName ? (
               <>
-                {previewUrl ? (
+                {displayedPreviewUrl ? (
                   <div className="mb-3 h-20 w-20 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
                     <img
-                      src={previewUrl}
+                      src={displayedPreviewUrl}
                       alt="Preview file"
                       className="h-full w-full object-cover"
                     />
@@ -196,7 +236,7 @@ const Upload = ({
                 )}
 
                 <p className="mt-1 text-[8px] font-bold uppercase text-emerald-400">
-                  Siap diunggah
+                  {activeFile ? "Siap diunggah" : "File tersimpan"}
                 </p>
               </>
             ) : error ? (
@@ -236,7 +276,7 @@ const Upload = ({
           accept={accept}
         />
 
-        {displayedFileName && !disabled && (
+        {activeFile && !disabled && (
           <button
             type="button"
             onClick={handleRemove}

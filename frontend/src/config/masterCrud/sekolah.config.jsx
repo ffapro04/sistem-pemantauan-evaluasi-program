@@ -25,6 +25,7 @@ import {
     cleanWilayahName,
     isActiveValue,
 } from "../../components/masterCrud";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const API_BASE_URL = "";
 
@@ -823,6 +824,11 @@ export const sekolahConfig = {
                     type: "file",
                     icon: Image,
                     accept: "image/*",
+                    buttonText: "Pilih Logo Sekolah",
+                    helperText: "Opsional · Format gambar",
+                    existingUrlField: "logo_url",
+                    existingNameField: "logo_url",
+                    previewAsImage: true,
                     help: "Upload logo sekolah jika tersedia.",
                 },
             ],
@@ -837,6 +843,11 @@ export const sekolahConfig = {
         if (!formData.akreditasi_internal) return "Level binaan wajib dipilih.";
         if (!formData.email_login?.trim())
             return "Email login sekolah wajib diisi.";
+        const emailError = validateEmailField(
+            formData.email_login,
+            "Email login sekolah",
+        );
+        if (emailError) return emailError;
         if (!formData.id_wilayah)
             return "Kabupaten/kota sekolah wajib dipilih.";
 
@@ -847,20 +858,24 @@ export const sekolahConfig = {
             return "Tahun binaan harus 4 digit, contoh: 2022.";
         }
 
-        if (
-            mode === "create" &&
-            String(formData.password_login || "").length < 8
-        ) {
-            return "Password login minimal 8 karakter.";
+        if (mode === "create") {
+            const passwordError = validatePasswordField(
+                formData.password_login,
+                "Password login",
+            );
+            if (passwordError) return passwordError;
         }
 
         if (
             mode === "edit" &&
             formData.password_login_changed &&
-            formData.password_login &&
-            String(formData.password_login).length < 8
+            formData.password_login
         ) {
-            return "Password login minimal 8 karakter.";
+            const passwordError = validatePasswordField(
+                formData.password_login,
+                "Password login",
+            );
+            if (passwordError) return passwordError;
         }
 
         return true;

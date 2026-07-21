@@ -1,2 +1,11 @@
 
 backend/uploads/
+
+# Generated testing/export artifacts
+output/
+outputs/
+output/**/node_modules/
+outputs/**/node_modules/
+*.inspect.ndjson
+tmp/
+USER_TESTING*.md

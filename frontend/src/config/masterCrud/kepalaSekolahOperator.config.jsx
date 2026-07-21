@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import { KeyRound, Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import { validateEmailField, validatePasswordField } from "./validation";
 
 const getSchoolIdFromUser = (user = {}) => {
   return (
@@ -105,26 +106,39 @@ export const kepalaSekolahOperatorConfig = {
       };
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const emailError = validateEmailField(email, "Email Kepala Sekolah");
+    if (emailError) {
       return {
         valid: false,
-        message: "Format email tidak valid.",
+        message: emailError,
       };
     }
 
     const password = String(formData.password || "").trim();
-    if (mode === "create" && password.length < 6) {
-      return {
-        valid: false,
-        message: "Password Kepala Sekolah minimal 6 karakter.",
-      };
+    if (mode === "create") {
+      const passwordError = validatePasswordField(
+        password,
+        "Password Kepala Sekolah",
+      );
+      if (passwordError) {
+        return {
+          valid: false,
+          message: passwordError,
+        };
+      }
     }
 
-    if (mode === "edit" && password && password.length < 6) {
-      return {
-        valid: false,
-        message: "Password Kepala Sekolah minimal 6 karakter.",
-      };
+    if (mode === "edit" && password) {
+      const passwordError = validatePasswordField(
+        password,
+        "Password Kepala Sekolah",
+      );
+      if (passwordError) {
+        return {
+          valid: false,
+          message: passwordError,
+        };
+      }
     }
 
     return { valid: true };

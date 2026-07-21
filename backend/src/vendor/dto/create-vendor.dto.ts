@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsEmail,
   IsNumber,
+  MinLength,
 } from 'class-validator';
 
 export class CreateVendorDto {
@@ -60,6 +61,7 @@ export class CreateVendorDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(8, { message: 'Password minimal 8 karakter' })
   password: string;
 
   @IsOptional()

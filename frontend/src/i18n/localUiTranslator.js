@@ -85,7 +85,7 @@ const ID_TO_EN = {
     "Nama tidak boleh kosong.": "Name cannot be empty.",
     "Email tidak boleh kosong.": "Email cannot be empty.",
     "Format email tidak valid.": "Invalid email format.",
-    "Password baru minimal 6 karakter.": "New password must be at least 6 characters.",
+    "Password baru minimal 8 karakter.": "New password must be at least 8 characters.",
     "Konfirmasi password tidak sama.": "Password confirmation does not match.",
     "Tidak ada perubahan profil yang perlu disimpan.": "There are no profile changes to save.",
     "Gagal menyimpan perubahan profil.": "Failed to save profile changes.",

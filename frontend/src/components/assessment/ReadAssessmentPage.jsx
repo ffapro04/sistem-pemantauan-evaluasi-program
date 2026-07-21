@@ -540,19 +540,54 @@ function ReadAssessmentPage({
             setRowLoading(row.id, true);
 
             const token = getToken();
-            const response = await fetch(`${API_BASE}/assessment/${row.id}/hasil`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
+            const response = await fetch(
+                `${API_BASE}/assessment/${row.id}/hasil?_ts=${Date.now()}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Cache-Control": "no-store",
+                        Pragma: "no-cache",
+                    },
+                    cache: "no-store",
                 },
-            });
+            );
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
                 throw new Error(payload?.message || "Gagal mengambil hasil assessment");
             }
 
+            const responseAssessmentId = Number(payload?.id_assessment ?? payload?.id);
+            if (
+                responseAssessmentId &&
+                Number(row.id) &&
+                responseAssessmentId !== Number(row.id)
+            ) {
+                throw new Error("Data export tidak sesuai dengan assessment yang dipilih. Silakan coba refresh halaman.");
+            }
+
+            const exportPayload = {
+                ...payload,
+                id_assessment: payload?.id_assessment ?? row.id,
+                nama_assessment:
+                    payload?.nama_assessment ||
+                    payload?.nama ||
+                    row?.raw?.nama_assessment ||
+                    row?.raw?.nama ||
+                    row?.nama,
+                nama:
+                    payload?.nama ||
+                    payload?.nama_assessment ||
+                    row?.raw?.nama ||
+                    row?.nama,
+                pilar: payload?.pilar || row?.pilar || row?.raw?.pilar,
+            };
+
             const XLSX = await loadXlsx();
-            exportAssessmentResultWorkbook(XLSX, payload, { id: row.id });
+            exportAssessmentResultWorkbook(XLSX, exportPayload, {
+                id: row.id,
+                fileName: exportPayload.nama_assessment,
+            });
             toast.success("File hasil assessment berhasil dibuat dalam format XLSX.");
         } catch (error) {
             console.error("Gagal export hasil assessment:", error);

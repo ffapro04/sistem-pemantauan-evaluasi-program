@@ -15,6 +15,35 @@ const resolveConfigValue = (value, context, fallback = undefined) => {
     return value;
 };
 
+const resolveUploadMeta = (field, value, formData, context) => {
+    const directExistingUrl = resolveConfigValue(field.existingUrl, context, "");
+    const existingUrlField = resolveConfigValue(field.existingUrlField, context, "");
+    const existingNameField = resolveConfigValue(field.existingNameField, context, "");
+
+    const autoBaseName = String(field.name || "").endsWith("_file")
+        ? String(field.name).replace(/_file$/, "")
+        : String(field.name || "");
+
+    const existingUrl =
+        directExistingUrl ||
+        (existingUrlField ? formData?.[existingUrlField] : "") ||
+        formData?.[`${field.name}_url`] ||
+        formData?.[`${autoBaseName}_url`] ||
+        (typeof value === "string" ? value : "");
+
+    const existingName =
+        resolveConfigValue(field.existingName, context, "") ||
+        (existingNameField ? formData?.[existingNameField] : "") ||
+        formData?.[field.name] ||
+        formData?.[autoBaseName] ||
+        "";
+
+    return {
+        existingUrl,
+        existingName,
+    };
+};
+
 const MultiSelectCards = ({ field, value, options, onChange }) => {
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -214,6 +243,11 @@ export default function MasterField({
     // Pakai state internal — setiap field password independen
     const showPassword = showPwdLocal;
     const togglePassword = () => setShowPwdLocal((prev) => !prev);
+    const inputDomName = useMemo(() => {
+        if (field.type !== "password") return field.name;
+        return `${field.name}_${mode}_${Math.random().toString(36).slice(2)}`;
+    }, [field.name, field.type, mode]);
+
     const context = {
         field,
         value,
@@ -292,26 +326,45 @@ export default function MasterField({
                 />
             )}
 
-            {field.type === "upload" && (
-                <Upload
-                    file={value}
-                    disabled={disabled}
-                    accept={field.accept}
-                    maxSize={field.maxSize}
-                    buttonText={field.buttonText}
-                    helperText={field.helperText}
-                    onFileSelect={(selectedFile) =>
-                        onChange(field.name, selectedFile)
-                    }
-                />
-            )}
+            {(field.type === "upload" || field.type === "file") &&
+                (() => {
+                    const uploadMeta = resolveUploadMeta(
+                        field,
+                        value,
+                        formData,
+                        context,
+                    );
+
+                    return (
+                        <Upload
+                            file={value}
+                            existingUrl={uploadMeta.existingUrl}
+                            existingName={uploadMeta.existingName}
+                            previewAsImage={resolveConfigValue(
+                                field.previewAsImage,
+                                context,
+                                false,
+                            )}
+                            disabled={disabled}
+                            accept={field.accept}
+                            maxSize={field.maxSize}
+                            buttonText={field.buttonText}
+                            helperText={field.helperText}
+                            onFileSelect={(selectedFile) =>
+                                onChange(field.name, selectedFile)
+                            }
+                        />
+                    );
+                })()}
 
             {field.type !== "select" &&
                 field.type !== "textarea" &&
                 field.type !== "upload" &&
+                field.type !== "file" &&
                 field.type !== "multiSelectCards" && (
                     <div className="relative">
                         <Input
+                            name={inputDomName}
                             type={
                                 field.type === "password"
                                     ? showPassword
@@ -323,7 +376,16 @@ export default function MasterField({
                             disabled={disabled}
                             onChange={(e) => onChange(field.name, e.target.value)}
                         placeholder={passwordPlaceholder}
-                        autoComplete={field.type === "password" ? "new-password" : undefined}
+                            autoComplete={
+                                field.type === "password" ? "new-password" : undefined
+                            }
+                            data-lpignore={
+                                field.type === "password" ? "true" : undefined
+                            }
+                            data-form-type={
+                                field.type === "password" ? "other" : undefined
+                            }
+                            minLength={field.minLength}
                             className={`${inputClass} ${Icon ? "!pl-10" : ""} ${field.type === "password" ? "!pr-12" : ""
                                 }`}
                         />
