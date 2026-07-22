@@ -14,6 +14,7 @@ import {
     NoScrollbarStyle,
     InfoPill,
 } from "../common";
+import Dropdown from "../Dropdown";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { getAuthToken } from "../../utils/authSession";
@@ -461,19 +462,16 @@ function AssessmentEditBase({
                             <label className="ml-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
                                 Pilar Assessment
                             </label>
-                            <select
+                            <Dropdown
                                 value={meta.pilar}
-                                onChange={(event) =>
-                                    setMeta((prev) => ({ ...prev, pilar: event.target.value }))
+                                onChange={(value) =>
+                                    setMeta((prev) => ({ ...prev, pilar: value }))
                                 }
-                                className="h-11 w-full rounded-xl border border-slate-100 bg-white px-4 text-[11px] font-black uppercase text-slate-600 outline-none focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-                            >
-                                {getPilarOptions(meta.jenis).map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                items={getPilarOptions(meta.jenis)}
+                                placeholder="Pilih Pilar"
+                                width="w-full"
+                                usePortal
+                            />
                         </div>
 
                         <div className="space-y-2">

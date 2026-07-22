@@ -62,7 +62,8 @@ export default function Dropdown({
     setOpen((prev) => !prev);
   };
 
-  const selectedItem = items.find((item) => item.value === value);
+  const isSameValue = (left, right) => String(left ?? "") === String(right ?? "");
+  const selectedItem = items.find((item) => isSameValue(item.value, value));
   const displayLabel = selectedItem ? selectedItem.label : placeholder || label || "Pilih...";
 
   const menuContent = (
@@ -72,7 +73,7 @@ export default function Dropdown({
           <DropdownItem
             key={index}
             label={item.label}
-            active={item.value === value}
+            active={isSameValue(item.value, value)}
             onClick={(e) => {
               e.preventDefault();
               onChange?.(item.value);

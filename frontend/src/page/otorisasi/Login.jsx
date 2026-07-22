@@ -962,7 +962,7 @@ const Login = () => {
                   className="h-full w-full object-cover"
                   alt="Library YPA-MDR"
                   decoding="async"
-                  fetchPriority="high"
+                  fetchpriority="high"
                 />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-950/35 via-[#0AC4E0]/10 to-slate-950/55" />
                 <div className="absolute inset-0 bg-[linear-gradient(115deg,rgba(10,196,224,0.14)_0%,transparent_38%,rgba(15,23,42,0.25)_100%)]" />

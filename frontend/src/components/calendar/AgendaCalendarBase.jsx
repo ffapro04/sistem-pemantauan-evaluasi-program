@@ -1842,36 +1842,31 @@ function COEFormModal({
                         <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Pilar COE
                         </label>
-                        <select
+                        <Dropdown
                             value={formData.pilar || ""}
-                            onChange={(event) => setField("pilar", event.target.value)}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
-                        >
-                            <option value="">Semua Pilar</option>
-                            {pilarOptions.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(value) => setField("pilar", value)}
+                            items={[{ value: "", label: "Semua Pilar" }, ...pilarOptions]}
+                            placeholder="Semua Pilar"
+                            width="w-full"
+                            usePortal
+                        />
                     </div>
 
                     <div>
                         <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Tipe Pelaksanaan
                         </label>
-                        <select
+                        <Dropdown
                             value={formData.activityType || ""}
-                            onChange={(event) => setField("activityType", event.target.value)}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
-                        >
-                            <option value="">Semua tipe / belum ditentukan</option>
-                            {COE_ACTIVITY_TYPES.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(value) => setField("activityType", value)}
+                            items={[
+                                { value: "", label: "Semua tipe / belum ditentukan" },
+                                ...COE_ACTIVITY_TYPES,
+                            ]}
+                            placeholder="Semua tipe / belum ditentukan"
+                            width="w-full"
+                            usePortal
+                        />
                     </div>
 
                     <div className="md:col-span-2">

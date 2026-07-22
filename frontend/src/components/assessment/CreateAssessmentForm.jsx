@@ -26,6 +26,7 @@ import Card from "../Card";
 import Input from "../Input";
 import Button from "../Button";
 import Label from "../Label";
+import Dropdown from "../Dropdown";
 import { filterSchoolsByHoAccess } from "../../utils/hoAccess";
 import { getAuthToken } from "../../utils/authSession";
 
@@ -763,17 +764,14 @@ function CreateAssessmentForm({
                                                 className="!ml-1 !text-[9px] !font-black !uppercase !tracking-widest !text-gray-400"
                                             />
 
-                                            <select
+                                            <Dropdown
                                                 value={formData.pilar}
-                                                onChange={(e) => setField("pilar", e.target.value)}
-                                                className="h-[46px] w-full rounded-xl border border-slate-100 bg-white px-4 text-[11px] font-black uppercase tracking-wide text-slate-600 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-                                            >
-                                                {pilarOptions.map((item) => (
-                                                    <option key={item.value} value={item.value}>
-                                                        {item.label}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                onChange={(value) => setField("pilar", value)}
+                                                items={pilarOptions}
+                                                placeholder="Pilih Pilar"
+                                                width="w-full"
+                                                usePortal
+                                            />
                                         </div>
                                     </div>
                                 </div>

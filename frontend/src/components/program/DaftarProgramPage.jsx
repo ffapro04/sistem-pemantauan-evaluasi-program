@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
+import Dropdown from "../Dropdown";
 import { getAuthToken } from "../../utils/authSession";
 
 const API_BASE_URL =
@@ -751,71 +752,52 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                                 />
                             </div>
 
-                            <select
+                            <Dropdown
                                 value={selectedJenis}
-                                onChange={(event) =>
-                                    setSelectedJenis(event.target.value)
-                                }
-                                className="h-11 w-full rounded-xl border border-slate-100 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {JENIS_OPTIONS.map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSelectedJenis}
+                                items={JENIS_OPTIONS}
+                                placeholder="Semua Jenis"
+                                width="w-full"
+                                usePortal
+                            />
 
                             {!lockedBidang && (
-                                <select
+                                <Dropdown
                                     value={selectedBidang}
-                                    onChange={(event) => {
-                                        setSelectedBidang(event.target.value);
+                                    onChange={(value) => {
+                                        setSelectedBidang(value);
                                         setSelectedPilar("ALL");
                                     }}
-                                    className="h-11 w-full rounded-xl border border-slate-100 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                                >
-                                    {BIDANG_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    items={BIDANG_OPTIONS}
+                                    placeholder="Semua Bidang"
+                                    width="w-full"
+                                    usePortal
+                                />
                             )}
 
-                            <select
+                            <Dropdown
                                 value={selectedPilar}
-                                onChange={(event) =>
-                                    setSelectedPilar(event.target.value)
-                                }
-                                className="h-11 w-full rounded-xl border border-slate-100 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {pilarOptions
+                                onChange={setSelectedPilar}
+                                items={pilarOptions
                                     .filter(
                                         (item) =>
                                             item.value === "ALL" ||
                                             selectedBidang === "ALL" ||
                                             PILAR_META[item.value]?.group === selectedBidang,
-                                    )
-                                    .map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                            </select>
+                                    )}
+                                placeholder="Semua Pilar"
+                                width="w-full"
+                                usePortal
+                            />
 
-                            <select
+                            <Dropdown
                                 value={selectedStatus}
-                                onChange={(event) =>
-                                    setSelectedStatus(event.target.value)
-                                }
-                                className="h-11 w-full rounded-xl border border-slate-100 bg-slate-50 px-4 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {statusOptions.map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSelectedStatus}
+                                items={statusOptions}
+                                placeholder="Semua Status"
+                                width="w-full"
+                                usePortal
+                            />
 
                             <div className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-widest text-white shadow-[0_10px_22px_rgba(10,196,224,0.16)]">
                                 {filteredPrograms.length} Data

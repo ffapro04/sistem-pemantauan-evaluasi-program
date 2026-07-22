@@ -59,6 +59,8 @@ const roleNameMap = {
   10: "Kepala Sekolah",
 };
 
+const USE_FLOATING_ROLE_NAVIGATION = false;
+
 const getInitial = (value) => {
   const raw = String(value || "U").trim();
   return raw.charAt(0).toUpperCase();
@@ -181,7 +183,6 @@ const getRoleMenus = (idRole, hoUser) => {
         { label: "Data Operator Sekolah", path: "/admin/operator-sekolah", icon: GraduationCap },
         { label: "Data Kepala Sekolah", path: "/admin/kepala-sekolah", icon: ShieldCheck },
         { label: "Data Vendor", path: "/admin/vendor", icon: BriefcaseBusiness },
-        { label: "Manajemen Vendor", path: "/admin/manajemen-vendor", icon: BarChart3 },
         { label: "Data Kepala Dinas", path: "/admin/kadin", icon: Landmark },
       ],
     },
@@ -193,7 +194,6 @@ const getRoleMenus = (idRole, hoUser) => {
       items: [
         { label: "Dashboard", path: "/pengurus/dashboard", icon: LayoutDashboard },
         { label: "Agenda", path: "/pengurus/agenda", icon: CalendarDays },
-        { label: "Manajemen Vendor", path: "/pengurus/manajemen-vendor", icon: BriefcaseBusiness },
       ],
     },
   ];
@@ -229,11 +229,6 @@ const getRoleMenus = (idRole, hoUser) => {
               label: "Daftar Program",
               path: "/ho/daftar-program/non-akademik", // <- Kunci ke non-akademik
               icon: ClipboardList,
-            },
-            {
-              label: "Manajemen Vendor",
-              path: "/ho/manajemen-vendor",
-              icon: BriefcaseBusiness,
             },
             {
               label: "Buat Program Non Akademik",
@@ -281,11 +276,6 @@ const getRoleMenus = (idRole, hoUser) => {
             icon: ClipboardList,
           },
           {
-            label: "Manajemen Vendor",
-            path: "/ho/manajemen-vendor",
-            icon: BriefcaseBusiness,
-          },
-          {
             label: "Buat Program Akademik",
             path: "/ho/program/akademik",
             icon: BookOpenCheck,
@@ -311,6 +301,7 @@ const getRoleMenus = (idRole, hoUser) => {
       items: [
         { label: "Dashboard", path: "/ao/dashboard", icon: LayoutDashboard },
         { label: "Agenda", path: "/ao/agenda", icon: CalendarDays },
+        { label: "Review Upload", path: "/ao/program", icon: FileCheck2 },
       ],
     },
   ];
@@ -1628,10 +1619,11 @@ const Sidebar = () => {
       <NavLink
         key={item.path}
         to={item.path}
+        viewTransition
         onClick={() => setMobileSidebarOpen(false)}
         className={({ isActive: navActive }) => {
           const active = navActive || isActive;
-          return `group flex min-h-12 items-center gap-3 rounded-[1.15rem] px-3.5 py-2.5 text-[13px] font-black leading-tight transition-all ${active
+          return `group relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[1.15rem] px-3.5 py-2.5 text-[13px] font-black leading-tight transition-[background-color,color,box-shadow,transform] duration-200 ease-out ${active
             ? "bg-[#0AC4E0] text-white shadow-[0_14px_30px_rgba(10,196,224,0.24)]"
             : "text-slate-500 hover:bg-[#0AC4E0]/5 hover:text-slate-900"
             }`;
@@ -1645,7 +1637,9 @@ const Sidebar = () => {
                 <Icon size={16} />
               </div>
               <span className="min-w-0 flex-1 whitespace-normal break-words">{item.label}</span>
-              {active && <ChevronRight size={13} />}
+              <span className={`flex h-4 w-4 shrink-0 items-center justify-center transition-opacity duration-200 ${active ? "opacity-100" : "opacity-0"}`}>
+                <ChevronRight size={13} />
+              </span>
             </>
           );
         }}
@@ -1653,9 +1647,9 @@ const Sidebar = () => {
     );
   };
 
-  // ===== ROLE DENGAN NAVIGASI KHUSUS =====
-  // Seluruh role eksekutif memakai dock kiri agar main content tidak tertutup.
-  if ([2, 4, 7, 10].includes(Number(user.id_role)) || isKepalaSekolahUser(user)) {
+  // Semua role memakai sidebar normal fixed agar navigasi tidak melayang,
+  // tidak ikut scroll, dan tidak menimpa konten halaman.
+  if (USE_FLOATING_ROLE_NAVIGATION && ([2, 4, 7, 10].includes(Number(user.id_role)) || isKepalaSekolahUser(user))) {
     const currentRoleId = Number(user.id_role);
     const isKepsek = currentRoleId === 10 || isKepalaSekolahUser(user);
 
@@ -1739,6 +1733,36 @@ const Sidebar = () => {
   // ===== ROLE LAIN: SIDEBAR NORMAL =====
   return (
     <>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .app-sidebar-spacer {
+            width: 304px;
+            min-width: 304px;
+            max-width: 304px;
+          }
+          .app-sidebar-panel {
+            width: min(320px, 88vw);
+            min-width: min(320px, 88vw);
+            max-width: min(320px, 88vw);
+            height: 100dvh;
+            min-height: 100dvh;
+            max-height: 100dvh;
+            box-sizing: border-box;
+            contain: layout paint;
+          }
+          @media (min-width: 1024px) {
+            .app-sidebar-panel {
+              width: 304px;
+              min-width: 304px;
+              max-width: 304px;
+              height: 100vh;
+              min-height: 100vh;
+              max-height: 100vh;
+            }
+          }
+        `,
+      }} />
+
       <div className="fixed left-4 top-4 z-[210] flex items-center gap-3 lg:hidden">
         <button
           type="button"
@@ -1769,9 +1793,9 @@ const Sidebar = () => {
         )}
       </AnimatePresence>
 
-      <div className="hidden w-[304px] shrink-0 lg:block" aria-hidden="true" />
+      <div className="app-sidebar-spacer hidden shrink-0 lg:block" aria-hidden="true" />
 
-      <aside className={`fixed inset-y-0 left-0 z-[220] flex h-dvh w-[min(320px,88vw)] shrink-0 flex-col overflow-hidden rounded-r-[1.55rem] border-r border-cyan-100/70 bg-white px-4 py-5 font-inter text-slate-800 shadow-[16px_0_48px_rgba(14,116,144,0.12)] transition-transform duration-300 ease-out lg:z-[80] lg:h-screen lg:w-[304px] lg:translate-x-0 lg:shadow-[14px_0_38px_rgba(14,116,144,0.08)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <aside className={`app-sidebar-panel fixed inset-y-0 left-0 z-[220] flex shrink-0 flex-col overflow-hidden rounded-r-[1.55rem] border-r border-cyan-100/70 bg-white px-4 py-5 font-inter text-slate-800 shadow-[16px_0_48px_rgba(14,116,144,0.12)] transition-transform duration-300 ease-out lg:z-[80] lg:translate-x-0 lg:shadow-[14px_0_38px_rgba(14,116,144,0.08)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div>

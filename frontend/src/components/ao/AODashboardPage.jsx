@@ -8,11 +8,11 @@ import {
     BarChart3,
     Building2,
     CheckCircle2,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Clock3,
     Eye,
+    FileCheck2,
     FolderOpen,
     GraduationCap,
     MapPin,
@@ -38,6 +38,7 @@ import { toast } from "react-toastify";
 import { Sidebar, PageWrapper } from "../common";
 import ResponsiveContainer from "../charts/SafeResponsiveContainer";
 import ProgramRatingStars from "../program/ProgramRatingStars";
+import Dropdown from "../Dropdown";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 
 const API_BASE_URL = (
@@ -72,6 +73,15 @@ const PROGRAM_STATUS_ORDER = [
     "IMPLEMENTASI",
     "EVALUASI",
     "SELESAI",
+];
+
+const REVIEW_STATUS_OPTIONS = [
+    { value: "WAITING_AO", label: "Menunggu Review AO" },
+    { value: "ALL", label: "Semua Status Bukti" },
+    { value: "WAITING_UPLOAD", label: "Belum Upload" },
+    { value: "WAITING_HO", label: "Diteruskan ke HO" },
+    { value: "APPROVED", label: "Disetujui HO" },
+    { value: "REJECTED", label: "Ditolak" },
 ];
 
 function normalizeArray(payload) {
@@ -1227,17 +1237,14 @@ function FilterSelect({ label, value, onChange, options }) {
                 {label}
             </span>
 
-            <select
+            <Dropdown
                 value={value}
-                onChange={(event) => onChange(event.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-bold text-slate-600 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/10"
-            >
-                {options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                        {option.label}
-                    </option>
-                ))}
-            </select>
+                onChange={onChange}
+                items={options}
+                placeholder={options[0]?.label || label}
+                width="w-full"
+                usePortal
+            />
         </label>
     );
 }
@@ -1253,30 +1260,14 @@ function DistrictDropdown({ label, value, onChange, options = [] }) {
                 {label}
             </span>
 
-            <div className="relative">
-                <MapPin
-                    size={14}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#0AC4E0]"
-                />
-
-                <select
-                    value={value}
-                    onChange={(event) => onChange(event.target.value)}
-                    title={selectedOption?.label || label}
-                    className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white pl-9 pr-10 text-[11px] font-bold text-slate-700 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/10"
-                >
-                    {options.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
-                </select>
-
-                <ChevronDown
-                    size={15}
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-            </div>
+            <Dropdown
+                value={value}
+                onChange={onChange}
+                items={options}
+                placeholder={selectedOption?.label || label}
+                width="w-full"
+                usePortal
+            />
 
             <span
                 className="min-h-[16px] break-words text-[10px] font-bold leading-4 text-slate-500"
@@ -1882,6 +1873,171 @@ function ProgramTable({
     );
 }
 
+function getReviewStatusCount(progress, status) {
+    if (status === "WAITING_AO") return progress.waitingAo;
+    if (status === "WAITING_UPLOAD") return progress.waitingUpload;
+    if (status === "WAITING_HO") return progress.waitingHo;
+    if (status === "APPROVED") return progress.approved;
+    if (status === "REJECTED") return progress.rejected;
+    return progress.total;
+}
+
+function ReviewUploadTable({
+    rows,
+    totalRows,
+    page,
+    totalPages,
+    onPageChange,
+    navigate,
+    detailPathPrefix,
+    schoolMap,
+    wilayahMap,
+}) {
+    if (!totalRows) {
+        return (
+            <div className="p-5">
+                <EmptyState
+                    title="Belum ada upload sesuai filter"
+                    description="Jika vendor sudah mengunggah bukti, data akan muncul pada status Menunggu Review AO."
+                    icon={<Clock3 size={22} />}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[1180px] border-collapse">
+                    <thead>
+                        <tr className="border-y border-slate-100 bg-slate-50">
+                            {[
+                                "Program",
+                                "Sekolah",
+                                "Kabupaten/Kota",
+                                "Bidang",
+                                "Pilar",
+                                "Menunggu AO",
+                                "Keputusan HO",
+                                "Approved",
+                                "Rejected",
+                                "Aksi",
+                            ].map((label) => (
+                                <th
+                                    key={label}
+                                    className="px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.14em] text-slate-400"
+                                >
+                                    {label}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {rows.map((program) => {
+                            const progress = getProgramProgress(program);
+                            const schoolNames = getProgramSchoolNames(
+                                program,
+                                schoolMap,
+                                wilayahMap,
+                            );
+                            const districtNames = getProgramDistrictNames(
+                                program,
+                                schoolMap,
+                                wilayahMap,
+                            );
+
+                            return (
+                                <tr
+                                    key={getProgramId(program)}
+                                    className="border-b border-slate-100 last:border-b-0 hover:bg-cyan-50/30"
+                                >
+                                    <td className="px-4 py-4 text-left">
+                                        <p className="max-w-[260px] truncate text-[12px] font-black text-slate-800">
+                                            {getProgramTitle(program)}
+                                        </p>
+                                        <p className="mt-1 text-[10px] font-semibold text-slate-400">
+                                            {formatStatusLabel(getProgramStatus(program))} · Tahun {program?.tahun || "-"}
+                                        </p>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-left">
+                                        <p className="max-w-[250px] truncate text-[11px] font-bold text-slate-600">
+                                            {schoolNames}
+                                        </p>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-left">
+                                        <p className="max-w-[220px] truncate text-[11px] font-bold text-slate-600">
+                                            {districtNames.join(", ") || "-"}
+                                        </p>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-left">
+                                        <span className="inline-flex rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-cyan-700">
+                                            {getProgramCategoryLabel(getProgramCategory(program))}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-left">
+                                        <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-violet-600">
+                                            {getProgramPillarLabel(getProgramPillar(program))}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-center">
+                                        <span className="inline-flex min-w-10 justify-center rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-black text-amber-600">
+                                            {progress.waitingAo}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-center">
+                                        <span className="inline-flex min-w-10 justify-center rounded-xl bg-sky-50 px-3 py-2 text-[11px] font-black text-sky-600">
+                                            {progress.waitingHo}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-center">
+                                        <span className="inline-flex min-w-10 justify-center rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-600">
+                                            {progress.approved}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-center">
+                                        <span className="inline-flex min-w-10 justify-center rounded-xl bg-red-50 px-3 py-2 text-[11px] font-black text-red-500">
+                                            {progress.rejected}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-4 py-4 text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                navigate(`${detailPathPrefix}/${getProgramId(program)}`)
+                                            }
+                                            className="inline-flex items-center gap-2 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8]"
+                                        >
+                                            <Eye size={14} />
+                                            Review
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalRows={totalRows}
+                onChange={onPageChange}
+            />
+        </>
+    );
+}
+
 function LoadingView() {
     return (
         <PageWrapper className="flex min-h-screen items-center justify-center bg-slate-100 !p-0">
@@ -1898,6 +2054,7 @@ function LoadingView() {
 function AODashboardPage({
     title = "Dashboard Area Officer",
     detailPathPrefix = "/ao/program/detail",
+    mode = "dashboard",
 }) {
     const navigate = useNavigate();
 
@@ -1926,6 +2083,7 @@ function AODashboardPage({
     const [programCategoryFilter, setProgramCategoryFilter] = useState("ALL");
     const [programPillarFilter, setProgramPillarFilter] = useState("ALL");
     const [programStatusFilter, setProgramStatusFilter] = useState("ALL");
+    const [reviewStatusFilter, setReviewStatusFilter] = useState("WAITING_AO");
     const [programSearch, setProgramSearch] = useState("");
     const [programPage, setProgramPage] = useState(1);
 
@@ -2121,6 +2279,7 @@ function AODashboardPage({
             setProgramCategoryFilter("ALL");
             setProgramPillarFilter("ALL");
             setProgramStatusFilter("ALL");
+            setReviewStatusFilter("WAITING_AO");
             setProgramSearch("");
             setProgramPage(1);
 
@@ -2516,6 +2675,32 @@ function AODashboardPage({
         }
     }, [programPage, programTotalPages]);
 
+    const reviewPrograms = useMemo(() => {
+        return filteredPrograms.filter((program) => {
+            const progress = getProgramProgress(program);
+
+            if (reviewStatusFilter === "ALL") return progress.total > 0;
+
+            return getReviewStatusCount(progress, reviewStatusFilter) > 0;
+        });
+    }, [filteredPrograms, reviewStatusFilter]);
+
+    const reviewTotalPages = Math.max(
+        1,
+        Math.ceil(reviewPrograms.length / PAGE_SIZE),
+    );
+
+    const reviewPageRows = useMemo(() => {
+        const start = (programPage - 1) * PAGE_SIZE;
+        return reviewPrograms.slice(start, start + PAGE_SIZE);
+    }, [reviewPrograms, programPage]);
+
+    useEffect(() => {
+        if (mode === "review" && programPage > reviewTotalPages) {
+            setProgramPage(reviewTotalPages);
+        }
+    }, [mode, programPage, reviewTotalPages]);
+
     const schoolProgramChartRows = useMemo(() => {
         const counter = new Map();
 
@@ -2609,6 +2794,7 @@ function AODashboardPage({
         setProgramCategoryFilter("ALL");
         setProgramPillarFilter("ALL");
         setProgramStatusFilter("ALL");
+        setReviewStatusFilter("WAITING_AO");
         setProgramSearch("");
         setProgramPage(1);
     };
@@ -2622,6 +2808,251 @@ function AODashboardPage({
             currentUser?.provinsi ||
             "Provinsi belum dipetakan",
         );
+
+    if (mode === "review") {
+        const reviewTotals = programs.reduce(
+            (acc, program) => {
+                const progress = getProgramProgress(program);
+
+                acc.total += progress.total;
+                acc.waitingAo += progress.waitingAo;
+                acc.waitingHo += progress.waitingHo;
+                acc.approved += progress.approved;
+                acc.rejected += progress.rejected;
+
+                return acc;
+            },
+            {
+                total: 0,
+                waitingAo: 0,
+                waitingHo: 0,
+                approved: 0,
+                rejected: 0,
+            },
+        );
+
+        return (
+            <PageWrapper className="min-h-screen bg-slate-100 !p-0 font-sans text-slate-700">
+                <Sidebar />
+
+                <main className="h-screen min-w-0 flex-1 overflow-y-auto pt-[84px] lg:pt-0">
+                    <header className="border-b border-slate-200 bg-white">
+                        <div className="flex w-full flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+                            <div className="flex min-w-0 items-center gap-4">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-[0_12px_26px_rgba(10,196,224,0.22)]">
+                                    <FileCheck2 size={22} />
+                                </div>
+
+                                <div className="min-w-0">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                                        Area Officer · Review Upload
+                                    </p>
+                                    <h1 className="mt-1 truncate text-2xl font-black tracking-[-0.04em] text-slate-900">
+                                        {title}
+                                    </h1>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                        Bukti vendor pada {provinceLabel} yang perlu dicek AO sebelum diteruskan ke HO.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => fetchAoData({ silent: true })}
+                                disabled={refreshing}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <RefreshCcw
+                                    size={14}
+                                    className={refreshing ? "animate-spin" : ""}
+                                />
+                                {refreshing ? "Memuat" : "Refresh"}
+                            </button>
+                        </div>
+                    </header>
+
+                    <section className="w-full space-y-6 px-5 py-6 lg:px-8">
+                        {errorMessage && (
+                            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-700">
+                                <AlertTriangle
+                                    size={18}
+                                    className="mt-0.5 shrink-0"
+                                />
+                                <div>
+                                    <p className="text-[11px] font-black uppercase tracking-widest">
+                                        Perhatian
+                                    </p>
+                                    <p className="mt-1 text-[11px] font-semibold leading-5">
+                                        {errorMessage}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                            <MetricCard
+                                label="Total Bukti"
+                                value={reviewTotals.total}
+                                helper="Seluruh bukti dalam cakupan AO"
+                                icon={<FolderOpen size={19} />}
+                                color={COLORS.blue}
+                            />
+                            <MetricCard
+                                label="Menunggu AO"
+                                value={reviewTotals.waitingAo}
+                                helper="Perlu disetujui atau ditolak AO"
+                                icon={<Clock3 size={19} />}
+                                color={COLORS.amber}
+                            />
+                            <MetricCard
+                                label="Keputusan HO"
+                                value={reviewTotals.waitingHo}
+                                helper="Sudah diteruskan dari AO ke HO"
+                                icon={<RefreshCcw size={19} />}
+                                color={COLORS.cyan}
+                            />
+                            <MetricCard
+                                label="Approved"
+                                value={reviewTotals.approved}
+                                helper="Sudah disetujui HO"
+                                icon={<CheckCircle2 size={19} />}
+                                color={COLORS.emerald}
+                            />
+                            <MetricCard
+                                label="Rejected"
+                                value={reviewTotals.rejected}
+                                helper="Ditolak AO atau HO"
+                                icon={<AlertTriangle size={19} />}
+                                color={COLORS.red}
+                            />
+                        </div>
+
+                        <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
+                            <PanelHeader
+                                eyebrow="Daftar Review"
+                                title="Upload Bukti Program"
+                                subtitle="Klik Review untuk membuka detail program, melihat file, memberi komentar, menyetujui ke HO, atau menolak upload."
+                                icon={<FileCheck2 size={18} />}
+                                right={
+                                    activeProgramFilterCount > 0 || reviewStatusFilter !== "WAITING_AO" ? (
+                                        <button
+                                            type="button"
+                                            onClick={resetProgramFilters}
+                                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 text-[9px] font-black uppercase tracking-widest text-rose-500 transition hover:bg-rose-500 hover:text-white"
+                                        >
+                                            <SlidersHorizontal size={13} />
+                                            Reset Filter
+                                        </button>
+                                    ) : null
+                                }
+                            />
+
+                            <div className="border-b border-slate-100 bg-slate-50/50 p-5">
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+                                    <div className="md:col-span-2 xl:col-span-2 2xl:col-span-2">
+                                        <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                            Pencarian
+                                        </span>
+                                        <SearchInput
+                                            value={programSearch}
+                                            onChange={(value) => {
+                                                setProgramSearch(value);
+                                                setProgramPage(1);
+                                            }}
+                                            placeholder="Cari program, sekolah, kabupaten..."
+                                        />
+                                    </div>
+
+                                    <DistrictDropdown
+                                        label="Kabupaten/Kota"
+                                        value={programDistrictFilter}
+                                        onChange={(value) => {
+                                            setProgramDistrictFilter(value);
+                                            setProgramSchoolFilter("ALL");
+                                            setProgramPage(1);
+                                        }}
+                                        options={programDistrictOptions}
+                                    />
+
+                                    <FilterSelect
+                                        label="Sekolah"
+                                        value={programSchoolFilter}
+                                        onChange={(value) => {
+                                            setProgramSchoolFilter(value);
+                                            setProgramPage(1);
+                                        }}
+                                        options={programSchoolOptions}
+                                    />
+
+                                    <FilterSelect
+                                        label="Bidang"
+                                        value={programCategoryFilter}
+                                        onChange={(value) => {
+                                            setProgramCategoryFilter(value);
+                                            setProgramPage(1);
+                                        }}
+                                        options={[
+                                            { value: "ALL", label: "Semua Bidang" },
+                                            { value: "AKADEMIK", label: "Akademik" },
+                                            { value: "NON_AKADEMIK", label: "Non Akademik" },
+                                        ]}
+                                    />
+
+                                    <FilterSelect
+                                        label="Pilar"
+                                        value={programPillarFilter}
+                                        onChange={(value) => {
+                                            setProgramPillarFilter(value);
+                                            setProgramPage(1);
+                                        }}
+                                        options={[
+                                            { value: "ALL", label: "Semua Pilar" },
+                                            { value: "AKADEMIK", label: "Akademik" },
+                                            { value: "KARAKTER", label: "Karakter" },
+                                            { value: "SENI_BUDAYA", label: "Seni Budaya" },
+                                            { value: "KECAKAPAN_HIDUP", label: "Kecakapan Hidup" },
+                                        ]}
+                                    />
+
+                                    <FilterSelect
+                                        label="Status Program"
+                                        value={programStatusFilter}
+                                        onChange={(value) => {
+                                            setProgramStatusFilter(value);
+                                            setProgramPage(1);
+                                        }}
+                                        options={programStatusOptions}
+                                    />
+
+                                    <FilterSelect
+                                        label="Status Bukti"
+                                        value={reviewStatusFilter}
+                                        onChange={(value) => {
+                                            setReviewStatusFilter(value);
+                                            setProgramPage(1);
+                                        }}
+                                        options={REVIEW_STATUS_OPTIONS}
+                                    />
+                                </div>
+                            </div>
+
+                            <ReviewUploadTable
+                                rows={reviewPageRows}
+                                totalRows={reviewPrograms.length}
+                                page={programPage}
+                                totalPages={reviewTotalPages}
+                                onPageChange={setProgramPage}
+                                navigate={navigate}
+                                detailPathPrefix={detailPathPrefix}
+                                schoolMap={scopedSchoolMap}
+                                wilayahMap={wilayahMap}
+                            />
+                        </section>
+                    </section>
+                </main>
+            </PageWrapper>
+        );
+    }
 
     return (
         <PageWrapper className="min-h-screen bg-slate-100 !p-0 font-sans text-slate-700">

@@ -1,4 +1,6 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
+import AppIconButton from "./ui/AppIconButton";
+
 export default function IconButton({
   icon,
   onClick,
@@ -6,25 +8,18 @@ export default function IconButton({
   className = "",
 }) {
   const variants = {
-    danger: "text-red-500 hover:text-red-700",
-    primary: "text-[#2E5AA7] hover:text-[#244a8a]",
-    success: "text-green-500 hover:text-green-700",
+    danger: "plainDanger",
+    primary: "plainPrimary",
+    success: "plainSuccess",
   };
 
   return (
-    <button
+    <AppIconButton
+      icon={icon}
       onClick={onClick}
-      className={`
-        p-1.5
-        rounded-md
-        transition
-        hover:bg-gray-100
-        ${variants[variant]}
-        ${className}
-      `}
-    >
-      {icon}
-    </button>
+      variant={variants[variant] || variants.danger}
+      size="auto"
+      className={className}
+    />
   );
 }
-

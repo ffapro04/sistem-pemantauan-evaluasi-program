@@ -782,30 +782,32 @@ function ReadAssessmentPage({
                                 />
                             </div>
 
-                            <select
+                            <Dropdown
                                 value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="h-10 rounded-xl border border-gray-100 bg-gray-50/70 px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 outline-none"
-                            >
-                                <option value="semua">Semua Status</option>
-                                <option value="lanjut">Lanjut</option>
-                                <option value="pending">Pending</option>
-                                <option value="draft">Belum Dikirim</option>
-                                <option value="terkirim">Terkirim</option>
-                            </select>
+                                onChange={setStatusFilter}
+                                items={[
+                                    { value: "semua", label: "Semua Status" },
+                                    { value: "lanjut", label: "Lanjut" },
+                                    { value: "pending", label: "Pending" },
+                                    { value: "draft", label: "Belum Dikirim" },
+                                    { value: "terkirim", label: "Terkirim" },
+                                ]}
+                                placeholder="Semua Status"
+                                width="w-full md:w-[170px]"
+                                usePortal
+                            />
 
-                            <select
+                            <Dropdown
                                 value={pilarFilter}
-                                onChange={(e) => setPilarFilter(e.target.value)}
-                                className="h-10 rounded-xl border border-gray-100 bg-gray-50/70 px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 outline-none"
-                            >
-                                <option value="semua">Semua Pilar</option>
-                                {getPilarOptions(jenisAssessment).map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setPilarFilter}
+                                items={[
+                                    { value: "semua", label: "Semua Pilar" },
+                                    ...getPilarOptions(jenisAssessment),
+                                ]}
+                                placeholder="Semua Pilar"
+                                width="w-full md:w-[170px]"
+                                usePortal
+                            />
 
                             <button
                                 type="button"

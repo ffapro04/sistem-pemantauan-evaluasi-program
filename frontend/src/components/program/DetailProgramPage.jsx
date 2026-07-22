@@ -38,6 +38,7 @@ import {
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { normalizeTerminChatMessage } from "../../utils/chatIdentity";
 import { getAuthToken } from "../../utils/authSession";
+import { buildFileUrl } from "../../utils/fileUrl";
 
 const API_BASE_URL =
     import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
@@ -371,24 +372,7 @@ function getCurrentUserRoleFromToken() {
 }
 
 function getFileUrl(file) {
-    if (!file) return null;
-
-    const value = String(file);
-
-    if (value.startsWith("http")) return value;
-    if (value.startsWith("/uploads")) return `${API_BASE_URL}${value}`;
-
-    const lower = value.toLowerCase();
-
-    if (
-        value.startsWith("MOU-") ||
-        value.startsWith("MOU-EDIT-") ||
-        lower.includes("mou")
-    ) {
-        return `${API_BASE_URL}/uploads/mou/${value}`;
-    }
-
-    return `${API_BASE_URL}/uploads/dokumentasi/${value}`;
+    return buildFileUrl(file);
 }
 
 function getRequirementFile(requirement) {

@@ -44,7 +44,6 @@ const ReadVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/Rea
 const CreateVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/CreateVendor"));
 const EditVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/EditVendor"));
 const DetailVendor = lazy(() => import("./page/admin/kelolamaster/mastervendor/DetailVendor"));
-const ManajemenVendor = lazy(() => import("./page/admin/vendor/ManajemenVendor"));
 const ReadKepalaSekolah = lazy(() => import("./page/admin/kelolamaster/masterkepalasekolah/ReadKepalaSekolah"));
 const ReadKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/ReadKepalaDinas"));
 const CreateKepalaDinas = lazy(() => import("./page/admin/kelolamaster/masterkepaladinas/CreateKepalaDinas"));
@@ -354,7 +353,6 @@ function App() {
         <Route path="/admin/vendor/create" element={<CreateVendor />} />
         <Route path="/admin/vendor/detail/:id" element={<DetailVendor />} />
         <Route path="/admin/vendor/edit/:id" element={<EditVendor />} />
-        <Route path="/admin/manajemen-vendor" element={<ManajemenVendor />} />
 
         {/* ADMIN - MASTER KEPALA DINAS */}
         <Route path="/admin/kadin" element={<ReadKepalaDinas />} />
@@ -406,7 +404,6 @@ function App() {
         {/* PENGURUS DASHBOARD */}
         <Route path="/pengurus/dashboard" element={<DashboardPengurus />} />
         <Route path="/pengurus/agenda" element={<AgendaPengurus />} />
-        <Route path="/pengurus/manajemen-vendor" element={<ManajemenVendor />} />
 
         {/* MODUL KEPALA DINAS - CANONICAL ROUTE */}
         <Route path="/kepala-dinas/dashboard" element={<DashboardKepalaDinas />} />
@@ -447,7 +444,6 @@ function App() {
 
         {/* HO - DAFTAR PROGRAM */}
         <Route path="/ho/daftar-program" element={<DaftarProgramPage />} />
-        <Route path="/ho/manajemen-vendor" element={<ManajemenVendor />} />
         <Route
           path="/ho/daftar-program/akademik"
           element={<DaftarProgramPage lockedBidang="AKADEMIK" />}
@@ -534,8 +530,9 @@ function App() {
           path="/ao/program"
           element={
             <AODashboardPage
-              title="Program Area Officer"
+              title="Review Upload Program"
               detailPathPrefix="/ao/program/detail"
+              mode="review"
             />
           }
         />

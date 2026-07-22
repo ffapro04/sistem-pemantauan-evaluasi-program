@@ -17,6 +17,7 @@ import { KelasModule } from './kelas/kelas.module';
 import { JurusanModule } from './jurusan/jurusan.module';
 import { AdminAgendaModule } from './admin-agenda/admin-agenda.module';
 import { GoogleDriveModule } from './google-drive/google-drive.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { GoogleDriveModule } from './google-drive/google-drive.module';
     JurusanModule,
     AdminAgendaModule,
     GoogleDriveModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

@@ -490,6 +490,7 @@ button:focus {
 /* Smooth scroll behavior */
 html {
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
 }
 
 /* Custom scrollbar */
@@ -1675,180 +1676,180 @@ body[data-app-route*="/dashboard"] main > section {
   gap: 0.85rem !important;
 }
 
-body[data-app-route*="/dashboard"] h1,
-body[data-app-route*="/dashboard"] .text-4xl,
-body[data-app-route*="/dashboard"] .text-5xl,
-body[data-app-route*="/dashboard"] [class*="text-[40px]"],
-body[data-app-route*="/dashboard"] [class*="text-[44px]"],
-body[data-app-route*="/dashboard"] [class*="text-[48px]"] {
+body[data-app-route*="/dashboard"] main h1,
+body[data-app-route*="/dashboard"] main .text-4xl,
+body[data-app-route*="/dashboard"] main .text-5xl,
+body[data-app-route*="/dashboard"] main [class*="text-[40px]"],
+body[data-app-route*="/dashboard"] main [class*="text-[44px]"],
+body[data-app-route*="/dashboard"] main [class*="text-[48px]"] {
   font-size: clamp(1.6rem, 2.2vw, 2.15rem) !important;
   line-height: 1.12 !important;
   letter-spacing: 0 !important;
 }
 
-body[data-app-route*="/dashboard"] h2,
-body[data-app-route*="/dashboard"] .text-2xl,
-body[data-app-route*="/dashboard"] .text-3xl,
-body[data-app-route*="/dashboard"] [class*="text-[28px]"],
-body[data-app-route*="/dashboard"] [class*="text-[32px]"],
-body[data-app-route*="/dashboard"] [class*="text-[36px]"] {
+body[data-app-route*="/dashboard"] main h2,
+body[data-app-route*="/dashboard"] main .text-2xl,
+body[data-app-route*="/dashboard"] main .text-3xl,
+body[data-app-route*="/dashboard"] main [class*="text-[28px]"],
+body[data-app-route*="/dashboard"] main [class*="text-[32px]"],
+body[data-app-route*="/dashboard"] main [class*="text-[36px]"] {
   font-size: clamp(1.25rem, 1.55vw, 1.65rem) !important;
   line-height: 1.18 !important;
 }
 
-body[data-app-route*="/dashboard"] p,
-body[data-app-route*="/dashboard"] span,
-body[data-app-route*="/dashboard"] li {
+body[data-app-route*="/dashboard"] main p,
+body[data-app-route*="/dashboard"] main span,
+body[data-app-route*="/dashboard"] main li {
   letter-spacing: 0 !important;
   overflow-wrap: anywhere;
 }
 
-body[data-app-route*="/dashboard"] p {
+body[data-app-route*="/dashboard"] main p {
   max-width: 72ch;
 }
 
-body[data-app-route*="/dashboard"] p[class*="max-w-"][class*="text-slate-400"],
-body[data-app-route*="/dashboard"] p[class*="max-w-"][class*="text-slate-500"],
-body[data-app-route*="/dashboard"] p[class*="leading-"][class*="text-slate-400"][class*="font-semibold"],
-body[data-app-route*="/dashboard"] p[class*="leading-"][class*="text-slate-500"][class*="font-semibold"] {
+body[data-app-route*="/dashboard"] main p[class*="max-w-"][class*="text-slate-400"],
+body[data-app-route*="/dashboard"] main p[class*="max-w-"][class*="text-slate-500"],
+body[data-app-route*="/dashboard"] main p[class*="leading-"][class*="text-slate-400"][class*="font-semibold"],
+body[data-app-route*="/dashboard"] main p[class*="leading-"][class*="text-slate-500"][class*="font-semibold"] {
   display: none !important;
 }
 
-body[data-app-route*="/dashboard"] .tracking-\[0\.28em\],
-body[data-app-route*="/dashboard"] .tracking-\[0\.24em\],
-body[data-app-route*="/dashboard"] .tracking-\[0\.2em\],
-body[data-app-route*="/dashboard"] .tracking-\[0\.18em\],
-body[data-app-route*="/dashboard"] .tracking-widest {
+body[data-app-route*="/dashboard"] main .tracking-\[0\.28em\],
+body[data-app-route*="/dashboard"] main .tracking-\[0\.24em\],
+body[data-app-route*="/dashboard"] main .tracking-\[0\.2em\],
+body[data-app-route*="/dashboard"] main .tracking-\[0\.18em\],
+body[data-app-route*="/dashboard"] main .tracking-widest {
   letter-spacing: 0.08em !important;
 }
 
-body[data-app-route*="/dashboard"] .rounded-\[2rem\],
-body[data-app-route*="/dashboard"] .rounded-\[28px\],
-body[data-app-route*="/dashboard"] .rounded-\[32px\],
-body[data-app-route*="/dashboard"] .rounded-3xl {
+body[data-app-route*="/dashboard"] main .rounded-\[2rem\],
+body[data-app-route*="/dashboard"] main .rounded-\[28px\],
+body[data-app-route*="/dashboard"] main .rounded-\[32px\],
+body[data-app-route*="/dashboard"] main .rounded-3xl {
   border-radius: 18px !important;
 }
 
-body[data-app-route*="/dashboard"] .shadow-2xl,
-body[data-app-route*="/dashboard"] .shadow-xl,
-body[data-app-route*="/dashboard"] .shadow-lg,
-body[data-app-route*="/dashboard"] [class*="shadow-["] {
+body[data-app-route*="/dashboard"] main .shadow-2xl,
+body[data-app-route*="/dashboard"] main .shadow-xl,
+body[data-app-route*="/dashboard"] main .shadow-lg,
+body[data-app-route*="/dashboard"] main [class*="shadow-["] {
   box-shadow: 0 18px 42px rgba(14, 116, 144, 0.12) !important;
 }
 
-body[data-app-route*="/dashboard"] section,
-body[data-app-route*="/dashboard"] article,
-body[data-app-route*="/dashboard"] .bg-white,
-body[data-app-route*="/dashboard"] .bg-white\/90,
-body[data-app-route*="/dashboard"] .bg-white\/95 {
+body[data-app-route*="/dashboard"] main section,
+body[data-app-route*="/dashboard"] main article,
+body[data-app-route*="/dashboard"] main .bg-white,
+body[data-app-route*="/dashboard"] main .bg-white\/90,
+body[data-app-route*="/dashboard"] main .bg-white\/95 {
   border-color: rgba(125, 211, 252, 0.42) !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="p-10"],
-body[data-app-route*="/dashboard"] [class*="p-9"],
-body[data-app-route*="/dashboard"] [class*="p-8"],
-body[data-app-route*="/dashboard"] [class*="px-10"],
-body[data-app-route*="/dashboard"] [class*="px-9"],
-body[data-app-route*="/dashboard"] [class*="px-8"] {
+body[data-app-route*="/dashboard"] main [class*="p-10"],
+body[data-app-route*="/dashboard"] main [class*="p-9"],
+body[data-app-route*="/dashboard"] main [class*="p-8"],
+body[data-app-route*="/dashboard"] main [class*="px-10"],
+body[data-app-route*="/dashboard"] main [class*="px-9"],
+body[data-app-route*="/dashboard"] main [class*="px-8"] {
   padding-left: clamp(1rem, 1.6vw, 1.55rem) !important;
   padding-right: clamp(1rem, 1.6vw, 1.55rem) !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="p-10"],
-body[data-app-route*="/dashboard"] [class*="p-9"],
-body[data-app-route*="/dashboard"] [class*="p-8"],
-body[data-app-route*="/dashboard"] [class*="py-10"],
-body[data-app-route*="/dashboard"] [class*="py-9"],
-body[data-app-route*="/dashboard"] [class*="py-8"] {
+body[data-app-route*="/dashboard"] main [class*="p-10"],
+body[data-app-route*="/dashboard"] main [class*="p-9"],
+body[data-app-route*="/dashboard"] main [class*="p-8"],
+body[data-app-route*="/dashboard"] main [class*="py-10"],
+body[data-app-route*="/dashboard"] main [class*="py-9"],
+body[data-app-route*="/dashboard"] main [class*="py-8"] {
   padding-top: clamp(1rem, 1.45vw, 1.45rem) !important;
   padding-bottom: clamp(1rem, 1.45vw, 1.45rem) !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="gap-10"],
-body[data-app-route*="/dashboard"] [class*="gap-9"],
-body[data-app-route*="/dashboard"] [class*="gap-8"],
-body[data-app-route*="/dashboard"] [class*="gap-7"] {
+body[data-app-route*="/dashboard"] main [class*="gap-10"],
+body[data-app-route*="/dashboard"] main [class*="gap-9"],
+body[data-app-route*="/dashboard"] main [class*="gap-8"],
+body[data-app-route*="/dashboard"] main [class*="gap-7"] {
   gap: clamp(0.75rem, 1.2vw, 1.15rem) !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="mb-10"],
-body[data-app-route*="/dashboard"] [class*="mb-9"],
-body[data-app-route*="/dashboard"] [class*="mb-8"],
-body[data-app-route*="/dashboard"] [class*="mt-10"],
-body[data-app-route*="/dashboard"] [class*="mt-9"],
-body[data-app-route*="/dashboard"] [class*="mt-8"] {
+body[data-app-route*="/dashboard"] main [class*="mb-10"],
+body[data-app-route*="/dashboard"] main [class*="mb-9"],
+body[data-app-route*="/dashboard"] main [class*="mb-8"],
+body[data-app-route*="/dashboard"] main [class*="mt-10"],
+body[data-app-route*="/dashboard"] main [class*="mt-9"],
+body[data-app-route*="/dashboard"] main [class*="mt-8"] {
   margin-top: clamp(0.75rem, 1.1vw, 1.1rem) !important;
   margin-bottom: clamp(0.75rem, 1.1vw, 1.1rem) !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="grid-cols-4"],
-body[data-app-route*="/dashboard"] [class*="grid-cols-5"],
-body[data-app-route*="/dashboard"] [class*="grid-cols-6"] {
+body[data-app-route*="/dashboard"] main [class*="grid-cols-4"],
+body[data-app-route*="/dashboard"] main [class*="grid-cols-5"],
+body[data-app-route*="/dashboard"] main [class*="grid-cols-6"] {
   align-items: stretch !important;
 }
 
-body[data-app-route*="/dashboard"] input,
-body[data-app-route*="/dashboard"] select,
-body[data-app-route*="/dashboard"] button,
-body[data-app-route*="/dashboard"] [role="button"] {
+body[data-app-route*="/dashboard"] main input,
+body[data-app-route*="/dashboard"] main select,
+body[data-app-route*="/dashboard"] main button,
+body[data-app-route*="/dashboard"] main [role="button"] {
   min-height: 2.55rem !important;
   border-radius: 14px !important;
 }
 
-body[data-app-route*="/dashboard"] .truncate {
+body[data-app-route*="/dashboard"] main .truncate {
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="line-clamp"] {
+body[data-app-route*="/dashboard"] main [class*="line-clamp"] {
   display: -webkit-box !important;
   -webkit-line-clamp: 4 !important;
   -webkit-box-orient: vertical !important;
   overflow: hidden !important;
 }
 
-body[data-app-route*="/dashboard"] table {
+body[data-app-route*="/dashboard"] main table {
   table-layout: auto;
 }
 
-body[data-app-route*="/dashboard"] th,
-body[data-app-route*="/dashboard"] td {
+body[data-app-route*="/dashboard"] main th,
+body[data-app-route*="/dashboard"] main td {
   padding-top: 0.7rem !important;
   padding-bottom: 0.7rem !important;
 }
 
-body[data-app-route*="/dashboard"] .recharts-wrapper,
-body[data-app-route*="/dashboard"] .recharts-responsive-container {
+body[data-app-route*="/dashboard"] main .recharts-wrapper,
+body[data-app-route*="/dashboard"] main .recharts-responsive-container {
   max-height: 560px !important;
 }
 
-body[data-app-route*="/dashboard"] .leaflet-container {
+body[data-app-route*="/dashboard"] main .leaflet-container {
   height: 100% !important;
   min-height: 260px !important;
   max-height: none !important;
   border-radius: 18px !important;
 }
 
-body[data-app-route*="/dashboard"] .leaflet-map-pane,
-body[data-app-route*="/dashboard"] .leaflet-tile-pane,
-body[data-app-route*="/dashboard"] .leaflet-overlay-pane,
-body[data-app-route*="/dashboard"] .leaflet-marker-pane {
+body[data-app-route*="/dashboard"] main .leaflet-map-pane,
+body[data-app-route*="/dashboard"] main .leaflet-tile-pane,
+body[data-app-route*="/dashboard"] main .leaflet-overlay-pane,
+body[data-app-route*="/dashboard"] main .leaflet-marker-pane {
   min-height: 100%;
 }
 
-body[data-app-route*="/dashboard"] [class*="min-h-[600px]"],
-body[data-app-route*="/dashboard"] [class*="min-h-[560px]"],
-body[data-app-route*="/dashboard"] [class*="min-h-[520px]"],
-body[data-app-route*="/dashboard"] [class*="min-h-[500px]"] {
+body[data-app-route*="/dashboard"] main [class*="min-h-[600px]"],
+body[data-app-route*="/dashboard"] main [class*="min-h-[560px]"],
+body[data-app-route*="/dashboard"] main [class*="min-h-[520px]"],
+body[data-app-route*="/dashboard"] main [class*="min-h-[500px]"] {
   min-height: 360px !important;
 }
 
-body[data-app-route*="/dashboard"] [class*="h-[620px]"],
-body[data-app-route*="/dashboard"] [class*="h-[600px]"],
-body[data-app-route*="/dashboard"] [class*="h-[560px]"],
-body[data-app-route*="/dashboard"] [class*="h-[520px]"],
-body[data-app-route*="/dashboard"] [class*="h-[500px]"] {
+body[data-app-route*="/dashboard"] main [class*="h-[620px]"],
+body[data-app-route*="/dashboard"] main [class*="h-[600px]"],
+body[data-app-route*="/dashboard"] main [class*="h-[560px]"],
+body[data-app-route*="/dashboard"] main [class*="h-[520px]"],
+body[data-app-route*="/dashboard"] main [class*="h-[500px]"] {
   height: 360px !important;
 }
 
@@ -1868,35 +1869,35 @@ body[data-app-route^="/admin/dashboard"] .admin-dashboard-visual-tile {
   overflow: visible !important;
 }
 
-body[data-app-route*="/dashboard"] .overflow-x-auto {
+body[data-app-route*="/dashboard"] main .overflow-x-auto {
   scrollbar-width: thin;
 }
 
-body[data-app-route*="/dashboard"] .overflow-y-auto,
-body[data-app-route*="/dashboard"] .overflow-auto {
+body[data-app-route*="/dashboard"] main .overflow-y-auto,
+body[data-app-route*="/dashboard"] main .overflow-auto {
   scrollbar-width: thin;
 }
 
-body[data-app-route*="/dashboard"] .text-slate-400,
-body[data-app-route*="/dashboard"] .text-slate-500,
-body[data-app-route*="/dashboard"] .text-slate-600 {
+body[data-app-route*="/dashboard"] main .text-slate-400,
+body[data-app-route*="/dashboard"] main .text-slate-500,
+body[data-app-route*="/dashboard"] main .text-slate-600 {
   color: #475569 !important;
 }
 
-body[data-app-route*="/dashboard"] .text-slate-900,
-body[data-app-route*="/dashboard"] .text-slate-950 {
+body[data-app-route*="/dashboard"] main .text-slate-900,
+body[data-app-route*="/dashboard"] main .text-slate-950 {
   color: #020617 !important;
 }
 
-body[data-app-route*="/dashboard"] .bg-cyan-500,
-body[data-app-route*="/dashboard"] .bg-sky-500,
-body[data-app-route*="/dashboard"] .bg-blue-600 {
+body[data-app-route*="/dashboard"] main .bg-cyan-500,
+body[data-app-route*="/dashboard"] main .bg-sky-500,
+body[data-app-route*="/dashboard"] main .bg-blue-600 {
   background: linear-gradient(135deg, #06b6d4, #0891b2) !important;
 }
 
-body[data-app-route*="/dashboard"] .border-cyan-100,
-body[data-app-route*="/dashboard"] .border-sky-100,
-body[data-app-route*="/dashboard"] .border-blue-100 {
+body[data-app-route*="/dashboard"] main .border-cyan-100,
+body[data-app-route*="/dashboard"] main .border-sky-100,
+body[data-app-route*="/dashboard"] main .border-blue-100 {
   border-color: rgba(103, 232, 249, 0.55) !important;
 }
 
