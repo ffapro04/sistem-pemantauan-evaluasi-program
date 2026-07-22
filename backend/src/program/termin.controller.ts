@@ -5,58 +5,49 @@ import {
   Post,
   Body,
   Param,
-  Headers,
+  Req,
   UnauthorizedException,
+  UseGuards,
   UseInterceptors,
   UploadedFile,
   Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth-guard';
 import { TerminService } from './termin.service';
 
 const FILE_LIMIT_10_MB = 10 * 1024 * 1024;
 
 @Controller('termin')
+@UseGuards(JwtAuthGuard)
 export class TerminController {
   constructor(private readonly terminService: TerminService) {}
 
-  private getUserFromAuth(authHeader: string) {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token tidak ada');
-    }
+  private getUserFromRequest(request: any) {
+    const payload = request?.user || {};
+    const idUser =
+      payload.id_user ||
+      payload.sub ||
+      payload.id ||
+      payload.userId ||
+      payload.id_guru_assessment;
 
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Format token tidak valid');
-    }
-
-    try {
-      const payloadBase64Url = token.split('.')[1];
-      const payloadBase64 = payloadBase64Url
-        .replace(/-/g, '+')
-        .replace(/_/g, '/');
-
-      const payloadJson = Buffer.from(payloadBase64, 'base64').toString(
-        'utf-8',
-      );
-
-      const payload = JSON.parse(payloadJson);
-
-      return {
-        id_user: payload.sub || payload.id_user || payload.id,
-        id_role: payload.id_role ? Number(payload.id_role) : null,
-        nama_user: payload.nama || payload.name || payload.email || '',
-        role_user:
-          payload.role ||
-          payload.nama_role ||
-          payload.jabatan ||
-          String(payload.id_role || ''),
-      };
-    } catch (e) {
+    if (!idUser) {
       throw new UnauthorizedException('Token tidak valid');
     }
+
+    return {
+      id_user: Number(idUser),
+      id_role: payload.id_role ? Number(payload.id_role) : null,
+      id_sekolah: payload.id_sekolah ? Number(payload.id_sekolah) : null,
+      nama_user: payload.nama || payload.name || payload.email || '',
+      role_user:
+        payload.role ||
+        payload.nama_role ||
+        payload.jabatan ||
+        String(payload.id_role || ''),
+    };
   }
 
   @Post()
@@ -71,9 +62,9 @@ export class TerminController {
   createTermin(
     @Body() createDto: any,
     @UploadedFile() file: Express.Multer.File,
-    @Headers('authorization') authHeader: string,
+    @Req() request: any,
   ) {
-    const user = this.getUserFromAuth(authHeader);
+    const user = this.getUserFromRequest(request);
 
     return this.terminService.createTermin(
       createDto,
@@ -93,25 +84,33 @@ export class TerminController {
   @Post('chat')
   createChat(
     @Body() createDto: any,
-    @Headers('authorization') authHeader: string,
+    @Req() request: any,
   ) {
-    const user = this.getUserFromAuth(authHeader);
+    const user = this.getUserFromRequest(request);
 
     return this.terminService.createChat(
       createDto,
       user.id_user,
       user.nama_user,
       user.role_user,
+      user,
     );
   }
 
   @Get('chat')
-  getChatsByContext(@Query() query: any) {
-    return this.terminService.getChatsByContext(query);
+  getChatsByContext(@Query() query: any, @Req() request: any) {
+    const user = this.getUserFromRequest(request);
+
+    return this.terminService.getChatsByContext(query, user);
   }
 
   @Get('chat/:id_termin')
-  getChatsByTermin(@Param('id_termin') id_termin: string) {
-    return this.terminService.getChatsByTermin(+id_termin);
+  getChatsByTermin(
+    @Param('id_termin') id_termin: string,
+    @Req() request: any,
+  ) {
+    const user = this.getUserFromRequest(request);
+
+    return this.terminService.getChatsByTermin(+id_termin, user);
   }
 }

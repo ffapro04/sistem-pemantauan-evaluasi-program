@@ -1,9 +1,9 @@
 ﻿/* eslint-disable react/prop-types */
 export default function Table({ columns = [], data = [], footer }) {
   return (
-    <div className="w-full bg-white rounded-[1.8rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.06)] overflow-hidden ring-1 ring-black/[0.02]">
+    <div className="w-full overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_10px_34px_rgba(15,23,42,0.06)]">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-max border-collapse">
+        <table className="w-full table-auto border-collapse">
 
           {/* HEADER */}
           <thead>
@@ -14,19 +14,18 @@ export default function Table({ columns = [], data = [], footer }) {
                   style={{
                     backgroundColor: "#0AC4E0",
                     color: "white",
-                    fontSize: "10px",
+                    fontSize: "11px",
                     fontWeight: 900,
                     textTransform: "uppercase",
-                    letterSpacing: "0.12em",
-                    padding: "1.5rem",
+                    letterSpacing: "0.06em",
+                    padding: "0.95rem 1rem",
                     border: "none",
                     position: "sticky",
                     top: 0,
                     zIndex: 10,
-                    whiteSpace: "nowrap",
-                    minWidth: col.minWidth || "140px",
-                    ...(index === 0 ? { borderTopLeftRadius: "1.8rem" } : {}),
-                    ...(index === columns.length - 1 ? { borderTopRightRadius: "1.8rem" } : {}),
+                    whiteSpace: "normal",
+                    minWidth: col.minWidth || undefined,
+                    width: col.width || undefined,
                   }}
                   className={col.align || "text-left"}
                 >
@@ -44,11 +43,8 @@ export default function Table({ columns = [], data = [], footer }) {
                   colSpan={columns.length}
                   style={{ padding: "5rem 1.5rem", textAlign: "center", border: "none" }}
                 >
-                  <div className="flex flex-col items-center justify-center opacity-20 text-gray-900">
-                    <svg width="48" height="48" fill="none" stroke="currentColor" strokeWidth="1" viewBox="0 0 24 24" className="mb-3">
-                      <ellipse cx="12" cy="5" rx="9" ry="3" /><path d="M3 5v6c0 1.657 4.03 3 9 3s9-1.343 9-3V5" /><path d="M3 11v6c0 1.657 4.03 3 9 3s9-1.343 9-3v-6" />
-                    </svg>
-                    <p style={{ fontSize: "10px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.15em" }}>
+                  <div className="flex flex-col items-center justify-center text-slate-400">
+                    <p style={{ fontSize: "11px", fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.08em" }}>
                       Data Tidak Ditemukan
                     </p>
                   </div>
@@ -70,10 +66,15 @@ export default function Table({ columns = [], data = [], footer }) {
                       key={colIndex}
                       style={{
                         padding: "1rem 1.5rem",
-                        borderBottom: "1px solid #F8FAFC",
+                        borderBottom: "1px solid #F1F5F9",
                         verticalAlign: "middle",
-                        whiteSpace: "nowrap",
-                        minWidth: col.minWidth || "140px",
+                        whiteSpace: "normal",
+                        minWidth: col.minWidth || undefined,
+                        width: col.width || undefined,
+                        color: "#0f172a",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        lineHeight: 1.45,
                       }}
                       className={col.align || "text-left"}
                     >

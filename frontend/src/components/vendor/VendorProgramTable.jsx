@@ -8,6 +8,8 @@ import {
     UploadCloud,
     Clock3,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -139,8 +141,16 @@ function VendorProgramTable({
     detailPathPrefix,
     getSchoolName,
     getHoName,
+    page = 1,
+    totalPages = 1,
+    startIndex = 0,
+    totalItems,
+    onPrevPage,
+    onNextPage,
 }) {
     const navigate = useNavigate();
+    const totalProgramCount = typeof totalItems === "number" ? totalItems : programs.length;
+    const hasPagination = totalPages > 1;
 
     return (
         <div className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
@@ -161,7 +171,7 @@ function VendorProgramTable({
                         className="grid grid-cols-12 items-center px-6 py-5 text-sm transition hover:bg-cyan-50/35"
                     >
                         <div className="col-span-1 text-[12px] font-black text-slate-300">
-                            {String(index + 1).padStart(2, "0")}
+                            {String(startIndex + index + 1).padStart(2, "0")}
                         </div>
 
                         <div className="col-span-3 min-w-0">
@@ -228,8 +238,36 @@ function VendorProgramTable({
             <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-4">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">
                     <BadgeCheck size={14} className="text-[#0AC4E0]" />
-                    Menampilkan {programs.length} program vendor
+                    Menampilkan {startIndex + 1}-{Math.min(startIndex + programs.length, totalProgramCount)} dari {totalProgramCount} program vendor
                 </div>
+
+                {hasPagination && (
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={onPrevPage}
+                            disabled={page <= 1}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <ChevronLeft size={15} />
+                            Prev
+                        </button>
+
+                        <span className="inline-flex h-10 min-w-[58px] items-center justify-center rounded-xl bg-[#0AC4E0] px-3 text-[11px] font-black text-white">
+                            {page} / {totalPages}
+                        </span>
+
+                        <button
+                            type="button"
+                            onClick={onNextPage}
+                            disabled={page >= totalPages}
+                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            Next
+                            <ChevronRight size={15} />
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

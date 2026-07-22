@@ -28,6 +28,7 @@ const isOperatorSekolah = () => {
     const jabatan = String(user?.jabatan || "").toLowerCase();
 
     return (
+        idRole === 5 ||
         idRole === 9 ||
         role.includes("operator") ||
         jabatan.includes("operator sekolah") ||

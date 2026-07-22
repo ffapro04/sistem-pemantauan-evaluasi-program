@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -8,14 +8,14 @@ import {
     BadgeCheck,
     BriefcaseBusiness,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     Clock3,
     Eye,
     FileClock,
     FolderOpen,
+    Gauge,
     Layers3,
-    Mail,
-    MapPin,
-    Phone,
     RefreshCcw,
     School,
     Search,
@@ -25,16 +25,8 @@ import {
 
 import { Sidebar, PageWrapper, Button, Input } from "../common";
 
-const API_BASE_URL = "";
-
-function getVendorEmail(vendor) {
-    return (
-        vendor?.email ||
-        vendor?.email_vendor ||
-        vendor?.user?.email ||
-        "-"
-    );
-}
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 function getVendorInitials(vendor) {
     const source =
@@ -304,8 +296,8 @@ function getProgramProcessStatus(program) {
     if (progress.waitingUpload > 0) {
         return {
             label: activePhase.openingDone
-                ? "Upload Termin Dalam"
-                : "Upload Termin Luar",
+                ? "Perlu Upload Bukti"
+                : "Upload Administrasi",
             className: "border-cyan-100 bg-cyan-50 text-[#0AC4E0]",
         };
     }
@@ -352,18 +344,18 @@ function StatCard({ label, value, helper, icon, tone = "cyan" }) {
                     : "bg-cyan-50 text-[#0AC4E0]";
 
     return (
-        <div className="min-h-0 rounded-[1.35rem] border border-slate-100 bg-white p-4 shadow-[0_12px_34px_rgba(15,23,42,0.04)]">
+        <div className="min-h-0 rounded-[1.35rem] border border-cyan-100 bg-white p-4 shadow-[0_14px_38px_rgba(10,196,224,0.08)]">
             <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                    <p className="truncate text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
                         {label}
                     </p>
 
-                    <p className="mt-2 text-[24px] font-black leading-none text-slate-800">
+                    <p className="mt-2 text-[28px] font-black leading-none text-slate-900">
                         {value}
                     </p>
 
-                    <p className="mt-1 truncate text-[10px] font-bold text-slate-400">
+                    <p className="mt-1 truncate text-[12px] font-bold text-slate-500">
                         {helper}
                     </p>
                 </div>
@@ -420,20 +412,20 @@ function ProgramCard({ program, getSchoolName, getHoName, onDetail }) {
     const activePhase = getActivePhaseInfo(program);
 
     return (
-        <div className="group flex h-full min-h-0 flex-col rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-sm transition hover:border-cyan-100 hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+        <div className="group flex h-full min-h-0 flex-col rounded-[1.15rem] border border-cyan-100 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.045)] transition hover:border-[#0AC4E0] hover:shadow-[0_18px_45px_rgba(10,196,224,0.12)]">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-[14px] font-black text-slate-800">
+                    <p className="line-clamp-1 text-[14px] font-black text-slate-900">
                         {program.nama_program || "-"}
                     </p>
 
-                    <p className="mt-1 truncate text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <p className="mt-1 truncate text-[11px] font-black uppercase tracking-widest text-slate-400">
                         {program.kode_program || `PRG-${program.id_program}`}
                     </p>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
-                    <div className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                <div className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
                         {activePhase.index}/{activePhase.totalPhase} Fase
                     </div>
 
@@ -448,18 +440,18 @@ function ProgramCard({ program, getSchoolName, getHoName, onDetail }) {
                 </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2">
                 <InfoPill icon={<School size={13} />} label={getSchoolName(program)} />
                 <InfoPill icon={<UserCheck size={13} />} label={getHoName(program)} />
             </div>
 
-            <div className="mt-3 rounded-2xl bg-slate-50 p-3">
+            <div className="mt-2 rounded-2xl bg-slate-50 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="truncate text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <p className="truncate text-[11px] font-black uppercase tracking-widest text-slate-400">
                         {activePhase.label}
                     </p>
 
-                    <p className="text-[13px] font-black text-[#0AC4E0]">
+                    <p className="text-[15px] font-black text-[#0AC4E0]">
                         {progress.percentage}%
                     </p>
                 </div>
@@ -541,6 +533,9 @@ function DashboardVendorPage({
 
     const [loading, setLoading] = useState(true);
     const [searchKeyword, setSearchKeyword] = useState("");
+    const [programPage, setProgramPage] = useState(1);
+
+    const PROGRAMS_PER_PAGE = 4;
 
     useEffect(() => {
         fetchDashboardData();
@@ -699,6 +694,10 @@ function DashboardVendorPage({
         });
     }, [programs, searchKeyword, schools, hos]);
 
+    useEffect(() => {
+        setProgramPage(1);
+    }, [searchKeyword, programs.length]);
+
     const stats = useMemo(() => {
         const allRequirements = programs.flatMap(getProgramRequirements);
 
@@ -733,10 +732,20 @@ function DashboardVendorPage({
             .slice(0, 3);
     }, [programs]);
 
-    const visiblePrograms = filteredPrograms.slice(0, 4);
-    const hiddenCount = Math.max(filteredPrograms.length - visiblePrograms.length, 0);
+    const totalProgramPages = Math.max(
+        1,
+        Math.ceil(filteredPrograms.length / PROGRAMS_PER_PAGE),
+    );
 
-    const vendorEmail = getVendorEmail(currentVendor);
+    const safeProgramPage = Math.min(programPage, totalProgramPages);
+
+    const visiblePrograms = filteredPrograms.slice(
+        (safeProgramPage - 1) * PROGRAMS_PER_PAGE,
+        safeProgramPage * PROGRAMS_PER_PAGE,
+    );
+
+    const hasProgramPagination = filteredPrograms.length > PROGRAMS_PER_PAGE;
+
     const vendorInitials = getVendorInitials(currentVendor);
 
     if (loading) {
@@ -758,39 +767,30 @@ function DashboardVendorPage({
             <Sidebar />
 
             <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <header className="relative shrink-0 overflow-hidden border-b border-slate-800 bg-slate-950 px-7 py-5 text-white">
-                    <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0AC4E0]/20 blur-3xl" />
-                    <div className="pointer-events-none absolute left-1/3 top-10 h-28 w-28 rounded-full bg-white/5 blur-2xl" />
+                <header className="relative shrink-0 overflow-hidden border-b border-cyan-100 bg-white px-6 py-4 text-slate-900 shadow-[0_10px_36px_rgba(10,196,224,0.08)]">
+                    <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0AC4E0]/18 blur-3xl" />
+                    <div className="pointer-events-none absolute left-1/3 top-10 h-28 w-28 rounded-full bg-emerald-200/20 blur-2xl" />
 
                     <div className="relative flex items-center justify-between gap-6">
                         <div className="flex min-w-0 items-center gap-4">
-                            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.4rem] border border-white/15 bg-white/10 text-lg font-black text-white shadow-[0_18px_45px_rgba(0,0,0,0.25)]">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] border border-cyan-100 bg-cyan-50 text-lg font-black text-[#0AC4E0] shadow-[0_18px_45px_rgba(10,196,224,0.16)]">
                                 {vendorInitials}
                             </div>
 
                             <div className="min-w-0">
-                                <p className="text-[9px] font-black uppercase tracking-[0.28em] text-cyan-300">
-                                    Vendor Workspace
-                                </p>
-
-                                <h1 className="mt-1 truncate text-[25px] font-black tracking-tight text-white">
+                                <h1 className="truncate text-[28px] font-black tracking-tight text-slate-950">
                                     {currentVendor?.nama_vendor || title}
                                 </h1>
 
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-wider text-white/90">
-                                        <BadgeCheck size={12} className="text-cyan-300" />
+                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                                        <BadgeCheck size={13} />
                                         {currentVendor?.status || "Bermitra"}
                                     </span>
 
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[9px] font-black uppercase tracking-wider text-white/90">
-                                        <BriefcaseBusiness size={12} className="text-cyan-300" />
+                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#0AC4E0]">
+                                        <BriefcaseBusiness size={13} />
                                         {currentVendor?.pilar || "Bidang Vendor"}
-                                    </span>
-
-                                    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[9px] font-bold text-white/80">
-                                        <Mail size={12} className="shrink-0 text-cyan-300" />
-                                        <span className="max-w-[220px] truncate">{vendorEmail}</span>
                                     </span>
                                 </div>
                             </div>
@@ -801,21 +801,21 @@ function DashboardVendorPage({
                                 text="Program"
                                 icon={<FolderOpen size={15} />}
                                 onClick={() => navigate(listPath)}
-                                className="!rounded-xl !border !border-white/10 !bg-white/10 !px-5 !py-2.5 !text-xs !font-bold !text-white !shadow-none hover:!bg-white/20"
+                                className="!rounded-xl !border !border-cyan-100 !bg-white !px-5 !py-2.5 !text-sm !font-bold !text-[#0AC4E0] !shadow-[0_12px_28px_rgba(10,196,224,0.08)] hover:!bg-cyan-50"
                             />
 
                             <Button
                                 text="Refresh"
                                 icon={<RefreshCcw size={15} />}
                                 onClick={fetchDashboardData}
-                                className="!rounded-xl !bg-[#0AC4E0] !px-5 !py-2.5 !text-xs !font-bold !text-white hover:!bg-cyan-400"
+                                className="!rounded-xl !bg-[#0AC4E0] !px-5 !py-2.5 !text-sm !font-bold !text-white hover:!bg-cyan-400"
                             />
                         </div>
                     </div>
                 </header>
 
-                <section className="grid min-h-0 flex-1 grid-cols-12 gap-4 overflow-hidden px-7 py-5">
-                    <div className="col-span-12 flex min-h-0 flex-col gap-4 xl:col-span-8">
+                <section className="grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-hidden px-6 py-4">
+                    <div className="col-span-12 flex min-h-0 flex-col gap-3 xl:col-span-9">
                         <div className="grid shrink-0 grid-cols-4 gap-3">
                             <StatCard
                                 label="Total Program"
@@ -848,106 +848,83 @@ function DashboardVendorPage({
                             />
                         </div>
 
-                        <div className="shrink-0 rounded-[1.45rem] border border-slate-100 bg-white p-4 shadow-sm">
-                            <div className="relative">
-                                <Search
-                                    size={17}
-                                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                                />
-
-                                <Input
-                                    value={searchKeyword}
-                                    onChange={(event) =>
-                                        setSearchKeyword(event.target.value)
-                                    }
-                                    placeholder="Cari program, sekolah, HO, status, fase, atau tahun."
-                                    className="!rounded-xl !border-none !bg-slate-50 !py-3 !pl-11 !text-sm !font-semibold"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="min-h-0 flex-1 rounded-[1.8rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.05)]">
-                            <div className="mb-4 flex items-center justify-between">
+                        <div className="min-h-0 flex-1 rounded-[1.45rem] border border-cyan-100 bg-white p-5 shadow-[0_18px_55px_rgba(10,196,224,0.08)]">
+                            <div className="mb-3 flex items-center justify-between">
                                 <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
-                                        Program Vendor
-                                    </p>
-
-                                    <h2 className="mt-1 text-[17px] font-black text-slate-800">
-                                        Ringkasan Program Berjalan
+                                    <h2 className="text-[21px] font-black text-slate-900">
+                                        Visual Status Program
                                     </h2>
                                 </div>
 
-                                <div className="flex items-center gap-2">
-                                    {hiddenCount > 0 && (
-                                        <span className="rounded-full border border-amber-100 bg-amber-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-600">
-                                            +{hiddenCount} lainnya
-                                        </span>
-                                    )}
-
-                                    <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                        {filteredPrograms.length} Data
-                                    </span>
-                                </div>
+                                <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                    {stats.totalProgram} Program
+                                </span>
                             </div>
 
-                            {visiblePrograms.length > 0 ? (
-                                <div className="grid h-[calc(100%-60px)] grid-cols-2 gap-3">
-                                    {visiblePrograms.map((program) => (
-                                        <ProgramCard
-                                            key={program.id_program}
-                                            program={program}
-                                            getSchoolName={getSchoolName}
-                                            getHoName={getHoName}
-                                            onDetail={goToDetail}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex h-[calc(100%-60px)] flex-col items-center justify-center rounded-[1.5rem] bg-slate-50 text-center">
-                                    <BriefcaseBusiness
-                                        size={48}
-                                        className="text-slate-300"
-                                    />
+                            <div className="grid h-[calc(100%-52px)] min-h-[360px] gap-4 lg:grid-cols-2">
+                                {[
+                                    ["Perlu Upload", stats.waitingUpload, "#0AC4E0"],
+                                    ["Menunggu HO", stats.waitingHo, "#F59E0B"],
+                                    ["Approved", stats.approved, "#10B981"],
+                                    ["Total Program", stats.totalProgram, "#2563EB"],
+                                ].map(([label, value, color]) => {
+                                    const numericValue = Number(value || 0);
+                                    const maxValue = Math.max(
+                                        stats.totalProgram,
+                                        stats.waitingUpload,
+                                        stats.waitingHo,
+                                        stats.approved,
+                                        1,
+                                    );
+                                    const percent = Math.max(8, Math.round((numericValue / maxValue) * 100));
 
-                                    <p className="mt-4 text-sm font-black text-slate-700">
-                                        Program tidak ditemukan
-                                    </p>
-
-                                    <p className="mt-2 max-w-sm text-xs font-semibold leading-6 text-slate-400">
-                                        Belum ada program yang cocok dengan kata kunci
-                                        atau belum ada program yang ditugaskan ke vendor ini.
-                                    </p>
-                                </div>
-                            )}
+                                    return (
+                                        <div key={label} className="flex min-h-[150px] flex-col justify-between rounded-[1.35rem] border border-slate-100 bg-slate-50/70 p-5">
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p className="text-[12px] font-black uppercase tracking-widest text-slate-500">
+                                                        {label}
+                                                    </p>
+                                                    <p className="mt-3 text-[42px] font-black leading-none text-slate-950">
+                                                        {numericValue}
+                                                    </p>
+                                                </div>
+                                                <span className="h-12 w-12 rounded-2xl" style={{ backgroundColor: `${color}1A`, border: `1px solid ${color}55` }} />
+                                            </div>
+                                            <div className="h-4 overflow-hidden rounded-full bg-white">
+                                                <div
+                                                    className="h-full rounded-full"
+                                                    style={{ width: `${percent}%`, backgroundColor: color }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
-                    <aside className="col-span-12 flex min-h-0 flex-col gap-4 xl:col-span-4">
-                        <div className="shrink-0 overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.08)]">
-                            <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 p-5 text-white">
+                    <aside className="col-span-12 flex min-h-0 flex-col gap-3 xl:col-span-3">
+                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.45rem] border border-cyan-100 bg-white shadow-[0_22px_70px_rgba(10,196,224,0.10)]">
+                            <div className="relative overflow-hidden bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-4 text-slate-900">
                                 <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-[#0AC4E0]/25 blur-3xl" />
 
                                 <div className="relative flex items-center gap-4">
-                                    <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.55rem] border border-white/15 bg-white/10 text-xl font-black text-white shadow-[0_18px_45px_rgba(0,0,0,0.22)]">
-                                        {vendorInitials}
+                                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_18px_45px_rgba(10,196,224,0.18)]">
+                                        <Gauge size={30} />
                                     </div>
 
                                     <div className="min-w-0">
-                                        <p className="text-[9px] font-black uppercase tracking-[0.24em] text-cyan-300">
-                                            Identitas Vendor
-                                        </p>
-
-                                        <h2 className="mt-1 line-clamp-2 text-[19px] font-black leading-tight text-white">
-                                            {currentVendor?.nama_vendor || "Vendor"}
+                                        <h2 className="text-[19px] font-black leading-tight text-slate-950">
+                                            Cockpit Vendor
                                         </h2>
 
                                         <div className="mt-2 flex flex-wrap gap-2">
-                                            <span className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-white/90">
+                                            <span className="rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0AC4E0]">
                                                 {currentVendor?.pilar || "Bidang Vendor"}
                                             </span>
 
-                                            <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-200">
+                                            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-600">
                                                 {currentVendor?.status || "Bermitra"}
                                             </span>
                                         </div>
@@ -955,126 +932,15 @@ function DashboardVendorPage({
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 p-4">
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <div className="flex items-center gap-2 text-[#0AC4E0]">
-                                        <UserCheck size={14} />
-                                        <p className="text-[8px] font-black uppercase tracking-widest">
-                                            PJ Utama
-                                        </p>
-                                    </div>
-                                    <p className="mt-2 line-clamp-1 text-[11px] font-black text-slate-700">
-                                        {currentVendor?.pj_1 || "-"}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <div className="flex items-center gap-2 text-[#0AC4E0]">
-                                        <Phone size={14} />
-                                        <p className="text-[8px] font-black uppercase tracking-widest">
-                                            Kontak
-                                        </p>
-                                    </div>
-                                    <p className="mt-2 line-clamp-1 text-[11px] font-black text-slate-700">
-                                        {currentVendor?.telp_pj_1 || "-"}
-                                    </p>
-                                </div>
-
-                                <div className="col-span-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <div className="flex items-center gap-2 text-[#0AC4E0]">
-                                        <Mail size={14} />
-                                        <p className="text-[8px] font-black uppercase tracking-widest">
-                                            Email Login
-                                        </p>
-                                    </div>
-                                    <p className="mt-2 truncate text-[11px] font-black lowercase text-slate-700">
-                                        {vendorEmail}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <div className="flex items-center gap-2 text-[#0AC4E0]">
-                                        <BriefcaseBusiness size={14} />
-                                        <p className="text-[8px] font-black uppercase tracking-widest">
-                                            No. Register
-                                        </p>
-                                    </div>
-                                    <p className="mt-2 truncate text-[11px] font-black text-slate-700">
-                                        {currentVendor?.no_register || "-"}
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <div className="flex items-center gap-2 text-[#0AC4E0]">
-                                        <MapPin size={14} />
-                                        <p className="text-[8px] font-black uppercase tracking-widest">
-                                            Lokasi
-                                        </p>
-                                    </div>
-                                    <p className="mt-2 line-clamp-1 text-[11px] font-black text-slate-700">
-                                        {currentVendor?.alamat || "-"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-slate-100 bg-cyan-50/60 px-4 py-3">
-                                <p className="text-[10px] font-semibold leading-5 text-slate-500">
-                                    Fokus pada upload Termin Luar dan Termin Dalam sesuai
-                                    fase yang sedang terbuka.
-                                </p>
+                            <div className="grid grid-cols-2 gap-2 p-4">
+                                <MiniStatus label="Program" value={stats.totalProgram} />
+                                <MiniStatus label="Upload" value={stats.waitingUpload} />
+                                <MiniStatus label="Validasi" value={stats.waitingHo} />
+                                <MiniStatus label="Approved" value={stats.approved} />
                             </div>
                         </div>
 
-                        <div className="min-h-0 flex-1 rounded-[1.8rem] border border-slate-100 bg-white p-4 shadow-sm">
-                            <div className="mb-4 flex items-center justify-between">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-400">
-                                        Prioritas Vendor
-                                    </p>
-
-                                    <h2 className="mt-1 text-[17px] font-black text-slate-800">
-                                        Tugas Fase Aktif
-                                    </h2>
-                                </div>
-
-                                <Clock3 size={20} className="text-[#0AC4E0]" />
-                            </div>
-
-                            {priorityTasks.length > 0 ? (
-                                <div className="space-y-3">
-                                    {priorityTasks.map((program) => (
-                                        <TaskItem
-                                            key={program.id_program}
-                                            program={program}
-                                            getSchoolName={getSchoolName}
-                                            onDetail={goToDetail}
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex h-[calc(100%-58px)] flex-col items-center justify-center rounded-2xl bg-slate-50 px-5 text-center">
-                                    <CheckCircle2
-                                        size={36}
-                                        className="text-emerald-500"
-                                    />
-
-                                    <p className="mt-4 text-sm font-black text-slate-700">
-                                        Tidak ada tugas aktif
-                                    </p>
-
-                                    <p className="mt-2 text-xs font-semibold leading-6 text-slate-400">
-                                        Semua bukti sudah diunggah, disetujui, atau
-                                        sedang menunggu validasi HO.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="shrink-0 rounded-[1.8rem] border border-cyan-100 bg-cyan-50/70 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                                Alur Kerja Vendor
-                            </p>
-
+                        <div className="shrink-0 rounded-[1.45rem] border border-cyan-100 bg-cyan-50/70 p-4">
                             <div className="mt-3 grid grid-cols-2 gap-2">
                                 <WorkflowStep number="01" text="Buka program berjalan" />
                                 <WorkflowStep number="02" text="Pilih fase terbuka" />

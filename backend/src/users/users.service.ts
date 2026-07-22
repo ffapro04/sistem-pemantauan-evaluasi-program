@@ -13,6 +13,7 @@ import { User } from './user.entity';
 import { Wilayah } from '../wilayah/entities/wilayah.entity';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -101,6 +102,7 @@ export class UsersService {
     ).toLowerCase();
 
     return (
+      roleId === 5 ||
       roleId === 9 ||
       role.includes('operator') ||
       jabatan.includes('operator sekolah') ||
@@ -500,7 +502,6 @@ export class UsersService {
       .leftJoinAndSelect('user.role', 'role')
       .leftJoinAndSelect('user.wilayah', 'wilayah')
       .leftJoinAndSelect('user.sekolah', 'sekolah')
-      .addSelect('user.password')
       .where('user.id_user = :id', { id })
       .getOne();
 
@@ -508,14 +509,7 @@ export class UsersService {
       throw new NotFoundException(`User dengan ID #${id} tidak ditemukan`);
     }
 
-    const password = user.password;
-
-    const hydratedUser = await this.hydrateKepalaDinasWilayah(user);
-
-    return {
-      ...hydratedUser,
-      password,
-    };
+    return this.hydrateKepalaDinasWilayah(user);
   }
 
   async getUsersByRole(roleName: string) {
@@ -586,6 +580,23 @@ export class UsersService {
     }
 
     return this.hydrateKepalaDinasWilayah(user);
+  }
+
+  async saveUserPassword(user: User) {
+    const password = String(user?.password || '').trim();
+    this.validatePassword(password);
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    await this.userRepo.update(
+      { id_user: user.id_user },
+      {
+        password: hashedPassword,
+      },
+    );
+
+    return {
+      success: true,
+    };
   }
 
   async create(data: any) {

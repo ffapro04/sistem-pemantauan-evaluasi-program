@@ -296,6 +296,17 @@ main {
    Untuk Recharts / dashboard chart
    ========================================================= */
 
+.recharts-responsive-container {
+  width: 100% !important;
+  min-width: 1px !important;
+  min-height: 240px !important;
+}
+
+.recharts-wrapper {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 @media (max-width: 768px) {
   .recharts-wrapper {
     min-width: 100% !important;

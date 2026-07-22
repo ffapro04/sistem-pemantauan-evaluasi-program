@@ -1,10 +1,19 @@
 /* eslint-disable prettier/prettier */
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.entity';
+import { EmailService } from './email.service';
+import { NotifikasiService } from '../notifikasi/notifikasi.service';
+import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
+import { createHash, randomInt } from 'node:crypto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +23,9 @@ export class AuthService {
 
     @InjectRepository(AssessmentGuru)
     private readonly guruRepo: Repository<AssessmentGuru>,
+
+    private readonly emailService: EmailService,
+    private readonly notifikasiService: NotifikasiService,
   ) {}
 
   // =========================================================================
@@ -26,18 +38,26 @@ export class AuthService {
       .toLowerCase();
     const cleanPassword = String(passwordInput || '').trim();
 
-    if (!cleanEmail || !cleanPassword) {
-      throw new UnauthorizedException('Email dan password wajib diisi');
+    this.validateEmail(cleanEmail);
+
+    if (!cleanPassword) {
+      throw new BadRequestException('Password wajib diisi');
     }
 
     const user = await this.usersService.findByEmail(cleanEmail);
 
     if (!user) {
-      throw new UnauthorizedException('User tidak ditemukan');
+      throw new UnauthorizedException('Email atau password salah');
     }
 
-    if (String(user.password || '') !== cleanPassword) {
-      throw new UnauthorizedException('Password salah');
+    const storedPassword = String(user.password || '');
+    const isHashedPassword = storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$');
+    const passwordMatches = isHashedPassword
+      ? await bcrypt.compare(cleanPassword, storedPassword)
+      : storedPassword === cleanPassword;
+
+    if (!passwordMatches) {
+      throw new UnauthorizedException('Email atau password salah');
     }
 
     const roleRel = user.role || null;
@@ -107,6 +127,252 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload),
+    };
+  }
+
+  private normalizeEmail(email: string) {
+    return String(email || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  private validateEmail(email: string) {
+    if (!email) {
+      throw new BadRequestException('Email wajib diisi');
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Format email tidak valid');
+    }
+  }
+
+  private hashOtp(email: string, otp: string) {
+    const secret = process.env.PASSWORD_RESET_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+    return createHash('sha256')
+      .update(`${email}:${otp}:${secret}`)
+      .digest('hex');
+  }
+
+  private generateOtp() {
+    return String(randomInt(100000, 999999));
+  }
+
+  private async ensurePasswordResetTable() {
+    await this.guruRepo.manager.query(`
+      CREATE TABLE IF NOT EXISTS t_password_reset_otp (
+        id_reset SERIAL PRIMARY KEY,
+        id_user INTEGER NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        otp_hash VARCHAR(128) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used_at TIMESTAMP NULL,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await this.guruRepo.manager.query(`
+      CREATE INDEX IF NOT EXISTS idx_password_reset_otp_email
+      ON t_password_reset_otp (LOWER(email), created_at DESC)
+    `);
+  }
+
+  private async createPasswordResetNotification(user: any, title: string, message: string) {
+    try {
+      await this.notifikasiService.createMany([
+        {
+          recipientType: NotificationRecipientType.USER,
+          recipientId: Number(user.id_user),
+          legacyUserId: Number(user.id_user),
+          judul: title,
+          pesan: message,
+          tipe: 'PASSWORD_RESET',
+          targetUrl: '/login',
+          metadata: {
+            email: user.email,
+            event: 'password_reset',
+          },
+        },
+      ]);
+    } catch {
+      // Notifikasi sistem tidak boleh menggagalkan reset password email.
+    }
+  }
+
+  async requestForgotPassword(email: string) {
+    const cleanEmail = this.normalizeEmail(email);
+    this.validateEmail(cleanEmail);
+
+    const user = await this.usersService.findByEmail(cleanEmail);
+
+    if (!user) {
+      throw new BadRequestException('Email tidak ditemukan');
+    }
+
+    await this.ensurePasswordResetTable();
+
+    const recentRows = await this.guruRepo.manager.query(
+      `
+        SELECT COUNT(*)::int AS total
+        FROM t_password_reset_otp
+        WHERE LOWER(email) = LOWER($1)
+          AND created_at >= NOW() - INTERVAL '30 seconds'
+      `,
+      [cleanEmail],
+    );
+
+    const recentTotal = Number(recentRows?.[0]?.total || 0);
+
+    if (recentTotal >= 10) {
+      throw new BadRequestException('Batas kirim OTP tercapai. Tunggu 30 detik lalu coba lagi.');
+    }
+
+    const otp = this.generateOtp();
+    const expiryMinutes = Number(process.env.PASSWORD_RESET_OTP_MINUTES || 10);
+    const expiresAt = new Date(Date.now() + expiryMinutes * 60_000);
+
+    await this.emailService.sendMail({
+      to: cleanEmail,
+      subject: 'Kode OTP Reset Password - Sistem Monitoring Evaluasi',
+      text: [
+        `Halo ${user.nama || 'User'},`,
+        '',
+        `Kode OTP reset password Anda adalah: ${otp}`,
+        `Kode ini berlaku selama ${expiryMinutes} menit.`,
+        '',
+        'Jika Anda tidak meminta reset password, abaikan email ini.',
+      ].join('\n'),
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0f172a">
+          <h2 style="margin:0 0 12px;color:#0AC4E0">Reset Password</h2>
+          <p>Halo <strong>${user.nama || 'User'}</strong>,</p>
+          <p>Kode OTP reset password Anda:</p>
+          <div style="font-size:28px;font-weight:800;letter-spacing:8px;padding:14px 18px;background:#f1f5f9;border-radius:12px;display:inline-block">${otp}</div>
+          <p>Kode ini berlaku selama <strong>${expiryMinutes} menit</strong>.</p>
+          <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
+        </div>
+      `,
+    });
+
+    await this.guruRepo.manager.query(
+      `
+        INSERT INTO t_password_reset_otp (id_user, email, otp_hash, expires_at)
+        VALUES ($1, $2, $3, $4)
+      `,
+      [user.id_user, cleanEmail, this.hashOtp(cleanEmail, otp), expiresAt],
+    );
+
+    await this.createPasswordResetNotification(
+      user,
+      'OTP reset password dikirim',
+      'Kode OTP reset password sudah dikirim ke email akun Anda.',
+    );
+
+    return {
+      success: true,
+      message: 'OTP reset password sudah dikirim ke email akun Anda.',
+      expires_in_minutes: expiryMinutes,
+    };
+  }
+
+  async verifyForgotPassword(data: {
+    email?: string;
+    otp?: string;
+    password?: string;
+    password_confirmation?: string;
+  }) {
+    const cleanEmail = this.normalizeEmail(data?.email || '');
+    const otp = String(data?.otp || '').trim();
+    const password = String(data?.password || '').trim();
+    const passwordConfirmation = String(
+      data?.password_confirmation || '',
+    ).trim();
+
+    this.validateEmail(cleanEmail);
+
+    if (!/^\d{6}$/.test(otp)) {
+      throw new BadRequestException('Kode OTP harus 6 digit');
+    }
+
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Password baru minimal 8 karakter');
+    }
+
+    if (password !== passwordConfirmation) {
+      throw new BadRequestException('Konfirmasi password tidak sama');
+    }
+
+    const user = await this.usersService.findByEmail(cleanEmail);
+
+    if (!user) {
+      throw new BadRequestException('Email tidak ditemukan');
+    }
+
+    await this.ensurePasswordResetTable();
+
+    const rows = await this.guruRepo.manager.query(
+      `
+        SELECT id_reset, otp_hash, expires_at, used_at, attempt_count
+        FROM t_password_reset_otp
+        WHERE LOWER(email) = LOWER($1)
+        ORDER BY created_at DESC
+        LIMIT 1
+      `,
+      [cleanEmail],
+    );
+
+    const reset = rows?.[0];
+
+    if (!reset) {
+      throw new BadRequestException('OTP belum diminta atau sudah kedaluwarsa');
+    }
+
+    if (reset.used_at) {
+      throw new BadRequestException('OTP sudah digunakan. Minta kode baru.');
+    }
+
+    if (new Date(reset.expires_at).getTime() < Date.now()) {
+      throw new BadRequestException('OTP sudah kedaluwarsa. Minta kode baru.');
+    }
+
+    if (Number(reset.attempt_count || 0) >= 5) {
+      throw new BadRequestException('Percobaan OTP terlalu banyak. Minta kode baru.');
+    }
+
+    if (reset.otp_hash !== this.hashOtp(cleanEmail, otp)) {
+      await this.guruRepo.manager.query(
+        `
+          UPDATE t_password_reset_otp
+          SET attempt_count = attempt_count + 1
+          WHERE id_reset = $1
+        `,
+        [reset.id_reset],
+      );
+
+      throw new BadRequestException('Kode OTP tidak valid');
+    }
+
+    user.password = password;
+    await this.usersService.saveUserPassword(user);
+
+    await this.guruRepo.manager.query(
+      `
+        UPDATE t_password_reset_otp
+        SET used_at = NOW()
+        WHERE id_reset = $1
+      `,
+      [reset.id_reset],
+    );
+
+    await this.createPasswordResetNotification(
+      user,
+      'Password berhasil diganti',
+      'Password akun Anda berhasil diganti melalui verifikasi OTP email.',
+    );
+
+    return {
+      success: true,
+      message: 'Password berhasil diperbarui. Silakan login dengan password baru.',
     };
   }
 

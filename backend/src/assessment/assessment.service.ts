@@ -3,6 +3,7 @@
 /* eslint-disable prettier/prettier */
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
@@ -18,6 +19,8 @@ import { Sekolah } from '../sekolah/entities/sekolah.entity';
 import { User } from '../users/user.entity';
 import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.entity';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
+import { NotifikasiService } from '../notifikasi/notifikasi.service';
+import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
 
 function normalizeAssessmentPilar(value?: string, jenis?: string) {
   const raw = String(value || '')
@@ -43,8 +46,33 @@ function normalizeAssessmentJenisKey(value?: string) {
     .replace(/[-\s]+/g, '_');
 }
 
+function getAssessmentDeadline(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
+  if (!assessment.sent_at) return null;
+
+  const deadline = new Date(assessment.sent_at);
+  if (Number.isNaN(deadline.getTime())) return null;
+
+  deadline.setDate(deadline.getDate() + Number(assessment.tenggat ?? 7));
+  return deadline;
+}
+
+function getAssessmentRemainingDays(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
+  const deadline = getAssessmentDeadline(assessment);
+  if (!deadline) return null;
+
+  const diff = deadline.getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function isAssessmentExpired(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
+  const deadline = getAssessmentDeadline(assessment);
+  return Boolean(deadline && Date.now() > deadline.getTime());
+}
+
 @Injectable()
 export class AssessmentService {
+  private readonly logger = new Logger(AssessmentService.name);
+
   constructor(
     @InjectRepository(Assessment)
     private assessmentRepo: Repository<Assessment>,
@@ -63,6 +91,8 @@ export class AssessmentService {
 
     @InjectRepository(AssessmentGuru)
     private guruRepo: Repository<AssessmentGuru>,
+
+    private readonly notifikasiService: NotifikasiService,
   ) {}
 
   private toNumberArray(value: any): number[] {
@@ -87,6 +117,122 @@ export class AssessmentService {
     if (typeof value === 'number') return [value];
 
     return [];
+  }
+
+  private formatDateOnly(value?: Date | string | null) {
+    if (!value) return '-';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  }
+
+  private getAssessmentTargetUrl(assessment: Assessment) {
+    return `/sekolah/assessment/isi/${assessment.id_assessment}`;
+  }
+
+  private async getAssessmentNotificationAudience(assessment: Assessment) {
+    const targetSekolahIds = this.toNumberArray(assessment.target_sekolah_ids)
+      .map(Number)
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!targetSekolahIds.length) {
+      return {
+        schoolUserIds: [],
+        guruIds: [],
+      };
+    }
+
+    const [schoolUsers, gurus] = await Promise.all([
+      this.assessmentRepo.manager.query(
+        `
+          SELECT id_user
+          FROM m_users
+          WHERE id_sekolah = ANY($1::int[])
+            AND COALESCE(status, true) = true
+            AND (
+              id_role IN (5, 9, 10)
+              OR LOWER(COALESCE(jabatan, '')) LIKE '%operator%'
+              OR LOWER(COALESCE(jabatan, '')) LIKE '%kepala%'
+            )
+        `,
+        [targetSekolahIds],
+      ),
+      this.assessmentRepo.manager.query(
+        `
+          SELECT id_guru_assessment
+          FROM assessment_guru
+          WHERE id_sekolah = ANY($1::int[])
+            AND COALESCE(is_active, true) = true
+        `,
+        [targetSekolahIds],
+      ),
+    ]);
+
+    return {
+      schoolUserIds: Array.from(
+        new Set(
+          schoolUsers
+            .map((row: any) => Number(row.id_user || 0))
+            .filter(Boolean),
+        ),
+      ),
+      guruIds: Array.from(
+        new Set(
+          gurus
+            .map((row: any) => Number(row.id_guru_assessment || 0))
+            .filter(Boolean),
+        ),
+      ),
+    };
+  }
+
+  private async notifyAssessmentSent(assessment: Assessment) {
+    if (!assessment?.id_assessment) return;
+
+    const audience = await this.getAssessmentNotificationAudience(assessment);
+    const targetUrl = this.getAssessmentTargetUrl(assessment);
+    const listUrl = '/sekolah/assessment';
+    const startDate = this.formatDateOnly(assessment.sent_at);
+    const endDate = this.formatDateOnly(getAssessmentDeadline(assessment));
+    const assessmentName = assessment.nama || 'Assessment';
+
+    const rows: any[] = [
+      ...audience.guruIds.map((idGuru) => ({
+        recipientType: NotificationRecipientType.GURU_ASSESSMENT,
+        recipientId: idGuru,
+        judul: 'Assessment baru perlu diisi',
+        pesan: `Assessment "${assessmentName}" sudah dibuka. Periode pengisian ${startDate} sampai ${endDate}. Silakan isi melalui link sistem.`,
+        tipe: 'ASSESSMENT_SENT',
+        targetUrl,
+        metadata: {
+          id_assessment: assessment.id_assessment,
+          deadline: endDate,
+        },
+        dedupeKey: `assessment-sent:guru:${assessment.id_assessment}:${idGuru}`,
+      })),
+      ...audience.schoolUserIds.map((idUser) => ({
+        recipientType: NotificationRecipientType.USER,
+        recipientId: idUser,
+        legacyUserId: idUser,
+        judul: 'Assessment baru untuk sekolah',
+        pesan: `Assessment "${assessmentName}" sudah dikirim ke sekolah Anda. Periode pengisian ${startDate} sampai ${endDate}. Pantau dan pastikan data terisi tepat waktu.`,
+        tipe: 'ASSESSMENT_SENT',
+        targetUrl: listUrl,
+        metadata: {
+          id_assessment: assessment.id_assessment,
+          deadline: endDate,
+        },
+        dedupeKey: `assessment-sent:school:${assessment.id_assessment}:${idUser}`,
+      })),
+    ];
+
+    await this.notifikasiService.dispatchMany(rows);
   }
 
   private async hydrateAssessmentPersonas<T extends any>(payload: T | T[]) {
@@ -198,26 +344,86 @@ export class AssessmentService {
   }
 
   async create(dto: CreateAssessmentDto) {
-    const assessment = await this.assessmentRepo.save({
-      id_ho: dto.id_ho,
-      nama: dto.nama,
-      target_sekolah_ids: dto.target_sekolah_ids || [],
-      tenggat: dto.tenggat ?? 7,
-      jenis: dto.jenis ?? 'non-akademik',
-      pilar: normalizeAssessmentPilar(dto.pilar, dto.jenis),
-      status: 'Siap Diajukan',
-      aktif: true,
-      sent_at: null,
+    const idHo = Number(dto?.id_ho);
+    const nama = String(dto?.nama || '').trim();
+    const targetSekolahIds = Array.isArray(dto?.target_sekolah_ids)
+      ? dto.target_sekolah_ids
+          .map(Number)
+          .filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    const questions = Array.isArray(dto?.questions) ? dto.questions : [];
+
+    if (!idHo) {
+      throw new BadRequestException('ID HO tidak valid.');
+    }
+
+    if (!nama) {
+      throw new BadRequestException('Nama assessment wajib diisi.');
+    }
+
+    if (targetSekolahIds.length === 0) {
+      throw new BadRequestException('Pilih minimal satu sekolah target.');
+    }
+
+    if (questions.length === 0) {
+      throw new BadRequestException('Minimal satu pertanyaan wajib diisi.');
+    }
+
+    questions.forEach((question, index) => {
+      const text = String(question?.question || '').trim();
+      const options = Array.isArray(question?.options)
+        ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
+        : [];
+
+      if (!text) {
+        throw new BadRequestException(
+          `Pertanyaan nomor ${index + 1} wajib diisi.`,
+        );
+      }
+
+      if (options.length < 2) {
+        throw new BadRequestException(
+          `Pertanyaan nomor ${index + 1} wajib memiliki minimal 2 pilihan.`,
+        );
+      }
     });
 
-    for (let i = 0; i < dto.questions.length; i++) {
-      await this.pertanyaanRepo.save({
-        id_assessment: assessment.id_assessment,
-        pertanyaan: dto.questions[i].question,
-        options: dto.questions[i].options,
-        urutan: i + 1,
-      });
-    }
+    const assessment = await this.assessmentRepo.manager.transaction(
+      async (manager) => {
+        const savedAssessment = await manager.save(
+          Assessment,
+          this.assessmentRepo.create({
+            id_ho: idHo,
+            nama,
+            target_sekolah_ids: targetSekolahIds,
+            tenggat: Number(dto?.tenggat) || 7,
+            jenis: dto?.jenis ?? 'non-akademik',
+            pilar: normalizeAssessmentPilar(dto?.pilar, dto?.jenis),
+            status: 'Siap Diajukan',
+            aktif: true,
+            sent_at: null,
+          }),
+        );
+
+        for (let i = 0; i < questions.length; i++) {
+          const options = questions[i].options
+            .map((option) => String(option || '').trim())
+            .filter(Boolean);
+
+          await manager.save(
+            AssessmentPertanyaan,
+            this.pertanyaanRepo.create({
+              id_assessment: savedAssessment.id_assessment,
+              pertanyaan: String(questions[i].question || '').trim(),
+              options,
+              urutan: i + 1,
+            }),
+          );
+        }
+
+        return savedAssessment;
+      },
+    );
 
     return {
       message: 'Assessment berhasil dibuat',
@@ -660,6 +866,12 @@ export class AssessmentService {
       throw new NotFoundException('Assessment tidak ditemukan');
     }
 
+    if (isAssessmentExpired(assessment)) {
+      throw new BadRequestException(
+        'Tenggat assessment sudah selesai. Jawaban tidak bisa dikirim lagi.',
+      );
+    }
+
     const rows = Array.isArray(body?.rows) ? body.rows : [];
     if (rows.length === 0) {
       throw new BadRequestException('Data import kosong.');
@@ -899,17 +1111,19 @@ export class AssessmentService {
 
     await this.assessmentRepo.save(assessment);
 
-    await this.pertanyaanRepo.delete({ id_assessment: id });
+    if (body.questions !== undefined) {
+      await this.pertanyaanRepo.delete({ id_assessment: id });
 
-    const questions = body.questions || [];
+      const questions = Array.isArray(body.questions) ? body.questions : [];
 
-    for (let i = 0; i < questions.length; i++) {
-      await this.pertanyaanRepo.save({
-        id_assessment: id,
-        pertanyaan: questions[i].question,
-        options: questions[i].options,
-        urutan: i + 1,
-      });
+      for (let i = 0; i < questions.length; i++) {
+        await this.pertanyaanRepo.save({
+          id_assessment: id,
+          pertanyaan: questions[i].question,
+          options: questions[i].options,
+          urutan: i + 1,
+        });
+      }
     }
 
     return {
@@ -934,6 +1148,12 @@ export class AssessmentService {
 
     if (!assessment) {
       throw new NotFoundException('Assessment tidak ditemukan');
+    }
+
+    if (!assessment.aktif) {
+      throw new BadRequestException(
+        'Assessment sedang pending. Guru belum bisa mengisi assessment ini.',
+      );
     }
 
     let id_guru_assessment = body.id_guru_assessment;
@@ -1064,6 +1284,13 @@ export class AssessmentService {
         .getRawMany();
 
       for (const a of assessments) {
+        const deadline = getAssessmentDeadline(a as any);
+        const isExpired = isAssessmentExpired(a as any);
+        a.deadline = deadline;
+        a.sisa_hari = getAssessmentRemainingDays(a as any);
+        a.is_expired = isExpired;
+        a.status_display = isExpired ? 'Selesai' : a.status;
+
         const pertanyaan = await this.pertanyaanRepo.find({
           where: { id_assessment: a.id_assessment },
         });
@@ -1103,6 +1330,10 @@ export class AssessmentService {
     assessment.sent_at = new Date();
 
     await this.assessmentRepo.save(assessment);
+    await this.notifyAssessmentSent(assessment).catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`ASSESSMENT_SENT_NOTIFICATION_ERROR: ${message}`);
+    });
 
     return {
       message: 'Assessment berhasil dikirim',
@@ -1123,8 +1354,11 @@ export class AssessmentService {
     await this.assessmentRepo.save(assessment);
 
     return {
-      message: 'Status assessment berhasil diubah',
+      message: assessment.aktif
+        ? 'Assessment berhasil dilanjutkan'
+        : 'Assessment berhasil dipending',
       aktif: assessment.aktif,
+      status_pengisian: assessment.aktif ? 'Lanjut' : 'Pending',
     };
   }
 }

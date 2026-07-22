@@ -1,4 +1,5 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable react/prop-types */
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
@@ -10,7 +11,8 @@ import {
     Building2,
     CalendarDays,
     CheckCircle2,
-    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     FolderOpen,
     Globe,
     GraduationCap,
@@ -40,15 +42,17 @@ import {
     Cell,
     Pie,
     PieChart,
-    ResponsiveContainer,
     Tooltip as RechartsTooltip,
     XAxis,
     YAxis,
 } from "recharts";
+import ResponsiveContainer from "../../components/charts/SafeResponsiveContainer";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
+import Dropdown from "../../components/Dropdown";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
+import { notify } from "../../utils/popup";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const COLORS = {
     cyan: CHART_STATUS_COLORS.info,
@@ -64,6 +68,8 @@ const COLORS = {
 };
 
 const CHART_COLORS = CHART_PALETTE;
+const ROWS_PER_PAGE = 5;
+const DASHBOARD_CHART_GROUP_LIMIT = 7;
 
 const normalizeArray = (payload) => {
     if (Array.isArray(payload)) return payload;
@@ -113,6 +119,19 @@ const getAssetUrl = (logoUrl) => {
     return `${API_BASE_URL}/${value.replace(/^\/+/, "")}`;
 };
 
+const getJurusanImageUrl = (imagePath) => {
+    if (!imagePath) return "";
+
+    const value = String(imagePath).trim();
+    if (!value) return "";
+
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith("/")) return `${API_BASE_URL}${value}`;
+    if (value.startsWith("uploads/")) return `${API_BASE_URL}/${value}`;
+
+    return `${API_BASE_URL}/uploads/jurusan/${value}`;
+};
+
 const getTokenPayload = () => {
     const token = localStorage.getItem("token");
 
@@ -132,10 +151,18 @@ const getUserId = (decoded) => {
 const getSekolahIdFromToken = (decoded) => {
     return (
         decoded?.id_sekolah ||
+        decoded?.idSekolah ||
         decoded?.sekolah_id ||
+        decoded?.schoolId ||
         decoded?.school_id ||
+        decoded?.user?.id_sekolah ||
+        decoded?.user?.sekolah_id ||
+        decoded?.operator?.id_sekolah ||
+        decoded?.kepala_sekolah?.id_sekolah ||
+        decoded?.guru?.id_sekolah ||
         decoded?.sekolah?.id_sekolah ||
         decoded?.sekolah?.id ||
+        decoded?.sekolah?.idSekolah ||
         decoded?.school?.id_sekolah ||
         decoded?.school?.id ||
         null
@@ -276,6 +303,32 @@ const getProgramStatus = (program) => {
     return program?.status_program || program?.status || "Berjalan";
 };
 
+const getProgramYear = (program) => {
+    const direct =
+        program?.tahun ||
+        program?.tahun_program ||
+        program?.year ||
+        program?.periode_tahun;
+
+    if (direct) return String(direct);
+
+    const dateValue =
+        program?.tanggal_mulai ||
+        program?.start_date ||
+        program?.mulai ||
+        program?.periode_mulai ||
+        program?.created_at;
+
+    if (!dateValue) return "-";
+
+    const date = new Date(dateValue);
+    return Number.isNaN(date.getTime()) ? "-" : String(date.getFullYear());
+};
+
+const isProgramFinished = (program) => {
+    return normalizeSearch(getProgramStatus(program)).includes("selesai");
+};
+
 const getProgramStatusTone = (status) => {
     const value = normalizeValue(status);
 
@@ -377,7 +430,12 @@ const getProgramCompositionColor = (program) => {
     return COLORS.slate;
 };
 
-const buildRows = (rows, getValue, fallback = "Lainnya") => {
+const buildRows = (
+    rows,
+    getValue,
+    fallback = "Lainnya",
+    limit = DASHBOARD_CHART_GROUP_LIMIT,
+) => {
     const counter = new Map();
 
     rows.forEach((item) => {
@@ -394,7 +452,23 @@ const buildRows = (rows, getValue, fallback = "Lainnya") => {
         counter.get(key).total += 1;
     });
 
-    return Array.from(counter.values()).sort((a, b) => b.total - a.total);
+    const sortedRows = Array.from(counter.values()).sort((a, b) => b.total - a.total);
+
+    if (sortedRows.length <= limit) return sortedRows;
+
+    const mainRows = sortedRows.slice(0, limit - 1);
+    const otherTotal = sortedRows
+        .slice(limit - 1)
+        .reduce((total, row) => total + Number(row.total || 0), 0);
+
+    return [
+        ...mainRows,
+        {
+            name: "Lainnya",
+            total: otherTotal,
+            color: CHART_COLORS[(limit - 1) % CHART_COLORS.length],
+        },
+    ];
 };
 
 const renderPieLabel = ({ percent }) => {
@@ -425,7 +499,7 @@ function ProgramMetricItem({ label, helper, value, icon, accentClass }) {
     return (
         <div className="group relative flex min-h-[126px] items-center gap-4 px-5 py-5 sm:px-6">
             <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${accentClass}`}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.055)] ${accentClass}`}
             >
                 {icon}
             </div>
@@ -462,8 +536,8 @@ function ProgramPortfolioSummary({ stats }) {
     );
 
     return (
-        <section className="mb-10 overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="mb-10 overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.07)] ring-1 ring-slate-100/80">
+            <div className="flex flex-col gap-3 border-b border-slate-100 px-7 py-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
                         Ringkasan Program
@@ -473,7 +547,7 @@ function ProgramPortfolioSummary({ stats }) {
                     </h2>
                 </div>
 
-                <div className="inline-flex w-fit items-center gap-3 rounded-full border border-slate-100 bg-slate-50 px-4 py-2">
+                <div className="inline-flex w-fit items-center gap-3 rounded-2xl border border-cyan-100 bg-white px-4 py-2 shadow-[0_12px_30px_rgba(10,196,224,0.08)]">
                     <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">
                         Total
                     </span>
@@ -489,7 +563,7 @@ function ProgramPortfolioSummary({ stats }) {
                     helper="Kategori akademik"
                     value={stats.akademik}
                     icon={<BookOpen size={18} />}
-                    accentClass="bg-cyan-50 text-cyan-600"
+                    accentClass="text-cyan-600"
                 />
 
                 <ProgramMetricItem
@@ -497,7 +571,7 @@ function ProgramPortfolioSummary({ stats }) {
                     helper="Kategori non akademik"
                     value={stats.nonAkademik}
                     icon={<Sparkles size={18} />}
-                    accentClass="bg-violet-50 text-violet-600"
+                    accentClass="text-violet-600"
                 />
 
                 <ProgramMetricItem
@@ -505,7 +579,7 @@ function ProgramPortfolioSummary({ stats }) {
                     helper="Jenis reguler"
                     value={stats.reguler}
                     icon={<FolderOpen size={18} />}
-                    accentClass="bg-emerald-50 text-emerald-600"
+                    accentClass="text-emerald-600"
                 />
 
                 <ProgramMetricItem
@@ -513,7 +587,7 @@ function ProgramPortfolioSummary({ stats }) {
                     helper="Jenis project"
                     value={stats.project}
                     icon={<Target size={18} />}
-                    accentClass="bg-amber-50 text-amber-600"
+                    accentClass="text-amber-600"
                 />
             </div>
         </section>
@@ -567,8 +641,8 @@ function ProgramCompositionChart({ rows, total }) {
     if (!rows.length) return <EmptyProgramState />;
 
     return (
-        <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-            <div className="relative h-[300px] min-h-[300px] min-w-0 rounded-[1.6rem] border border-slate-100 bg-white p-4">
+        <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="relative h-[320px] min-h-[320px] min-w-0 rounded-[1.25rem] border border-slate-100 bg-white p-4">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
@@ -577,11 +651,10 @@ function ProgramCompositionChart({ rows, total }) {
                             nameKey="name"
                             cx="50%"
                             cy="50%"
-                            innerRadius={72}
-                            outerRadius={112}
-                            paddingAngle={4}
+                            outerRadius={116}
+                            paddingAngle={2}
                             stroke="#ffffff"
-                            strokeWidth={4}
+                            strokeWidth={3}
                             labelLine={false}
                             label={renderPieLabel}
                         >
@@ -598,65 +671,44 @@ function ProgramCompositionChart({ rows, total }) {
                         />
                     </PieChart>
                 </ResponsiveContainer>
-
-                <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                    <span className="text-[36px] font-black leading-none tracking-[-0.08em] text-slate-800">
-                        {total}
-                    </span>
-
-                    <span className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                        Program
-                    </span>
-                </div>
             </div>
 
-            <div className="h-[300px] min-h-[300px] min-w-0 rounded-[1.6rem] border border-slate-100 bg-white p-4">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                        data={rows}
-                        layout="vertical"
-                        margin={{ top: 12, right: 24, left: 10, bottom: 12 }}
-                    >
-                        <CartesianGrid
-                            strokeDasharray="3 3"
-                            horizontal={false}
-                            stroke="#E2E8F0"
-                        />
+            <div className="min-w-0 rounded-[1.25rem] border border-slate-100 bg-white p-5">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div>
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Total Program
+                        </p>
+                        <p className="mt-1 text-3xl font-black leading-none tracking-[-0.06em] text-slate-950">
+                            {total}
+                        </p>
+                    </div>
+                    <span className="rounded-2xl bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                        Pie
+                    </span>
+                </div>
 
-                        <XAxis
-                            type="number"
-                            allowDecimals={false}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                                fontSize: 11,
-                                fontWeight: 800,
-                                fill: "#94A3B8",
-                            }}
-                        />
-
-                        <YAxis
-                            type="category"
-                            dataKey="name"
-                            width={150}
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{
-                                fontSize: 10,
-                                fontWeight: 900,
-                                fill: "#64748B",
-                            }}
-                        />
-
-                        <RechartsTooltip />
-
-                        <Bar dataKey="total" radius={[0, 12, 12, 0]} barSize={24}>
-                            {rows.map((item) => (
-                                <Cell key={item.name} fill={item.color} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                <div className="mt-4 space-y-3">
+                    {rows.map((item) => (
+                        <div
+                            key={item.name}
+                            className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3"
+                        >
+                            <div className="flex min-w-0 items-center gap-3">
+                                <span
+                                    className="h-3 w-3 shrink-0 rounded-full"
+                                    style={{ backgroundColor: item.color }}
+                                />
+                                <p className="truncate text-[11px] font-black text-slate-700">
+                                    {item.name}
+                                </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-[10px] font-black text-slate-600 shadow-sm">
+                                {item.total}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -693,6 +745,17 @@ function CredentialItem({ label, value, icon, tone }) {
 }
 
 function JurusanSelector({ jurusanList, selectedJurusanId, selectedJurusan, onChange }) {
+    const jurusanItems = [
+        {
+            value: "",
+            label: jurusanList.length ? "Pilih salah satu jurusan" : "Belum ada data jurusan",
+        },
+        ...jurusanList.map((jurusan) => ({
+            value: String(jurusan.id_jurusan),
+            label: jurusan.nama_jurusan,
+        })),
+    ];
+
     return (
         <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:col-span-2">
             <div className="flex items-center justify-between gap-3">
@@ -710,28 +773,13 @@ function JurusanSelector({ jurusanList, selectedJurusanId, selectedJurusan, onCh
                 </div>
             </div>
 
-            <div className="relative mt-4">
-                <select
+            <div className="mt-4">
+                <Dropdown
                     value={selectedJurusanId}
-                    onChange={(event) => onChange(event.target.value)}
-                    className="h-11 w-full appearance-none rounded-2xl border border-slate-100 bg-white px-4 pr-10 text-xs font-black uppercase tracking-wide text-slate-700 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-                >
-                    <option value="">
-                        {jurusanList.length
-                            ? "Pilih salah satu jurusan"
-                            : "Belum ada data jurusan"}
-                    </option>
-
-                    {jurusanList.map((jurusan) => (
-                        <option key={jurusan.id_jurusan} value={jurusan.id_jurusan}>
-                            {jurusan.nama_jurusan}
-                        </option>
-                    ))}
-                </select>
-
-                <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    onChange={onChange}
+                    items={jurusanItems}
+                    placeholder={jurusanItems[0].label}
+                    disabled={!jurusanList.length}
                 />
             </div>
 
@@ -800,6 +848,137 @@ function InfoRow({ label, value }) {
             <p className="line-clamp-2 text-right text-[11px] font-bold leading-5 text-slate-700">
                 {value || "-"}
             </p>
+        </div>
+    );
+}
+
+function ProgramSelectFilter({ value, onChange, items, label }) {
+    return (
+        <Dropdown
+            value={value}
+            onChange={onChange}
+            items={items}
+            placeholder={label}
+            width="w-full"
+        />
+    );
+}
+
+function ProgramPagination({ page, totalPages, onChange }) {
+    return (
+        <div className="flex items-center gap-2">
+            <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => onChange(Math.max(1, page - 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+                <ChevronLeft size={14} />
+            </button>
+            <span className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black text-white">
+                {page} / {totalPages}
+            </span>
+            <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => onChange(Math.min(totalPages, page + 1))}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+                <ChevronRight size={14} />
+            </button>
+        </div>
+    );
+}
+
+function ProgramListTable({ programs }) {
+    const [page, setPage] = useState(1);
+    const totalPages = Math.max(1, Math.ceil(programs.length / ROWS_PER_PAGE));
+    const startIndex = (page - 1) * ROWS_PER_PAGE;
+    const visible = programs.slice(startIndex, startIndex + ROWS_PER_PAGE);
+
+    useEffect(() => {
+        setPage(1);
+    }, [programs]);
+
+    useEffect(() => {
+        if (page > totalPages) setPage(totalPages);
+    }, [page, totalPages]);
+
+    if (!programs.length) return <EmptyProgramState />;
+
+    return (
+        <div className="overflow-hidden rounded-[1.25rem] border border-slate-100 bg-white">
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[860px] border-collapse">
+                    <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50">
+                            {["No", "Program", "Kategori", "Periode", "Pelaksana", "Status"].map((head) => (
+                                <th
+                                    key={head}
+                                    className="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.16em] text-slate-400"
+                                >
+                                    {head}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visible.map((program, index) => {
+                            const category = getProgramCategory(program);
+                            const type = getProgramType(program);
+                            return (
+                                <tr
+                                    key={getProgramId(program) || `${startIndex}-${index}`}
+                                    className="border-b border-slate-100 last:border-b-0 hover:bg-cyan-50/30"
+                                >
+                                    <td className="px-4 py-4 text-[10px] font-black text-slate-300">
+                                        {String(startIndex + index + 1).padStart(2, "0")}
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <p className="line-clamp-2 text-[12px] font-black leading-5 text-slate-950">
+                                            {getProgramTitle(program)}
+                                        </p>
+                                        <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                            PRG-{getProgramId(program) || "-"} Â· Tahun {getProgramYear(program)}
+                                        </p>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                                                {getProgramCategoryLabel(category)}
+                                            </span>
+                                            <span className="rounded-full bg-slate-50 px-3 py-1 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                {getProgramTypeLabel(type)}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-4 text-[11px] font-bold text-slate-600">
+                                        {getProgramPeriod(program)}
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <p className="text-[11px] font-black text-slate-700">
+                                            {getVendorName(program)}
+                                        </p>
+                                        <p className="mt-1 text-[9px] font-bold text-slate-400">
+                                            AO: {getAoName(program)}
+                                        </p>
+                                    </td>
+                                    <td className="px-4 py-4">
+                                        <ProgramStatusBadge status={getProgramStatus(program)} />
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    Menampilkan {startIndex + 1}-{Math.min(startIndex + ROWS_PER_PAGE, programs.length)} dari {programs.length} program
+                </p>
+                <ProgramPagination page={page} totalPages={totalPages} onChange={setPage} />
+            </div>
         </div>
     );
 }
@@ -900,9 +1079,12 @@ export default function DashboardSekolah() {
     const [loadingProgram, setLoadingProgram] = useState(false);
     const [categoryFilter, setCategoryFilter] = useState("ALL");
     const [typeFilter, setTypeFilter] = useState("ALL");
+    const [yearFilter, setYearFilter] = useState("ALL");
+    const [statusFilter, setStatusFilter] = useState("ALL");
     const [keyword, setKeyword] = useState("");
     const [jurusanList, setJurusanList] = useState([]);
     const [selectedJurusanId, setSelectedJurusanId] = useState("");
+    const [activeJurusanIndex, setActiveJurusanIndex] = useState(0);
     const [loadingJurusan, setLoadingJurusan] = useState(false);
     const [editingJumlahSiswa, setEditingJumlahSiswa] = useState(false);
     const [jumlahSiswaDraft, setJumlahSiswaDraft] = useState("");
@@ -1040,6 +1222,7 @@ export default function DashboardSekolah() {
             fetchSekolah(),
             fetchProgramSekolah(),
             fetchGuruSekolah(),
+            fetchJurusanSekolah(),
         ]);
     };
 
@@ -1049,7 +1232,7 @@ export default function DashboardSekolah() {
 
     const roleId = Number(user?.id_role);
     const isGuru = roleId === 8;
-    const isOperator = roleId === 9;
+    const isOperator = roleId === 5 || roleId === 9;
     const active = isActiveValue(sekolah?.status);
 
     const jenjang = String(
@@ -1067,11 +1250,33 @@ export default function DashboardSekolah() {
         if (!isSmkSekolah) {
             setJurusanList([]);
             setSelectedJurusanId("");
+            setActiveJurusanIndex(0);
             return;
         }
 
         fetchJurusanSekolah();
     }, [idSekolahAktif, isSmkSekolah]);
+
+    useEffect(() => {
+        if (jurusanList.length <= 1) return undefined;
+
+        const timer = window.setInterval(() => {
+            setActiveJurusanIndex((currentIndex) => (currentIndex + 1) % jurusanList.length);
+        }, 4500);
+
+        return () => window.clearInterval(timer);
+    }, [jurusanList.length]);
+
+    useEffect(() => {
+        if (!jurusanList.length) {
+            setActiveJurusanIndex(0);
+            return;
+        }
+
+        if (activeJurusanIndex >= jurusanList.length) {
+            setActiveJurusanIndex(0);
+        }
+    }, [activeJurusanIndex, jurusanList.length]);
 
     const roleLabel = isGuru
         ? "Guru Assessment"
@@ -1107,8 +1312,23 @@ export default function DashboardSekolah() {
         });
     }, [guruList, selectedJurusanId]);
 
+    const activeJurusanIndexSafe = jurusanList.length
+        ? Math.min(activeJurusanIndex, jurusanList.length - 1)
+        : 0;
+
+    const activeJurusan = jurusanList[activeJurusanIndexSafe] || null;
+    const activeJurusanImage = getJurusanImageUrl(
+        activeJurusan?.gambar_jurusan ||
+        activeJurusan?.gambar_jurusan_url ||
+        activeJurusan?.image_url ||
+        activeJurusan?.foto_jurusan ||
+        activeJurusan?.thumbnail ||
+        activeJurusan?.gambar ||
+        activeJurusan?.foto,
+    );
+
     const programStats = useMemo(() => {
-        return programs.reduce(
+        const stats = programs.reduce(
             (acc, program) => {
                 const category = getProgramCategory(program);
                 const type = getProgramType(program);
@@ -1134,6 +1354,22 @@ export default function DashboardSekolah() {
                 done: 0,
             },
         );
+
+        return {
+            ...stats,
+            total: programs.length,
+            completed: stats.done,
+        };
+    }, [programs]);
+
+    const yearOptions = useMemo(() => {
+        const years = [...new Set(programs.map(getProgramYear).filter((year) => year && year !== "-"))]
+            .sort((a, b) => Number(b) - Number(a));
+
+        return [
+            { value: "ALL", label: "Semua Tahun" },
+            ...years.map((year) => ({ value: year, label: year })),
+        ];
     }, [programs]);
 
     const filteredPrograms = useMemo(() => {
@@ -1142,11 +1378,18 @@ export default function DashboardSekolah() {
         return programs.filter((program) => {
             const category = getProgramCategory(program);
             const type = getProgramType(program);
+            const year = getProgramYear(program);
 
             const matchCategory =
                 categoryFilter === "ALL" || category === categoryFilter;
 
             const matchType = typeFilter === "ALL" || type === typeFilter;
+            const matchYear = yearFilter === "ALL" || String(year) === String(yearFilter);
+            const matchStatus =
+                statusFilter === "ALL" ||
+                (statusFilter === "SELESAI"
+                    ? isProgramFinished(program)
+                    : !isProgramFinished(program));
 
             const matchSearch =
                 !search ||
@@ -1167,9 +1410,9 @@ export default function DashboardSekolah() {
                         .join(" "),
                 ).includes(search);
 
-            return matchCategory && matchType && matchSearch;
+            return matchCategory && matchType && matchYear && matchStatus && matchSearch;
         });
-    }, [programs, categoryFilter, typeFilter, keyword]);
+    }, [programs, categoryFilter, typeFilter, yearFilter, statusFilter, keyword]);
 
     const compositionRows = useMemo(() => {
         return buildRows(filteredPrograms, getProgramCompositionLabel).map((row) => {
@@ -1200,7 +1443,7 @@ export default function DashboardSekolah() {
         const nextValue = Number(jumlahSiswaDraft);
 
         if (!Number.isInteger(nextValue) || nextValue < 0) {
-            alert("Jumlah siswa harus berupa angka minimal 0.");
+            notify.warning("Jumlah siswa harus berupa angka minimal 0.");
             return;
         }
 
@@ -1234,7 +1477,7 @@ export default function DashboardSekolah() {
             setEditingJumlahSiswa(false);
         } catch (error) {
             console.error("Gagal update jumlah siswa:", error);
-            alert(
+            notify.error(
                 error?.response?.data?.message ||
                 "Gagal memperbarui jumlah siswa.",
             );
@@ -1246,10 +1489,13 @@ export default function DashboardSekolah() {
     const resetFilter = () => {
         setCategoryFilter("ALL");
         setTypeFilter("ALL");
+        setYearFilter("ALL");
+        setStatusFilter("ALL");
         setKeyword("");
     };
 
     const isLoading = loadingSekolah || loadingProgram || loadingJurusan;
+    const showLegacySchoolOverview = false;
 
     return (
         <MasterPageShell
@@ -1257,9 +1503,9 @@ export default function DashboardSekolah() {
             highlight="Hub Kelembagaan"
             subtitle="Sistem Monitoring dan Evaluasi Mutu Pendidikan Indonesia"
         >
-            <div className="relative h-full overflow-y-auto no-scrollbar bg-slate-50 selection:bg-cyan-500 selection:text-white">
-                <div className="pointer-events-none absolute left-0 right-0 top-0 z-0 h-[520px] bg-gradient-to-b from-blue-950 via-blue-900 to-cyan-500">
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.4),transparent_50%)]" />
+            <div className="relative h-full overflow-y-auto no-scrollbar bg-[#F8FBFF] selection:bg-cyan-500 selection:text-white">
+                <div className="pointer-events-none absolute left-0 right-0 top-0 z-0 h-[420px] bg-gradient-to-b from-cyan-50 via-white to-[#F8FBFF]">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(10,196,224,0.16),transparent_48%)]" />
 
                     <svg
                         className="absolute bottom-0 h-32 w-full translate-y-1 transform"
@@ -1268,11 +1514,11 @@ export default function DashboardSekolah() {
                         xmlns="http://www.w3.org/2000/svg"
                     >
                         <path
-                            fill="rgba(6,182,212,0.2)"
+                            fill="rgba(10,196,224,0.08)"
                             d="M0,160L48,176C96,192,192,224,288,213.3C384,203,480,149,576,144C672,139,768,181,864,181.3C960,181,1056,139,1152,122.7C1248,107,1344,117,1392,122.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
                         />
                         <path
-                            fill="#f8fafc"
+                            fill="#F8FBFF"
                             d="M0,224L60,213.3C120,203,240,181,360,181.3C480,181,600,203,720,197.3C840,192,960,160,1080,144C1200,128,1320,128,1380,128L1440,128L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
                         />
                     </svg>
@@ -1281,11 +1527,11 @@ export default function DashboardSekolah() {
                 <div className="relative z-10 px-10 py-10">
                     <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-100">
+                            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                                 Operator Sekolah Workspace
                             </p>
 
-                            <h1 className="mt-1 text-2xl font-black tracking-[-0.04em] text-white">
+                            <h1 className="mt-1 text-[28px] font-black tracking-[-0.035em] text-slate-950">
                                 Dashboard Profil Sekolah
                             </h1>
                         </div>
@@ -1293,7 +1539,7 @@ export default function DashboardSekolah() {
                         <button
                             type="button"
                             onClick={refreshDashboard}
-                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-xs font-black uppercase tracking-widest text-white backdrop-blur transition hover:bg-white hover:text-slate-900"
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-cyan-100 bg-white px-5 text-xs font-black uppercase tracking-widest text-[#0AC4E0] shadow-[0_12px_30px_rgba(10,196,224,0.10)] transition hover:border-cyan-200 hover:shadow-[0_16px_34px_rgba(10,196,224,0.16)]"
                         >
                             {isLoading ? (
                                 <Loader2 className="animate-spin" size={15} />
@@ -1304,71 +1550,360 @@ export default function DashboardSekolah() {
                         </button>
                     </div>
 
-                    <section className="mb-12 overflow-hidden rounded-[2.5rem] border border-white/20 bg-white/10 p-6 shadow-2xl shadow-blue-950/20 backdrop-blur-xl sm:p-8">
+                    <section className="mb-6 grid gap-5 xl:grid-cols-[1.12fr_0.88fr]">
+                        <div className="relative overflow-hidden rounded-[2.2rem] border border-cyan-100 bg-white p-7 shadow-[0_28px_80px_rgba(15,23,42,0.09)] ring-1 ring-white">
+                            <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-cyan-100/55 blur-3xl" />
+                            <div className="pointer-events-none absolute -bottom-28 left-12 h-52 w-52 rounded-full bg-sky-100/60 blur-3xl" />
+
+                            <div className="relative grid gap-6 lg:grid-cols-[190px_1fr] lg:items-center">
+                                <div className="flex justify-center lg:justify-start">
+                                    <div className="relative flex h-44 w-44 items-center justify-center rounded-[2rem] border border-cyan-100 bg-white shadow-[0_26px_54px_rgba(10,196,224,0.14)]">
+                                        {logoUrl ? (
+                                            <img
+                                                src={logoUrl}
+                                                alt={`Logo ${schoolName}`}
+                                                className="max-h-32 max-w-[132px] object-contain"
+                                            />
+                                        ) : (
+                                            <School size={58} className="text-[#0AC4E0]" />
+                                        )}
+                                        <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-cyan-100 bg-white px-4 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-[#0AC4E0] shadow-[0_12px_28px_rgba(10,196,224,0.12)]">
+                                            Logo Resmi
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                                            Profil Sekolah
+                                        </span>
+                                        <StatusPill active={active} />
+                                    </div>
+
+                                    <h2 className="mt-4 break-words text-4xl font-black leading-[1.05] tracking-[-0.045em] text-slate-950 lg:text-5xl">
+                                        {schoolName}
+                                    </h2>
+
+                                    <div className="mt-4 flex min-w-0 items-center gap-2 text-sm font-bold text-slate-500">
+                                        <Mail size={16} className="shrink-0 text-[#0AC4E0]" />
+                                        <span className="truncate">
+                                            {sekolah?.email_login || user?.email || "Email belum tersedia"}
+                                        </span>
+                                    </div>
+
+                                    <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                                        <div className="rounded-[1.4rem] border border-slate-100 bg-white/90 p-4 shadow-[0_14px_32px_rgba(15,23,42,0.05)]">
+                                            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                                NPSN
+                                            </p>
+                                            <p className="mt-2 text-base font-black text-slate-950">
+                                                {sekolah?.npsn || "Belum tersedia"}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-[1.4rem] border border-slate-100 bg-white/90 p-4 shadow-[0_14px_32px_rgba(15,23,42,0.05)]">
+                                            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                                Jenjang
+                                            </p>
+                                            <p className="mt-2 text-base font-black text-slate-950">
+                                                {jenjang || "Belum tersedia"}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-[1.4rem] border border-cyan-100 bg-cyan-50/70 p-4 shadow-[0_14px_32px_rgba(10,196,224,0.08)]">
+                                            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">
+                                                Kategori Binaan
+                                            </p>
+                                            <p className="mt-2 text-base font-black text-slate-950">
+                                                {sekolah?.akreditasi_internal ||
+                                                    sekolah?.kategori_binaan ||
+                                                    sekolah?.level_binaan ||
+                                                    "Dasar"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {[
+                                { label: "Total Program", value: programStats.total, helper: "Semua program", tone: "cyan" },
+                                { label: "Akademik", value: programStats.akademik, helper: "Program akademik", tone: "emerald" },
+                                { label: "Non Akademik", value: programStats.nonAkademik, helper: "Program karakter", tone: "violet" },
+                                { label: "Selesai", value: programStats.completed, helper: "Progress selesai", tone: "sky" },
+                            ].map((item) => (
+                                <div
+                                    key={item.label}
+                                    className="relative overflow-hidden rounded-[1.8rem] border border-cyan-100 bg-white p-5 shadow-[0_22px_58px_rgba(15,23,42,0.07)]"
+                                >
+                                    <div className="absolute right-4 top-4 h-12 w-12 rounded-2xl bg-cyan-50" />
+                                    <p className="relative text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                        {item.label}
+                                    </p>
+                                    <p className="relative mt-3 text-4xl font-black tracking-[-0.05em] text-slate-950">
+                                        {item.value || 0}
+                                    </p>
+                                    <p className="relative mt-1 text-xs font-bold text-slate-500">
+                                        {item.helper}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    <section className="mb-10 grid items-stretch gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+                        <div className="overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_26px_72px_rgba(15,23,42,0.08)] ring-1 ring-slate-100">
+                            <div className="border-b border-slate-100 px-7 py-6">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                                    Operasional Sekolah
+                                </p>
+                                <h3 className="mt-1 text-2xl font-black tracking-[-0.04em] text-slate-950">
+                                    Kapasitas, wilayah, dan kredensial.
+                                </h3>
+                            </div>
+
+                            <div className="grid gap-0 sm:grid-cols-2">
+                                <div className="border-b border-slate-100 p-6 sm:border-r">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                        Total Pengajar
+                                    </p>
+                                    <div className="mt-3 flex items-end gap-2">
+                                        <span className="text-5xl font-black tracking-[-0.06em] text-slate-950">
+                                            {sekolah?.jumlah_guru || 0}
+                                        </span>
+                                        <span className="pb-2 text-xs font-black uppercase tracking-widest text-[#0AC4E0]">
+                                            Guru
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="border-b border-slate-100 p-6">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                        Siswa Aktif
+                                    </p>
+                                    <div className="mt-3 flex items-end gap-2">
+                                        {editingJumlahSiswa ? (
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                min="0"
+                                                value={jumlahSiswaDraft}
+                                                disabled={savingJumlahSiswa}
+                                                onChange={(event) => setJumlahSiswaDraft(event.target.value)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Enter") {
+                                                        event.preventDefault();
+                                                        handleSaveJumlahSiswa();
+                                                    }
+
+                                                    if (event.key === "Escape") {
+                                                        event.preventDefault();
+                                                        handleCancelEditJumlahSiswa();
+                                                    }
+                                                }}
+                                                onBlur={handleCancelEditJumlahSiswa}
+                                                className="h-14 w-32 rounded-2xl border border-cyan-100 bg-white px-3 text-center text-4xl font-black tracking-[-0.06em] text-slate-950 outline-none transition focus:border-[#0AC4E0] focus:ring-4 focus:ring-cyan-100 disabled:cursor-wait disabled:opacity-70"
+                                            />
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={handleStartEditJumlahSiswa}
+                                                className="rounded-2xl px-2 text-5xl font-black tracking-[-0.06em] text-slate-950 transition hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+                                                title="Klik untuk mengubah jumlah siswa"
+                                            >
+                                                {sekolah?.jumlah_siswa || 0}
+                                            </button>
+                                        )}
+                                        <span className="pb-2 text-xs font-black uppercase tracking-widest text-[#0AC4E0]">
+                                            Siswa
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {[
+                                    ["Kabupaten/Kota", getKabupatenText(sekolah)],
+                                    ["Provinsi", getProvinsiText(sekolah)],
+                                    ["Akreditasi", sekolah?.akreditasi || "Belum Terakreditasi"],
+                                    ["Tahun Binaan", getTahunBinaan(sekolah)],
+                                    ["Sertifikat ISO", sekolah?.sertifikat_iso || "Belum"],
+                                    ["Jumlah Jurusan", `${jurusanList.length} Jurusan`],
+                                ].map(([label, value]) => (
+                                    <div key={label} className="border-b border-slate-100 px-6 py-5 odd:sm:border-r">
+                                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                            {label}
+                                        </p>
+                                        <p className="mt-2 text-sm font-black leading-6 text-slate-900">
+                                            {value}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="p-6">
+                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                    Alamat Operasional
+                                </p>
+                                <p className="mt-2 text-sm font-semibold leading-7 text-slate-600">
+                                    {getAddressText(sekolah)}
+                                </p>
+                            </div>
+                        </div>
+
+                        {jurusanList.length ? (
+                            <div
+                                key={activeJurusan?.id_jurusan || activeJurusanIndexSafe}
+                                className="jurusan-carousel-card h-full overflow-hidden rounded-[2rem] border border-cyan-100 bg-white shadow-[0_22px_54px_rgba(10,196,224,0.12)] transition duration-500"
+                            >
+                                <div className="grid h-full min-h-[360px] lg:grid-cols-[1.05fr_1fr]">
+                                    <div className="relative min-h-[260px] overflow-hidden bg-cyan-50/70 lg:min-h-0">
+                                        {activeJurusanImage ? (
+                                            <img
+                                                src={activeJurusanImage}
+                                                alt={activeJurusan?.nama_jurusan || "Gambar jurusan"}
+                                                className="h-full min-h-[260px] w-full object-cover lg:min-h-0"
+                                            />
+                                        ) : (
+                                            <div className="flex h-full min-h-[260px] flex-col items-center justify-center px-8 text-center lg:min-h-0">
+                                                <div className="flex h-16 w-16 items-center justify-center rounded-[1.4rem] border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_16px_34px_rgba(10,196,224,0.14)]">
+                                                    <Image size={30} />
+                                                </div>
+                                                <p className="mt-4 text-xs font-black uppercase tracking-[0.14em] text-[#0AC4E0]">
+                                                    Gambar Jurusan
+                                                </p>
+                                                <p className="mt-2 max-w-sm text-xs font-semibold leading-6 text-slate-500">
+                                                    Belum ada gambar. Operator bisa mengisi gambar dari master jurusan.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <span className="absolute left-4 top-4 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.08)]">
+                                            {String(activeJurusanIndexSafe + 1).padStart(2, "0")} / {String(jurusanList.length).padStart(2, "0")}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex min-w-0 flex-col justify-center p-7 lg:p-10">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">
+                                                    Jurusan {String(activeJurusanIndexSafe + 1).padStart(2, "0")}
+                                                </span>
+                                                <span
+                                                    className={`rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-[0.14em] ${isActiveValue(activeJurusan?.status)
+                                                        ? "border-emerald-100 bg-emerald-50 text-emerald-600"
+                                                        : "border-slate-100 bg-slate-50 text-slate-400"
+                                                        }`}
+                                                >
+                                                    {isActiveValue(activeJurusan?.status) ? "Aktif" : "Nonaktif"}
+                                                </span>
+                                            </div>
+
+                                            <h3 className="mt-5 text-3xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-[34px]">
+                                                {activeJurusan?.nama_jurusan || "Nama jurusan belum tersedia"}
+                                            </h3>
+                                            <p className="mt-4 max-w-xl text-sm font-semibold leading-7 text-slate-500">
+                                                {activeJurusan?.deskripsi ||
+                                                    "Caption jurusan belum diisi. Tambahkan deskripsi singkat di master jurusan agar dashboard sekolah terasa lebih informatif."}
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-7 flex flex-wrap items-center gap-2">
+                                                {jurusanList.map((jurusan, index) => (
+                                                    <button
+                                                        key={jurusan.id_jurusan || jurusan.nama_jurusan || index}
+                                                        type="button"
+                                                        onClick={() => setActiveJurusanIndex(index)}
+                                                        aria-label={`Tampilkan jurusan ${index + 1}`}
+                                                        className={`h-2.5 rounded-full transition-all ${index === activeJurusanIndexSafe
+                                                            ? "w-9 bg-[#0AC4E0]"
+                                                            : "w-2.5 bg-slate-200 hover:bg-cyan-200"
+                                                        }`}
+                                                    />
+                                                ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex min-h-[260px] items-center justify-center rounded-[2rem] border border-dashed border-cyan-100 bg-white p-6 text-center shadow-[0_20px_48px_rgba(10,196,224,0.08)]">
+                                <div>
+                                    <Layers size={34} className="mx-auto text-[#0AC4E0]" />
+                                    <p className="mt-4 text-sm font-black text-slate-900">
+                                        Belum ada jurusan.
+                                    </p>
+                                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                                        Data jurusan akan tampil otomatis setelah diatur oleh operator sekolah.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
+                    {showLegacySchoolOverview && (
+                    <section className="hidden">
                         <div className="flex flex-col gap-7 lg:flex-row lg:items-center">
                             <div className="flex w-full shrink-0 flex-col items-center justify-center lg:w-40">
                                 {logoUrl ? (
                                     <img
                                         src={logoUrl}
                                         alt={`Logo ${schoolName}`}
-                                        className="max-h-32 max-w-[150px] object-contain drop-shadow-[0_18px_24px_rgba(15,23,42,0.28)] sm:max-h-36 sm:max-w-[170px]"
+                                        className="max-h-28 max-w-[140px] object-contain drop-shadow-[0_18px_24px_rgba(15,23,42,0.12)] sm:max-h-32 sm:max-w-[160px]"
                                     />
                                 ) : (
-                                    <div className="flex h-28 w-28 items-center justify-center rounded-full border border-white/20 bg-white/10 text-cyan-100 shadow-[0_18px_36px_rgba(15,23,42,0.18)]">
+                                    <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_18px_38px_rgba(10,196,224,0.12)]">
                                         <School size={42} />
                                     </div>
                                 )}
 
-                                <span className="mt-3 text-center text-[8px] font-black uppercase tracking-[0.16em] text-cyan-100/70">
+                                <span className="mt-3 text-center text-[8px] font-black uppercase tracking-[0.18em] text-slate-300">
                                     Logo dikelola Admin
                                 </span>
                             </div>
 
                             <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="inline-flex items-center gap-2 rounded-full bg-cyan-400/20 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-cyan-100 ring-1 ring-cyan-300/25">
-                                        <School size={13} />
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <span className="inline-flex items-center gap-2 border-b border-cyan-200 pb-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                                        <School size={12} />
                                         Profil Sekolah
                                     </span>
 
                                     <StatusPill active={active} />
                                 </div>
 
-                                <h1 className="mt-4 break-words text-3xl font-black leading-tight tracking-[-0.045em] text-white sm:text-4xl">
+                                <h1 className="mt-4 break-words text-3xl font-black leading-tight tracking-[-0.035em] text-slate-950 sm:text-4xl">
                                     {schoolName}
                                 </h1>
 
-                                <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-blue-100/85">
-                                    <Mail size={16} className="shrink-0 text-cyan-300" />
+                                <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-500">
+                                    <Mail size={16} className="shrink-0 text-[#0AC4E0]" />
                                     <span className="truncate">
                                         {sekolah?.email_login || user?.email || "Email belum tersedia"}
                                     </span>
                                 </div>
 
                                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-200/70">
+                                    <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
                                             NPSN
                                         </p>
-                                        <p className="mt-1 text-sm font-black text-white">
+                                        <p className="mt-1 text-sm font-black text-slate-950">
                                             {sekolah?.npsn || "Belum tersedia"}
                                         </p>
                                     </div>
 
-                                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-200/70">
+                                    <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-[0_12px_30px_rgba(15,23,42,0.045)]">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
                                             Jenjang
                                         </p>
-                                        <p className="mt-1 text-sm font-black text-white">
+                                        <p className="mt-1 text-sm font-black text-slate-950">
                                             {jenjang || "Belum tersedia"}
                                         </p>
                                     </div>
 
-                                    <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/15 px-4 py-3">
-                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-cyan-100/75">
+                                    <div className="rounded-2xl border border-cyan-100 bg-white px-4 py-3 shadow-[0_12px_30px_rgba(10,196,224,0.08)]">
+                                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">
                                             Kategori Binaan
                                         </p>
-                                        <p className="mt-1 text-sm font-black text-cyan-100">
+                                        <p className="mt-1 text-sm font-black text-slate-950">
                                             {sekolah?.akreditasi_internal ||
                                                 sekolah?.kategori_binaan ||
                                                 sekolah?.level_binaan ||
@@ -1380,11 +1915,12 @@ export default function DashboardSekolah() {
                         </div>
                     </section>
 
-                    <ProgramPortfolioSummary stats={programStats} />
+                    )}
 
-                    <div className="mb-10">
-                        <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
-                            <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                    {showLegacySchoolOverview && (
+                    <div className="hidden">
+                        <section className="overflow-hidden rounded-[2rem] border border-white bg-white shadow-[0_24px_70px_rgba(15,23,42,0.07)] ring-1 ring-slate-100/80">
+                            <div className="flex flex-col gap-4 border-b border-slate-100 px-7 py-6 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
                                         Data Resmi Sekolah
@@ -1406,9 +1942,9 @@ export default function DashboardSekolah() {
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr]">
-                                <div className="border-b border-slate-100 p-6 lg:border-b-0 lg:border-r">
+                                <div className="border-b border-slate-100 p-7 lg:border-b-0 lg:border-r">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0]">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_12px_26px_rgba(10,196,224,0.12)]">
                                             <UsersRound size={18} />
                                         </div>
                                         <div>
@@ -1421,7 +1957,7 @@ export default function DashboardSekolah() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/70">
+                                    <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-[0_14px_38px_rgba(15,23,42,0.045)]">
                                         <div className="p-5">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                                                 Total Pengajar
@@ -1488,7 +2024,7 @@ export default function DashboardSekolah() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-6 border-t border-slate-100 pt-5">
+                                    <div className="mt-7 border-t border-slate-100 pt-6">
                                         <h3 className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                                             Wilayah dan Alamat
                                         </h3>
@@ -1533,9 +2069,9 @@ export default function DashboardSekolah() {
                                     </div>
                                 </div>
 
-                                <div className="p-6">
+                                <div className="p-7">
                                     <div className="flex items-center gap-3">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_12px_26px_rgba(10,196,224,0.12)]">
                                             <ShieldCheck size={18} />
                                         </div>
                                         <div>
@@ -1548,7 +2084,7 @@ export default function DashboardSekolah() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+                                    <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.04)] sm:grid-cols-3">
                                         <div>
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                                                 Akreditasi Nasional
@@ -1595,7 +2131,7 @@ export default function DashboardSekolah() {
                                         </div>
                                     </div>
 
-                                    <div className="mt-6 border-t border-slate-100 pt-5">
+                                    <div className="mt-7 border-t border-slate-100 pt-6">
                                         <div className="flex items-center justify-between gap-3">
                                             <div>
                                                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
@@ -1605,49 +2141,44 @@ export default function DashboardSekolah() {
                                                     Lihat informasi jurusan yang terdaftar di sekolah.
                                                 </p>
                                             </div>
-                                            <Layers size={18} className="shrink-0 text-violet-500" />
+                                            <Layers size={18} className="shrink-0 text-[#0AC4E0]" />
                                         </div>
 
-                                        <div className="relative mt-4">
-                                            <select
+                                        <div className="mt-4">
+                                            <Dropdown
                                                 value={selectedJurusanId}
-                                                onChange={(event) =>
-                                                    setSelectedJurusanId(event.target.value)
-                                                }
-                                                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-10 text-xs font-bold text-slate-700 outline-none transition focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-                                            >
-                                                <option value="">
-                                                    {jurusanList.length
+                                                onChange={setSelectedJurusanId}
+                                                items={[
+                                                    {
+                                                        value: "",
+                                                        label: jurusanList.length
+                                                            ? "Pilih salah satu jurusan"
+                                                            : "Belum ada data jurusan",
+                                                    },
+                                                    ...jurusanList.map((jurusan) => ({
+                                                        value: String(jurusan.id_jurusan),
+                                                        label: jurusan.nama_jurusan,
+                                                    })),
+                                                ]}
+                                                placeholder={
+                                                    jurusanList.length
                                                         ? "Pilih salah satu jurusan"
-                                                        : "Belum ada data jurusan"}
-                                                </option>
-
-                                                {jurusanList.map((jurusan) => (
-                                                    <option
-                                                        key={jurusan.id_jurusan}
-                                                        value={jurusan.id_jurusan}
-                                                    >
-                                                        {jurusan.nama_jurusan}
-                                                    </option>
-                                                ))}
-                                            </select>
-
-                                            <ChevronDown
-                                                size={16}
-                                                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                                        : "Belum ada data jurusan"
+                                                }
+                                                disabled={!jurusanList.length}
                                             />
                                         </div>
 
                                         {selectedJurusan && (
-                                            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+                                            <div className="mt-4 rounded-[1.5rem] border border-slate-100 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.045)]">
                                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                                     <h4 className="text-sm font-black text-slate-900">
                                                         {selectedJurusan.nama_jurusan}
                                                     </h4>
                                                     <span
-                                                        className={`rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-widest ${isActiveValue(selectedJurusan.status)
-                                                            ? "bg-emerald-50 text-emerald-600"
-                                                            : "bg-rose-50 text-rose-600"
+                                                        className={`border-b pb-1 text-[8px] font-black uppercase tracking-widest ${isActiveValue(selectedJurusan.status)
+                                                            ? "border-emerald-200 text-emerald-600"
+                                                            : "border-rose-200 text-rose-600"
                                                             }`}
                                                     >
                                                         {isActiveValue(selectedJurusan.status)
@@ -1666,7 +2197,7 @@ export default function DashboardSekolah() {
                                                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                                                             Guru Terhubung
                                                         </p>
-                                                        <span className="rounded-full bg-white px-3 py-1 text-[9px] font-black text-slate-500 shadow-sm">
+                                                        <span className="border-b border-cyan-200 pb-1 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
                                                             {selectedJurusanTeachers.length} Guru
                                                         </span>
                                                     </div>
@@ -1680,7 +2211,7 @@ export default function DashboardSekolah() {
                                                                         guru.id_user ||
                                                                         guru.email_guru
                                                                     }
-                                                                    className="flex flex-col gap-2 rounded-xl border border-white bg-white px-3 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                                                                    className="flex flex-col gap-2 border-b border-slate-100 px-1 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
                                                                 >
                                                                     <div className="min-w-0">
                                                                         <p className="truncate text-xs font-black text-slate-800">
@@ -1691,11 +2222,11 @@ export default function DashboardSekolah() {
                                                                         </p>
                                                                     </div>
 
-                                                                    <div className="flex flex-wrap gap-2 text-[9px] font-black uppercase tracking-wider">
-                                                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-cyan-600">
+                                                                    <div className="flex flex-wrap gap-3 text-[9px] font-black uppercase tracking-wider">
+                                                                        <span className="text-cyan-600">
                                                                             {guru.mata_pelajaran || "Mapel belum diisi"}
                                                                         </span>
-                                                                        <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-600">
+                                                                        <span className="text-amber-600">
                                                                             {guru.kelas_data?.nama_kelas ||
                                                                                 guru.nama_kelas ||
                                                                                 guru.kelas_wali ||
@@ -1718,129 +2249,93 @@ export default function DashboardSekolah() {
                             </div>
                         </section>
                     </div>
+                    )}
 
-                    <section className="mb-10 overflow-hidden rounded-[2.5rem] border border-slate-200/70 bg-white shadow-xl shadow-slate-200/40">
-                        <div className="flex flex-col gap-4 border-b border-slate-100 bg-slate-50/80 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
+                    <section className="mb-10 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-100 bg-white px-6 py-6">
                             <div>
-                                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-cyan-600">
-                                    <BarChart3 size={14} />
-                                    <span>Portfolio Program Sekolah</span>
-                                </div>
-
-                                <h2 className="mt-1 text-2xl font-black text-slate-900">
-                                    Program Akademik & Non Akademik
+                                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                                    Monitoring Program
+                                </p>
+                                <h2 className="mt-2 text-[22px] font-black tracking-[-0.04em] text-slate-900">
+                                    Program di {schoolName}
                                 </h2>
-
-                                <p className="mt-1 text-xs font-semibold text-slate-400">
-                                    Dashboard ini tidak menampilkan assessment.
-                                    Fokus utama halaman adalah profil sekolah dan
-                                    program yang berjalan.
+                                <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-slate-400">
+                                    Guru dapat memantau program sekolah melalui visual pie dan daftar ringkas tanpa akses ke detail transaksi program.
                                 </p>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-2">
-                                <FilterButton
-                                    active={categoryFilter === "ALL"}
-                                    label="Semua Kategori"
-                                    onClick={() => setCategoryFilter("ALL")}
-                                    color={COLORS.cyan}
-                                />
-
-                                <FilterButton
-                                    active={categoryFilter === "AKADEMIK"}
-                                    label="Akademik"
-                                    onClick={() => setCategoryFilter("AKADEMIK")}
-                                    color={COLORS.blue}
-                                />
-
-                                <FilterButton
-                                    active={categoryFilter === "NON_AKADEMIK"}
-                                    label="Non Akademik"
-                                    onClick={() =>
-                                        setCategoryFilter("NON_AKADEMIK")
-                                    }
-                                    color={COLORS.violet}
-                                />
-
-                                <div className="mx-1 hidden h-8 w-px bg-slate-200 xl:block" />
-
-                                <FilterButton
-                                    active={typeFilter === "ALL"}
-                                    label="Semua Jenis"
-                                    onClick={() => setTypeFilter("ALL")}
-                                    color={COLORS.cyan}
-                                />
-
-                                <FilterButton
-                                    active={typeFilter === "REGULER"}
-                                    label="Reguler"
-                                    onClick={() => setTypeFilter("REGULER")}
-                                    color={COLORS.emerald}
-                                />
-
-                                <FilterButton
-                                    active={typeFilter === "PROJECT"}
-                                    label="Project"
-                                    onClick={() => setTypeFilter("PROJECT")}
-                                    color={COLORS.amber}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-5 p-6">
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                                <div className="relative w-full lg:max-w-md">
+                            <div className="mt-5 grid gap-3 xl:grid-cols-[1.35fr_0.85fr_0.85fr_0.85fr_0.85fr_auto]">
+                                <div className="relative min-w-0">
                                     <Search
                                         size={15}
-                                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
+                                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#0AC4E0]"
                                     />
-
                                     <input
                                         value={keyword}
                                         onChange={(event) =>
                                             setKeyword(event.target.value)
                                         }
-                                        placeholder="Cari nama program, tahun, status, AO, atau vendor..."
-                                        className="h-11 w-full rounded-2xl border border-slate-100 bg-white pl-11 pr-4 text-xs font-semibold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
+                                        placeholder="Cari program, tahun, status, AO, atau vendor..."
+                                        className="h-11 w-full rounded-2xl border border-slate-100 bg-white pl-11 pr-4 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
                                     />
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="rounded-full bg-slate-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                        {filteredPrograms.length} program tampil
-                                    </span>
+                                <ProgramSelectFilter
+                                    label="Kategori"
+                                    value={categoryFilter}
+                                    onChange={setCategoryFilter}
+                                    items={[
+                                        { value: "ALL", label: "Semua Kategori" },
+                                        { value: "AKADEMIK", label: "Akademik" },
+                                        { value: "NON_AKADEMIK", label: "Non Akademik" },
+                                    ]}
+                                />
 
-                                    {(categoryFilter !== "ALL" ||
-                                        typeFilter !== "ALL" ||
-                                        keyword) && (
-                                        <button
-                                            type="button"
-                                            onClick={resetFilter}
-                                            className="rounded-full bg-red-50 px-3 py-1 text-[9px] font-black uppercase tracking-widest text-red-500 transition hover:bg-red-100"
-                                        >
-                                            Reset Filter
-                                        </button>
-                                        )}
-                                </div>
+                                <ProgramSelectFilter
+                                    label="Jenis"
+                                    value={typeFilter}
+                                    onChange={setTypeFilter}
+                                    items={[
+                                        { value: "ALL", label: "Semua Jenis" },
+                                        { value: "PROJECT", label: "Project" },
+                                        { value: "REGULER", label: "Reguler" },
+                                    ]}
+                                />
+
+                                <ProgramSelectFilter
+                                    label="Tahun"
+                                    value={yearFilter}
+                                    onChange={setYearFilter}
+                                    items={yearOptions}
+                                />
+
+                                <ProgramSelectFilter
+                                    label="Status"
+                                    value={statusFilter}
+                                    onChange={setStatusFilter}
+                                    items={[
+                                        { value: "ALL", label: "Semua Status" },
+                                        { value: "BERJALAN", label: "Berjalan" },
+                                        { value: "SELESAI", label: "Selesai" },
+                                    ]}
+                                />
+
+                                <button
+                                    type="button"
+                                    onClick={resetFilter}
+                                    className="h-11 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0] transition hover:bg-cyan-100"
+                                >
+                                    Reset
+                                </button>
                             </div>
+                        </div>
 
+                        <div className="space-y-5 p-6">
                             <ProgramCompositionChart
                                 rows={compositionRows}
                                 total={filteredPrograms.length}
                             />
-
-                            {filteredPrograms.length === 0 ? (
-                                <EmptyProgramState />
-                            ) : (
-                                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                                    {filteredPrograms.map((program) => (
-                                        <ProgramCard
-                                            key={getProgramId(program)}
-                                            program={program}
-                                        />
-                                    ))}
-                                </div>
-                            )}
                         </div>
                     </section>
 

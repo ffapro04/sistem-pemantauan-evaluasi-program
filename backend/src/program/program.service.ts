@@ -961,7 +961,100 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       pushUserRows(audience.vendorUserIds, 'vendor', payload);
     }
 
-    await this.notifikasiService.createMany(rows);
+    await this.notifikasiService.dispatchMany(rows);
+  }
+
+  private async notifyProgramCreated(
+    program: Program | any,
+    actorUserId?: number | null,
+  ) {
+    if (!program?.id_program) return;
+
+    const audience = await this.getProgramNotificationAudience(program);
+    const rows: any[] = [];
+    const pushed = new Set<string>();
+    const programName = program.nama_program || 'Program';
+    const targetUrls = {
+      ho: this.getHoProgramTargetUrl(program),
+      ao: `/ao/program/detail/${program.id_program}`,
+      vendor: `/vendor/program/detail/${program.id_program}`,
+      school: '/sekolah/program',
+    };
+
+    const pushUserRows = (
+      ids: number[],
+      scope: 'ho' | 'ao' | 'vendor' | 'school',
+      payload: { judul: string; pesan: string; tipe: string },
+    ) => {
+      ids.forEach((idUser) => {
+        const id = Number(idUser || 0);
+        if (!id || id === Number(actorUserId || 0)) return;
+
+        const key = `${scope}:${id}`;
+        if (pushed.has(key)) return;
+        pushed.add(key);
+
+        rows.push({
+          recipientType: NotificationRecipientType.USER,
+          recipientId: id,
+          legacyUserId: id,
+          judul: payload.judul,
+          pesan: payload.pesan,
+          tipe: payload.tipe,
+          targetUrl: targetUrls[scope],
+          metadata: {
+            id_program: program.id_program,
+            notification_scope: scope,
+          },
+          dedupeKey: `program-created:${scope}:${program.id_program}:${id}`,
+        });
+      });
+    };
+
+    pushUserRows(audience.hoUserIds, 'ho', {
+      judul: 'Program baru dibuat',
+      pesan: `Program "${programName}" sudah dibuat dan siap dipantau pada dashboard Head Office.`,
+      tipe: 'PROGRAM_CREATED',
+    });
+
+    pushUserRows(audience.aoUserIds, 'ao', {
+      judul: 'Program baru perlu dipantau',
+      pesan: `Program "${programName}" sudah ditetapkan. Pantau progres lapangan dan review bukti dari vendor sesuai alur.`,
+      tipe: 'PROGRAM_CREATED',
+    });
+
+    pushUserRows(audience.vendorUserIds, 'vendor', {
+      judul: 'Program baru ditugaskan',
+      pesan: `Program "${programName}" sudah ditugaskan kepada Anda. Buka detail program untuk melihat periode, aktivitas, dan upload bukti.`,
+      tipe: 'PROGRAM_CREATED',
+    });
+
+    pushUserRows(audience.schoolUserIds, 'school', {
+      judul: 'Program baru untuk sekolah',
+      pesan: `Program "${programName}" sudah masuk untuk sekolah Anda. Pantau progres dan beri rating jika aktivitas telah selesai.`,
+      tipe: 'PROGRAM_CREATED',
+    });
+
+    audience.guruIds.forEach((idGuru) => {
+      const id = Number(idGuru || 0);
+      if (!id) return;
+
+      rows.push({
+        recipientType: NotificationRecipientType.GURU_ASSESSMENT,
+        recipientId: id,
+        judul: 'Program baru untuk sekolah',
+        pesan: `Program "${programName}" sudah tersedia untuk sekolah Anda. Buka sistem untuk melihat program dan memberi rating saat aktivitas selesai.`,
+        tipe: 'PROGRAM_CREATED',
+        targetUrl: targetUrls.school,
+        metadata: {
+          id_program: program.id_program,
+          notification_scope: 'guru',
+        },
+        dedupeKey: `program-created:guru:${program.id_program}:${id}`,
+      });
+    });
+
+    await this.notifikasiService.dispatchMany(rows);
   }
 
   private async getProgramByKegiatan(id_kegiatans: number) {
@@ -1045,7 +1138,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       })),
     ];
 
-    await this.notifikasiService.createMany(rows);
+    await this.notifikasiService.dispatchMany(rows);
   }
 
   private getTomorrowDateString() {
@@ -1212,7 +1305,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    const created = await this.notifikasiService.createMany(rows);
+    const created = await this.notifikasiService.dispatchMany(rows);
 
     return {
       date,
@@ -1255,8 +1348,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       const idPengawas =
         this.toNumber(createProgramDto.id_pengawas) || aoIds[0] || null;
 
-      if (!idSekolah) throw new Error('id_sekolah tidak valid');
-      if (!idPengawas) throw new Error('id_pengawas tidak valid');
+      if (!idSekolah) throw new BadRequestException('Sekolah sasaran wajib dipilih.');
+      if (!idPengawas) throw new BadRequestException('Area Officer wajib dipilih.');
 
       const finalSekolahIds = sekolahIds.length ? sekolahIds : [idSekolah];
       const finalAoIds = aoIds.length ? aoIds : [idPengawas];
@@ -1269,6 +1362,65 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
 
       this.validateProgramPilar(kategori, pilarProgram);
+
+      const fases = this.parseFases(createProgramDto.fases).filter((fase) =>
+        String(fase?.nama_fase || '').trim(),
+      );
+
+      if (fases.length === 0) {
+        throw new BadRequestException('Minimal satu periode program wajib diisi.');
+      }
+
+      for (const fase of fases) {
+        const terminList = Array.isArray(fase.termin) ? fase.termin : [];
+        const kegiatanList = Array.isArray(fase.kegiatans) ? fase.kegiatans : [];
+
+        if (terminList.length === 0) {
+          throw new BadRequestException(
+            'Setiap periode wajib memiliki administrasi pembuka.',
+          );
+        }
+
+        if (kegiatanList.length === 0) {
+          throw new BadRequestException(
+            'Setiap periode wajib memiliki minimal satu aktivitas.',
+          );
+        }
+
+        for (const termin of terminList) {
+          const persyaratan = Array.isArray(termin.persyaratan)
+            ? termin.persyaratan
+            : [];
+
+          if (!String(termin?.nama_termin || '').trim()) {
+            throw new BadRequestException(
+              'Nama administrasi pembuka wajib diisi.',
+            );
+          }
+
+          if (persyaratan.length === 0) {
+            throw new BadRequestException(
+              'Administrasi pembuka wajib memiliki minimal satu bukti upload.',
+            );
+          }
+        }
+
+        for (const kegiatan of kegiatanList) {
+          const persyaratan = Array.isArray(kegiatan.persyaratan)
+            ? kegiatan.persyaratan
+            : [];
+
+          if (!String(kegiatan?.nama_kegiatans || '').trim()) {
+            throw new BadRequestException('Nama aktivitas wajib diisi.');
+          }
+
+          if (persyaratan.length === 0) {
+            throw new BadRequestException(
+              'Aktivitas wajib memiliki minimal satu bukti upload.',
+            );
+          }
+        }
+      }
 
       const program = this.programRepo.create({
         nama_program: createProgramDto.nama_program,
@@ -1334,8 +1486,6 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
         await queryRunner.manager.save(DokumenProgram, dokumen);
       }
-
-      const fases = this.parseFases(createProgramDto.fases);
 
       for (let faseIndex = 0; faseIndex < fases.length; faseIndex++) {
         const fData = fases[faseIndex];
@@ -1486,6 +1636,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       }
 
       await queryRunner.commitTransaction();
+      await this.notifyProgramCreated(savedProgram, id_user).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`PROGRAM_CREATED_NOTIFICATION_ERROR: ${message}`);
+      });
       return this.findOne(savedProgram.id_program);
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -1900,7 +2054,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async approvePersyaratanTermin(id_persyaratan: number, id_user: number) {
+  async approvePersyaratanTermin(
+    id_persyaratan: number,
+    id_user: number,
+    role_user: string,
+  ) {
+    if (!this.isHORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya HO yang boleh memberi keputusan final',
+      );
+    }
+
     const persyaratan = await this.persyaratanTerminRepo.findOne({
       where: { id_persyaratan },
     });
@@ -1953,8 +2117,15 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   async rejectPersyaratanTermin(
     id_persyaratan: number,
     id_user: number,
+    role_user: string,
     body: any,
   ) {
+    if (!this.isHORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya HO yang boleh memberi keputusan final',
+      );
+    }
+
     const persyaratan = await this.persyaratanTerminRepo.findOne({
       where: { id_persyaratan },
     });
@@ -2226,7 +2397,17 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async approvePersyaratanKegiatan(id_persyaratan: number, id_user: number) {
+  async approvePersyaratanKegiatan(
+    id_persyaratan: number,
+    id_user: number,
+    role_user: string,
+  ) {
+    if (!this.isHORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya HO yang boleh memberi keputusan final',
+      );
+    }
+
     const persyaratan = await this.persyaratanKegiatanRepo.findOne({
       where: { id_persyaratan },
     });
@@ -2278,8 +2459,15 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   async rejectPersyaratanKegiatan(
     id_persyaratan: number,
     id_user: number,
+    role_user: string,
     body: any,
   ) {
+    if (!this.isHORole(role_user)) {
+      throw new BadRequestException(
+        'Akses ditolak: hanya HO yang boleh memberi keputusan final',
+      );
+    }
+
     const persyaratan = await this.persyaratanKegiatanRepo.findOne({
       where: { id_persyaratan },
     });

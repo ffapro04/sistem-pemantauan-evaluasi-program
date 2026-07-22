@@ -25,6 +25,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Dropdown from "../../components/Dropdown";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import { showConfirmDialog } from "../../utils/popup";
 
 const BASE_URL =
     import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
@@ -87,6 +88,7 @@ function isOperatorSekolah(user) {
     const jabatan = String(user?.jabatan || "").toLowerCase();
 
     return (
+        idRole === 5 ||
         idRole === 9 ||
         role.includes("operator") ||
         jabatan.includes("operator sekolah") ||
@@ -498,9 +500,11 @@ export default function DaftarGuru() {
         const nextActive = !active;
         const actionText = active ? "nonaktifkan" : "aktifkan";
 
-        const confirmed = window.confirm(
-            `Yakin ingin ${actionText} guru "${getGuruName(item)}"?`,
-        );
+        const confirmed = await showConfirmDialog({
+            title: `${active ? "Nonaktifkan" : "Aktifkan"} Guru?`,
+            text: `Yakin ingin ${actionText} guru "${getGuruName(item)}"?`,
+            confirmButtonText: active ? "Nonaktifkan" : "Aktifkan",
+        });
 
         if (!confirmed) return;
 
@@ -541,9 +545,11 @@ export default function DaftarGuru() {
         const id = getGuruId(item);
         if (!id) return;
 
-        const confirmed = window.confirm(
-            `Yakin ingin menghapus guru "${getGuruName(item)}"? Data yang dihapus tidak bisa dikembalikan.`,
-        );
+        const confirmed = await showConfirmDialog({
+            title: "Hapus Guru?",
+            text: `Yakin ingin menghapus guru "${getGuruName(item)}"? Data yang dihapus tidak bisa dikembalikan.`,
+            confirmButtonText: "Hapus",
+        });
 
         if (!confirmed) return;
 

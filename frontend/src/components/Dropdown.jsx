@@ -62,7 +62,8 @@ export default function Dropdown({
     setOpen((prev) => !prev);
   };
 
-  const selectedItem = items.find((item) => item.value === value);
+  const isSameValue = (left, right) => String(left ?? "") === String(right ?? "");
+  const selectedItem = items.find((item) => isSameValue(item.value, value));
   const displayLabel = selectedItem ? selectedItem.label : placeholder || label || "Pilih...";
 
   const menuContent = (
@@ -72,7 +73,7 @@ export default function Dropdown({
           <DropdownItem
             key={index}
             label={item.label}
-            active={item.value === value}
+            active={isSameValue(item.value, value)}
             onClick={(e) => {
               e.preventDefault();
               onChange?.(item.value);
@@ -103,7 +104,7 @@ export default function Dropdown({
             disabled
               ? "bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed"
               : open
-                ? "border-[#2E5AA7] ring-4 ring-[#2E5AA7]/10 bg-white text-gray-800 shadow-sm"
+                ? "border-[#0AC4E0] ring-4 ring-[#0AC4E0]/10 bg-white text-slate-900 shadow-sm"
                 : "bg-gray-50/50 border-gray-100 text-gray-600 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] hover:bg-white hover:border-gray-300"
           }
         `}
@@ -113,7 +114,7 @@ export default function Dropdown({
           size={14}
           strokeWidth={3}
           className={`flex-shrink-0 text-gray-400 transition-transform duration-500 ${
-            open ? "rotate-180 text-[#2E5AA7]" : ""
+            open ? "rotate-180 text-[#0AC4E0]" : ""
           }`}
         />
       </button>

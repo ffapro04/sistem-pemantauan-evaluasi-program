@@ -10,50 +10,36 @@ export default function MasterAlert({ note, setNote }) {
         <AnimatePresence>
             {note?.show && (
                 <motion.div
-                    initial={{
-                        x: note.type === "error" ? -100 : 100,
-                        opacity: 0,
-                    }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{
-                        x: note.type === "error" ? -100 : 100,
-                        opacity: 0,
-                    }}
-                    className={`fixed ${note.type === "error" ? "left-[320px]" : "right-12"
-                        } top-[45%] z-[350] w-72`}
+                    initial={{ y: -24, opacity: 0, scale: 0.98 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    exit={{ y: -24, opacity: 0, scale: 0.98 }}
+                    className="pointer-events-none fixed inset-x-0 top-5 z-[350] flex justify-center px-4"
                 >
-                    <div className="rounded-[3rem] border border-slate-200 bg-white/90 p-8 text-center shadow-2xl backdrop-blur-xl">
+                    <div className="pointer-events-auto w-[min(420px,calc(100vw-32px))] rounded-[1.35rem] border border-slate-200 bg-white/95 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.14)] backdrop-blur-xl">
                         <div
-                            className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg ${note.type === "error"
+                            className={`float-left mr-3 flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-lg ${note.type === "error"
                                     ? "bg-rose-500 shadow-rose-200"
                                     : "bg-emerald-500 shadow-emerald-200"
                                 }`}
                         >
-                            {note.type === "error" ? (
-                                <XCircle size={28} />
-                            ) : (
-                                <CheckCircle2 size={28} />
-                            )}
+                            {note.type === "error" ? <XCircle size={21} /> : <CheckCircle2 size={21} />}
                         </div>
 
                         <h4
-                            className={`mb-3 text-[10px] font-black uppercase tracking-widest ${note.type === "error" ? "text-rose-600" : "text-emerald-600"
+                            className={`mb-1 text-[10px] font-black uppercase tracking-widest ${note.type === "error" ? "text-rose-600" : "text-emerald-600"
                                 }`}
                         >
                             {note.type === "error" ? "Sistem Alert" : "Berhasil"}
                         </h4>
 
-                        <p className="mb-8 text-xs font-bold leading-relaxed text-slate-700">
+                        <p className="text-xs font-bold leading-relaxed text-slate-700">
                             {note.message}
                         </p>
 
                         <button
                             type="button"
                             onClick={() => setNote({ show: false, type: null, message: "" })}
-                            className={`w-full rounded-2xl py-4 text-[10px] font-black uppercase transition-all active:scale-95 ${note.type === "error"
-                                    ? "bg-rose-50 text-rose-600"
-                                    : "bg-emerald-50 text-emerald-600"
-                                }`}
+                            className="mt-3 w-full rounded-xl bg-slate-950 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-[#0AC4E0] active:scale-95"
                         >
                             Mengerti
                         </button>

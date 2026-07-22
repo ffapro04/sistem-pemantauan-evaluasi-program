@@ -29,6 +29,9 @@ export class Jurusan {
   @Column({ type: 'text', nullable: true })
   deskripsi: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  gambar_jurusan: string;
+
   @Column({ default: true })
   status: boolean;
 

@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
+import PageState from "./ui/PageState";
 
 function EmptyState({
     icon,
@@ -7,20 +8,15 @@ function EmptyState({
     className = "",
 }) {
     return (
-        <div
-            className={`flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center ${className}`}
-        >
-            <div className="mb-4 text-slate-300">{icon}</div>
-
-            <h3 className="text-[12px] font-black uppercase tracking-widest text-slate-500">
-                {title}
-            </h3>
-
-            <p className="mt-2 max-w-md text-[11px] font-semibold leading-relaxed text-slate-400">
-                {description}
-            </p>
-        </div>
+        <PageState
+            title={title}
+            description={description}
+            eyebrow="Status Data"
+            icon={icon ? () => icon : undefined}
+            className={`min-h-[220px] bg-transparent px-0 ${className}`}
+        />
     );
 }
 
 export default EmptyState;
+

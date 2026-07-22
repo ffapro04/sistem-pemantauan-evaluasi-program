@@ -1,6 +1,7 @@
 ﻿/* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
 import {
+    GeoJSON,
     MapContainer,
     Marker,
     Popup,
@@ -22,12 +23,25 @@ import {
 import "leaflet/dist/leaflet.css";
 
 import OnboardingLeafletStyle from "./OnboardingLeafletStyle";
+import Dropdown from "../Dropdown";
+import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
 const INDONESIA_CENTER = [-2.5, 118];
 const INDONESIA_BOUNDS = [
     [-11.2, 94.5],
     [6.5, 141.5],
 ];
+const INDONESIA_MAX_BOUNDS = [
+    [-13.0, 92.0],
+    [8.2, 143.5],
+];
+const INDONESIA_GEOJSON_STYLE = {
+    color: "#0AC4E0",
+    weight: 1.25,
+    opacity: 0.82,
+    fillColor: "#0AC4E0",
+    fillOpacity: 0.08,
+};
 const ITEMS_PER_PAGE = 5;
 
 const PROVINCE_FALLBACKS = {
@@ -435,10 +449,10 @@ function MapViewportController({ provinceGroup, countyGroup }) {
     const map = useMap();
 
     useEffect(() => {
-        map.stop();
-        map.invalidateSize();
+        const applyViewport = () => {
+            map.stop();
+            map.invalidateSize({ pan: false });
 
-        const timer = window.setTimeout(() => {
             if (countyGroup) {
                 const points = countyGroup.schools.map(getCoordinate).filter(Boolean);
 
@@ -476,9 +490,18 @@ function MapViewportController({ provinceGroup, countyGroup }) {
                 padding: [18, 18],
                 animate: true,
             });
-        }, 80);
+        };
 
-        return () => window.clearTimeout(timer);
+        applyViewport();
+        const timers = [80, 240, 520, 900].map((delay) =>
+            window.setTimeout(applyViewport, delay),
+        );
+        window.addEventListener("resize", applyViewport);
+
+        return () => {
+            timers.forEach((timer) => window.clearTimeout(timer));
+            window.removeEventListener("resize", applyViewport);
+        };
     }, [map, provinceGroup?.key, countyGroup?.key]);
 
     return null;
@@ -578,11 +601,19 @@ function SchoolMap({
                 zoom={5}
                 style={{ height: "100%", width: "100%", background: "#F1F5F9" }}
                 zoomControl={false}
+                maxBounds={INDONESIA_MAX_BOUNDS}
+                maxBoundsViscosity={1}
                 scrollWheelZoom
             >
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+
+                <GeoJSON
+                    data={indonesiaGeoJson}
+                    style={INDONESIA_GEOJSON_STYLE}
+                    interactive={false}
                 />
 
                 <ZoomControl position="bottomright" />
@@ -942,38 +973,42 @@ function SchoolMapPanel({
             </div>
 
             <div className="mb-6 grid grid-cols-1 gap-3 rounded-[1.8rem] border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.4fr_auto]">
-                <select
+                <Dropdown
                     value={selectedProvinceKey}
-                    onChange={(event) => {
+                    onChange={(value) => {
                         const group = provinceGroups.find(
-                            (item) => String(item.id) === event.target.value || item.key === event.target.value,
+                            (item) => String(item.id) === value || item.key === value,
                         );
                         if (group) selectProvince(group);
                         else resetMap();
                     }}
-                    className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 outline-none focus:border-cyan-300"
-                >
-                    <option value="">Semua Provinsi</option>
-                    {provinceGroups.map((group) => (
-                        <option key={group.key} value={String(group.id)}>
-                            {group.name} ({group.schools.length})
-                        </option>
-                    ))}
-                </select>
+                    items={[
+                        { value: "", label: "Semua Provinsi" },
+                        ...provinceGroups.map((group) => ({
+                            value: String(group.id),
+                            label: `${group.name} (${group.schools.length})`,
+                        })),
+                    ]}
+                    placeholder="Semua Provinsi"
+                    width="w-full"
+                    usePortal
+                />
 
-                <select
+                <Dropdown
                     value={selectedCountyKey}
                     disabled={!activeProvince}
-                    onChange={(event) => setSelectedCountyKey(event.target.value)}
-                    className="h-12 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 outline-none focus:border-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
-                >
-                    <option value="">Semua Kabupaten/Kota</option>
-                    {(activeProvince?.counties || []).map((county) => (
-                        <option key={county.key} value={county.key}>
-                            {county.name} ({county.schools.length})
-                        </option>
-                    ))}
-                </select>
+                    onChange={setSelectedCountyKey}
+                    items={[
+                        { value: "", label: "Semua Kabupaten/Kota" },
+                        ...(activeProvince?.counties || []).map((county) => ({
+                            value: county.key,
+                            label: `${county.name} (${county.schools.length})`,
+                        })),
+                    ]}
+                    placeholder="Semua Kabupaten/Kota"
+                    width="w-full"
+                    usePortal
+                />
 
                 <div className="relative">
                     <Search

@@ -5,6 +5,7 @@ import {
     BookOpen,
     FileText,
     Hash,
+    Image as ImageIcon,
     Layers,
     School,
     ShieldCheck,
@@ -13,6 +14,21 @@ import {
 } from "lucide-react";
 
 import { isActiveValue } from "../../components/masterCrud";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+
+const getJurusanImageUrl = (imagePath) => {
+    if (!imagePath) return "";
+
+    const value = String(imagePath).trim();
+    if (!value) return "";
+
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith("/")) return `${API_BASE_URL}${value}`;
+    if (value.startsWith("uploads/")) return `${API_BASE_URL}/${value}`;
+
+    return `${API_BASE_URL}/uploads/jurusan/${value}`;
+};
 
 const getCurrentUser = () => {
     try {
@@ -51,6 +67,10 @@ const normalizeJurusan = (row) => ({
     nama_jurusan: row?.nama_jurusan || row?.nama || "",
     kode_jurusan: String(row?.kode_jurusan || row?.kode || "").toUpperCase(),
     deskripsi: row?.deskripsi || "",
+    gambar_jurusan: row?.gambar_jurusan || row?.gambar_jurusan_url || row?.image_url || "",
+    gambar_jurusan_url: getJurusanImageUrl(
+        row?.gambar_jurusan_url || row?.gambar_jurusan || row?.image_url || "",
+    ),
     status: row?.status ?? true,
 });
 
@@ -134,6 +154,8 @@ export const jurusanConfig = {
         nama_jurusan: "",
         kode_jurusan: "",
         deskripsi: "",
+        gambar_jurusan: "",
+        gambar_jurusan_file: null,
         status: true,
     }),
 
@@ -258,6 +280,20 @@ export const jurusanConfig = {
                         "Contoh: Jurusan yang berfokus pada perawatan, perbaikan, dan teknologi kendaraan ringan.",
                     help: "Deskripsi ini akan tampil di dashboard operator sekolah saat jurusan dipilih.",
                 },
+                {
+                    name: "gambar_jurusan_file",
+                    label: "Gambar Jurusan",
+                    type: "file",
+                    icon: ImageIcon,
+                    wrapperClassName: "md:col-span-2",
+                    accept: "image/png,image/jpeg,image/jpg,image/webp",
+                    maxSize: 3 * 1024 * 1024,
+                    buttonText: "Upload Gambar Jurusan",
+                    previewAsImage: true,
+                    existingUrlField: "gambar_jurusan_url",
+                    existingNameField: "gambar_jurusan",
+                    help: "Opsional. Gambar ini akan tampil di carousel dashboard sekolah.",
+                },
             ],
         },
     ],
@@ -280,13 +316,25 @@ export const jurusanConfig = {
         return true;
     },
 
-    buildPayload: ({ formData, user }) => ({
-        id_sekolah: Number(getOperatorSekolahId(user)),
-        nama_jurusan: formData.nama_jurusan?.trim() || "",
-        kode_jurusan: formData.kode_jurusan?.trim().toUpperCase() || "",
-        deskripsi: formData.deskripsi?.trim() || "",
-        status: formData.status ?? true,
-    }),
+    buildPayload: ({ formData, user }) => {
+        const payload = new FormData();
+
+        payload.append("id_sekolah", Number(getOperatorSekolahId(user)));
+        payload.append("nama_jurusan", formData.nama_jurusan?.trim() || "");
+        payload.append("kode_jurusan", formData.kode_jurusan?.trim().toUpperCase() || "");
+        payload.append("deskripsi", formData.deskripsi?.trim() || "");
+        payload.append("status", formData.status ?? true);
+
+        if (formData.gambar_jurusan_file instanceof File) {
+            payload.append("gambar_jurusan_file", formData.gambar_jurusan_file);
+        }
+
+        if (formData.gambar_jurusan) {
+            payload.append("gambar_jurusan", formData.gambar_jurusan);
+        }
+
+        return payload;
+    },
     formTitle: {
         create: "Tambah Data",
         edit: "Edit Data",
@@ -358,6 +406,12 @@ export const jurusanConfig = {
                         key: "deskripsi",
                         icon: FileText,
                         format: (value) => value || "Belum ada deskripsi.",
+                    },
+                    {
+                        label: "Gambar Jurusan",
+                        key: "gambar_jurusan",
+                        icon: ImageIcon,
+                        format: (value) => value || "Belum ada gambar.",
                     },
                     {
                         label: "ID Sekolah",

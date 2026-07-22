@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -14,10 +14,13 @@ import {
     NoScrollbarStyle,
     InfoPill,
 } from "../common";
+import Dropdown from "../Dropdown";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
+import { getAuthToken } from "../../utils/authSession";
 
-const DEFAULT_API_BASE = "";
+const DEFAULT_API_BASE =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -61,7 +64,7 @@ const getPilarTone = (value) => {
 };
 
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => getAuthToken();
 
 const normalizeOption = (option) => {
     if (typeof option === "string") return option;
@@ -360,6 +363,7 @@ function AssessmentEditBase({
     };
 
     const handleSave = async () => {
+        if (saving) return;
         if (!validateQuestions()) return;
 
         try {
@@ -458,19 +462,16 @@ function AssessmentEditBase({
                             <label className="ml-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
                                 Pilar Assessment
                             </label>
-                            <select
+                            <Dropdown
                                 value={meta.pilar}
-                                onChange={(event) =>
-                                    setMeta((prev) => ({ ...prev, pilar: event.target.value }))
+                                onChange={(value) =>
+                                    setMeta((prev) => ({ ...prev, pilar: value }))
                                 }
-                                className="h-11 w-full rounded-xl border border-slate-100 bg-white px-4 text-[11px] font-black uppercase text-slate-600 outline-none focus:border-[#0AC4E0] focus:ring-2 focus:ring-[#0AC4E0]/15"
-                            >
-                                {getPilarOptions(meta.jenis).map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                items={getPilarOptions(meta.jenis)}
+                                placeholder="Pilih Pilar"
+                                width="w-full"
+                                usePortal
+                            />
                         </div>
 
                         <div className="space-y-2">

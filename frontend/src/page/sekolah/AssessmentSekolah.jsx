@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import { getAuthToken, getAuthUser } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+const ROWS_PER_PAGE = 8;
 
 const STATUS_MAP = {
     draft: {
@@ -50,7 +52,7 @@ const STATUS_MAP = {
 
 const getStoredUser = () => {
     try {
-        const raw = localStorage.getItem("user");
+        const raw = getAuthUser();
         return raw ? JSON.parse(raw) : null;
     } catch {
         return null;
@@ -59,7 +61,7 @@ const getStoredUser = () => {
 
 const getTokenUser = () => {
     try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         return token ? jwtDecode(token) : null;
     } catch {
         return null;
@@ -85,6 +87,7 @@ const isOperatorSekolah = (user = {}) => {
     const jabatan = String(user?.jabatan || "").toLowerCase();
 
     return (
+        idRole === 5 ||
         idRole === 9 ||
         role.includes("operator") ||
         jabatan.includes("operator sekolah") ||
@@ -205,7 +208,8 @@ const getAssessmentDeadlineDate = (item = {}) => {
 
 const getAssessmentDeadline = (item = {}) => {
     if (item.sisa_hari !== undefined && item.sisa_hari !== null) {
-        return `${Math.max(0, Number(item.sisa_hari))} hari lagi`;
+        const remaining = Math.max(0, Number(item.sisa_hari));
+        return remaining === 0 ? "Tenggat selesai" : `${remaining} hari lagi`;
     }
 
     const deadline = getAssessmentDeadlineDate(item);
@@ -219,7 +223,28 @@ const getAssessmentDeadline = (item = {}) => {
     const diff = deadline.getTime() - now.getTime();
     const sisaHari = Math.max(0, Math.ceil(diff / MS_PER_DAY));
 
-    return `${sisaHari} hari lagi`;
+    return sisaHari === 0 ? "Tenggat selesai" : `${sisaHari} hari lagi`;
+};
+
+const isAssessmentExpired = (item = {}) => {
+    if (item.is_expired !== undefined && item.is_expired !== null) {
+        return Boolean(item.is_expired);
+    }
+
+    if (item.sisa_hari !== undefined && item.sisa_hari !== null) {
+        return Number(item.sisa_hari) <= 0;
+    }
+
+    const deadline = getAssessmentDeadlineDate(item);
+    return Boolean(deadline && Date.now() > deadline.getTime());
+};
+
+const getAssessmentStatus = (item = {}) => {
+    if (item.sudah_diisi || isAssessmentExpired(item)) {
+        return "Selesai";
+    }
+
+    return item.status_display || item.status;
 };
 
 export default function AssessmentSekolah() {
@@ -227,6 +252,7 @@ export default function AssessmentSekolah() {
 
     const [user, setUser] = useState(null);
     const [list, setList] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
     const [loading, setLoading] = useState(false);
     const [note, setNote] = useState({
         show: false,
@@ -270,7 +296,7 @@ export default function AssessmentSekolah() {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             const guruId =
                 user?.id_guru_assessment ||
@@ -294,6 +320,7 @@ export default function AssessmentSekolah() {
             const result = Array.isArray(data) ? data : data?.data ?? [];
 
             setList(result);
+            setCurrentPage(1);
         } catch (error) {
             console.error("FETCH ASSESSMENT SEKOLAH ERROR:", error);
 
@@ -305,11 +332,23 @@ export default function AssessmentSekolah() {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, guruAssessment]);
 
     useEffect(() => {
         if (user) fetchData();
     }, [user, fetchData]);
+
+    const totalPages = Math.max(1, Math.ceil(list.length / ROWS_PER_PAGE));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const pageStartIndex = (safeCurrentPage - 1) * ROWS_PER_PAGE;
+    const pageEndIndex = Math.min(pageStartIndex + ROWS_PER_PAGE, list.length);
+    const paginatedList = list.slice(pageStartIndex, pageEndIndex);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
     const statusBadge = (status) => {
         const s =
@@ -379,6 +418,7 @@ export default function AssessmentSekolah() {
             title="Assessment"
             highlight="Sekolah"
             subtitle="Sistem Monitoring dan Evaluasi Program"
+            contentClassName="bg-[#F8FBFF]"
             action={
                 <button
                     type="button"
@@ -395,7 +435,7 @@ export default function AssessmentSekolah() {
         >
             <MasterAlert note={note} setNote={setNote} />
 
-            <div className="h-full overflow-y-auto no-scrollbar px-10 py-8">
+            <div className="h-full overflow-y-auto no-scrollbar px-6 py-6 md:px-8">
                 {renderRoleInfo()}
 
                 {loading ? (
@@ -416,28 +456,28 @@ export default function AssessmentSekolah() {
                         </p>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white">
+                    <div className="overflow-hidden rounded-[1.35rem] border border-slate-100 bg-white shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
                         <table className="w-full text-left">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50">
-                                    <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                <tr className="border-b border-slate-100 bg-[#0AC4E0]">
+                                    <th className="w-14 px-3 py-3.5 text-center text-[9px] font-black uppercase tracking-widest text-white">
                                         No
                                     </th>
-                                    <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    <th className="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-white">
                                         Nama Assessment
                                     </th>
-                                    <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    <th className="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-white">
                                         Jenis
                                     </th>
-                                    <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    <th className="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-white">
                                         Status
                                     </th>
-                                    <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    <th className="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-white">
                                         Tenggat
                                     </th>
 
                                     {canFillAssessment && (
-                                        <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                        <th className="px-5 py-3.5 text-[9px] font-black uppercase tracking-widest text-white">
                                             Aksi
                                         </th>
                                     )}
@@ -445,7 +485,7 @@ export default function AssessmentSekolah() {
                             </thead>
 
                             <tbody>
-                                {list.map((item, idx) => {
+                                {paginatedList.map((item, idx) => {
                                     const idAssessment = getAssessmentId(item);
                                     const jenis = getAssessmentJenis(item);
 
@@ -454,13 +494,13 @@ export default function AssessmentSekolah() {
                                             key={idAssessment || idx}
                                             className="border-b border-slate-50 bg-white transition-colors hover:bg-slate-50/50"
                                         >
-                                            <td className="px-6 py-4 text-[10px] font-bold text-slate-400">
-                                                {idx + 1}
+                                            <td className="w-14 px-3 py-4 text-center text-[10px] font-bold text-slate-400">
+                                                {pageStartIndex + idx + 1}
                                             </td>
 
-                                            <td className="px-6 py-4">
+                                            <td className="px-5 py-4">
                                                 <div className="flex min-w-0 flex-col">
-                                                    <p className="text-xs font-bold text-slate-800">
+                                                    <p className="text-[13px] font-black text-slate-950">
                                                         {getAssessmentName(item)}
                                                     </p>
                                                     <p className="mt-1 text-[9px] font-bold text-slate-400">
@@ -470,7 +510,7 @@ export default function AssessmentSekolah() {
                                                 </div>
                                             </td>
 
-                                            <td className="px-6 py-4">
+                                            <td className="px-5 py-4">
                                                 <span
                                                     className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${getAssessmentJenisClass(
                                                         jenis,
@@ -480,11 +520,11 @@ export default function AssessmentSekolah() {
                                                 </span>
                                             </td>
 
-                                            <td className="px-6 py-4">
-                                                {statusBadge(item.status)}
+                                            <td className="px-5 py-4">
+                                                {statusBadge(getAssessmentStatus(item))}
                                             </td>
 
-                                            <td className="px-6 py-4">
+                                            <td className="px-5 py-4">
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] font-black text-slate-600">
                                                         {getAssessmentDeadline(item)}
@@ -496,8 +536,8 @@ export default function AssessmentSekolah() {
                                             </td>
 
                                             {canFillAssessment && (
-                                                <td className="px-6 py-4">
-                                                    {item.sudah_diisi ? (
+                                                <td className="px-5 py-4">
+                                                    {item.sudah_diisi || isAssessmentExpired(item) ? (
                                                         <button
                                                             type="button"
                                                             disabled
@@ -525,6 +565,36 @@ export default function AssessmentSekolah() {
                                 })}
                             </tbody>
                         </table>
+
+                        <div className="flex flex-col gap-3 border-t border-slate-100 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                Menampilkan {pageStartIndex + 1}-{pageEndIndex} dari {list.length} assessment
+                            </p>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={safeCurrentPage <= 1}
+                                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                                    className="rounded-full border border-slate-100 bg-white px-4 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 shadow-sm transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Prev
+                                </button>
+
+                                <span className="rounded-full bg-[#0AC4E0] px-4 py-2 text-[9px] font-black uppercase tracking-widest text-white shadow-sm shadow-cyan-100">
+                                    {safeCurrentPage} / {totalPages}
+                                </span>
+
+                                <button
+                                    type="button"
+                                    disabled={safeCurrentPage >= totalPages}
+                                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                                    className="rounded-full border border-slate-100 bg-white px-4 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 shadow-sm transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

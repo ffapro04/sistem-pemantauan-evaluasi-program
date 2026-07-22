@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -36,7 +36,7 @@ import astraLogo from "../../assets/img/logo-astra.png";
 import satuIndonesiaLogo from "../../assets/img/satu_indonesia.png";
 import INDONESIA_HOLIDAY_EVENTS from "../../data/indonesiaHolidayEvents";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const AgendaFullCalendar = lazy(() => import("./AgendaFullCalendar"));
 
 const AGENDA_LOGO_PATHS = {
@@ -330,10 +330,18 @@ function getRoleId(user = {}) {
 function getSchoolId(user = {}) {
     return (
         user?.id_sekolah ??
+        user?.idSekolah ??
         user?.sekolah_id ??
+        user?.schoolId ??
         user?.school_id ??
+        user?.user?.id_sekolah ??
+        user?.user?.sekolah_id ??
+        user?.operator?.id_sekolah ??
+        user?.kepala_sekolah?.id_sekolah ??
+        user?.guru?.id_sekolah ??
         user?.sekolah?.id_sekolah ??
         user?.sekolah?.id ??
+        user?.sekolah?.idSekolah ??
         user?.school?.id_sekolah ??
         user?.school?.id ??
         ""
@@ -1834,36 +1842,31 @@ function COEFormModal({
                         <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Pilar COE
                         </label>
-                        <select
+                        <Dropdown
                             value={formData.pilar || ""}
-                            onChange={(event) => setField("pilar", event.target.value)}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
-                        >
-                            <option value="">Semua Pilar</option>
-                            {pilarOptions.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(value) => setField("pilar", value)}
+                            items={[{ value: "", label: "Semua Pilar" }, ...pilarOptions]}
+                            placeholder="Semua Pilar"
+                            width="w-full"
+                            usePortal
+                        />
                     </div>
 
                     <div>
                         <label className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Tipe Pelaksanaan
                         </label>
-                        <select
+                        <Dropdown
                             value={formData.activityType || ""}
-                            onChange={(event) => setField("activityType", event.target.value)}
-                            className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-bold text-slate-700 outline-none focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
-                        >
-                            <option value="">Semua tipe / belum ditentukan</option>
-                            {COE_ACTIVITY_TYPES.map((item) => (
-                                <option key={item.value} value={item.value}>
-                                    {item.label}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(value) => setField("activityType", value)}
+                            items={[
+                                { value: "", label: "Semua tipe / belum ditentukan" },
+                                ...COE_ACTIVITY_TYPES,
+                            ]}
+                            placeholder="Semua tipe / belum ditentukan"
+                            width="w-full"
+                            usePortal
+                        />
                     </div>
 
                     <div className="md:col-span-2">

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import { RefreshCcw, Search, BriefcaseBusiness } from "lucide-react";
@@ -15,7 +15,9 @@ import VendorProgramStats from "./VendorProgramStats";
 import VendorProgramTable from "./VendorProgramTable";
 import VendorEmptyState from "./VendorEmptyState";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+const ROWS_PER_PAGE = 3;
 
 function normalizeArray(payload) {
     if (Array.isArray(payload?.data)) return payload.data;
@@ -37,6 +39,7 @@ function VendorProgramPage({
 
     const [loading, setLoading] = useState(true);
     const [searchKeyword, setSearchKeyword] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
         fetchVendorPrograms();
@@ -277,6 +280,24 @@ function VendorProgramPage({
         });
     }, [programs, searchKeyword, schools, hos, vendors]);
 
+    const totalPages = Math.max(1, Math.ceil(filteredPrograms.length / ROWS_PER_PAGE));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * ROWS_PER_PAGE;
+    const visiblePrograms = filteredPrograms.slice(
+        startIndex,
+        startIndex + ROWS_PER_PAGE,
+    );
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchKeyword, programs.length]);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
+
     const getSchoolName = (program) => {
         const school = schools.find(
             (item) => String(item.id_sekolah) === String(program.id_sekolah),
@@ -384,10 +405,22 @@ function VendorProgramPage({
 
                     {filteredPrograms.length > 0 ? (
                         <VendorProgramTable
-                            programs={filteredPrograms}
+                            programs={visiblePrograms}
                             detailPathPrefix={detailPathPrefix}
                             getSchoolName={getSchoolName}
                             getHoName={getHoName}
+                            page={safeCurrentPage}
+                            totalPages={totalPages}
+                            startIndex={startIndex}
+                            totalItems={filteredPrograms.length}
+                            onPrevPage={() =>
+                                setCurrentPage((page) => Math.max(1, page - 1))
+                            }
+                            onNextPage={() =>
+                                setCurrentPage((page) =>
+                                    Math.min(totalPages, page + 1),
+                                )
+                            }
                         />
                     ) : (
                         <VendorEmptyState

@@ -30,6 +30,11 @@ export class CreateJurusanDto {
   deskripsi?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  gambar_jurusan?: string;
+
+  @IsOptional()
   @Transform(
     ({ value }) =>
       value === true || value === 'true' || value === 1 || value === '1',

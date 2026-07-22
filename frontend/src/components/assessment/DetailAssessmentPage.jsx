@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
@@ -10,9 +10,9 @@ import {
     XAxis,
     YAxis,
     Tooltip,
-    ResponsiveContainer,
     CartesianGrid,
 } from "recharts";
+import ResponsiveContainer from "../charts/SafeResponsiveContainer";
 
 import {
     ArrowLeft,
@@ -51,8 +51,10 @@ import {
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
+import { getAuthToken } from "../../utils/authSession";
 
-const DEFAULT_API_BASE = "";
+const DEFAULT_API_BASE =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const loadXlsx = async () => import("xlsx");
 const ANSWER_CHART_COLORS = ["#FF0052", "#FFD400", "#00C68D", "#0055DA"];
 
@@ -133,7 +135,7 @@ const getPilarTone = (value) => {
 };
 
 
-const getToken = () => localStorage.getItem("token");
+const getToken = () => getAuthToken();
 
 const toArray = (value) => (Array.isArray(value) ? value : []);
 

@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Building2,
@@ -26,7 +26,6 @@ import {
   Cell,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -34,7 +33,7 @@ import {
 
 import Sidebar from "../../../components/Sidebar";
 import PageWrapper from "../../../components/PageWrapper";
-import Dropdown from "../../../components/Dropdown";
+import ResponsiveContainer from "../../../components/charts/SafeResponsiveContainer";
 import {
   CHART_PALETTE,
   CHART_STATUS_COLORS,
@@ -42,6 +41,7 @@ import {
 } from "../../../utils/chartPalette";
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
   Marker,
   Popup,
@@ -52,14 +52,18 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import indonesiaGeoJson from "../../../assets/maps/indonesia-province-simple.json";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const INDONESIA_CENTER = [-2.5, 118];
 const DEFAULT_ZOOM = 5;
 const PROVINCE_ZOOM = 7;
+const KABUPATEN_ZOOM = 9;
 const SCHOOL_ZOOM = 12;
 const ITEMS_PER_PAGE = 5;
+const VISUAL_ITEM_PAGE_SIZE = 6;
+const VISUAL_ALL_VALUE = "__ALL__";
 
 const defaultMarkerIcon = new L.Icon({
   iconUrl: markerIcon,
@@ -147,6 +151,7 @@ const ROLE_LABEL = {
   7: "Kepala Dinas",
   8: "Guru Assessment",
   9: "Operator Sekolah (Legacy)",
+  10: "Kepala Sekolah",
 };
 
 const ROLE_COLOR = {
@@ -159,6 +164,7 @@ const ROLE_COLOR = {
   7: getChartPaletteColor(1),
   8: getChartPaletteColor(6),
   9: getChartPaletteColor(4),
+  10: getChartPaletteColor(8),
 };
 
 const WARNA_DIAGRAM = CHART_PALETTE;
@@ -180,6 +186,7 @@ const ROLE_FILTERS = [
   { label: "Kepala Dinas", value: 7 },
   { label: "Guru Assessment", value: 8 },
   { label: "Operator Sekolah (Legacy)", value: 9 },
+  { label: "Kepala Sekolah", value: 10 },
 ];
 
 const HO_FILTERS = [
@@ -297,6 +304,8 @@ function ambilArray(payload) {
   if (Array.isArray(payload?.vendors)) return payload.vendors;
   if (Array.isArray(payload?.agenda)) return payload.agenda;
   if (Array.isArray(payload?.agendas)) return payload.agendas;
+  if (Array.isArray(payload?.assessment)) return payload.assessment;
+  if (Array.isArray(payload?.assessments)) return payload.assessments;
   if (Array.isArray(payload)) return payload;
   return [];
 }
@@ -923,6 +932,45 @@ function mergeProgramsWithCategoryHints(base = [], akademik = [], nonAkademik = 
   return Array.from(map.values());
 }
 
+function ambilIdentityAssessment(assessment) {
+  return String(
+    assessment?.id_assessment ||
+    assessment?.assessment_id ||
+    assessment?.id ||
+    assessment?.nama_assessment ||
+    assessment?.nama ||
+    Math.random(),
+  );
+}
+
+function mergeAssessmentsWithCategoryHints(base = [], akademik = [], nonAkademik = []) {
+  const map = new Map();
+
+  base.forEach((assessment) => {
+    map.set(ambilIdentityAssessment(assessment), assessment);
+  });
+
+  akademik.forEach((assessment) => {
+    const key = ambilIdentityAssessment(assessment);
+    map.set(key, {
+      ...(map.get(key) || {}),
+      ...assessment,
+      _resolved_assessment_category: "AKADEMIK",
+    });
+  });
+
+  nonAkademik.forEach((assessment) => {
+    const key = ambilIdentityAssessment(assessment);
+    map.set(key, {
+      ...(map.get(key) || {}),
+      ...assessment,
+      _resolved_assessment_category: "NON_AKADEMIK",
+    });
+  });
+
+  return Array.from(map.values());
+}
+
 function ambilJenjangSekolah(sekolah = {}) {
   return nilaiTampil(
     sekolah?.jenjang,
@@ -1087,6 +1135,648 @@ function ambilKategoriProgram(program) {
     program?.tipe ||
     "",
   );
+}
+
+function ambilKategoriAssessment(assessment) {
+  if (assessment?._resolved_assessment_category) return assessment._resolved_assessment_category;
+
+  return normalisasiKategoriVendor(
+    assessment?.jenis ||
+    assessment?.jenis_assessment ||
+    assessment?.kategori ||
+    assessment?.kategori_assessment ||
+    assessment?.pilar ||
+    assessment?.pilar_assessment ||
+    assessment?.raw?.pilar ||
+    "",
+  );
+}
+
+function normalisasiStatusProses(value, fallback = "Belum Diproses") {
+  const raw = String(value || "").trim();
+  const text = raw.toLowerCase();
+
+  if (!raw) return fallback;
+  if (text.includes("pending")) return "Pending";
+  if (text.includes("draft") || text.includes("siap")) return "Siap Diajukan";
+  if (text.includes("kirim") || text.includes("terkirim")) return "Terkirim";
+  if (text.includes("isi") || text.includes("proses") || text.includes("jalan")) return "Dalam Proses";
+  if (text.includes("approval")) return "Approval";
+  if (text.includes("sosialisasi")) return "Sosialisasi";
+  if (text.includes("implementasi")) return "Implementasi";
+  if (text.includes("evaluasi")) return "Evaluasi";
+  if (text.includes("selesai") || text.includes("approved")) return "Selesai";
+  if (text.includes("tolak") || text.includes("reject")) return "Revisi";
+
+  return raw;
+}
+
+function ambilStatusAssessment(assessment = {}) {
+  if (!isDataAktif(assessment)) return "Pending";
+
+  return normalisasiStatusProses(
+    assessment?.status_assessment ||
+    assessment?.status_pengisian ||
+    assessment?.status ||
+    assessment?.state ||
+    assessment?.progress_status ||
+    "",
+    "Siap Diajukan",
+  );
+}
+
+function ambilStatusProgram(program = {}) {
+  return normalisasiStatusProses(
+    program?.status_program ||
+    program?.status ||
+    program?.fase_aktif?.nama_fase ||
+    program?.faseAktif?.nama_fase ||
+    program?.fase ||
+    program?.nama_fase ||
+    "",
+    "Approval",
+  );
+}
+
+function ambilNamaProgram(program = {}) {
+  return nilaiTampil(
+    program?.nama_program,
+    program?.namaProgram,
+    program?.program_name,
+    program?.judul_program,
+    program?.judul,
+    program?.nama,
+    program?.name,
+    "Program",
+  );
+}
+
+function ambilNamaAssessment(assessment = {}) {
+  return nilaiTampil(
+    assessment?.nama_assessment,
+    assessment?.namaAssessment,
+    assessment?.assessment_name,
+    assessment?.judul_assessment,
+    assessment?.judul,
+    assessment?.nama,
+    assessment?.name,
+    "Assessment",
+  );
+}
+
+function ambilKodeVisualItem(item = {}, mode = "assessment") {
+  return nilaiTampil(
+    mode === "assessment" ? item?.kode_assessment : item?.kode_program,
+    mode === "assessment" ? item?.nomor_assessment : item?.nomor_program,
+    item?.kode,
+    item?.code,
+    item?.nomor,
+    item?.no,
+    "-",
+  );
+}
+
+function normalizeReferenceText(value) {
+  return normalisasiText(value)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tambahReferenceValue(refs, value, treatStringAsName = true) {
+  if (value === null || value === undefined || value === "") return;
+
+  if (typeof value === "number" || typeof value === "bigint") {
+    refs.ids.add(String(value));
+    return;
+  }
+
+  if (typeof value === "boolean") return;
+
+  const text = String(value).trim();
+  if (!text || text === "-") return;
+
+  if (text.includes(",")) {
+    text
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach((item) => tambahReferenceValue(refs, item, treatStringAsName));
+    return;
+  }
+
+  if (/^\d+$/.test(text)) {
+    refs.ids.add(text);
+    return;
+  }
+
+  if (treatStringAsName) refs.names.add(normalizeReferenceText(text));
+}
+
+function collectEntityReferences(values = [], idKeys = [], nameKeys = []) {
+  const refs = {
+    ids: new Set(),
+    names: new Set(),
+    rawNames: new Set(),
+  };
+
+  const visit = (value) => {
+    if (value === null || value === undefined || value === "") return;
+
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+
+    if (typeof value === "object") {
+      idKeys.forEach((key) => tambahReferenceValue(refs, value?.[key], false));
+      nameKeys.forEach((key) => {
+        const name = value?.[key];
+        tambahReferenceValue(refs, name, true);
+        if (name) refs.rawNames.add(String(name).trim());
+      });
+
+      [
+        value?.user,
+        value?.akun,
+        value?.sekolah,
+        value?.school,
+        value?.vendor,
+        value?.head_office,
+        value?.ho,
+        value?.area_officer,
+        value?.ao,
+        value?.pic,
+      ].forEach((nested) => {
+        if (nested && nested !== value) visit(nested);
+      });
+      return;
+    }
+
+    tambahReferenceValue(refs, value, true);
+    refs.rawNames.add(String(value).trim());
+  };
+
+  values.forEach(visit);
+  return refs;
+}
+
+function collectSchoolRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_sekolah,
+      item?.sekolah_id,
+      item?.school_id,
+      item?.target_sekolah_id,
+      item?.id_target_sekolah,
+      item?.id_sekolah_sasaran,
+      item?.sekolah,
+      item?.school,
+      item?.target_sekolah,
+      item?.targetSekolah,
+      item?.sekolah_sasaran,
+      item?.sekolahSasaran,
+      item?.daftar_sekolah,
+      item?.daftarSekolah,
+      item?.target_schools,
+      item?.targetSchools,
+      item?.schools,
+      item?.targets,
+      item?.target,
+    ],
+    ["id_sekolah", "id", "sekolah_id", "school_id", "id_target_sekolah"],
+    ["nama_sekolah", "nama", "name", "school_name", "namaSekolah"],
+  );
+}
+
+function collectVendorRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_vendor,
+      item?.vendor_id,
+      item?.vendor,
+      item?.vendors,
+      item?.nama_vendor,
+      item?.vendor_name,
+      item?.narasumber,
+      item?.nama_narasumber,
+    ],
+    ["id_vendor", "id", "vendor_id"],
+    ["nama_vendor", "nama", "name", "vendor_name", "nama_badan_usaha"],
+  );
+}
+
+function collectHoRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_ho,
+      item?.ho_id,
+      item?.id_head_office,
+      item?.head_office_id,
+      item?.pic_ho_id,
+      item?.head_office,
+      item?.headOffice,
+      item?.ho,
+      item?.pic_ho,
+      item?.picHo,
+      item?.nama_ho,
+      item?.nama_head_office,
+    ],
+    ["id_user", "id", "id_ho", "ho_id", "id_head_office", "head_office_id"],
+    ["nama", "nama_lengkap", "name", "nama_ho", "nama_head_office", "email"],
+  );
+}
+
+function collectAoRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_ao,
+      item?.ao_id,
+      item?.id_area_officer,
+      item?.area_officer_id,
+      item?.pic_ao_id,
+      item?.area_officer,
+      item?.areaOfficer,
+      item?.ao,
+      item?.pic_ao,
+      item?.picAo,
+      item?.nama_ao,
+      item?.nama_area_officer,
+    ],
+    ["id_user", "id", "id_ao", "ao_id", "id_area_officer", "area_officer_id"],
+    ["nama", "nama_lengkap", "name", "nama_ao", "nama_area_officer", "email"],
+  );
+}
+
+function collectGuruRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_guru,
+      item?.guru_id,
+      item?.id_guru_assessment,
+      item?.guru_assessment_id,
+      item?.guru,
+      item?.gurus,
+      item?.guru_assessment,
+      item?.guruAssessment,
+      item?.daftar_guru,
+      item?.daftarGuru,
+      item?.responden,
+      item?.peserta,
+      item?.nama_guru,
+    ],
+    ["id_user", "id", "id_guru", "guru_id", "id_guru_assessment"],
+    ["nama", "nama_lengkap", "nama_guru", "name", "email"],
+  );
+}
+
+function collectOperatorRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_operator,
+      item?.operator_id,
+      item?.id_operator_sekolah,
+      item?.operator_sekolah_id,
+      item?.operator,
+      item?.operator_sekolah,
+      item?.operatorSekolah,
+      item?.nama_operator,
+    ],
+    ["id_user", "id", "id_operator", "operator_id", "id_operator_sekolah"],
+    ["nama", "nama_lengkap", "nama_operator", "name", "email"],
+  );
+}
+
+function collectKepsekRefsFromItem(item = {}) {
+  return collectEntityReferences(
+    [
+      item?.id_kepala_sekolah,
+      item?.kepala_sekolah_id,
+      item?.kepsek_id,
+      item?.kepala_sekolah,
+      item?.kepalaSekolah,
+      item?.kepsek,
+      item?.nama_kepala_sekolah,
+      item?.nama_kepsek,
+    ],
+    ["id_user", "id", "id_kepala_sekolah", "kepala_sekolah_id", "kepsek_id"],
+    ["nama", "nama_lengkap", "nama_kepala_sekolah", "nama_kepsek", "name", "email"],
+  );
+}
+
+function entityMatchesReferences(entity, refs, getId, getName, extraNames = []) {
+  const id = getId?.(entity);
+  if (id && refs.ids.has(String(id))) return true;
+
+  const names = [getName?.(entity), ...extraNames]
+    .map(normalizeReferenceText)
+    .filter(Boolean);
+
+  return names.some((name) => refs.names.has(name));
+}
+
+function dedupeEntities(list = [], getKey) {
+  const map = new Map();
+
+  list.forEach((item, index) => {
+    const key = String(getKey?.(item) || index);
+    if (!map.has(key)) map.set(key, item);
+  });
+
+  return Array.from(map.values());
+}
+
+function ambilSchoolIdsUser(user = {}) {
+  return [
+    user?.id_sekolah,
+    user?.sekolah_id,
+    user?.school_id,
+    user?.sekolah?.id_sekolah,
+    user?.sekolah?.id,
+    user?.school?.id,
+  ]
+    .filter(Boolean)
+    .map(String);
+}
+
+function buildParticipantGroup({ label, color, entities = [], getKey, getName, fallbackNames = [] }) {
+  const names = [
+    ...dedupeEntities(entities, getKey).map(getName),
+    ...fallbackNames,
+  ]
+    .map((name) => String(name || "").trim())
+    .filter((name) => name && name !== "-");
+
+  const uniqueNames = [...new Set(names)];
+
+  return {
+    label,
+    color,
+    value: uniqueNames.length,
+    names: uniqueNames,
+  };
+}
+
+function buildVisualItemInvolvement({
+  mode,
+  item,
+  schools,
+  vendors,
+  headOffice,
+  areaOfficer,
+  guruAssessment,
+  operatorSekolah,
+  kepalaSekolah,
+  wilayahMap,
+}) {
+  if (!item) return [];
+
+  const schoolRefs = collectSchoolRefsFromItem(item);
+  const hoRefs = collectHoRefsFromItem(item);
+  const aoRefs = collectAoRefsFromItem(item);
+  const vendorRefs = collectVendorRefsFromItem(item);
+  const guruRefs = collectGuruRefsFromItem(item);
+  const operatorRefs = collectOperatorRefsFromItem(item);
+  const kepsekRefs = collectKepsekRefsFromItem(item);
+
+  const selectedSchools = schools.filter((school) =>
+    entityMatchesReferences(
+      school,
+      schoolRefs,
+      ambilIdSekolah,
+      ambilNamaSekolah,
+      [ambilNpsn(school), ambilKabupatenSekolah(school, wilayahMap)],
+    ),
+  );
+
+  const selectedSchoolIds = new Set(
+    selectedSchools
+      .map(ambilIdSekolah)
+      .filter(Boolean)
+      .map(String),
+  );
+
+  const matchUserBySchool = (user) =>
+    ambilSchoolIdsUser(user).some((id) => selectedSchoolIds.has(String(id)));
+
+  const selectedHo = headOffice.filter((user) =>
+    entityMatchesReferences(user, hoRefs, ambilIdentityUser, ambilNamaUser, [ambilEmail(user)]),
+  );
+
+  const selectedAoDirect = areaOfficer.filter((user) =>
+    entityMatchesReferences(user, aoRefs, ambilIdentityUser, ambilNamaUser, [ambilEmail(user)]),
+  );
+
+  const selectedAoByArea = selectedSchools.length
+    ? areaOfficer.filter((user) => {
+      const userWilayahIds = new Set(collectWilayahIds(user).map(String));
+      const userWilayahNames = collectWilayahNames(user).map(normalizeReferenceText);
+
+      return selectedSchools.some((school) => {
+        const schoolIds = [
+          ambilIdWilayah(school),
+          ambilIdKabupatenSekolah(school),
+          ambilIdProvinsiSekolah(school),
+        ]
+          .filter(Boolean)
+          .map(String);
+
+        const schoolNames = [
+          ambilKabupatenSekolah(school, wilayahMap),
+          ambilProvinsiSekolah(school, wilayahMap),
+          resolveNamaWilayahSekolah(school, wilayahMap),
+        ]
+          .map(normalizeReferenceText)
+          .filter(Boolean);
+
+        return (
+          schoolIds.some((id) => userWilayahIds.has(id)) ||
+          schoolNames.some((name) => userWilayahNames.includes(name))
+        );
+      });
+    })
+    : [];
+
+  const selectedVendors = vendors.filter((vendor) =>
+    programMemakaiVendor(item, vendor) ||
+    entityMatchesReferences(vendor, vendorRefs, ambilIdVendor, ambilNamaVendor, [ambilEmail(vendor)]),
+  );
+
+  const selectedGuru = dedupeEntities(
+    [
+      ...guruAssessment.filter((user) =>
+        entityMatchesReferences(user, guruRefs, ambilIdentityUser, ambilNamaUser, [ambilEmail(user)]),
+      ),
+      ...guruAssessment.filter(matchUserBySchool),
+    ],
+    ambilIdentityUser,
+  );
+  const selectedOperator = dedupeEntities(
+    [
+      ...operatorSekolah.filter((user) =>
+        entityMatchesReferences(user, operatorRefs, ambilIdentityUser, ambilNamaUser, [ambilEmail(user)]),
+      ),
+      ...operatorSekolah.filter(matchUserBySchool),
+    ],
+    ambilIdentityUser,
+  );
+  const selectedKepsek = dedupeEntities(
+    [
+      ...kepalaSekolah.filter((user) =>
+        entityMatchesReferences(user, kepsekRefs, ambilIdentityUser, ambilNamaUser, [ambilEmail(user)]),
+      ),
+      ...kepalaSekolah.filter(matchUserBySchool),
+    ],
+    ambilIdentityUser,
+  );
+
+  const groups =
+    mode === "assessment"
+      ? [
+        buildParticipantGroup({
+          label: "Head Office",
+          color: ROLE_COLOR[3],
+          entities: selectedHo,
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+          fallbackNames: selectedHo.length ? [] : Array.from(hoRefs.rawNames),
+        }),
+        buildParticipantGroup({
+          label: "Sekolah Target",
+          color: WARNA.cyan,
+          entities: selectedSchools,
+          getKey: ambilIdSekolah,
+          getName: ambilNamaSekolah,
+          fallbackNames: selectedSchools.length ? [] : Array.from(schoolRefs.rawNames),
+        }),
+        buildParticipantGroup({
+          label: "Guru Assessment",
+          color: ROLE_COLOR[8],
+          entities: selectedGuru,
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+        }),
+        buildParticipantGroup({
+          label: "Operator Sekolah",
+          color: ROLE_COLOR[5],
+          entities: selectedOperator,
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+        }),
+        buildParticipantGroup({
+          label: "Kepala Sekolah",
+          color: ROLE_COLOR[10],
+          entities: selectedKepsek,
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+        }),
+      ]
+      : [
+        buildParticipantGroup({
+          label: "Head Office",
+          color: ROLE_COLOR[3],
+          entities: selectedHo,
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+          fallbackNames: selectedHo.length ? [] : Array.from(hoRefs.rawNames),
+        }),
+        buildParticipantGroup({
+          label: "Area Officer",
+          color: ROLE_COLOR[4],
+          entities: dedupeEntities([...selectedAoDirect, ...selectedAoByArea], ambilIdentityUser),
+          getKey: ambilIdentityUser,
+          getName: ambilNamaUser,
+          fallbackNames: selectedAoDirect.length || selectedAoByArea.length ? [] : Array.from(aoRefs.rawNames),
+        }),
+        buildParticipantGroup({
+          label: "Vendor",
+          color: ROLE_COLOR[6],
+          entities: selectedVendors,
+          getKey: ambilIdVendor,
+          getName: ambilNamaVendor,
+          fallbackNames: selectedVendors.length ? [] : Array.from(vendorRefs.rawNames),
+        }),
+        buildParticipantGroup({
+          label: "Sekolah Target",
+          color: WARNA.cyan,
+          entities: selectedSchools,
+          getKey: ambilIdSekolah,
+          getName: ambilNamaSekolah,
+          fallbackNames: selectedSchools.length ? [] : Array.from(schoolRefs.rawNames),
+        }),
+      ];
+
+  return groups;
+}
+
+function buildVisualAggregateInvolvement({
+  mode,
+  items = [],
+  schools,
+  vendors,
+  headOffice,
+  areaOfficer,
+  guruAssessment,
+  operatorSekolah,
+  kepalaSekolah,
+  wilayahMap,
+}) {
+  const groupMap = new Map();
+
+  items.forEach((item) => {
+    buildVisualItemInvolvement({
+      mode,
+      item,
+      schools,
+      vendors,
+      headOffice,
+      areaOfficer,
+      guruAssessment,
+      operatorSekolah,
+      kepalaSekolah,
+      wilayahMap,
+    }).forEach((group) => {
+      if (!groupMap.has(group.label)) {
+        groupMap.set(group.label, {
+          label: group.label,
+          color: group.color,
+          names: new Set(),
+        });
+      }
+
+      const currentGroup = groupMap.get(group.label);
+      (group.names || []).forEach((name) => {
+        const cleanName = String(name || "").trim();
+        if (cleanName) currentGroup.names.add(cleanName);
+      });
+    });
+  });
+
+  return Array.from(groupMap.values()).map((group) => ({
+    label: group.label,
+    color: group.color,
+    value: group.names.size,
+    names: Array.from(group.names),
+  }));
+}
+
+function warnaStatusVisual(name) {
+  const text = normalisasiText(name);
+
+  if (text.includes("selesai") || text.includes("approved")) return WARNA.hijau;
+  if (text.includes("proses") || text.includes("implementasi")) return WARNA.cyan;
+  if (text.includes("approval") || text.includes("siap")) return WARNA.amber;
+  if (text.includes("terkirim") || text.includes("sosialisasi")) return WARNA.biru;
+  if (text.includes("evaluasi")) return WARNA.ungu;
+  if (text.includes("pending") || text.includes("revisi")) return WARNA.merah;
+
+  return null;
+}
+
+function warnaDataStatus(data) {
+  return data.map((item, index) => ({
+    ...item,
+    color: warnaStatusVisual(item.name) || warnaKategori(item.name) || item.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
+  }));
 }
 
 function programMemakaiVendor(program, vendor) {
@@ -1492,6 +2182,96 @@ function isSekolahMasukWilayah(sekolah, selectedWilayah, wilayahMap) {
 
   const kabupatenSekolah = ambilKabupatenSekolah(sekolah, wilayahMap);
   return normalisasiText(kabupatenSekolah) === normalisasiText(selectedName);
+}
+
+function itemMemilikiWilayahLangsung(item = {}) {
+  return Boolean(
+    item?.id_wilayah ||
+    item?.wilayah_id ||
+    item?.id_kabupaten ||
+    item?.kabupaten_id ||
+    item?.id_kota ||
+    item?.kota_id ||
+    item?.id_provinsi ||
+    item?.provinsi_id ||
+    item?.nama_kabupaten ||
+    item?.kabupaten ||
+    item?.nama_kota ||
+    item?.kota ||
+    item?.nama_provinsi ||
+    item?.provinsi ||
+    item?.wilayah,
+  );
+}
+
+function itemMasukWilayahTerpilih(item, selectedWilayah, schools, wilayahMap) {
+  if (!selectedWilayah) return true;
+
+  const schoolRefs = collectSchoolRefsFromItem(item);
+  const selectedName = nilaiTampil(
+    selectedWilayah?.nama_wilayah,
+    selectedWilayah?.nama,
+    selectedWilayah?.name,
+    "",
+  );
+  const matchedSchools = schools.filter((school) =>
+    entityMatchesReferences(
+      school,
+      schoolRefs,
+      ambilIdSekolah,
+      ambilNamaSekolah,
+      [
+        ambilNpsn(school),
+        ambilKabupatenSekolah(school, wilayahMap),
+        ambilProvinsiSekolah(school, wilayahMap),
+      ],
+    ),
+  );
+
+  if (matchedSchools.length > 0) {
+    return matchedSchools.some((school) =>
+      isSekolahMasukWilayah(school, selectedWilayah, wilayahMap),
+    );
+  }
+
+  if (itemMemilikiWilayahLangsung(item)) {
+    const syntheticSchool = {
+      id_wilayah: item?.id_wilayah || item?.wilayah_id,
+      id_kabupaten: item?.id_kabupaten || item?.kabupaten_id || item?.id_kota || item?.kota_id,
+      id_provinsi: item?.id_provinsi || item?.provinsi_id,
+      nama_kabupaten: nilaiTampil(
+        item?.nama_kabupaten,
+        typeof item?.kabupaten === "string" ? item.kabupaten : null,
+        item?.nama_kota,
+        typeof item?.kota === "string" ? item.kota : null,
+        "",
+      ),
+      nama_provinsi: nilaiTampil(
+        item?.nama_provinsi,
+        typeof item?.provinsi === "string" ? item.provinsi : null,
+        "",
+      ),
+      wilayah: item?.wilayah,
+      kabupaten: item?.kabupaten,
+      provinsi: item?.provinsi,
+    };
+
+    return isSekolahMasukWilayah(syntheticSchool, selectedWilayah, wilayahMap);
+  }
+
+  if (isProvinsi(selectedWilayah) && selectedName) {
+    return Array.from(schoolRefs.names).some((name) =>
+      normalisasiText(name) === normalisasiText(selectedName),
+    );
+  }
+
+  if (selectedName) {
+    return Array.from(schoolRefs.names).some((name) =>
+      normalisasiText(name) === normalisasiText(selectedName),
+    );
+  }
+
+  return false;
 }
 
 function buildProvinsiKabupatenBinaanChart(wilayahList, schools, wilayahMap) {
@@ -1979,23 +2759,28 @@ function ChartBox({ children, height = "h-[280px]" }) {
   );
 }
 
-function PieWithLegend({ data, emptyText, icon }) {
+function PieWithLegend({ data, emptyText, icon, compact = false }) {
   if (!data || data.length === 0) {
     return <EmptyChart icon={icon} text={emptyText} />;
   }
 
   return (
-    <div className="grid min-h-[285px] grid-cols-1 items-center gap-4 lg:grid-cols-[1fr_190px]">
-      <ChartBox height="h-[260px]">
+    <div
+      className={`grid grid-cols-1 items-center gap-4 ${compact
+        ? "min-h-[255px]"
+        : "min-h-[285px] xl:grid-cols-[1fr_190px]"
+        }`}
+    >
+      <ChartBox height={compact ? "h-[190px]" : "h-[260px]"}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              innerRadius={62}
-              outerRadius={104}
-              paddingAngle={4}
+              innerRadius={0}
+              outerRadius={compact ? 78 : 104}
+              paddingAngle={2}
               stroke="#ffffff"
               strokeWidth={3}
             >
@@ -2011,7 +2796,7 @@ function PieWithLegend({ data, emptyText, icon }) {
         </ResponsiveContainer>
       </ChartBox>
 
-      <div className="space-y-2">
+      <div className={compact ? "grid grid-cols-1 gap-2" : "space-y-2"}>
         {data.map((item, index) => (
           <div
             key={item.name}
@@ -2037,6 +2822,242 @@ function PieWithLegend({ data, emptyText, icon }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function SummaryPieCard({
+  hidden = false,
+  title,
+  total,
+  data,
+  emptyText,
+  icon,
+  filters,
+}) {
+  if (hidden) return null;
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-[1.1rem] border border-cyan-100 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4">
+        <p className="min-w-0 break-words whitespace-normal text-[15px] font-black text-slate-900">
+          {title}
+        </p>
+
+        <div className="shrink-0 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+          Total {total || 0}
+        </div>
+      </div>
+
+      {filters && (
+        <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+          <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+            Filter
+          </p>
+          {filters}
+        </div>
+      )}
+
+      <div className="bg-white px-4 py-4">
+        <p className="mb-3 text-[9px] font-black uppercase tracking-widest text-slate-400">
+          Diagram
+        </p>
+        <PieWithLegend
+          data={data}
+          emptyText={emptyText}
+          icon={icon}
+          compact
+        />
+      </div>
+    </section>
+  );
+}
+
+function VisualFilterField({ label, children }) {
+  return (
+    <div className="min-w-0 rounded-md border border-slate-100 bg-white p-3">
+      <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+        {label}
+      </p>
+      {children}
+    </div>
+  );
+}
+
+function VisualItemChooser({ modeLabel, options = [], value, onChange }) {
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const selectedOption = useMemo(
+    () => options.find((item) => String(item.value) === String(value)),
+    [options, value],
+  );
+
+  const filteredOptions = useMemo(() => {
+    const keyword = normalisasiText(query);
+    if (!keyword) return options;
+
+    return options.filter((item) =>
+      normalisasiText(
+        `${item.label || ""} ${item.title || ""} ${item.code || ""} ${item.status || ""} ${item.category || ""}`,
+      ).includes(keyword),
+    );
+  }, [options, query]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredOptions.length / VISUAL_ITEM_PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, modeLabel, options.length]);
+
+  useEffect(() => {
+    setPage((currentPage) => Math.min(Math.max(currentPage, 1), totalPages));
+  }, [totalPages]);
+
+  const startIndex = (page - 1) * VISUAL_ITEM_PAGE_SIZE;
+  const visibleOptions = filteredOptions.slice(
+    startIndex,
+    startIndex + VISUAL_ITEM_PAGE_SIZE,
+  );
+
+  return (
+    <div className="min-w-0 rounded-md border border-slate-100 bg-white p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+            Pilih {modeLabel}
+          </p>
+          <p className="mt-1 text-[12px] font-black text-slate-800">
+            {filteredOptions.length} dari {options.length} data
+          </p>
+        </div>
+
+        <div className="min-w-0 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
+          {selectedOption
+            ? potongLabel(selectedOption.title || selectedOption.label, 34)
+            : "Belum dipilih"}
+        </div>
+      </div>
+
+      <div className="relative mt-3">
+        <Search
+          size={15}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#0AC4E0]"
+        />
+        <input
+          type="text"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder={`Cari ${String(modeLabel || "data").toLowerCase()}...`}
+          className="h-10 w-full rounded-md border border-slate-100 bg-slate-50 pl-9 pr-3 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-300 focus:border-[#0AC4E0] focus:bg-white focus:ring-4 focus:ring-cyan-100"
+        />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-2 xl:grid-cols-2">
+        {visibleOptions.length > 0 ? (
+          visibleOptions.map((item) => {
+            const active = String(item.value) === String(value);
+
+            return (
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => onChange?.(item.value)}
+                className={`min-w-0 rounded-md border px-3 py-2 text-left transition ${active
+                  ? "border-[#0AC4E0] bg-cyan-50 shadow-sm"
+                  : "border-slate-100 bg-white hover:border-cyan-100 hover:bg-cyan-50/40"
+                  }`}
+              >
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <p className="truncate text-[11px] font-black text-slate-800">
+                    {item.title || item.label}
+                  </p>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wide ${active
+                      ? "bg-[#0AC4E0] text-white"
+                      : "bg-slate-100 text-slate-500"
+                      }`}
+                  >
+                    {item.status || "-"}
+                  </span>
+                </div>
+                <p className="mt-1 truncate text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  {item.code || "-"} / {item.category || "-"}
+                </p>
+              </button>
+            );
+          })
+        ) : (
+          <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 xl:col-span-2">
+            Data tidak ditemukan
+          </div>
+        )}
+      </div>
+
+      {filteredOptions.length > VISUAL_ITEM_PAGE_SIZE && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            disabled={page <= 1}
+            className="h-9 rounded-md border border-slate-100 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Prev
+          </button>
+
+          <span className="rounded-full bg-slate-50 px-4 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
+            {page} / {totalPages}
+          </span>
+
+          <button
+            type="button"
+            onClick={() =>
+              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
+            }
+            disabled={page >= totalPages}
+            className="h-9 rounded-md border border-slate-100 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VisualDashboardTile({
+  title,
+  total,
+  helper,
+  children,
+  wide = false,
+}) {
+  return (
+    <article
+      className={`admin-dashboard-visual-tile min-w-0 overflow-visible rounded-[1rem] border border-slate-100 bg-white shadow-[0_14px_32px_rgba(15,23,42,0.045)] ${wide ? "xl:col-span-2" : ""
+        }`}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <div className="min-w-0">
+          <p className="break-words whitespace-normal text-[14px] font-black text-slate-900">
+            {title}
+          </p>
+          {helper && (
+            <p className="mt-1 break-words whitespace-normal text-[10px] font-bold text-slate-400">
+              {helper}
+            </p>
+          )}
+        </div>
+
+        <span className="shrink-0 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+          Total {total || 0}
+        </span>
+      </div>
+
+      <div className="px-4 py-4">{children}</div>
+    </article>
   );
 }
 
@@ -2077,6 +3098,56 @@ function ColumnBarMaster({ data, emptyText, icon, barName = "Total" }) {
           />
           <Tooltip content={<TooltipDiagram />} />
           <Bar dataKey="value" name={barName} radius={[6, 6, 0, 0]} barSize={34}>
+            {data.map((entry, index) => (
+              <Cell
+                key={entry.name}
+                fill={entry.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length]}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartBox>
+  );
+}
+
+function ExecutiveProcessChart({ data, emptyText, icon, barName = "Data" }) {
+  if (!data || data.length === 0) {
+    return <EmptyChart icon={icon} text={emptyText} />;
+  }
+
+  return (
+    <ChartBox height="h-[390px]">
+      <ResponsiveContainer width="100%" height="100%" minHeight={340}>
+        <BarChart
+          data={data}
+          barGap={12}
+          margin={{ top: 20, right: 26, left: -4, bottom: 8 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+          <XAxis
+            dataKey="name"
+            tick={{
+              fill: "#334155",
+              fontSize: 12,
+              fontWeight: 900,
+            }}
+            axisLine={{ stroke: "#CBD5E1" }}
+            tickLine={false}
+            tickFormatter={(value) => potongLabel(value, 18)}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{
+              fill: "#64748B",
+              fontSize: 12,
+              fontWeight: 800,
+            }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip content={<TooltipDiagram />} />
+          <Bar dataKey="value" name={barName} radius={[12, 12, 0, 0]} barSize={58}>
             {data.map((entry, index) => (
               <Cell
                 key={entry.name}
@@ -2312,6 +3383,7 @@ function ChartTableSection({
   filters,
   table,
   hidden = false,
+  withTable = false,
 }) {
   if (hidden) return null;
 
@@ -2323,28 +3395,45 @@ function ChartTableSection({
       className="min-h-[430px]"
       bodyClassName="p-5"
     >
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="rounded-md border border-slate-100 bg-white p-4">
-          <div className="mb-4">
+      <div
+        className={`grid grid-cols-1 gap-5 ${withTable ? "xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : ""
+          }`}
+      >
+        <div className="overflow-hidden rounded-[1.1rem] border border-cyan-100 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-slate-100 px-4 py-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
               {chartTitle}
             </p>
           </div>
 
-          {chart}
-        </div>
+          {filters && (
+            <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+              <p className="mb-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                Filter
+              </p>
+              {filters}
+            </div>
+          )}
 
-        <div className="rounded-md border border-slate-100 bg-white">
-          <div className="border-b border-slate-100 px-4 py-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              {tableTitle}
+          <div className="px-4 py-4">
+            <p className="mb-3 text-[9px] font-black uppercase tracking-widest text-slate-400">
+              Diagram
             </p>
-
-            {filters && <div className="mt-3">{filters}</div>}
+            {chart}
           </div>
-
-          {table}
         </div>
+
+        {withTable && table && (
+          <div className="min-w-0 overflow-hidden rounded-md border border-slate-100 bg-white">
+            <div className="border-b border-slate-100 px-4 py-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {tableTitle}
+              </p>
+            </div>
+
+            {table}
+          </div>
+        )}
       </div>
     </DashboardPanel>
   );
@@ -2619,6 +3708,17 @@ const INDONESIA_BOUNDS = [
   [-11.6, 94.0],
   [6.7, 141.7],
 ];
+const INDONESIA_MAX_BOUNDS = [
+  [-13.0, 92.0],
+  [8.2, 143.5],
+];
+const INDONESIA_GEOJSON_STYLE = {
+  color: "#0AC4E0",
+  weight: 1.25,
+  opacity: 0.82,
+  fillColor: "#0AC4E0",
+  fillOpacity: 0.08,
+};
 
 function isValidIndonesiaCoordinate(latitude, longitude) {
   const lat = angka(latitude);
@@ -3086,8 +4186,6 @@ function MapViewportController({
   const centerKey = JSON.stringify(center || null);
 
   useEffect(() => {
-    let timeoutId;
-
     const applyViewport = () => {
       map.stop();
       map.invalidateSize({ pan: false });
@@ -3111,9 +4209,16 @@ function MapViewportController({
     };
 
     // Memberi waktu container Leaflet menyelesaikan ukuran setelah panel/filter berubah.
-    timeoutId = window.setTimeout(applyViewport, 80);
+    applyViewport();
+    const timeoutIds = [80, 240, 520, 900].map((delay) =>
+      window.setTimeout(applyViewport, delay),
+    );
+    window.addEventListener("resize", applyViewport);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      window.removeEventListener("resize", applyViewport);
+    };
   }, [boundsKey, centerKey, zoom, focusKey, map]);
 
   return null;
@@ -3127,6 +4232,7 @@ function CompactSchoolLeafletMap({
   mapCenter,
   zoom,
   onSelectProvinsi,
+  onSelectKabupaten,
   onResetFilter,
 }) {
   const [mapSearch, setMapSearch] = useState("");
@@ -3136,17 +4242,43 @@ function CompactSchoolLeafletMap({
     useState({});
 
   const normalizedSearch = normalisasiText(mapSearch);
+  const selectedProvinceSource = useMemo(() => {
+    if (!selectedWilayah) return null;
+    if (isProvinsi(selectedWilayah)) return selectedWilayah;
+
+    const parentProvinceName = String(selectedWilayah?._parent_province_name || "").trim();
+    if (parentProvinceName) {
+      return {
+        nama_wilayah: parentProvinceName,
+        jenis_wilayah: "PROVINSI",
+      };
+    }
+
+    return cariProvinsiInduk(selectedWilayah, wilayahMap);
+  }, [selectedWilayah, wilayahMap]);
+
   const selectedProvinceKey = kunciNamaProvinsi(
-    selectedWilayah?.nama_wilayah ||
-    selectedWilayah?.nama ||
+    selectedProvinceSource?.nama_wilayah ||
+    selectedProvinceSource?.nama ||
     "",
   );
+  const selectedKabupatenFilterKey =
+    selectedWilayah && !isProvinsi(selectedWilayah)
+      ? selectedWilayah?._selected_kabupaten_key ||
+      `NAME:${normalisasiUpper(selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "")}`
+      : "";
 
   useEffect(() => {
     setSelectedKabupatenKey("");
     setKabupatenSchoolSearch({});
     setMapSearch("");
   }, [selectedProvinceKey]);
+
+  useEffect(() => {
+    if (selectedKabupatenFilterKey) {
+      setSelectedKabupatenKey(selectedKabupatenFilterKey);
+    }
+  }, [selectedKabupatenFilterKey]);
 
   const filteredProvinceMarkers = useMemo(() => {
     if (!normalizedSearch) return provinceMarkers;
@@ -3265,72 +4397,14 @@ function CompactSchoolLeafletMap({
     )
     : 0;
 
+  const pilihKabupaten = (kabupaten) => {
+    setSelectedKabupatenKey(kabupaten.key);
+    onSelectKabupaten?.(kabupaten);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-              Peta Indonesia Binaan
-            </p>
-
-            <h3 className="mt-1 break-words text-[20px] font-black text-slate-800">
-              {selectedLabel}
-            </h3>
-
-            <p className="mt-1 text-[11px] font-bold leading-5 text-slate-400">
-              {!selectedProvinceData
-                ? "Klik marker merah provinsi untuk menampilkan seluruh kabupaten yang mempunyai sekolah binaan."
-                : "Peta otomatis menyesuaikan batas provinsi. Marker biru mewakili kabupaten yang mempunyai sekolah binaan dan menampilkan detail sekolah saat diklik."}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onResetFilter}
-            className={`inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-4 text-[10px] font-black uppercase tracking-widest transition ${!selectedWilayah
-              ? "border-[#0AC4E0] bg-[#0AC4E0] text-white"
-              : "border-slate-200 bg-white text-slate-500 hover:border-[#0AC4E0] hover:text-[#0AC4E0]"
-              }`}
-          >
-            <MapPin size={14} />
-            Seluruh Indonesia
-          </button>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-100 bg-white p-3">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-              Provinsi Binaan
-            </p>
-            <p className="mt-1 text-[22px] font-black text-slate-800">
-              {selectedProvinceData ? 1 : provinceMarkers.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-100 bg-white p-3">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-              Kabupaten Binaan
-            </p>
-            <p className="mt-1 text-[22px] font-black text-slate-800">
-              {selectedProvinceData?.totalKabupaten ??
-                totalKabupaten}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-100 bg-white p-3">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-              Sekolah Binaan
-            </p>
-            <p className="mt-1 text-[22px] font-black text-slate-800">
-              {selectedProvinceData?.totalSekolah ??
-                totalSchools}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+      <div className="hidden">
         <div className="relative">
           <Search
             size={14}
@@ -3389,9 +4463,7 @@ function CompactSchoolLeafletMap({
                 <button
                   key={kabupaten.key}
                   type="button"
-                  onClick={() =>
-                    setSelectedKabupatenKey(kabupaten.key)
-                  }
+                  onClick={() => pilihKabupaten(kabupaten)}
                   className={`shrink-0 rounded-full border px-4 py-2 text-[10px] font-black uppercase tracking-wide transition ${active
                     ? "border-[#0AC4E0] bg-[#0AC4E0] text-white shadow-sm"
                     : "border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:bg-cyan-50 hover:text-[#0AC4E0]"
@@ -3428,7 +4500,8 @@ function CompactSchoolLeafletMap({
           zoom={zoom}
           minZoom={4}
           maxZoom={14}
-          maxBounds={INDONESIA_BOUNDS}
+          maxBounds={INDONESIA_MAX_BOUNDS}
+          maxBoundsViscosity={1}
           scrollWheelZoom
           className="h-full w-full"
         >
@@ -3447,6 +4520,12 @@ function CompactSchoolLeafletMap({
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          <GeoJSON
+            data={indonesiaGeoJson}
+            style={INDONESIA_GEOJSON_STYLE}
+            interactive={false}
           />
 
           {!selectedProvinceData &&
@@ -3526,9 +4605,9 @@ function CompactSchoolLeafletMap({
                           onClick={() =>
                             onSelectProvinsi(province)
                           }
-                          className="mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
+                          className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
                         >
-                          Fokuskan Provinsi
+                          Lihat Program Wilayah Ini
                         </button>
                       </div>
                     </Popup>
@@ -3576,10 +4655,7 @@ function CompactSchoolLeafletMap({
                       weight: active ? 3 : 2,
                     }}
                     eventHandlers={{
-                      click: () =>
-                        setSelectedKabupatenKey(
-                          kabupaten.key,
-                        ),
+                      click: () => pilihKabupaten(kabupaten),
                     }}
                   />
 
@@ -3591,10 +4667,7 @@ function CompactSchoolLeafletMap({
                       active,
                     )}
                     eventHandlers={{
-                      click: () =>
-                        setSelectedKabupatenKey(
-                          kabupaten.key,
-                        ),
+                      click: () => pilihKabupaten(kabupaten),
                     }}
                   >
                     <Popup minWidth={285} maxWidth={320}>
@@ -3683,6 +4756,14 @@ function CompactSchoolLeafletMap({
                           </p>
                         )}
 
+                        <button
+                          type="button"
+                          onClick={() => pilihKabupaten(kabupaten)}
+                          className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
+                        >
+                          Lihat Program Wilayah Ini
+                        </button>
+
                         {kabupaten.coordinateSource !==
                           "database" && (
                             <p className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-[8px] font-bold leading-4 text-amber-600">
@@ -3703,15 +4784,25 @@ function CompactSchoolLeafletMap({
           {!selectedProvinceData ? (
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-600">
               <span className="h-3 w-3 rounded-full bg-red-500" />
-              Provinsi Binaan
+              Pilih Provinsi
             </div>
           ) : (
             <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-slate-600">
               <span className="h-3 w-3 rounded-full bg-cyan-500" />
-              Kabupaten Binaan
+              Pilih Kabupaten
             </div>
           )}
         </div>
+
+        {selectedProvinceData && (
+          <button
+            type="button"
+            onClick={onResetFilter}
+            className="absolute right-4 top-4 z-[500] inline-flex h-9 items-center justify-center rounded-xl border border-white/70 bg-white/90 px-4 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0] shadow-sm backdrop-blur transition hover:bg-cyan-50"
+          >
+            Seluruh Indonesia
+          </button>
+        )}
 
         {!selectedProvinceData &&
           provinceMarkers.length === 0 && (
@@ -3761,10 +4852,15 @@ export default function DashboardAdmin() {
   const [schools, setSchools] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [programs, setPrograms] = useState([]);
+  const [assessments, setAssessments] = useState([]);
   const [agendas, setAgendas] = useState([]);
 
   const [activeFilter, setActiveFilter] = useState("SEMUA");
   const [searchValue, setSearchValue] = useState("");
+  const [visualFilterOpen, setVisualFilterOpen] = useState(false);
+  const [visualMode, setVisualMode] = useState("assessment");
+  const [selectedAssessmentVisualId, setSelectedAssessmentVisualId] = useState("");
+  const [selectedProgramVisualId, setSelectedProgramVisualId] = useState("");
 
   const [roleExplorerFilter, setRoleExplorerFilter] = useState("SEMUA");
   const [hoFilter, setHoFilter] = useState("SEMUA");
@@ -3810,6 +4906,9 @@ export default function DashboardAdmin() {
         programData,
         programAkademikData,
         programNonAkademikData,
+        assessmentData,
+        assessmentAkademikData,
+        assessmentNonAkademikData,
         agendaData,
       ] = await Promise.all([
         ambilDataDenganFallback(["/users"], headers),
@@ -3841,6 +4940,21 @@ export default function DashboardAdmin() {
           "/program?kategori=non-akademik",
           "/program?kategori=non akademik",
         ], headers),
+        ambilDataDenganFallback(["/assessment"], headers),
+        ambilDataDenganFallback([
+          "/assessment?jenis=AKADEMIK",
+          "/assessment?jenis=akademik",
+          "/assessment?pilar=AKADEMIK",
+          "/assessment?pilar=akademik",
+        ], headers),
+        ambilDataDenganFallback([
+          "/assessment?jenis=NON_AKADEMIK",
+          "/assessment?jenis=non-akademik",
+          "/assessment?jenis=non akademik",
+          "/assessment?pilar=NON_AKADEMIK",
+          "/assessment?pilar=non-akademik",
+          "/assessment?pilar=non akademik",
+        ], headers),
         ambilDataDenganFallback(["/admin-agenda"], headers),
       ]);
 
@@ -3860,11 +4974,18 @@ export default function DashboardAdmin() {
         programNonAkademikData,
       );
 
+      const mergedAssessments = mergeAssessmentsWithCategoryHints(
+        assessmentData,
+        assessmentAkademikData,
+        assessmentNonAkademikData,
+      );
+
       setUsers(mergedUsers);
       setWilayah(wilayahData);
       setSchools(schoolData);
       setVendors(mergedVendors);
       setPrograms(mergedPrograms);
+      setAssessments(mergedAssessments);
       setAgendas(agendaData);
     } catch (error) {
       console.error("Dashboard Admin Error:", error);
@@ -3873,6 +4994,7 @@ export default function DashboardAdmin() {
       setSchools([]);
       setVendors([]);
       setPrograms([]);
+      setAssessments([]);
       setAgendas([]);
     } finally {
       setLoading(false);
@@ -3903,15 +5025,14 @@ export default function DashboardAdmin() {
   };
 
   const visibleSectionCount = [
-    sectionMatches("Komposisi Akun Sistem per Role", "akun sistem", "role", "user"),
-    sectionMatches("Data Head Office", "head office", "ho", "akademik", "non akademik"),
-    sectionMatches("Data Area Officer", "area officer", "ao", "wilayah penugasan"),
-    sectionMatches("Data Kepala Dinas", "kepala dinas", "kadin", "dinas", "wilayah"),
-    sectionMatches("Eksplorasi Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi"),
-    sectionMatches("Coverage Kabupaten Binaan per Provinsi", "coverage", "kabupaten", "provinsi", "wilayah binaan"),
+    sectionMatches("Komposisi Akun", "akun sistem", "role", "user"),
+    sectionMatches("Head Office", "head office", "ho", "akademik", "non akademik"),
+    sectionMatches("Area Officer", "area officer", "ao", "wilayah penugasan"),
+    sectionMatches("Kepala Dinas", "kepala dinas", "kadin", "dinas", "wilayah"),
     sectionMatches("Data Vendor", "vendor", "akademik", "non akademik"),
-    sectionMatches("Coverage Operator Sekolah", "operator sekolah", "operator", "sekolah"),
-    sectionMatches("Data User Terbaru", "user terbaru", "akun", "role"),
+    sectionMatches("Binaan Sekolah", "sekolah", "jenjang", "wilayah"),
+    sectionMatches("Data User", "user terbaru", "akun", "role"),
+    sectionMatches("Peta Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi"),
   ].filter(Boolean).length;
 
   const wilayahMap = useMemo(() => buatWilayahMap(wilayah), [wilayah]);
@@ -3999,6 +5120,54 @@ export default function DashboardAdmin() {
       );
   }, [vendorsWithCategory, activeFilter, keyword]);
 
+  const filteredPrograms = useMemo(() => {
+    return programs
+      .filter((item) => sesuaiFilterStatus(item, activeFilter))
+      .filter((item) =>
+        itemMasukWilayahTerpilih(item, selectedWilayah, allSchoolsWithMap, wilayahMap),
+      )
+      .filter((item) =>
+        cocokSearch(item, keyword, [
+          "nama_program",
+          "nama",
+          "kode_program",
+          "nomor_mou",
+          "tahun",
+          "jenis_program",
+          "kategori",
+          "kategori_program",
+          "pilar_program",
+          "status",
+          "status_program",
+          ambilKategoriProgram,
+          ambilStatusProgram,
+        ]),
+      );
+  }, [programs, activeFilter, selectedWilayah, allSchoolsWithMap, wilayahMap, keyword]);
+
+  const filteredAssessments = useMemo(() => {
+    return assessments
+      .filter((item) => sesuaiFilterStatus(item, activeFilter))
+      .filter((item) =>
+        itemMasukWilayahTerpilih(item, selectedWilayah, allSchoolsWithMap, wilayahMap),
+      )
+      .filter((item) =>
+        cocokSearch(item, keyword, [
+          "nama_assessment",
+          "nama",
+          "jenis",
+          "pilar",
+          "status",
+          "status_assessment",
+          "nama_ho",
+          "nama_sekolah",
+          "daftar_sekolah",
+          ambilKategoriAssessment,
+          ambilStatusAssessment,
+        ]),
+      );
+  }, [assessments, activeFilter, selectedWilayah, allSchoolsWithMap, wilayahMap, keyword]);
+
   const filteredAgendas = useMemo(() => {
     return agendas.filter((item) =>
       cocokSearch(item, keyword, [
@@ -4030,6 +5199,23 @@ export default function DashboardAdmin() {
 
   const kepalaDinas = useMemo(
     () => filteredUsers.filter((item) => ambilIdRole(item) === 7),
+    [filteredUsers],
+  );
+
+  const guruAssessment = useMemo(
+    () => filteredUsers.filter((item) => ambilIdRole(item) === 8),
+    [filteredUsers],
+  );
+
+  const kepalaSekolah = useMemo(
+    () =>
+      filteredUsers.filter((item) => {
+        const roleId = ambilIdRole(item);
+        const role = normalisasiText(ambilNamaRole(item));
+        const jabatan = normalisasiText(ambilJabatan(item));
+
+        return roleId === 10 || role.includes("kepala sekolah") || jabatan.includes("kepala sekolah");
+      }),
     [filteredUsers],
   );
 
@@ -4086,7 +5272,7 @@ export default function DashboardAdmin() {
   }, [filteredUsers, roleExplorerFilter]);
 
   const roleExplorerChart = useMemo(() => {
-    const roleYangDitampilkan = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const roleYangDitampilkan = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
     return roleYangDitampilkan
       .map((idRole) => ({
@@ -4206,6 +5392,217 @@ export default function DashboardAdmin() {
       });
   }, [filteredUsers, userTableRoleFilter]);
 
+  const userLatestChartData = useMemo(() => {
+    return warnaDataKonsisten(
+      kelompokkanData(userTableData, (user) => ambilNamaRole(user)),
+    );
+  }, [userTableData]);
+
+  const assessmentProcessChartData = useMemo(() => {
+    return warnaDataStatus(
+      kelompokkanData(filteredAssessments, ambilStatusAssessment),
+    );
+  }, [filteredAssessments]);
+
+  const programProcessChartData = useMemo(() => {
+    return warnaDataStatus(
+      kelompokkanData(filteredPrograms, ambilStatusProgram),
+    );
+  }, [filteredPrograms]);
+
+  useEffect(() => {
+    const source = visualMode === "assessment" ? filteredAssessments : filteredPrograms;
+    const getIdentity = visualMode === "assessment" ? ambilIdentityAssessment : ambilIdentityProgram;
+    const currentId = visualMode === "assessment" ? selectedAssessmentVisualId : selectedProgramVisualId;
+    const setCurrentId = visualMode === "assessment" ? setSelectedAssessmentVisualId : setSelectedProgramVisualId;
+
+    if (!source.length) {
+      setCurrentId(VISUAL_ALL_VALUE);
+      return;
+    }
+
+    const ids = new Set(source.map((item) => getIdentity(item)));
+    if (!currentId || (currentId !== VISUAL_ALL_VALUE && !ids.has(String(currentId)))) {
+      setCurrentId(VISUAL_ALL_VALUE);
+    }
+  }, [
+    visualMode,
+    filteredAssessments,
+    filteredPrograms,
+    selectedAssessmentVisualId,
+    selectedProgramVisualId,
+  ]);
+
+  const visualItemOptions = useMemo(() => {
+    const isAssessment = visualMode === "assessment";
+    const source = isAssessment ? filteredAssessments : filteredPrograms;
+    const getIdentity = isAssessment ? ambilIdentityAssessment : ambilIdentityProgram;
+    const getName = isAssessment ? ambilNamaAssessment : ambilNamaProgram;
+    const getStatus = isAssessment ? ambilStatusAssessment : ambilStatusProgram;
+
+    const aggregateOption = {
+      value: VISUAL_ALL_VALUE,
+      title: `Semua ${isAssessment ? "Assessment" : "Program"}`,
+      code: selectedWilayah
+        ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "Wilayah Terpilih"
+        : "Semua Wilayah",
+      status: "Semua",
+      category: `${source.length} data`,
+      label: `00 - Semua ${isAssessment ? "Assessment" : "Program"} - ${source.length} data`,
+    };
+
+    return [aggregateOption, ...source.map((item, index) => {
+      const title = getName(item);
+      const status = getStatus(item);
+      const code = ambilKodeVisualItem(item, visualMode);
+      const category = isAssessment
+        ? tampilVendorCategory(ambilKategoriAssessment(item))
+        : tampilVendorCategory(ambilKategoriProgram(item));
+
+      return {
+        value: getIdentity(item),
+        title,
+        code,
+        status,
+        category,
+      label: `${String(index + 1).padStart(2, "0")} · ${potongLabel(getName(item), 54)} · ${getStatus(item)}`,
+      };
+    })];
+  }, [visualMode, filteredAssessments, filteredPrograms, selectedWilayah]);
+
+  const selectedVisualItemId =
+    (visualMode === "assessment" ? selectedAssessmentVisualId : selectedProgramVisualId) || VISUAL_ALL_VALUE;
+
+  const selectedVisualOption = useMemo(
+    () =>
+      visualItemOptions.find(
+        (item) => String(item.value) === String(selectedVisualItemId),
+      ),
+    [visualItemOptions, selectedVisualItemId],
+  );
+
+  const selectedVisualItem = useMemo(() => {
+    if (selectedVisualItemId === VISUAL_ALL_VALUE) return null;
+
+    const isAssessment = visualMode === "assessment";
+    const source = isAssessment ? filteredAssessments : filteredPrograms;
+    const getIdentity = isAssessment ? ambilIdentityAssessment : ambilIdentityProgram;
+
+    return source.find((item) => getIdentity(item) === selectedVisualItemId) || null;
+  }, [visualMode, filteredAssessments, filteredPrograms, selectedVisualItemId]);
+
+  const visualProcess = useMemo(() => {
+    const isAssessment = visualMode === "assessment";
+    const data = isAssessment ? filteredAssessments : filteredPrograms;
+    const isAggregate = selectedVisualItemId === VISUAL_ALL_VALUE || !selectedVisualItem;
+    const scopeName = selectedWilayah
+      ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "Wilayah Terpilih"
+      : "Semua Wilayah";
+    const status = selectedVisualItem
+      ? isAssessment
+        ? ambilStatusAssessment(selectedVisualItem)
+        : ambilStatusProgram(selectedVisualItem)
+      : "Semua Data";
+    const category = selectedVisualItem
+      ? isAssessment
+        ? tampilVendorCategory(ambilKategoriAssessment(selectedVisualItem))
+        : tampilVendorCategory(ambilKategoriProgram(selectedVisualItem))
+      : `${data.length} data`;
+    const selectedTitle = selectedVisualItem
+      ? isAssessment
+        ? ambilNamaAssessment(selectedVisualItem)
+        : ambilNamaProgram(selectedVisualItem)
+      : `Semua ${isAssessment ? "Assessment" : "Program"}`;
+    const selectedCode = selectedVisualItem
+      ? ambilKodeVisualItem(selectedVisualItem, visualMode)
+      : scopeName;
+    const participantGroups = isAggregate
+      ? buildVisualAggregateInvolvement({
+        mode: visualMode,
+        items: data,
+        schools: filteredSchools,
+        vendors: filteredVendors,
+        headOffice,
+        areaOfficer,
+        guruAssessment,
+        operatorSekolah,
+        kepalaSekolah,
+        wilayahMap,
+      })
+      : buildVisualItemInvolvement({
+        mode: visualMode,
+        item: selectedVisualItem,
+        schools: filteredSchools,
+        vendors: filteredVendors,
+        headOffice,
+        areaOfficer,
+        guruAssessment,
+        operatorSekolah,
+        kepalaSekolah,
+        wilayahMap,
+      });
+    const chartData = participantGroups
+      .filter((group) => group.value > 0)
+      .map((group) => ({
+        name: group.label,
+        value: group.value,
+        color: group.color,
+      }));
+    const totalInvolved = participantGroups.reduce((total, group) => total + group.value, 0);
+    const dominant = chartData[0];
+
+    return {
+      key: visualMode,
+      label: isAssessment ? "Assessment" : "Program",
+      total: data.length,
+      selectedTitle,
+      selectedCode,
+      status,
+      category,
+      totalInvolved,
+      chartData,
+      dominantLabel: dominant?.name || "Belum Ada",
+      dominantValue: dominant?.value || 0,
+      participantGroups,
+      emptyText: data.length
+        ? "Relasi stakeholder pada data ini belum terbaca"
+        : isAssessment
+          ? "Belum ada data assessment"
+          : "Belum ada data program",
+      barName: isAssessment ? "Stakeholder Assessment" : "Stakeholder Program",
+    };
+  }, [
+    visualMode,
+    filteredAssessments,
+    filteredPrograms,
+    selectedVisualItemId,
+    selectedVisualItem,
+    selectedWilayah,
+    filteredSchools,
+    headOffice,
+    areaOfficer,
+    guruAssessment,
+    operatorSekolah,
+    kepalaSekolah,
+    filteredVendors,
+    wilayahMap,
+  ]);
+
+  const operatorCoverageChartData = useMemo(() => {
+    return [
+      {
+        name: "Sudah Ada Operator",
+        value: sekolahDenganOperator.length,
+        color: WARNA.hijau,
+      },
+      {
+        name: "Belum Ada Operator",
+        value: sekolahBelumOperator.length,
+        color: WARNA.amber,
+      },
+    ].filter((item) => item.value > 0);
+  }, [sekolahDenganOperator, sekolahBelumOperator]);
+
   const schoolExplorerList = useMemo(() => {
     return filteredSchools.filter((sekolah) =>
       isSekolahMasukWilayah(sekolah, selectedWilayah, wilayahMap),
@@ -4270,6 +5667,8 @@ export default function DashboardAdmin() {
       operator: operatorSekolah.length,
       vendor: filteredVendors.length,
       kadin: kepalaDinas.length,
+      assessment: filteredAssessments.length,
+      program: filteredPrograms.length,
       agenda: filteredAgendas.length,
       totalUser: filteredUsers.length,
     };
@@ -4282,6 +5681,8 @@ export default function DashboardAdmin() {
     operatorSekolah,
     filteredVendors,
     kepalaDinas,
+    filteredAssessments,
+    filteredPrograms,
     filteredAgendas,
     filteredUsers,
   ]);
@@ -4302,6 +5703,26 @@ export default function DashboardAdmin() {
     setSelectedWilayah(selectedProvince);
     setMapCenter([province.latitude, province.longitude]);
     setZoom(PROVINCE_ZOOM);
+    setCurrentPage(1);
+  };
+
+  const selectKabupaten = (kabupaten) => {
+    if (!kabupaten) return;
+
+    const selectedKabupaten = {
+      ...(kabupaten?.wilayah || {}),
+      nama_wilayah: kabupaten?.name,
+      jenis_wilayah: "KABUPATEN/KOTA",
+      latitude: kabupaten?.latitude,
+      longitude: kabupaten?.longitude,
+      _parent_province_name: kabupaten?.provinceName,
+      _selected_kabupaten_key: kabupaten?.key,
+      _focus_nonce: Date.now(),
+    };
+
+    setSelectedWilayah(selectedKabupaten);
+    setMapCenter([kabupaten.latitude, kabupaten.longitude]);
+    setZoom(KABUPATEN_ZOOM);
     setCurrentPage(1);
   };
 
@@ -4503,6 +5924,22 @@ export default function DashboardAdmin() {
           color: #ffffff;
         }
 
+        .admin-map-action-pulse {
+          animation: adminMapActionPulse 1.45s ease-in-out infinite;
+        }
+
+        @keyframes adminMapActionPulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(10, 196, 224, 0.28);
+            transform: translateY(0);
+          }
+
+          50% {
+            box-shadow: 0 0 0 7px rgba(10, 196, 224, 0);
+            transform: translateY(-1px);
+          }
+        }
+
         .admin-compact-map .leaflet-container {
           height: 220px !important;
           min-height: 220px !important;
@@ -4579,14 +6016,6 @@ export default function DashboardAdmin() {
                 </div>
               </header>
 
-              <div className="border-b border-slate-100 px-6 py-4">
-                <FilterButtonGroup
-                  options={STATUS_FILTERS}
-                  value={activeFilter}
-                  onChange={setActiveFilter}
-                />
-              </div>
-
               <section className="grid grid-cols-1 border-b border-slate-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 <KartuAngka
                   active
@@ -4623,6 +6052,20 @@ export default function DashboardAdmin() {
                   value={ringkasan.sekolah}
                   helper="Sekolah terdaftar"
                   icon={<School size={18} />}
+                />
+                <KartuAngka
+                  color={WARNA.biru}
+                  label="Assessment"
+                  value={ringkasan.assessment}
+                  helper="Data assessment"
+                  icon={<ClipboardList size={18} />}
+                />
+                <KartuAngka
+                  color={WARNA.cyan}
+                  label="Program"
+                  value={ringkasan.program}
+                  helper="Data program"
+                  icon={<LayoutDashboard size={18} />}
                 />
                 <KartuAngka
                   color={ROLE_COLOR[9]}
@@ -4678,292 +6121,12 @@ export default function DashboardAdmin() {
               </DashboardPanel>
             )}
 
-            <ChartTableSection
-              hidden={!sectionMatches("Komposisi Akun Sistem per Role", "akun sistem", "role", "user")}
-              title="Komposisi Akun Sistem per Role"
-              subtitle="Chart kiri dan tabel kanan saling terhubung lewat filter role."
-              icon={<UsersRound size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Chart Role"
-              tableTitle="List User Role"
-              filters={
-                <FilterButtonGroup
-                  options={ROLE_FILTERS}
-                  value={roleExplorerFilter}
-                  onChange={setRoleExplorerFilter}
-                  dark
-                />
-              }
-              chart={
-                <ColumnBarMaster
-                  data={roleExplorerChart}
-                  emptyText="Belum ada data role"
-                  icon={<UsersRound size={24} />}
-                  barName="User"
-                />
-              }
-              table={
-                <TableMini
-                  data={roleExplorerUsers}
-                  getSearchText={(user) =>
-                    `${ambilNamaUser(user)} ${user?.email || ""} ${ambilNamaRole(user)} ${statusLabel(user)}`
-                  }
-                  searchPlaceholder="Cari nama, email, role, atau status..."
-                  emptyText="Belum ada user pada role ini"
-                  columns={[
-                    {
-                      key: "user",
-                      label: "User",
-                      render: (user) => (
-                        <div>
-                          <p className="max-w-[260px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaUser(user)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilEmail(user)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "role",
-                      label: "Role",
-                      render: (user) => {
-                        const idRole = ambilIdRole(user);
-                        return (
-                          <span
-                            className="inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white"
-                            style={{
-                              backgroundColor:
-                                ROLE_COLOR[idRole] || WARNA.slate,
-                            }}
-                          >
-                            {ambilNamaRole(user)}
-                          </span>
-                        );
-                      },
-                    },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (user) => <StatusPill status={statusLabel(user)} />,
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden={!sectionMatches("Data Head Office", "head office", "ho", "akademik", "non akademik")}
-              title="Data Head Office"
-              subtitle="Filter jenis HO di kanan akan ikut mengubah chart di kiri."
-              icon={<Building2 size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Komposisi HO"
-              tableTitle="List Head Office"
-              filters={
-                <FilterButtonGroup
-                  options={HO_FILTERS}
-                  value={hoFilter}
-                  onChange={setHoFilter}
-                  dark
-                />
-              }
-              chart={
-                <PieWithLegend
-                  data={hoChartData}
-                  emptyText="Belum ada data Head Office"
-                  icon={<Building2 size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={hoTableData}
-                  getSearchText={(user) =>
-                    `${ambilNamaUser(user)} ${user?.email || ""} ${tampilHOCategory(getHOCategory(user))} ${statusLabel(user)}`
-                  }
-                  searchPlaceholder="Cari nama, email, jenis HO, atau status..."
-                  emptyText="Belum ada Head Office sesuai filter"
-                  columns={[
-                    {
-                      key: "nama",
-                      label: "Nama",
-                      render: (user) => (
-                        <div>
-                          <p className="max-w-[250px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaUser(user)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilEmail(user)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "jenis",
-                      label: "Jenis",
-                      render: (user) => (
-                        <p className="max-w-[160px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {tampilHOCategory(getHOCategory(user))}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (user) => <StatusPill status={statusLabel(user)} />,
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden={!sectionMatches("Data Area Officer", "area officer", "ao", "wilayah penugasan")}
-              title="Data Area Officer"
-              subtitle="Fokus pada kelengkapan pemetaan wilayah AO."
-              icon={<UserCog size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Distribusi AO per Area Binaan"
-              tableTitle="List Area Officer"
-              filters={
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                  <FilterButtonGroup
-                    options={ASSIGNMENT_FILTERS}
-                    value={aoFilter}
-                    onChange={setAoFilter}
-                    dark
-                  />
-                  <label className="flex min-w-[220px] flex-col gap-1">
-                    <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      Area Binaan
-                    </span>
-                    <Dropdown
-                      value={aoAreaFilter}
-                      items={aoAreaOptions}
-                      onChange={setAoAreaFilter}
-                      placeholder="Semua Area Binaan"
-                      width="w-full"
-                    />
-                  </label>
-                </div>
-              }
-              chart={
-                <PieWithLegend
-                  data={aoChartData}
-                  emptyText="Belum ada Area Officer"
-                  icon={<UserCog size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={aoTableData}
-                  getSearchText={(user) =>
-                    `${ambilNamaUser(user)} ${user?.email || ""} ${resolveNamaWilayahUser(user, wilayahMap)} ${resolveAreaBinaanUser(user, wilayahMap)} ${statusLabel(user)}`
-                  }
-                  searchPlaceholder="Cari nama, email, wilayah, area, atau status..."
-                  emptyText="Belum ada AO sesuai filter"
-                  columns={[
-                    {
-                      key: "nama",
-                      label: "Nama",
-                      render: (user) => (
-                        <div>
-                          <p className="max-w-[180px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaUser(user)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilEmail(user)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "area",
-                      label: "Area",
-                      render: (user) => (
-                        <p className="max-w-[120px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {resolveAreaBinaanUser(user, wilayahMap)}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "wilayah",
-                      label: "Wilayah",
-                      render: (user) => (
-                        <p className="max-w-[140px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {resolveNamaWilayahUser(user, wilayahMap)}
-                        </p>
-                      ),
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden={!sectionMatches("Data Kepala Dinas", "kepala dinas", "kadin", "dinas", "wilayah")}
-              title="Data Kepala Dinas"
-              subtitle="Fokus pada kelengkapan pemetaan wilayah Kepala Dinas."
-              icon={<Landmark size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Status Pemetaan Kadin"
-              tableTitle="List Kepala Dinas"
-              filters={
-                <FilterButtonGroup
-                  options={ASSIGNMENT_FILTERS}
-                  value={kadinFilter}
-                  onChange={setKadinFilter}
-                  dark
-                />
-              }
-              chart={
-                <PieWithLegend
-                  data={kadinChartData}
-                  emptyText="Belum ada Kepala Dinas"
-                  icon={<Landmark size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={kadinTableData}
-                  getSearchText={(user) =>
-                    `${ambilNamaUser(user)} ${user?.email || ""} ${resolveNamaWilayahUser(user, wilayahMap)} ${statusLabel(user)}`
-                  }
-                  searchPlaceholder="Cari nama, email, wilayah, atau status..."
-                  emptyText="Belum ada Kepala Dinas sesuai filter"
-                  columns={[
-                    {
-                      key: "nama",
-                      label: "Nama",
-                      render: (user) => (
-                        <div>
-                          <p className="max-w-[180px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaUser(user)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilEmail(user)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "wilayah",
-                      label: "Wilayah",
-                      render: (user) => (
-                        <p className="max-w-[140px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {resolveNamaWilayahUser(user, wilayahMap)}
-                        </p>
-                      ),
-                    },
-                  ]}
-                />
-              }
-            />
-
             <DashboardPanel
-              hidden={!sectionMatches("Eksplorasi Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi")}
-              title="Eksplorasi Sekolah Binaan"
-              subtitle="Satu peta Indonesia dengan marker provinsi. Setelah difokuskan, peta menampilkan marker kabupaten beserta sekolah binaannya."
+              hidden={!sectionMatches("Peta Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi")}
+              title="Peta Sekolah Binaan"
               right={<MapPin size={18} className="text-[#0AC4E0]" />}
-              className="min-h-[660px]"
-              bodyClassName="p-5"
+              className="min-h-[580px]"
+              bodyClassName="p-4"
             >
               <CompactSchoolLeafletMap
                 schools={schoolExplorerList}
@@ -4973,11 +6136,222 @@ export default function DashboardAdmin() {
                 mapCenter={mapCenter}
                 zoom={zoom}
                 onSelectProvinsi={selectProvinsi}
+                onSelectKabupaten={selectKabupaten}
                 onResetFilter={resetFilterMap}
               />
             </DashboardPanel>
 
+            <DashboardPanel
+              hidden={visibleSectionCount === 0}
+              title="Visualisasi Data"
+              right={<LayoutDashboard size={18} className="text-[#0AC4E0]" />}
+              className="admin-dashboard-visual-panel"
+              bodyClassName="p-0"
+            >
+              <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
+                    Drill Down Visual
+                  </p>
+                  <h2 className="mt-1 text-[20px] font-black text-slate-900">
+                    {visualProcess.label}
+                  </h2>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                    {[
+                      { label: "Assessment", value: "assessment" },
+                      { label: "Program", value: "program" },
+                    ].map((item) => {
+                      const active = visualMode === item.value;
+
+                      return (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => {
+                            setVisualMode(item.value);
+                            setVisualFilterOpen(false);
+                          }}
+                          className={`inline-flex h-9 items-center justify-center rounded-md px-4 text-[10px] font-black uppercase tracking-wide transition ${active
+                            ? "bg-[#0AC4E0] text-white shadow-sm"
+                            : "text-slate-500 hover:bg-white hover:text-[#0AC4E0]"
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="min-w-0 rounded-md border border-slate-100 bg-slate-50 px-4 py-2 sm:w-[420px]">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                      Data Aktif
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] font-black text-slate-700">
+                      {selectedVisualOption?.title ||
+                        selectedVisualOption?.label ||
+                        `Pilih ${visualProcess.label}`}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setVisualFilterOpen((value) => !value)}
+                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-cyan-100 bg-cyan-50 px-4 text-[10px] font-black uppercase tracking-wide text-[#0AC4E0] transition hover:border-[#0AC4E0] hover:bg-white"
+                  >
+                    <LayoutDashboard size={14} />
+                    {visualFilterOpen ? "Tutup" : "Pilih Data"}
+                  </button>
+                </div>
+              </div>
+
+              {visualFilterOpen && (
+                <div className="border-b border-slate-100 bg-slate-50/70 p-5">
+                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                    <VisualItemChooser
+                      key={visualMode}
+                      modeLabel={visualProcess.label}
+                      options={visualItemOptions}
+                      value={selectedVisualItemId}
+                      onChange={(value) => {
+                        if (visualMode === "assessment") {
+                          setSelectedAssessmentVisualId(value);
+                          return;
+                        }
+
+                        setSelectedProgramVisualId(value);
+                      }}
+                    />
+
+                    <VisualFilterField label="Status Data">
+                      <FilterButtonGroup
+                        options={STATUS_FILTERS}
+                        value={activeFilter}
+                        onChange={setActiveFilter}
+                        dark
+                      />
+                    </VisualFilterField>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_390px]">
+                <div className="min-w-0 rounded-[1rem] border border-cyan-100 bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.045)]">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                        Komposisi Keterlibatan
+                      </p>
+                      <h3 className="mt-1 break-words text-[20px] font-black leading-tight text-slate-900">
+                        {visualProcess.selectedTitle}
+                      </h3>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0]">
+                          {visualProcess.selectedCode}
+                        </span>
+                        <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500">
+                          {visualProcess.category}
+                        </span>
+                        <span
+                          className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-wide text-white"
+                          style={{ backgroundColor: warnaStatusVisual(visualProcess.status) || WARNA.cyan }}
+                        >
+                          {visualProcess.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-md border border-cyan-100 bg-cyan-50 px-4 py-3 text-right">
+                      <p className="text-[10px] font-black uppercase tracking-wide text-[#0AC4E0]">
+                        Total Terlibat
+                      </p>
+                      <p className="mt-1 text-[28px] font-black leading-none text-slate-900">
+                        {visualProcess.totalInvolved}
+                      </p>
+                    </div>
+                  </div>
+
+                  <PieWithLegend
+                    data={visualProcess.chartData}
+                    emptyText={visualProcess.emptyText}
+                    icon={<UsersRound size={24} />}
+                  />
+                </div>
+
+                <aside className="min-w-0 rounded-[1rem] border border-slate-100 bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.045)]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                    Siapa Saja yang Terlibat
+                  </p>
+                  <h3 className="mt-1 break-words text-[18px] font-black text-slate-900">
+                    {potongLabel(visualProcess.selectedTitle, 42)}
+                  </h3>
+
+                  <div className="mt-5 max-h-[390px] space-y-3 overflow-y-auto pr-1">
+                    {visualProcess.participantGroups.map((role) => (
+                      <div
+                        key={role.label}
+                        className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span
+                              className="h-3 w-3 shrink-0 rounded-full"
+                              style={{ backgroundColor: role.color || WARNA.cyan }}
+                            />
+                            <p className="break-words whitespace-normal text-[12px] font-black text-slate-700">
+                              {role.label}
+                            </p>
+                          </div>
+                          <p className="shrink-0 text-[20px] font-black text-slate-900">
+                            {role.value}
+                          </p>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {role.names.length > 0 ? (
+                            role.names.slice(0, 8).map((name) => (
+                              <span
+                                key={`${role.label}-${name}`}
+                                className="max-w-full break-words rounded-full border border-white bg-white px-3 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500 shadow-sm"
+                              >
+                                {potongLabel(name, 32)}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="rounded-full border border-dashed border-slate-200 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                              Belum terbaca
+                            </span>
+                          )}
+
+                          {role.names.length > 8 && (
+                            <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0]">
+                              +{role.names.length - 8} lainnya
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-5 rounded-md border border-cyan-100 bg-cyan-50 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-[#0AC4E0]">
+                      Data Terfilter
+                    </p>
+                    <p className="mt-2 text-[36px] font-black leading-none text-slate-900">
+                      {visualProcess.total}
+                    </p>
+                    <p className="mt-2 text-[11px] font-bold text-slate-500">
+                      Pilihan item mengikuti mode, pencarian, dan filter aktif.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+            </DashboardPanel>
+
             <ChartTableSection
+              hidden
               title="Detail Sekolah Binaan Terpilih"
               subtitle="Chart kiri dan tabel kanan mengikuti pilihan wilayah pada peta."
               icon={<School size={18} className="text-[#0AC4E0]" />}
@@ -5042,12 +6416,13 @@ export default function DashboardAdmin() {
             />
 
             <ChartTableSection
-              hidden={!sectionMatches("Coverage Kabupaten Binaan per Provinsi", "coverage", "kabupaten", "provinsi", "wilayah binaan")}
+              hidden
               title="Coverage Kabupaten Binaan per Provinsi"
               subtitle="Chart kiri menunjukkan jumlah kabupaten binaan; tabel kanan menunjukkan detail provinsi dan sekolah."
               icon={<MapPin size={18} className="text-[#0AC4E0]" />}
               chartTitle="Kabupaten Binaan"
               tableTitle="Detail Provinsi Binaan"
+              withTable
               chart={
                 <ColumnBarMaster
                   data={diagramWilayahCoverageProvinsi}
@@ -5104,7 +6479,7 @@ export default function DashboardAdmin() {
             />
 
             <ChartTableSection
-              hidden={!sectionMatches("Data Vendor", "vendor", "akademik", "non akademik")}
+              hidden
               title="Data Vendor"
               subtitle="Filter kategori vendor di kanan akan ikut mengubah chart di kiri."
               icon={<Factory size={18} className="text-[#0AC4E0]" />}
@@ -5170,12 +6545,13 @@ export default function DashboardAdmin() {
             />
 
             <ChartTableSection
-              hidden={!sectionMatches("Coverage Operator Sekolah", "operator sekolah", "operator", "sekolah")}
+              hidden
               title="Coverage Operator Sekolah"
               subtitle="Kiri menampilkan coverage, kanan menampilkan daftar sekolah berdasarkan filter."
               icon={<GraduationCap size={18} className="text-[#0AC4E0]" />}
               chartTitle="Coverage Operator"
               tableTitle="List Sekolah"
+              withTable
               filters={
                 <FilterButtonGroup
                   options={OPERATOR_FILTERS}
@@ -5185,10 +6561,10 @@ export default function DashboardAdmin() {
                 />
               }
               chart={
-                <OperatorCoverageCard
-                  totalSekolah={filteredSchools.length}
-                  sudah={sekolahDenganOperator.length}
-                  belum={sekolahBelumOperator.length}
+                <PieWithLegend
+                  data={operatorCoverageChartData}
+                  emptyText="Belum ada coverage operator"
+                  icon={<GraduationCap size={24} />}
                 />
               }
               table={
@@ -5244,7 +6620,7 @@ export default function DashboardAdmin() {
             />
 
             <DashboardPanel
-              hidden={!sectionMatches("Data User Terbaru", "user terbaru", "akun", "role")}
+              hidden
               title="Data User Terbaru"
               subtitle="Tabel akun sistem terbaru. Gunakan filter role untuk melihat data spesifik."
               className="min-h-[330px]"
@@ -5325,6 +6701,26 @@ export default function DashboardAdmin() {
                     render: (user) => <StatusPill status={statusLabel(user)} />,
                   },
                 ]}
+              />
+            </DashboardPanel>
+
+            <DashboardPanel
+              hidden
+              title="Peta Sekolah Binaan"
+              right={<MapPin size={18} className="text-[#0AC4E0]" />}
+              className="min-h-[660px]"
+              bodyClassName="p-5"
+            >
+              <CompactSchoolLeafletMap
+                schools={schoolExplorerList}
+                wilayahMap={wilayahMap}
+                provinceMarkers={provinceMapMarkers}
+                selectedWilayah={selectedWilayah}
+                mapCenter={mapCenter}
+                zoom={zoom}
+                onSelectProvinsi={selectProvinsi}
+                onSelectKabupaten={selectKabupaten}
+                onResetFilter={resetFilterMap}
               />
             </DashboardPanel>
           </div>

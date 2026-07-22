@@ -1,6 +1,7 @@
 ﻿/* eslint-disable react/prop-types */
 import { useEffect, useMemo } from "react";
 import {
+    GeoJSON,
     MapContainer,
     Marker,
     Popup,
@@ -9,9 +10,21 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import { MapPin, School } from "lucide-react";
+import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
 const DEFAULT_CENTER = [-2.5489, 118.0149];
 const DEFAULT_ZOOM = 5;
+const INDONESIA_MAX_BOUNDS = [
+    [-13.0, 92.0],
+    [8.2, 143.5],
+];
+const INDONESIA_GEOJSON_STYLE = {
+    color: "#0AC4E0",
+    weight: 1.3,
+    opacity: 0.85,
+    fillColor: "#0AC4E0",
+    fillOpacity: 0.09,
+};
 
 const schoolIcon = L.divIcon({
     className: "school-map-marker",
@@ -112,6 +125,8 @@ function MapAutoFocus({ schools, wilayah, mode }) {
     const map = useMap();
 
     useEffect(() => {
+        map.invalidateSize({ pan: false });
+
         const validPositions = schools
             .map((school) => [getLat(school), getLng(school)])
             .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng));
@@ -134,6 +149,29 @@ function MapAutoFocus({ schools, wilayah, mode }) {
 
         map.setView(getWilayahCenter(wilayah), mode === "admin" ? 5 : 8);
     }, [map, schools, wilayah, mode]);
+
+    return null;
+}
+
+function MapResizeGuard({ refreshKey }) {
+    const map = useMap();
+
+    useEffect(() => {
+        const refresh = () => {
+            map.invalidateSize({ pan: false });
+        };
+
+        refresh();
+        const timers = [80, 240, 520, 900].map((delay) =>
+            window.setTimeout(refresh, delay),
+        );
+        window.addEventListener("resize", refresh);
+
+        return () => {
+            timers.forEach((timer) => window.clearTimeout(timer));
+            window.removeEventListener("resize", refresh);
+        };
+    }, [map, refreshKey]);
 
     return null;
 }
@@ -210,6 +248,8 @@ export default function RegionalSchoolMap({
                     zoom={DEFAULT_ZOOM}
                     minZoom={mode === "admin" ? 4 : 5}
                     maxZoom={13}
+                    maxBounds={INDONESIA_MAX_BOUNDS}
+                    maxBoundsViscosity={1}
                     scrollWheelZoom
                     className="h-full w-full"
                 >
@@ -218,7 +258,14 @@ export default function RegionalSchoolMap({
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
 
+                    <GeoJSON
+                        data={indonesiaGeoJson}
+                        style={INDONESIA_GEOJSON_STYLE}
+                        interactive={false}
+                    />
+
                     <MapAutoFocus schools={mappedSchools} wilayah={wilayah} mode={mode} />
+                    <MapResizeGuard refreshKey={`${mappedSchools.length}-${mode}`} />
 
                     {mappedSchools.map((school) => (
                         <Marker

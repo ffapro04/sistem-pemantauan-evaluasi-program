@@ -22,9 +22,12 @@ import { TerminController } from './termin.controller';
 
 import { GoogleDriveModule } from '../google-drive/google-drive.module';
 import { NotifikasiModule } from '../notifikasi/notifikasi.module';
+import { AuthModule } from '../auth/auth.module';
+import { Vendor } from '../vendor/entities/vendor.entity';
 
 @Module({
   imports: [
+    AuthModule,
     GoogleDriveModule,
     NotifikasiModule,
     TypeOrmModule.forFeature([
@@ -39,6 +42,7 @@ import { NotifikasiModule } from '../notifikasi/notifikasi.module';
       KegiatanComment,
       KegiatanPertemuan,
       KegiatanRating,
+      Vendor,
     ]),
   ],
   controllers: [ProgramController, TerminController],

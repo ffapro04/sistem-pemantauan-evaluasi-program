@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -16,12 +16,14 @@ import {
     School,
     Search,
     Tag,
-    WalletCards,
 } from "lucide-react";
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
+import Dropdown from "../Dropdown";
+import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE_URL = "";
+const API_BASE_URL =
+    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const ROWS_PER_PAGE = 5;
 
 const JENIS_OPTIONS = [
@@ -40,22 +42,22 @@ const PILAR_META = {
     AKADEMIK: {
         label: "Akademik",
         group: "AKADEMIK",
-        className: "border-slate-300 bg-slate-100 text-slate-700",
+        className: "border-cyan-100 bg-cyan-50 text-[#0AC4E0]",
     },
     KARAKTER: {
         label: "Karakter",
         group: "AKADEMIK",
-        className: "border-slate-200 bg-slate-50 text-slate-500",
+        className: "border-violet-100 bg-violet-50 text-violet-600",
     },
     SENI_BUDAYA: {
         label: "Seni Budaya",
         group: "NON_AKADEMIK",
-        className: "border-[#D8B898] bg-[#F8EFE7] text-[#9A6E48]",
+        className: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-600",
     },
     KECAKAPAN_HIDUP: {
         label: "Kecakapan Hidup",
         group: "NON_AKADEMIK",
-        className: "border-[#A87955] bg-[#F4ECE6] text-[#7A4E2D]",
+        className: "border-emerald-100 bg-emerald-50 text-emerald-600",
     },
 };
 
@@ -113,14 +115,6 @@ function formatDate(value) {
         month: "short",
         year: "numeric",
     });
-}
-
-function formatCurrency(value) {
-    return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-    }).format(Number(value || 0));
 }
 
 function normalizeText(value) {
@@ -357,30 +351,32 @@ function getProgramSchoolIds(program) {
 function TableBadge({ children, className = "" }) {
     return (
         <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-[9px] font-black uppercase tracking-widest ${className}`}
+            className={`inline-flex max-w-full items-center justify-center rounded-full border px-2.5 py-1 text-center text-[8px] font-black uppercase leading-4 tracking-widest ${className}`}
         >
             {children}
         </span>
     );
 }
 
-function StatCard({ label, value, icon, helper }) {
+function StatCard({ label, value, helper, icon }) {
     return (
-        <div className="rounded-[1.35rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.05)]">
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
+        <div className="flex min-h-[92px] items-center justify-between gap-3 rounded-2xl border border-cyan-100 bg-white p-4 shadow-[0_14px_34px_rgba(10,196,224,0.08)]">
+            <div className="min-w-0">
+                <p className="text-[24px] font-black leading-none text-slate-950">
+                    {value}
+                </p>
+                <p className="mt-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    {label}
+                </p>
+                {helper && (
+                    <p className="mt-1 line-clamp-1 text-[10px] font-semibold leading-relaxed text-slate-400">
+                        {helper}
+                    </p>
+                )}
+            </div>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E9FBFF] text-[#0AC4E0]">
                 {icon}
             </div>
-            <p className="text-[28px] font-black leading-none tracking-[-0.06em] text-slate-900">
-                {value}
-            </p>
-            <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {label}
-            </p>
-            {helper && (
-                <p className="mt-1 text-[10px] font-semibold leading-relaxed text-slate-400">
-                    {helper}
-                </p>
-            )}
         </div>
     );
 }
@@ -418,7 +414,7 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
     const fetchData = async () => {
         setRefreshing(true);
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             if (!token) {
                 navigate("/login", { replace: true });
                 return;
@@ -636,10 +632,6 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
         const selesai = enrichedPrograms.filter(
             (item) => normalizeText(item.__status) === "selesai",
         ).length;
-        const totalBudget = enrichedPrograms.reduce(
-            (total, item) => total + Number(item.harga_vendor || item.budget || 0),
-            0,
-        );
         const progress = enrichedPrograms.length
             ? Math.round((selesai / enrichedPrograms.length) * 100)
             : 0;
@@ -648,10 +640,13 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
             project,
             reguler,
             selesai,
-            totalBudget,
             progress,
         };
     }, [enrichedPrograms]);
+
+    const activeBidangLabel = lockedBidang
+        ? getBidangLabel(lockedBidang)
+        : "Semua Bidang";
 
     if (loading) {
         return (
@@ -670,82 +665,79 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
     }
 
     return (
-        <PageWrapper className="flex h-screen w-full overflow-hidden bg-[#F6F8FB] !p-0 font-sans text-slate-800">
+        <PageWrapper className="flex h-screen w-full overflow-hidden bg-[#F4F7FB] !p-0 font-sans text-slate-800">
             <Sidebar />
-            <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <header className="shrink-0 border-b border-slate-200 bg-white px-7 py-5">
-                    <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-                        <div>
-                            <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
-                                <ClipboardList size={13} /> Head Office
-                            </div>
-                            <h1 className="text-[28px] font-black tracking-[-0.04em] text-slate-950">
-                                Daftar Program
-                            </h1>
-                            <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-6 text-slate-400">
-                                Tabel seluruh program yang berisi jenis program, nama
-                                program, sekolah sasaran, wilayah, dan periode
-                                pelaksanaan.
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={fetchData}
-                            disabled={refreshing}
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_16px_34px_rgba(10,196,224,0.24)] transition hover:bg-cyan-500 disabled:opacity-60"
-                        >
-                            <RefreshCcw
-                                size={15}
-                                className={refreshing ? "animate-spin" : ""}
-                            />
-                            {refreshing ? "Memuat..." : "Muat Ulang"}
-                        </button>
-                    </div>
-                </header>
+            <main className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+                <div className="arcade-grid pointer-events-none absolute inset-0 opacity-70" />
 
-                <section className="simple-scroll flex-1 overflow-y-auto px-7 py-6">
-                    <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+                <section className="relative z-10 shrink-0 px-6 pt-5">
+                    <div className="arcade-panel overflow-hidden rounded-2xl border border-white bg-white/95 p-5 shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+                        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
+                                    Ringkasan Program
+                                </p>
+                                <h1 className="mt-1 text-[30px] font-black leading-tight text-slate-950">
+                                    Daftar Program {activeBidangLabel}
+                                </h1>
+                                <p className="mt-2 max-w-3xl text-[13px] font-semibold leading-6 text-slate-500">
+                                    Pantau program berdasarkan jenis, pilar, sekolah sasaran, wilayah, periode, dan status terbaru.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={fetchData}
+                                disabled={refreshing}
+                                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-[#E9FBFF] px-4 text-[10px] font-black uppercase tracking-widest text-[#078EA3] shadow-[0_10px_22px_rgba(10,196,224,0.12)] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-60"
+                            >
+                                <RefreshCcw
+                                    size={14}
+                                    className={refreshing ? "animate-spin" : ""}
+                                />
+                                {refreshing ? "Memuat" : "Muat Ulang"}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section className="simple-scroll relative z-10 flex-1 overflow-y-auto px-6 py-5">
+                    <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                         <StatCard
                             label="Total Program"
                             value={summary.total}
-                            helper="Seluruh data program"
-                            icon={<ClipboardList size={19} />}
+                            helper="Seluruh data"
+                            icon={<ClipboardList size={18} />}
                         />
                         <StatCard
                             label="Project"
                             value={summary.project}
-                            helper="Jenis program project"
-                            icon={<Tag size={19} />}
+                            helper="Program project"
+                            icon={<Tag size={18} />}
                         />
                         <StatCard
                             label="Reguler"
                             value={summary.reguler}
-                            helper="Jenis program reguler"
-                            icon={<CalendarDays size={19} />}
+                            helper="Program reguler"
+                            icon={<CalendarDays size={18} />}
                         />
                         <StatCard
                             label="Selesai"
                             value={summary.selesai}
-                            helper="Status program selesai"
-                            icon={<CheckCircle2 size={19} />}
-                        />
-                        <StatCard
-                            label="Budget Vendor"
-                            value={formatCurrency(summary.totalBudget)}
-                            helper="Akumulasi nilai MOU"
-                            icon={<WalletCards size={19} />}
+                            helper="Status selesai"
+                            icon={<CheckCircle2 size={18} />}
                         />
                         <StatCard
                             label="Progress"
                             value={`${summary.progress}%`}
-                            helper="Selesai dibanding total"
-                            icon={<CheckCircle2 size={19} />}
+                            helper="Selesai / total"
+                            icon={<CheckCircle2 size={18} />}
                         />
                     </div>
 
-                    <div className="mb-5 rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-7">
-                            <div className="relative md:col-span-2 xl:col-span-2">
+                    <div className="mb-4 rounded-2xl border border-white bg-white/95 p-4 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+                        <div className={`grid grid-cols-1 gap-3 md:grid-cols-2 ${lockedBidang ? "xl:grid-cols-[minmax(260px,1.5fr)_repeat(3,minmax(160px,1fr))_120px]" : "xl:grid-cols-[minmax(260px,1.5fr)_repeat(4,minmax(150px,1fr))_120px]"}`}>
+                            <div className="relative">
                                 <Search
                                     size={16}
                                     className="absolute left-4 top-1/2 -translate-y-1/2 text-[#0AC4E0]"
@@ -756,81 +748,59 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                                         setSearchValue(event.target.value)
                                     }
                                     placeholder="Cari program, pilar, sekolah, wilayah, MOU..."
-                                    className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 pl-11 pr-4 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0]/40 focus:bg-white"
+                                    className="h-11 w-full rounded-xl border border-slate-100 bg-slate-50 pl-11 pr-4 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0]/40 focus:bg-white"
                                 />
                             </div>
 
-                            <select
+                            <Dropdown
                                 value={selectedJenis}
-                                onChange={(event) =>
-                                    setSelectedJenis(event.target.value)
-                                }
-                                className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-[11px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {JENIS_OPTIONS.map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSelectedJenis}
+                                items={JENIS_OPTIONS}
+                                placeholder="Semua Jenis"
+                                width="w-full"
+                                usePortal
+                            />
 
                             {!lockedBidang && (
-                                <select
+                                <Dropdown
                                     value={selectedBidang}
-                                    onChange={(event) => {
-                                        setSelectedBidang(event.target.value);
+                                    onChange={(value) => {
+                                        setSelectedBidang(value);
                                         setSelectedPilar("ALL");
                                     }}
-                                    className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-[11px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                                >
-                                    {BIDANG_OPTIONS.map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    items={BIDANG_OPTIONS}
+                                    placeholder="Semua Bidang"
+                                    width="w-full"
+                                    usePortal
+                                />
                             )}
 
-                            <select
+                            <Dropdown
                                 value={selectedPilar}
-                                onChange={(event) =>
-                                    setSelectedPilar(event.target.value)
-                                }
-                                className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-[11px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {pilarOptions
+                                onChange={setSelectedPilar}
+                                items={pilarOptions
                                     .filter(
                                         (item) =>
                                             item.value === "ALL" ||
                                             selectedBidang === "ALL" ||
                                             PILAR_META[item.value]?.group === selectedBidang,
-                                    )
-                                    .map((item) => (
-                                        <option key={item.value} value={item.value}>
-                                            {item.label}
-                                        </option>
-                                    ))}
-                            </select>
+                                    )}
+                                placeholder="Semua Pilar"
+                                width="w-full"
+                                usePortal
+                            />
 
-                            <select
+                            <Dropdown
                                 value={selectedStatus}
-                                onChange={(event) =>
-                                    setSelectedStatus(event.target.value)
-                                }
-                                className="h-12 w-full rounded-2xl border border-slate-100 bg-slate-50 px-4 text-[11px] font-black uppercase tracking-widest text-slate-600 outline-none transition focus:border-[#0AC4E0]/40 focus:bg-white"
-                            >
-                                {statusOptions.map((item) => (
-                                    <option key={item.value} value={item.value}>
-                                        {item.label}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={setSelectedStatus}
+                                items={statusOptions}
+                                placeholder="Semua Status"
+                                width="w-full"
+                                usePortal
+                            />
 
-                            <div className="flex items-center justify-end">
-                                <div className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-50 px-4 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                    <Filter size={14} />
-                                    {filteredPrograms.length} Data
-                                </div>
+                            <div className="inline-flex h-11 items-center justify-center rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-widest text-white shadow-[0_10px_22px_rgba(10,196,224,0.16)]">
+                                {filteredPrograms.length} Data
                             </div>
                         </div>
                     </div>
@@ -838,25 +808,17 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                     {filteredPrograms.length === 0 ? (
                         <EmptyState />
                     ) : (
-                        <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-[1280px] w-full border-collapse">
+                        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_18px_60px_rgba(15,23,42,0.05)]">
+                            <div className="daftar-program-table overflow-x-auto">
+                                <table className="w-full min-w-[760px] table-fixed border-collapse">
                                     <thead>
-                                        <tr className="bg-[#0AC4E0] text-center text-[10px] font-black uppercase tracking-[0.18em] text-white">
-                                            <th className="w-[70px] px-4 py-4">No</th>
-                                            <th className="px-4 py-4">Program</th>
-                                            <th className="px-4 py-4">Jenis</th>
-                                            <th className="px-4 py-4">Bidang</th>
-                                            <th className="px-4 py-4">Pilar</th>
-                                            <th className="px-4 py-4">Sekolah</th>
-                                            <th className="px-4 py-4">Wilayah</th>
-                                            <th className="px-4 py-4">
-                                                Waktu Mulai
-                                            </th>
-                                            <th className="px-4 py-4">
-                                                Waktu Selesai
-                                            </th>
-                                            <th className="px-4 py-4">Status</th>
+                                        <tr className="bg-[#0AC4E0] text-left text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                                            <th className="w-[5%] px-4 py-3.5 text-center">No</th>
+                                            <th className="w-[32%] px-4 py-3.5">Program</th>
+                                            <th className="w-[24%] px-4 py-3.5">Target</th>
+                                            <th className="w-[18%] px-4 py-3.5">Kategori</th>
+                                            <th className="w-[10%] px-4 py-3.5">Periode</th>
+                                            <th className="w-[11%] px-3 py-3.5 text-center">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -875,7 +837,7 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                                                             rowNumber,
                                                         ).padStart(2, "0")}
                                                     </td>
-                                                    <td className="max-w-[260px] px-4 py-4">
+                                                    <td className="px-4 py-4">
                                                         <p className="line-clamp-2 text-[13px] font-black leading-snug text-slate-900">
                                                             {getProgramName(
                                                                 program,
@@ -893,80 +855,60 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                                                         </p>
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <TableBadge
-                                                            className={
-                                                                program.__jenis ===
-                                                                    "REGULER"
-                                                                    ? "border-emerald-100 bg-emerald-50 text-emerald-600"
-                                                                    : "border-cyan-100 bg-cyan-50 text-[#0AC4E0]"
-                                                            }
-                                                        >
-                                                            {
-                                                                program.__jenisLabel
-                                                            }
-                                                        </TableBadge>
+                                                        <p className="line-clamp-1 text-[12px] font-black leading-5 text-slate-700">
+                                                            {program.__schoolNames}
+                                                        </p>
+                                                        <p className="mt-1 line-clamp-1 text-[10px] font-bold leading-5 text-slate-400">
+                                                            {program.__wilayahNames}
+                                                        </p>
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <TableBadge className="border-slate-100 bg-slate-50 text-slate-500">
-                                                            {program.__bidangLabel}
-                                                        </TableBadge>
-                                                    </td>
-                                                    <td className="px-4 py-4">
-                                                        <TableBadge
-                                                            className={
-                                                                program.__pilarMeta
-                                                                    ?.className ||
-                                                                PILAR_META.AKADEMIK
-                                                                    .className
-                                                            }
-                                                        >
-                                                            {program.__pilarLabel}
-                                                        </TableBadge>
-                                                    </td>
-                                                    <td className="max-w-[280px] px-4 py-4">
-                                                        <div className="flex items-start gap-2">
-                                                            <School
-                                                                size={15}
-                                                                className="mt-0.5 shrink-0 text-[#0AC4E0]"
-                                                            />
-                                                            <span className="line-clamp-2 text-[12px] font-bold leading-5 text-slate-600">
-                                                                {
-                                                                    program.__schoolNames
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <TableBadge
+                                                                className={
+                                                                    program.__jenis ===
+                                                                        "REGULER"
+                                                                        ? "border-emerald-100 bg-emerald-50 text-emerald-600"
+                                                                        : "border-cyan-100 bg-cyan-50 text-[#0AC4E0]"
                                                                 }
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="max-w-[220px] px-4 py-4">
-                                                        <div className="flex items-start gap-2">
-                                                            <MapPin
-                                                                size={15}
-                                                                className="mt-0.5 shrink-0 text-[#0AC4E0]"
-                                                            />
-                                                            <span className="line-clamp-2 text-[12px] font-bold leading-5 text-slate-600">
-                                                                {
-                                                                    program.__wilayahNames
+                                                            >
+                                                                {program.__jenisLabel}
+                                                            </TableBadge>
+                                                            <TableBadge
+                                                                className={
+                                                                    program.__pilarMeta
+                                                                        ?.className ||
+                                                                    PILAR_META.AKADEMIK
+                                                                        .className
                                                                 }
-                                                            </span>
+                                                            >
+                                                                {program.__pilarLabel}
+                                                            </TableBadge>
                                                         </div>
-                                                    </td>
-                                                    <td className="px-4 py-4 text-[12px] font-bold text-slate-600">
-                                                        {formatDate(
-                                                            program?.tanggal_mulai,
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-4 text-[12px] font-bold text-slate-600">
-                                                        {formatDate(
-                                                            program?.tanggal_selesai,
+                                                        {!lockedBidang && (
+                                                            <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                                                {program.__bidangLabel}
+                                                            </p>
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-4">
-                                                        <TableBadge
-                                                            className={getStatusClass(
-                                                                program.__status,
-                                                            )}
-                                                        >
-                                                            {program.__status}
-                                                        </TableBadge>
+                                                        <p className="text-[12px] font-black text-slate-700">
+                                                            {formatDate(program?.tanggal_mulai)}
+                                                        </p>
+                                                        <p className="mt-1 text-[10px] font-bold text-slate-400">
+                                                            s/d {formatDate(program?.tanggal_selesai)}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-3 py-4 text-center">
+                                                        <div className="flex w-full items-center justify-center">
+                                                            <TableBadge
+                                                                className={`min-w-[86px] ${getStatusClass(
+                                                                    program.__status,
+                                                                )}`}
+                                                            >
+                                                                {program.__status}
+                                                            </TableBadge>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -1037,6 +979,10 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                         .simple-scroll::-webkit-scrollbar-track { background: transparent; }
                         .simple-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.55); border-radius: 999px; }
                         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+                        .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+                        @media (min-width: 1280px) {
+                            .daftar-program-table { overflow-x: hidden !important; }
+                        }
                     `,
                 }}
             />

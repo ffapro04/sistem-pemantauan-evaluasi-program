@@ -11,9 +11,11 @@ import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.enti
 
 import { AssessmentService } from './assessment.service';
 import { AssessmentController } from './assessment.controller';
+import { NotifikasiModule } from '../notifikasi/notifikasi.module';
 
 @Module({
   imports: [
+    NotifikasiModule,
     TypeOrmModule.forFeature([
       Assessment,
       AssessmentPertanyaan,

@@ -1,4 +1,4 @@
-﻿/* eslint-disable no-unused-vars */
+/* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
 import {
     BarChart3,
@@ -18,18 +18,20 @@ import {
     TrendingUp,
 } from "lucide-react";
 import {
+    Area,
+    AreaChart,
     Bar,
     BarChart,
     CartesianGrid,
     Cell,
     Pie,
     PieChart,
-    ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
 } from "recharts";
 import {
+    GeoJSON,
     MapContainer,
     Marker,
     Popup,
@@ -42,13 +44,28 @@ import "leaflet/dist/leaflet.css";
 import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
 import Dropdown from "../../components/Dropdown";
-import ProgramRatingStars from "../../components/program/ProgramRatingStars";
+import ResponsiveContainer from "../../components/charts/SafeResponsiveContainer";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
+import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const INDONESIA_CENTER = [-2.5, 118];
 const INDONESIA_ZOOM = 5;
-const ROWS_PER_PAGE = 5;
+const INDONESIA_MAX_BOUNDS = [
+    [-13.0, 92.0],
+    [8.2, 143.5],
+];
+const INDONESIA_GEOJSON_STYLE = {
+    color: "#0AC4E0",
+    weight: 1.25,
+    opacity: 0.82,
+    fillColor: "#0AC4E0",
+    fillOpacity: 0.08,
+};
+const ROWS_PER_PAGE = 4;
+const PROGRAM_YEAR_OPTIONS = Array.from({ length: 19 }, (_, index) =>
+    String(2017 + index),
+);
 
 const COLORS = {
     cyan: CHART_STATUS_COLORS.info,
@@ -118,6 +135,66 @@ const VENDOR_CATEGORY_OPTIONS = [
     { value: "AKADEMIK", label: "Akademik" },
     { value: "NON_AKADEMIK", label: "Non Akademik" },
 ];
+
+const CHART_LIMIT = 8;
+const CHART_PALETTE = [
+    COLORS.cyan,
+    COLORS.green,
+    COLORS.amber,
+    COLORS.orange,
+    COLORS.violet,
+    COLORS.rose,
+    COLORS.blue,
+    COLORS.slate,
+    COLORS.grey,
+];
+
+const compactChartRows = (rows, limit = CHART_LIMIT) => {
+    const usableRows = rows
+        .filter((row) => Number(row.value || 0) > 0)
+        .sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+
+    if (usableRows.length === 0) {
+        return [{ name: "Belum ada data", value: 0, color: COLORS.grey }];
+    }
+
+    if (usableRows.length <= limit) return usableRows;
+
+    const mainRows = usableRows.slice(0, limit - 1);
+    const otherRows = usableRows.slice(limit - 1);
+    const otherValue = otherRows.reduce(
+        (total, row) => total + Number(row.value || 0),
+        0,
+    );
+
+    return [
+        ...mainRows,
+        {
+            name: "Lainnya",
+            value: otherValue,
+            color: COLORS.grey,
+        },
+    ];
+};
+
+const buildCountChartRows = (items, getName, limit = CHART_LIMIT) => {
+    const bucket = new Map();
+
+    items.forEach((item) => {
+        const rawName = getName(item);
+        const name = String(rawName || "Belum Diisi").trim() || "Belum Diisi";
+        bucket.set(name, (bucket.get(name) || 0) + 1);
+    });
+
+    return compactChartRows(
+        Array.from(bucket.entries()).map(([name, value], index) => ({
+            name,
+            value,
+            color: CHART_PALETTE[index % CHART_PALETTE.length],
+        })),
+        limit,
+    );
+};
 
 const PROVINCE_FALLBACKS = {
     ACEH: [4.6951, 96.7494],
@@ -954,6 +1031,28 @@ function getProgramStatus(program) {
     );
 }
 
+function getProgramChartBucket(program) {
+    const raw = normalizeText(program?.__status || getProgramStatus(program));
+
+    if (!raw) return "Belum Diisi";
+    if (raw.includes("selesai") || raw.includes("approved")) return "Selesai";
+    if (raw.includes("evaluasi")) return "Evaluasi";
+    if (raw.includes("implementasi") || raw.includes("pelaksanaan")) {
+        return "Implementasi";
+    }
+    if (raw.includes("sosialisasi")) return "Sosialisasi";
+    if (
+        raw.includes("revisi") ||
+        raw.includes("validasi") ||
+        raw.includes("menunggu") ||
+        raw.includes("approval")
+    ) {
+        return "Validasi";
+    }
+
+    return getProgramStatus(program);
+}
+
 function getProgramCode(program) {
     return safeText(
         program?.kode_program,
@@ -961,6 +1060,35 @@ function getProgramCode(program) {
         program?.kode,
         `PRG-${program?.id_program ?? program?.id ?? ""}`,
     );
+}
+
+function getProgramYear(program) {
+    const explicitYear = safeText(
+        program?.tahun,
+        program?.tahun_program,
+        program?.year,
+        program?.periode_tahun,
+        program?.periodeTahun,
+    );
+
+    if (explicitYear !== "Belum Diisi") return String(explicitYear);
+
+    const dateValue =
+        program?.tanggal_mulai ||
+        program?.waktu_mulai ||
+        program?.start_date ||
+        program?.startDate ||
+        program?.created_at ||
+        program?.createdAt;
+    const date = dateValue ? new Date(dateValue) : null;
+
+    if (date && !Number.isNaN(date.getTime())) return String(date.getFullYear());
+    return "Belum Diisi";
+}
+
+function compactAxisLabel(value, max = 16) {
+    const text = String(value || "-");
+    return text.length > max ? `${text.slice(0, max)}...` : text;
 }
 
 function isProgramFinished(program) {
@@ -1280,11 +1408,11 @@ function MapViewport({ request }) {
     const map = useMap();
 
     useEffect(() => {
-        if (!request) return;
+        if (!request) return undefined;
 
-        const timer = window.setTimeout(() => {
+        const applyViewport = () => {
             map.stop();
-            map.invalidateSize();
+            map.invalidateSize({ pan: false });
 
             if (request.bounds?.length >= 2) {
                 map.fitBounds(request.bounds, {
@@ -1298,15 +1426,24 @@ function MapViewport({ request }) {
                     animate: true,
                 });
             }
-        }, 80);
+        };
 
-        return () => window.clearTimeout(timer);
+        applyViewport();
+        const timers = [80, 240, 520, 900].map((delay) =>
+            window.setTimeout(applyViewport, delay),
+        );
+        window.addEventListener("resize", applyViewport);
+
+        return () => {
+            timers.forEach((timer) => window.clearTimeout(timer));
+            window.removeEventListener("resize", applyViewport);
+        };
     }, [map, request]);
 
     return null;
 }
 
-function DistrictPopup({ district }) {
+function DistrictPopup({ district, onSelect }) {
     const [search, setSearch] = useState("");
 
     const filtered = useMemo(() => {
@@ -1378,6 +1515,14 @@ function DistrictPopup({ district }) {
                 </p>
             )}
 
+            <button
+                type="button"
+                onClick={() => onSelect?.(district.key)}
+                className="executive-map-action-pulse mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
+            >
+                Lihat Program Wilayah Ini
+            </button>
+
             {district.approximate && (
                 <p className="mt-3 text-[9px] font-bold text-amber-600">
                     Posisi marker memakai titik perkiraan wilayah.
@@ -1387,7 +1532,7 @@ function DistrictPopup({ district }) {
     );
 }
 
-function ExecutiveMap({ mapData }) {
+function ExecutiveMap({ mapData, onScopeChange }) {
     const [selectedProvince, setSelectedProvince] = useState("ALL");
     const [selectedDistrict, setSelectedDistrict] = useState("ALL");
     const [search, setSearch] = useState("");
@@ -1459,6 +1604,11 @@ function ExecutiveMap({ mapData }) {
     const focusProvince = (province) => {
         setSelectedProvince(province.key);
         setSelectedDistrict("ALL");
+        onScopeChange?.({
+            type: "province",
+            key: province.key,
+            name: province.name,
+        });
 
         const districtCoordinates = province.districts
             .map((district) => district.coordinate)
@@ -1492,6 +1642,7 @@ function ExecutiveMap({ mapData }) {
         if (value === "ALL") {
             setSelectedProvince("ALL");
             setSelectedDistrict("ALL");
+            onScopeChange?.(null);
             setViewport({
                 center: INDONESIA_CENTER,
                 zoom: INDONESIA_ZOOM,
@@ -1517,6 +1668,12 @@ function ExecutiveMap({ mapData }) {
         );
 
         if (!district) return;
+        onScopeChange?.({
+            type: "district",
+            key: district.key,
+            name: district.name,
+            provinceName: activeProvince.name,
+        });
 
         const schoolCoordinates = district.schools
             .map((school) => school.__coordinate)
@@ -1547,6 +1704,7 @@ function ExecutiveMap({ mapData }) {
         setSelectedProvince("ALL");
         setSelectedDistrict("ALL");
         setSearch("");
+        onScopeChange?.(null);
         setViewport({
             center: INDONESIA_CENTER,
             zoom: INDONESIA_ZOOM,
@@ -1571,21 +1729,20 @@ function ExecutiveMap({ mapData }) {
                 .executive-map-shell .leaflet-popup-pane {
                     z-index: 10 !important;
                 }
+                .executive-map-action-pulse {
+                    animation: executiveMapActionPulse 1.45s ease-in-out infinite;
+                }
+                @keyframes executiveMapActionPulse {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(10,196,224,.3); transform: translateY(0); }
+                    50% { box-shadow: 0 0 0 8px rgba(10,196,224,0); transform: translateY(-1px); }
+                }
             `}</style>
 
-            <div className="relative z-30 flex flex-col gap-5 border-b border-slate-100 px-6 py-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative z-30 flex flex-col gap-5 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.2em] text-cyan-700">
-                        <MapPinned size={13} />
-                        National Coverage
-                    </div>
-                    <h2 className="mt-3 text-[22px] font-black tracking-[-0.04em] text-slate-950">
+                    <h2 className="text-[22px] font-black tracking-[-0.04em] text-slate-950">
                         Persebaran Sekolah Binaan
                     </h2>
-                    <p className="mt-1 max-w-3xl text-[12px] font-semibold leading-6 text-slate-400">
-                        Marker merah mewakili provinsi binaan. Fokuskan provinsi untuk
-                        membuka marker kabupaten dan daftar sekolah di dalamnya.
-                    </p>
                 </div>
 
                 {selectedProvince !== "ALL" && (
@@ -1599,7 +1756,7 @@ function ExecutiveMap({ mapData }) {
                 )}
             </div>
 
-            <div className="relative z-40 grid gap-3 border-b border-slate-100 bg-slate-50/70 px-6 py-4 md:grid-cols-3">
+            <div className="hidden">
                 <Dropdown
                     value={selectedProvince}
                     items={[
@@ -1648,6 +1805,8 @@ function ExecutiveMap({ mapData }) {
                     center={INDONESIA_CENTER}
                     zoom={INDONESIA_ZOOM}
                     minZoom={4}
+                    maxBounds={INDONESIA_MAX_BOUNDS}
+                    maxBoundsViscosity={1}
                     scrollWheelZoom
                     className="relative z-0 h-full w-full"
                 >
@@ -1656,6 +1815,12 @@ function ExecutiveMap({ mapData }) {
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <GeoJSON
+                        data={indonesiaGeoJson}
+                        style={INDONESIA_GEOJSON_STYLE}
+                        interactive={false}
                     />
 
                     {!activeProvince &&
@@ -1691,9 +1856,9 @@ function ExecutiveMap({ mapData }) {
                                         <button
                                             type="button"
                                             onClick={() => focusProvince(province)}
-                                            className="mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
+                                            className="executive-map-action-pulse mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
                                         >
-                                            Fokuskan Provinsi
+                                            Lihat Program Wilayah Ini
                                         </button>
                                     </div>
                                 </Popup>
@@ -1711,7 +1876,7 @@ function ExecutiveMap({ mapData }) {
                                 )}
                             >
                                 <Popup>
-                                    <DistrictPopup district={district} />
+                                    <DistrictPopup district={district} onSelect={handleDistrictFilter} />
                                 </Popup>
                             </Marker>
                         ))}
@@ -1888,6 +2053,7 @@ function DataTable({
     emptyText,
     getSearchText,
     tableMinWidth = "min-w-[720px]",
+    compact = false,
 }) {
     const [search, setSearch] = useState("");
     const [page, setPage] = useState(1);
@@ -1924,9 +2090,9 @@ function DataTable({
     }, [page, totalPages]);
 
     return (
-        <div className="flex min-h-[430px] flex-col">
-            <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="relative w-full sm:max-w-[330px]">
+        <div className={`${compact ? "flex h-full min-h-0 flex-col" : "flex min-h-[430px] flex-col"}`}>
+            <div className={`flex flex-col gap-3 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between ${compact ? "px-4 py-3" : "px-5 py-4"}`}>
+                <div className={`relative w-full ${compact ? "sm:max-w-[280px]" : "sm:max-w-[330px]"}`}>
                     <Search
                         size={14}
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-600"
@@ -1954,14 +2120,14 @@ function DataTable({
                     </p>
                 </div>
             ) : (
-                <div className="min-h-0 flex-1 overflow-x-auto">
+                <div className={`min-h-0 flex-1 ${compact ? "overflow-y-auto overflow-x-hidden" : "overflow-x-auto"}`}>
                     <table className={`w-full ${tableMinWidth} border-collapse`}>
                         <thead>
                             <tr className="border-b border-slate-100 bg-slate-50">
                                 {columns.map((column) => (
                                     <th
                                         key={column.key}
-                                        className="px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.16em] text-slate-400"
+                                        className={`${compact ? "px-3 py-3 text-[8px] tracking-[0.12em]" : "px-4 py-3 text-[9px] tracking-[0.16em]"} ${column.headerClassName || ""} text-left font-black uppercase text-slate-400`}
                                     >
                                         {column.label}
                                     </th>
@@ -1982,7 +2148,7 @@ function DataTable({
                                     {columns.map((column) => (
                                         <td
                                             key={column.key}
-                                            className="px-4 py-4 align-top"
+                                            className={`${compact ? "px-3 py-2.5" : "px-4 py-4"} ${column.cellClassName || ""} align-top`}
                                         >
                                             {column.render(item, startIndex + index)}
                                         </td>
@@ -1994,7 +2160,7 @@ function DataTable({
                 </div>
             )}
 
-            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className={`flex flex-col gap-3 border-t border-slate-100 bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${compact ? "px-4 py-3" : "px-5 py-4"}`}>
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
                     Menampilkan {filtered.length ? startIndex + 1 : 0}-
                     {Math.min(startIndex + ROWS_PER_PAGE, filtered.length)} dari{" "}
@@ -2038,7 +2204,7 @@ function AnalyticsSection({
                 {filters && <div className="mt-5">{filters}</div>}
             </div>
 
-            <div className="grid xl:grid-cols-[0.95fr_1.35fr]">
+            <div className="grid xl:grid-cols-[0.74fr_1.56fr]">
                 <div className="min-w-0 border-b border-slate-100 bg-white p-5 xl:border-b-0 xl:border-r">
                     {chart}
                 </div>
@@ -2061,9 +2227,12 @@ export default function DashboardPengurus() {
     const [programPillar, setProgramPillar] = useState("ALL");
     const [programType, setProgramType] = useState("ALL");
     const [programStatus, setProgramStatus] = useState("ALL");
+    const [programYear, setProgramYear] = useState("ALL");
     const [programChartMode, setProgramChartMode] = useState("PIE");
+    const [mapScope, setMapScope] = useState(null);
 
     const [vendorCategory, setVendorCategory] = useState("ALL");
+    const [activeDataset, setActiveDataset] = useState("PROGRAM");
 
     const fetchDashboard = async () => {
         setRefreshing(true);
@@ -2257,6 +2426,19 @@ export default function DashboardPengurus() {
                     .map((area) => area.trim())
                     .some((area) => area === programArea);
             })
+            .filter((program) => {
+                if (!mapScope) return true;
+
+                const targetName = normalizeText(mapScope.name);
+                const searchable = normalizeText(
+                    `${program.__provinceNames} ${program.__districtNames} ${program.__schoolNames}`,
+                );
+
+                if (mapScope.type === "province") return searchable.includes(targetName);
+                if (mapScope.type === "district") return searchable.includes(targetName);
+
+                return true;
+            })
             .filter(
                 (program) =>
                     programPillar === "ALL" ||
@@ -2274,6 +2456,11 @@ export default function DashboardPengurus() {
                 }
                 return !isProgramFinished(program);
             })
+            .filter(
+                (program) =>
+                    programYear === "ALL" ||
+                    String(getProgramYear(program)) === String(programYear),
+            )
             .filter((program) => {
                 if (!keyword) return true;
 
@@ -2292,20 +2479,20 @@ export default function DashboardPengurus() {
     }, [
         enrichedPrograms,
         programArea,
+        mapScope,
         programPillar,
         programSearch,
         programStatus,
         programType,
+        programYear,
     ]);
 
     const programChartData = useMemo(() => {
-        return Object.entries(PILLAR_META).map(([value, meta]) => ({
-            name: meta.label,
-            value: filteredPrograms.filter(
-                (program) => program.__pillar === value,
-            ).length,
-            color: meta.color,
-        }));
+        return buildCountChartRows(
+            filteredPrograms,
+            (program) => getProgramChartBucket(program),
+            CHART_LIMIT,
+        );
     }, [filteredPrograms]);
 
     const filteredVendors = useMemo(() => {
@@ -2321,25 +2508,11 @@ export default function DashboardPengurus() {
     }, [vendorCategory, vendors]);
 
     const vendorChartData = useMemo(() => {
-        const academic = filteredVendors.filter(
-            (vendor) => normalizeVendorCategory(vendor) === "AKADEMIK",
-        ).length;
-        const nonAcademic = filteredVendors.filter(
-            (vendor) => normalizeVendorCategory(vendor) === "NON_AKADEMIK",
-        ).length;
-
-        return [
-            {
-                name: "Akademik",
-                value: academic,
-                color: COLORS.blue,
-            },
-            {
-                name: "Non Akademik",
-                value: nonAcademic,
-                color: COLORS.orange,
-            },
-        ];
+        return buildCountChartRows(
+            filteredVendors,
+            (vendor) => getVendorStatusLabel(vendor),
+            CHART_LIMIT,
+        );
     }, [filteredVendors]);
 
     const totalDistricts = useMemo(
@@ -2357,6 +2530,69 @@ export default function DashboardPengurus() {
         [enrichedPrograms],
     );
 
+    const schoolChartData = useMemo(
+        () =>
+            compactChartRows(
+                mapData.map((item, index) => ({
+                    name: item.name,
+                    value: item.schools.length,
+                    color: CHART_PALETTE[index % CHART_PALETTE.length],
+                })),
+                CHART_LIMIT,
+            ),
+        [mapData],
+    );
+
+    const activeChartData = useMemo(() => {
+        if (activeDataset === "VENDOR") return vendorChartData;
+        if (activeDataset === "SEKOLAH") return schoolChartData;
+        return programChartData;
+    }, [activeDataset, programChartData, schoolChartData, vendorChartData]);
+
+    const cockpitTabs = useMemo(
+        () => [
+            {
+                value: "PROGRAM",
+                label: "Program",
+                total: filteredPrograms.length,
+                helper: `${completedPrograms} selesai`,
+            },
+            {
+                value: "VENDOR",
+                label: "Vendor",
+                total: filteredVendors.length,
+                helper: `${vendorChartData.length} kategori`,
+            },
+            {
+                value: "SEKOLAH",
+                label: "Sekolah",
+                total: enrichedSchools.length,
+                helper: `${mapData.length} provinsi`,
+            },
+        ],
+        [
+            completedPrograms,
+            enrichedSchools.length,
+            filteredPrograms.length,
+            filteredVendors.length,
+            mapData.length,
+            vendorChartData.length,
+        ],
+    );
+
+    const activeTab = cockpitTabs.find((item) => item.value === activeDataset) || cockpitTabs[0];
+    const activeTotal = activeChartData.reduce(
+        (total, item) => total + Number(item.value || 0),
+        0,
+    );
+    const activePeak = activeChartData.reduce(
+        (peak, item) => (Number(item.value || 0) > Number(peak.value || 0) ? item : peak),
+        activeChartData[0] || { name: "-", value: 0 },
+    );
+    const activeAverage = activeChartData.length
+        ? Math.round(activeTotal / activeChartData.length)
+        : 0;
+
     if (loading) {
         return (
             <PageWrapper className="flex h-screen w-full overflow-hidden bg-[#F4F6F8] !p-0">
@@ -2372,6 +2608,500 @@ export default function DashboardPengurus() {
             </PageWrapper>
         );
     }
+
+    return (
+        <PageWrapper className="flex h-screen w-full overflow-hidden bg-[#F7FAFC] !p-0 font-sans text-slate-900">
+            <Sidebar />
+
+            <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+                <div className="flex min-h-full w-full flex-col gap-3 px-4 py-4 lg:px-5">
+                    <header className="flex shrink-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h1 className="text-[30px] font-black tracking-[-0.03em] text-slate-950">
+                                Dashboard Pengurus
+                                <span className="ml-3 align-middle text-[15px] font-bold tracking-normal text-slate-500">
+                                    {activeTab.total}
+                                </span>
+                            </h1>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={fetchDashboard}
+                            disabled={refreshing}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 text-[12px] font-black text-white transition hover:bg-[#0AC4E0] disabled:opacity-60"
+                        >
+                            <RefreshCcw
+                                size={15}
+                                className={refreshing ? "animate-spin" : ""}
+                            />
+                            Refresh
+                        </button>
+                    </header>
+
+                    <section className="grid shrink-0 gap-3 md:grid-cols-3">
+                        {cockpitTabs.map((item) => {
+                            const active = activeDataset === item.value;
+
+                            return (
+                                <button
+                                    key={item.value}
+                                    type="button"
+                                    onClick={() => setActiveDataset(item.value)}
+                                    className={`rounded-[1.05rem] border p-4 text-left transition ${active
+                                        ? "border-slate-950 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.10)]"
+                                        : "border-slate-200 bg-white hover:border-cyan-200 hover:shadow-[0_14px_32px_rgba(14,165,233,0.10)]"
+                                        }`}
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p className="text-[13px] font-semibold text-slate-500">
+                                                {item.label}
+                                            </p>
+                                            <p className="mt-2 text-[32px] font-black leading-none tracking-[-0.03em] text-slate-950">
+                                                {item.total}
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            className={`rounded-full border px-3 py-1 text-[11px] font-black ${active
+                                                ? "border-slate-950 bg-slate-950 text-white"
+                                                : "border-slate-200 bg-white text-slate-600"
+                                                }`}
+                                        >
+                                            {item.helper}
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </section>
+
+                    <section className="min-h-[470px] flex-1 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-white shadow-[0_20px_55px_rgba(15,23,42,0.06)]">
+                        <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
+                            <div className="inline-flex w-fit overflow-hidden rounded-xl border border-slate-200 bg-white">
+                                {cockpitTabs.map((item) => (
+                                    <button
+                                        key={item.value}
+                                        type="button"
+                                        onClick={() => setActiveDataset(item.value)}
+                                        className={`h-10 px-4 text-[13px] font-bold transition ${activeDataset === item.value
+                                            ? "bg-slate-950 text-white"
+                                            : "text-slate-600 hover:bg-slate-50"
+                                            }`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {activeDataset === "PROGRAM" && (
+                                <div className="grid gap-2 md:grid-cols-5 xl:w-[900px]">
+                                    <div className="relative md:col-span-1">
+                                        <Search
+                                            size={14}
+                                            className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-600"
+                                        />
+                                        <input
+                                            value={programSearch}
+                                            onChange={(event) =>
+                                                setProgramSearch(event.target.value)
+                                            }
+                                            placeholder="Cari program..."
+                                            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none focus:border-cyan-400"
+                                        />
+                                    </div>
+
+                                    <Dropdown
+                                        value={programArea}
+                                        items={programAreaOptions}
+                                        onChange={setProgramArea}
+                                        placeholder="Area"
+                                        width="w-full"
+                                        usePortal
+                                    />
+                                    <Dropdown
+                                        value={programPillar}
+                                        items={PILLAR_OPTIONS}
+                                        onChange={setProgramPillar}
+                                        placeholder="Pilar"
+                                        width="w-full"
+                                        usePortal
+                                    />
+                                    <Dropdown
+                                        value={programYear}
+                                        items={[
+                                            { value: "ALL", label: "Semua Tahun" },
+                                            ...PROGRAM_YEAR_OPTIONS.map((year) => ({
+                                                value: year,
+                                                label: year,
+                                            })),
+                                        ]}
+                                        onChange={setProgramYear}
+                                        placeholder="Tahun"
+                                        width="w-full"
+                                        usePortal
+                                    />
+                                    <Dropdown
+                                        value={programStatus}
+                                        items={PROGRAM_STATUS_OPTIONS}
+                                        onChange={setProgramStatus}
+                                        placeholder="Status"
+                                        width="w-full"
+                                        usePortal
+                                    />
+                                </div>
+                            )}
+
+                            {activeDataset === "VENDOR" && (
+                                <div className="flex flex-wrap gap-2">
+                                    {VENDOR_CATEGORY_OPTIONS.map((item) => (
+                                        <button
+                                            key={item.value}
+                                            type="button"
+                                            onClick={() => setVendorCategory(item.value)}
+                                            className={`h-10 rounded-xl border px-4 text-[12px] font-black transition ${vendorCategory === item.value
+                                                ? "border-slate-950 bg-slate-950 text-white"
+                                                : "border-slate-200 bg-white text-slate-600 hover:border-cyan-200"
+                                                }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_330px]">
+                            <div className="min-w-0 px-4 py-4">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-[20px] font-black text-slate-950">
+                                            {activeTab.label}
+                                        </h2>
+                                    </div>
+
+                                    <span className="rounded-full border border-slate-200 px-3 py-1 text-[12px] font-black text-slate-700">
+                                        Total {activeTab.total}
+                                    </span>
+                                </div>
+
+                                <div className="h-[340px] min-w-0 xl:h-[420px]">
+                                    <ResponsiveContainer
+                                        width="100%"
+                                        height="100%"
+                                        minWidth={0}
+                                        minHeight={320}
+                                    >
+                                        <AreaChart
+                                            data={activeChartData}
+                                            margin={{
+                                                top: 10,
+                                                right: 18,
+                                                left: -12,
+                                                bottom: 8,
+                                            }}
+                                        >
+                                            <defs>
+                                                <linearGradient
+                                                    id="pengurusCockpitGradient"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="1"
+                                                    y2="0"
+                                                >
+                                                    <stop offset="0%" stopColor="#F97316" />
+                                                    <stop offset="45%" stopColor="#D946EF" />
+                                                    <stop offset="100%" stopColor="#2563EB" />
+                                                </linearGradient>
+                                                <linearGradient
+                                                    id="pengurusCockpitFill"
+                                                    x1="0"
+                                                    y1="0"
+                                                    x2="0"
+                                                    y2="1"
+                                                >
+                                                    <stop
+                                                        offset="0%"
+                                                        stopColor="#0AC4E0"
+                                                        stopOpacity={0.24}
+                                                    />
+                                                    <stop
+                                                        offset="100%"
+                                                        stopColor="#0AC4E0"
+                                                        stopOpacity={0.02}
+                                                    />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid
+                                                stroke="#EDF2F7"
+                                                vertical={false}
+                                            />
+                                            <XAxis
+                                                dataKey="name"
+                                                minTickGap={18}
+                                                height={42}
+                                                tickMargin={10}
+                                                tick={{
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    fill: "#64748B",
+                                                }}
+                                                tickFormatter={(value) => compactAxisLabel(value)}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <YAxis
+                                                allowDecimals={false}
+                                                tick={{
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    fill: "#94A3B8",
+                                                }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                            />
+                                            <Tooltip content={<ChartTooltip />} />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="value"
+                                                stroke="url(#pengurusCockpitGradient)"
+                                                strokeWidth={3}
+                                                fill="url(#pengurusCockpitFill)"
+                                                dot={false}
+                                                activeDot={{ r: 5, fill: "#0F172A" }}
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <aside className="border-t border-slate-100 bg-slate-50/70 p-4 xl:border-l xl:border-t-0">
+                                <div className="grid gap-2">
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                        <p className="text-[12px] font-semibold text-slate-500">
+                                            Total Data
+                                        </p>
+                                        <p className="mt-1 text-[30px] font-black leading-none text-slate-950">
+                                            {activeTotal}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                        <p className="text-[12px] font-semibold text-slate-500">
+                                            Tertinggi
+                                        </p>
+                                        <p className="mt-2 text-[16px] font-black leading-5 text-slate-950">
+                                            {activePeak.name}
+                                        </p>
+                                        <p className="mt-1 text-[23px] font-black text-[#0AC4E0]">
+                                            {activePeak.value}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                                        <p className="text-[12px] font-semibold text-slate-500">
+                                            Rata-rata
+                                        </p>
+                                        <p className="mt-1 text-[27px] font-black leading-none text-slate-950">
+                                            {activeAverage}
+                                        </p>
+                                    </div>
+                                </div>
+                            </aside>
+                        </div>
+                    </section>
+
+                    <section className="hidden">
+                        {activeDataset === "PROGRAM" && (
+                            <DataTable
+                                data={filteredPrograms}
+                                tableMinWidth="min-w-0"
+                                compact
+                                searchPlaceholder="Cari detail program..."
+                                emptyText="Program tidak ditemukan"
+                                getSearchText={(program) =>
+                                    `${getProgramName(program)} ${getProgramCode(
+                                        program,
+                                    )} ${program.__schoolNames} ${program.__districtNames
+                                    } ${program.__provinceNames} ${PILLAR_META[program.__pillar]?.label || ""
+                                    } ${program.__areaNames} ${program.__type} ${program.__status}`
+                                }
+                                columns={[
+                                    {
+                                        key: "program",
+                                        label: "Program",
+                                        headerClassName: "w-[36%]",
+                                        cellClassName: "w-[36%]",
+                                        render: (program) => (
+                                            <div>
+                                                <p className="text-[13px] font-black leading-5 text-slate-900">
+                                                    {getProgramName(program)}
+                                                </p>
+                                                <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                                    {getProgramCode(program)} · Tahun{" "}
+                                                    {getProgramYear(program)}
+                                                </p>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "kategori",
+                                        label: "Kategori",
+                                        headerClassName: "w-[22%]",
+                                        cellClassName: "w-[22%]",
+                                        render: (program) => (
+                                            <div className="flex flex-wrap gap-2">
+                                                <PillarBadge value={program.__pillar} />
+                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                                                    {program.__type === "REGULER" ? "Reguler" : "Project"}
+                                                </span>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "target",
+                                        label: "Target",
+                                        headerClassName: "w-[28%]",
+                                        cellClassName: "w-[28%]",
+                                        render: (program) => (
+                                            <div>
+                                                <p className="text-[12px] font-black leading-5 text-slate-800">
+                                                    {program.__schoolNames}
+                                                </p>
+                                                <p className="mt-1 text-[10px] font-bold leading-4 text-slate-400">
+                                                    {program.__districtNames} ·{" "}
+                                                    {program.__provinceNames}
+                                                </p>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "status",
+                                        label: "Status",
+                                        headerClassName: "w-[14%] text-center",
+                                        cellClassName: "w-[14%] text-center",
+                                        render: (program) => (
+                                            <div className="flex justify-center">
+                                                <StatusBadge value={program.__status} />
+                                            </div>
+                                        ),
+                                    },
+                                ]}
+                            />
+                        )}
+
+                        {activeDataset === "VENDOR" && (
+                            <DataTable
+                                data={filteredVendors}
+                                tableMinWidth="min-w-0"
+                                compact
+                                searchPlaceholder="Cari vendor..."
+                                emptyText="Vendor tidak ditemukan"
+                                getSearchText={(vendor) =>
+                                    `${getVendorName(vendor)} ${normalizeVendorCategory(
+                                        vendor,
+                                    )} ${getVendorStatusLabel(vendor)}`
+                                }
+                                columns={[
+                                    {
+                                        key: "vendor",
+                                        label: "Vendor",
+                                        headerClassName: "w-[45%]",
+                                        cellClassName: "w-[45%]",
+                                        render: (vendor) => (
+                                            <div>
+                                                <p className="text-[13px] font-black leading-5 text-slate-900">
+                                                    {getVendorName(vendor)}
+                                                </p>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "kategori",
+                                        label: "Kategori",
+                                        headerClassName: "w-[30%]",
+                                        cellClassName: "w-[30%]",
+                                        render: (vendor) => (
+                                            <PillarBadge value={normalizeVendorCategory(vendor)} />
+                                        ),
+                                    },
+                                    {
+                                        key: "status",
+                                        label: "Status",
+                                        headerClassName: "w-[25%] text-center",
+                                        cellClassName: "w-[25%] text-center",
+                                        render: (vendor) => (
+                                            <div className="flex justify-center">
+                                                <StatusBadge value={getVendorStatusLabel(vendor)} />
+                                            </div>
+                                        ),
+                                    },
+                                ]}
+                            />
+                        )}
+
+                        {activeDataset === "SEKOLAH" && (
+                            <DataTable
+                                data={enrichedSchools}
+                                tableMinWidth="min-w-0"
+                                compact
+                                searchPlaceholder="Cari sekolah..."
+                                emptyText="Sekolah tidak ditemukan"
+                                getSearchText={(school) =>
+                                    `${getSchoolName(school)} ${school.__districtName} ${school.__provinceName} ${getSchoolLevel(school)}`
+                                }
+                                columns={[
+                                    {
+                                        key: "sekolah",
+                                        label: "Sekolah",
+                                        headerClassName: "w-[46%]",
+                                        cellClassName: "w-[46%]",
+                                        render: (school) => (
+                                            <div>
+                                                <p className="text-[13px] font-black leading-5 text-slate-900">
+                                                    {getSchoolName(school)}
+                                                </p>
+                                                <p className="mt-1 text-[10px] font-bold text-slate-400">
+                                                    {getSchoolLevel(school)} · NPSN{" "}
+                                                    {getSchoolNpsn(school)}
+                                                </p>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "wilayah",
+                                        label: "Wilayah",
+                                        headerClassName: "w-[34%]",
+                                        cellClassName: "w-[34%]",
+                                        render: (school) => (
+                                            <div>
+                                                <p className="text-[12px] font-black leading-5 text-slate-800">
+                                                    {school.__districtName}
+                                                </p>
+                                                <p className="mt-1 text-[10px] font-bold text-slate-400">
+                                                    {school.__provinceName}
+                                                </p>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        key: "status",
+                                        label: "Status",
+                                        headerClassName: "w-[20%] text-center",
+                                        cellClassName: "w-[20%] text-center",
+                                        render: (school) => (
+                                            <div className="flex justify-center">
+                                                <StatusBadge value={getSchoolStatus(school)} />
+                                            </div>
+                                        ),
+                                    },
+                                ]}
+                            />
+                        )}
+                    </section>
+                </div>
+            </main>
+        </PageWrapper>
+    );
 
     return (
         <PageWrapper className="flex h-screen w-full overflow-hidden bg-[#F6F9FC] !p-0 font-sans text-slate-800">
@@ -2456,14 +3186,14 @@ export default function DashboardPengurus() {
                         />
                     </section>
 
-                    <ExecutiveMap mapData={mapData} />
+                    <ExecutiveMap mapData={mapData} onScopeChange={setMapScope} />
 
                     <AnalyticsSection
                         eyebrow="Strategic Program Portfolio"
                         title="Portofolio Program Empat Pilar"
                         subtitle="Komposisi program dibagi menjadi Akademik, Karakter, Seni Budaya, dan Kecakapan Hidup. Seluruh filter memengaruhi diagram dan daftar program."
                         filters={
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
                                 <div className="relative xl:col-span-2">
                                     <Search
                                         size={14}
@@ -2501,6 +3231,21 @@ export default function DashboardPengurus() {
                                     items={PROGRAM_TYPE_OPTIONS}
                                     onChange={setProgramType}
                                     placeholder="Semua Jenis"
+                                    width="w-full"
+                                    usePortal
+                                />
+
+                                <Dropdown
+                                    value={programYear}
+                                    items={[
+                                        { value: "ALL", label: "Semua Tahun" },
+                                        ...PROGRAM_YEAR_OPTIONS.map((year) => ({
+                                            value: year,
+                                            label: year,
+                                        })),
+                                    ]}
+                                    onChange={setProgramYear}
+                                    placeholder="Semua Tahun"
                                     width="w-full"
                                     usePortal
                                 />
@@ -2550,12 +3295,12 @@ export default function DashboardPengurus() {
                                     </div>
                                 </div>
 
-                                <div className="h-[330px] min-w-0">
+                                <div className="h-[282px] min-w-0">
                                     <ResponsiveContainer
                                         width="100%"
                                         height="100%"
                                         minWidth={0}
-                                        minHeight={0}
+                                        minHeight={260}
                                     >
                                         {programChartMode === "PIE" ? (
                                             <PieChart>
@@ -2563,11 +3308,13 @@ export default function DashboardPengurus() {
                                                     data={programChartData}
                                                     dataKey="value"
                                                     nameKey="name"
-                                                    innerRadius={66}
-                                                    outerRadius={112}
-                                                    paddingAngle={4}
+                                                    cx="46%"
+                                                    cy="50%"
+                                                    innerRadius={0}
+                                                    outerRadius={92}
+                                                    paddingAngle={2}
                                                     stroke="#FFFFFF"
-                                                    strokeWidth={4}
+                                                    strokeWidth={3}
                                                 >
                                                     {programChartData.map((item) => (
                                                         <Cell
@@ -2661,7 +3408,8 @@ export default function DashboardPengurus() {
                         table={
                             <DataTable
                                 data={filteredPrograms}
-                                tableMinWidth="min-w-[980px]"
+                                tableMinWidth="min-w-0"
+                                compact
                                 searchPlaceholder="Cari detail program pada daftar..."
                                 emptyText="Program tidak ditemukan"
                                 getSearchText={(program) =>
@@ -2675,49 +3423,49 @@ export default function DashboardPengurus() {
                                     {
                                         key: "program",
                                         label: "Program",
+                                        headerClassName: "w-[29%]",
+                                        cellClassName: "w-[29%]",
                                         render: (program) => (
                                             <div>
-                                                <p className="max-w-[250px] text-[12px] font-black leading-5 text-slate-900">
+                                                <p className="line-clamp-2 text-[11px] font-black leading-5 text-slate-900">
                                                     {getProgramName(program)}
                                                 </p>
                                                 <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-slate-400">
                                                     {getProgramCode(program)} · Tahun{" "}
-                                                    {safeText(program?.tahun)}
+                                                    {getProgramYear(program)}
                                                 </p>
                                             </div>
                                         ),
                                     },
                                     {
-                                        key: "pilar",
-                                        label: "Pilar",
+                                        key: "kategori",
+                                        label: "Kategori",
+                                        headerClassName: "w-[16%]",
+                                        cellClassName: "w-[16%]",
                                         render: (program) => (
-                                            <PillarBadge value={program.__pillar} />
-                                        ),
-                                    },
-                                    {
-                                        key: "jenis",
-                                        label: "Jenis",
-                                        render: (program) => (
-                                            <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">
-                                                {program.__type === "REGULER"
-                                                    ? "Reguler"
-                                                    : "Project"}
-                                            </p>
+                                            <div className="flex flex-col items-start gap-1.5">
+                                                <PillarBadge value={program.__pillar} />
+                                                <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                                    {program.__type === "REGULER" ? "Reguler" : "Project"}
+                                                </span>
+                                            </div>
                                         ),
                                     },
                                     {
                                         key: "sekolah",
                                         label: "Sekolah & Wilayah",
+                                        headerClassName: "w-[27%]",
+                                        cellClassName: "w-[27%]",
                                         render: (program) => (
                                             <div>
-                                                <p className="max-w-[260px] text-[11px] font-black leading-4 text-slate-700">
+                                                <p className="line-clamp-2 text-[10px] font-black leading-4 text-slate-700">
                                                     {program.__schoolNames}
                                                 </p>
-                                                <p className="mt-1 max-w-[260px] text-[9px] font-bold leading-4 text-slate-400">
+                                                <p className="mt-1 line-clamp-1 text-[9px] font-bold leading-4 text-slate-400">
                                                     {program.__districtNames} ·{" "}
                                                     {program.__provinceNames}
                                                 </p>
-                                                <p className="mt-1 max-w-[260px] text-[9px] font-black uppercase tracking-wider text-[#0AC4E0]">
+                                                <p className="mt-1 line-clamp-1 text-[9px] font-black uppercase tracking-wider text-[#0AC4E0]">
                                                     {program.__areaNames || "Area belum ditentukan"}
                                                 </p>
                                             </div>
@@ -2726,8 +3474,10 @@ export default function DashboardPengurus() {
                                     {
                                         key: "periode",
                                         label: "Periode",
+                                        headerClassName: "w-[13%]",
+                                        cellClassName: "w-[13%]",
                                         render: (program) => (
-                                            <p className="text-[10px] font-bold leading-4 text-slate-500">
+                                            <p className="text-[9px] font-bold leading-4 text-slate-500">
                                                 {formatDate(
                                                     program?.tanggal_mulai ??
                                                     program?.waktu_mulai,
@@ -2741,20 +3491,14 @@ export default function DashboardPengurus() {
                                         ),
                                     },
                                     {
-                                        key: "rating",
-                                        label: "Rating Guru",
-                                        render: (program) => (
-                                            <ProgramRatingStars
-                                                program={program}
-                                                size={13}
-                                            />
-                                        ),
-                                    },
-                                    {
                                         key: "status",
                                         label: "Status",
+                                        headerClassName: "w-[15%] text-center",
+                                        cellClassName: "w-[15%] text-center",
                                         render: (program) => (
-                                            <StatusBadge value={program.__status} />
+                                            <div className="flex justify-center">
+                                                <StatusBadge value={program.__status} />
+                                            </div>
                                         ),
                                     },
                                 ]}
@@ -2796,23 +3540,25 @@ export default function DashboardPengurus() {
                                     </p>
                                 </div>
 
-                                <div className="h-[330px] min-w-0">
+                                <div className="h-[282px] min-w-0">
                                     <ResponsiveContainer
                                         width="100%"
                                         height="100%"
                                         minWidth={0}
-                                        minHeight={0}
+                                        minHeight={260}
                                     >
                                         <PieChart>
                                             <Pie
                                                 data={vendorChartData}
                                                 dataKey="value"
                                                 nameKey="name"
-                                                innerRadius={68}
-                                                outerRadius={112}
-                                                paddingAngle={5}
+                                                cx="46%"
+                                                cy="50%"
+                                                innerRadius={0}
+                                                outerRadius={92}
+                                                paddingAngle={2}
                                                 stroke="#FFFFFF"
-                                                strokeWidth={4}
+                                                strokeWidth={3}
                                             >
                                                 {vendorChartData.map((item) => (
                                                     <Cell

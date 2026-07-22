@@ -1,6 +1,6 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     AlertTriangle,
     Award,
@@ -8,7 +8,6 @@ import {
     Building2,
     CalendarDays,
     CheckCircle2,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     ClipboardList,
@@ -41,13 +40,13 @@ import {
     Cell,
     Pie,
     PieChart,
-    ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
 } from "recharts";
 
 import {
+    GeoJSON,
     MapContainer,
     Marker,
     Popup,
@@ -61,9 +60,12 @@ import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
 import Input from "../../components/Input";
 import Button from "../../components/Button";
+import Dropdown from "../../components/Dropdown";
+import ResponsiveContainer from "../../components/charts/SafeResponsiveContainer";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
+import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 const COLORS = {
     cyan: CHART_STATUS_COLORS.info,
@@ -98,7 +100,19 @@ const STATUS_CLASS = {
 
 const KADIN_INDONESIA_CENTER = [-2.5, 118];
 const KADIN_INDONESIA_ZOOM = 5;
+const KADIN_INDONESIA_MAX_BOUNDS = [
+    [-13.0, 92.0],
+    [8.2, 143.5],
+];
+const KADIN_INDONESIA_GEOJSON_STYLE = {
+    color: "#0AC4E0",
+    weight: 1.25,
+    opacity: 0.82,
+    fillColor: "#0AC4E0",
+    fillOpacity: 0.08,
+};
 const KADIN_ROWS_PER_PAGE = 5;
+const KADIN_CHART_GROUP_LIMIT = 8;
 
 const KADIN_PILLAR_META = {
     AKADEMIK: {
@@ -2611,9 +2625,9 @@ function KadinMapViewport({ request }) {
     useEffect(() => {
         if (!request) return undefined;
 
-        const timer = window.setTimeout(() => {
+        const applyViewport = () => {
             map.stop();
-            map.invalidateSize();
+            map.invalidateSize({ pan: false });
 
             if (request.bounds?.length >= 2) {
                 map.fitBounds(request.bounds, {
@@ -2627,9 +2641,18 @@ function KadinMapViewport({ request }) {
                     animate: true,
                 });
             }
-        }, 90);
+        };
 
-        return () => window.clearTimeout(timer);
+        applyViewport();
+        const timers = [90, 260, 560, 920].map((delay) =>
+            window.setTimeout(applyViewport, delay),
+        );
+        window.addEventListener("resize", applyViewport);
+
+        return () => {
+            timers.forEach((timer) => window.clearTimeout(timer));
+            window.removeEventListener("resize", applyViewport);
+        };
     }, [map, request]);
 
     return null;
@@ -2715,7 +2738,27 @@ function KadinDistrictPopup({ district }) {
     );
 }
 
-function KadinProvinceMap({ wilayah, wilayahList, schools }) {
+function KadinFilterDropdown({
+    value,
+    onChange,
+    items,
+    placeholder,
+    disabled = false,
+    width = "min-w-[160px] flex-1 sm:flex-none",
+}) {
+    return (
+        <Dropdown
+            value={value}
+            onChange={onChange}
+            items={items}
+            placeholder={placeholder}
+            disabled={disabled}
+            width={width}
+        />
+    );
+}
+
+function KadinProvinceMap({ wilayah, wilayahList, schools, onScopeChange }) {
     const mapData = useMemo(
         () => buildKadinProvinceMapData(wilayah, wilayahList, schools),
         [wilayah, wilayahList, schools],
@@ -2733,12 +2776,13 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
         setFocused(false);
         setSelectedDistrict("ALL");
         setSearch("");
+        onScopeChange?.(null);
         setViewport({
             center: KADIN_INDONESIA_CENTER,
             zoom: KADIN_INDONESIA_ZOOM,
             nonce: Date.now(),
         });
-    }, [mapData?.key]);
+    }, [mapData?.key, onScopeChange]);
 
     const filteredDistricts = useMemo(() => {
         if (!mapData || !focused) return [];
@@ -2770,6 +2814,7 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
 
         setFocused(true);
         setSelectedDistrict("ALL");
+        onScopeChange?.(null);
         setViewport({
             bounds: mapData.bounds,
             center: mapData.center,
@@ -2790,6 +2835,11 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
 
         const district = mapData.districts.find((item) => item.key === districtKey);
         if (!district) return;
+        onScopeChange?.({
+            type: "district",
+            key: district.key,
+            name: district.name,
+        });
 
         const schoolCoordinates = district.schools
             .map((school) => school.__mapCoordinate)
@@ -2819,6 +2869,7 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
         setFocused(false);
         setSelectedDistrict("ALL");
         setSearch("");
+        onScopeChange?.(null);
         setViewport({
             center: KADIN_INDONESIA_CENTER,
             zoom: KADIN_INDONESIA_ZOOM,
@@ -2840,18 +2891,21 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
 
     return (
         <section className="mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <style>{`
+                .kadin-map-action-pulse {
+                    animation: kadinMapActionPulse 1.45s ease-in-out infinite;
+                }
+                @keyframes kadinMapActionPulse {
+                    0%, 100% { box-shadow: 0 0 0 0 rgba(10,196,224,.3); transform: translateY(0); }
+                    50% { box-shadow: 0 0 0 8px rgba(10,196,224,0); transform: translateY(-1px); }
+                }
+            `}</style>
+
             <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-600">
-                        <MapPinned size={14} />
-                        Peta Wilayah Kepala Dinas
-                    </div>
-                    <h2 className="mt-1 text-2xl font-black text-slate-900">
+                    <h2 className="text-2xl font-black text-slate-900">
                         Persebaran Sekolah di {mapData.name}
                     </h2>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">
-                        Hanya provinsi pada akun Kepala Dinas yang ditampilkan. Fokuskan provinsi untuk membuka marker kabupaten dan sekolah binaan.
-                    </p>
                 </div>
 
                 {focused && (
@@ -2865,20 +2919,21 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
                 )}
             </div>
 
-            <div className="grid gap-3 border-b border-slate-100 bg-slate-50 px-6 py-4 md:grid-cols-2">
-                <select
+            <div className="hidden">
+                <KadinFilterDropdown
                     value={selectedDistrict}
                     disabled={!focused}
-                    onChange={(event) => focusDistrict(event.target.value)}
-                    className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-[11px] font-black text-slate-700 outline-none focus:border-cyan-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                    <option value="ALL">Semua Kabupaten/Kota</option>
-                    {mapData.districts.map((district) => (
-                        <option key={district.key} value={district.key}>
-                            {district.name}
-                        </option>
-                    ))}
-                </select>
+                    onChange={focusDistrict}
+                    items={[
+                        { value: "ALL", label: "Semua Kabupaten/Kota" },
+                        ...mapData.districts.map((district) => ({
+                            value: district.key,
+                            label: district.name,
+                        })),
+                    ]}
+                    placeholder="Semua Kabupaten/Kota"
+                    width="w-full"
+                />
 
                 <div className="relative">
                     <Search
@@ -2899,6 +2954,8 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
                     center={KADIN_INDONESIA_CENTER}
                     zoom={KADIN_INDONESIA_ZOOM}
                     minZoom={4}
+                    maxBounds={KADIN_INDONESIA_MAX_BOUNDS}
+                    maxBoundsViscosity={1}
                     scrollWheelZoom
                     className="h-full w-full"
                 >
@@ -2907,6 +2964,12 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <GeoJSON
+                        data={indonesiaGeoJson}
+                        style={KADIN_INDONESIA_GEOJSON_STYLE}
+                        interactive={false}
                     />
 
                     {!focused && (
@@ -2943,9 +3006,9 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
                                     <button
                                         type="button"
                                         onClick={focusProvince}
-                                        className="mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
+                                        className="kadin-map-action-pulse mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
                                     >
-                                        Fokuskan Provinsi
+                                        Lihat Program Wilayah Ini
                                     </button>
                                 </div>
                             </Popup>
@@ -2961,6 +3024,9 @@ function KadinProvinceMap({ wilayah, wilayahList, schools }) {
                                     district.schools.length,
                                     selectedDistrict === district.key,
                                 )}
+                                eventHandlers={{
+                                    click: () => focusDistrict(district.key),
+                                }}
                             >
                                 <Popup>
                                     <KadinDistrictPopup district={district} />
@@ -3051,6 +3117,41 @@ function KadinAnalyticsTooltip({ active, payload, label }) {
     );
 }
 
+function compactKadinChartRows(rows = [], limit = KADIN_CHART_GROUP_LIMIT) {
+    const sortedRows = [...rows]
+        .filter((row) => Number(row?.total || 0) > 0)
+        .sort((a, b) => Number(b?.total || 0) - Number(a?.total || 0));
+
+    if (sortedRows.length <= limit) return sortedRows;
+
+    const mainRows = sortedRows.slice(0, limit - 1);
+    const otherRows = sortedRows.slice(limit - 1);
+
+    const otherSummary = otherRows.reduce(
+        (summary, row) => ({
+            name: "Lainnya",
+            akademik: summary.akademik + Number(row.akademik || 0),
+            karakter: summary.karakter + Number(row.karakter || 0),
+            seniBudaya: summary.seniBudaya + Number(row.seniBudaya || 0),
+            kecakapanHidup:
+                summary.kecakapanHidup + Number(row.kecakapanHidup || 0),
+            total: summary.total + Number(row.total || 0),
+            _groupedCount: summary._groupedCount + 1,
+        }),
+        {
+            name: "Lainnya",
+            akademik: 0,
+            karakter: 0,
+            seniBudaya: 0,
+            kecakapanHidup: 0,
+            total: 0,
+            _groupedCount: 0,
+        },
+    );
+
+    return [...mainRows, otherSummary];
+}
+
 function KadinCoverageChart({ rows, visiblePillars, chartType }) {
     if (!rows.length) {
         return (
@@ -3060,6 +3161,8 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
             />
         );
     }
+
+    const visualRows = compactKadinChartRows(rows);
 
     const pieRows = visiblePillars
         .map((pillarKey) => {
@@ -3115,8 +3218,7 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                                 nameKey="name"
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={78}
-                                outerRadius={128}
+                                outerRadius={138}
                                 paddingAngle={4}
                                 stroke="#FFFFFF"
                                 strokeWidth={4}
@@ -3128,25 +3230,19 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                             <Tooltip content={<KadinAnalyticsTooltip />} />
                         </PieChart>
                     </ResponsiveContainer>
-
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center">
-                        <span className="text-4xl font-black leading-none text-slate-800">
-                            {total}
-                        </span>
-                        <span className="mt-1 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                            Total Data
-                        </span>
-                    </div>
+                    <span className="absolute right-3 top-3 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                        Total {total}
+                    </span>
                 </div>
             </div>
         );
     }
 
-    const chartHeight = Math.max(360, rows.length * 58);
+    const chartHeight = Math.max(360, visualRows.length * 58);
 
     return (
         <div className="min-w-0">
-            <div className="mb-3 flex flex-wrap gap-3">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
                 {visiblePillars.map((pillarKey) => {
                     const meta = KADIN_PILLAR_META[pillarKey];
 
@@ -3163,13 +3259,18 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                         </span>
                     );
                 })}
+                {rows.length > visualRows.length && (
+                    <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0]">
+                        Top {KADIN_CHART_GROUP_LIMIT - 1} + Lainnya
+                    </span>
+                )}
             </div>
 
             <div className="max-h-[430px] min-w-0 overflow-y-auto pr-2">
                 <div style={{ height: chartHeight, minWidth: 0 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart
-                            data={rows}
+                            data={visualRows}
                             layout="vertical"
                             margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
                         >
@@ -3423,62 +3524,65 @@ function KadinAnalyticsSection({
                     />
                 </div>
 
-                <select
+                <KadinFilterDropdown
                     value={pillarFilter}
-                    onChange={(event) => setPillarFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Pilar</option>
-                    {Object.entries(KADIN_PILLAR_META).map(([key, meta]) => (
-                        <option key={key} value={key}>
-                            {meta.label}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setPillarFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Pilar" },
+                        ...Object.entries(KADIN_PILLAR_META).map(([key, meta]) => ({
+                            value: key,
+                            label: meta.label,
+                        })),
+                    ]}
+                    placeholder="Semua Pilar"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={districtFilter}
-                    onChange={(event) => setDistrictFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Kabupaten</option>
-                    {districtOptions.map((district) => (
-                        <option key={district} value={district}>
-                            {district}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setDistrictFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Kabupaten" },
+                        ...districtOptions.map((district) => ({
+                            value: district,
+                            label: district,
+                        })),
+                    ]}
+                    placeholder="Semua Kabupaten"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={groupBy}
-                    onChange={(event) => setGroupBy(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="SEKOLAH">Per Sekolah</option>
-                    <option value="KABUPATEN">Per Kabupaten</option>
-                </select>
+                    onChange={setGroupBy}
+                    items={[
+                        { value: "SEKOLAH", label: "Per Sekolah" },
+                        { value: "KABUPATEN", label: "Per Kabupaten" },
+                    ]}
+                    placeholder="Per Sekolah"
+                />
 
                 {type === "PROGRAM" && (
-                    <select
+                    <KadinFilterDropdown
                         value={typeFilter}
-                        onChange={(event) => setTypeFilter(event.target.value)}
-                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                    >
-                        <option value="ALL">Semua Jenis</option>
-                        <option value="REGULER">Reguler</option>
-                        <option value="PROJECT">Project</option>
-                    </select>
+                        onChange={setTypeFilter}
+                        items={[
+                            { value: "ALL", label: "Semua Jenis" },
+                            { value: "REGULER", label: "Reguler" },
+                            { value: "PROJECT", label: "Project" },
+                        ]}
+                        placeholder="Semua Jenis"
+                    />
                 )}
 
-                <select
+                <KadinFilterDropdown
                     value={progressFilter}
-                    onChange={(event) => setProgressFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Status</option>
-                    <option value="PROSES">Dalam Proses</option>
-                    <option value="SELESAI">Selesai</option>
-                </select>
+                    onChange={setProgressFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Status" },
+                        { value: "PROSES", label: "Dalam Proses" },
+                        { value: "SELESAI", label: "Selesai" },
+                    ]}
+                    placeholder="Semua Status"
+                />
             </div>
 
             <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -3959,7 +4063,7 @@ function KadinSchoolAnalyticsSection({ schools, programsBySchool, provinceName }
         <section className="mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
             <DashboardSectionHeader
                 eyebrow="Data Sekolah Regional"
-                title="Diagram dan Daftar Sekolah"
+                title="Diagram Sekolah"
                 description={`Hanya menampilkan sekolah SD, SMP, dan SMK yang berada di provinsi ${provinceName}. Diagram dikelompokkan per kabupaten/kota.`}
                 icon={<School size={14} />}
             />
@@ -3978,33 +4082,34 @@ function KadinSchoolAnalyticsSection({ schools, programsBySchool, provinceName }
                     />
                 </div>
 
-                <select
+                <KadinFilterDropdown
                     value={jenjangFilter}
-                    onChange={(event) => setJenjangFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Jenjang</option>
-                    <option value="SD">SD</option>
-                    <option value="SMP">SMP</option>
-                    <option value="SMK">SMK</option>
-                </select>
+                    onChange={setJenjangFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Jenjang" },
+                        { value: "SD", label: "SD" },
+                        { value: "SMP", label: "SMP" },
+                        { value: "SMK", label: "SMK" },
+                    ]}
+                    placeholder="Semua Jenjang"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={districtFilter}
-                    onChange={(event) => setDistrictFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Kabupaten</option>
-                    {districtOptions.map((district) => (
-                        <option key={district} value={district}>
-                            {district}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setDistrictFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Kabupaten" },
+                        ...districtOptions.map((district) => ({
+                            value: district,
+                            label: district,
+                        })),
+                    ]}
+                    placeholder="Semua Kabupaten"
+                />
             </div>
 
-            <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                <div className="flex min-w-0 flex-col border-b border-slate-100 xl:border-b-0 xl:border-r">
+            <div className="grid min-w-0 grid-cols-1">
+                <div className="hidden">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Menampilkan {filteredSchools.length === 0 ? 0 : startIndex + 1}-
@@ -4284,7 +4389,7 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
         <section className="mb-10 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
             <DashboardSectionHeader
                 eyebrow="Program Regional"
-                title="Diagram dan Daftar Program"
+                title="Diagram Program"
                 description={`Program yang tampil wajib terhubung ke sekolah di provinsi ${provinceName}. Filter tersedia berdasarkan jenjang, kabupaten, status proses, dan empat pilar pembinaan.`}
                 icon={<FolderKanban size={14} />}
             />
@@ -4303,65 +4408,68 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
                     />
                 </div>
 
-                <select
+                <KadinFilterDropdown
                     value={jenjangFilter}
-                    onChange={(event) => setJenjangFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Jenjang</option>
-                    <option value="SD">SD</option>
-                    <option value="SMP">SMP</option>
-                    <option value="SMK">SMK</option>
-                </select>
+                    onChange={setJenjangFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Jenjang" },
+                        { value: "SD", label: "SD" },
+                        { value: "SMP", label: "SMP" },
+                        { value: "SMK", label: "SMK" },
+                    ]}
+                    placeholder="Semua Jenjang"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={pillarFilter}
-                    onChange={(event) => setPillarFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Pilar</option>
-                    {Object.entries(KADIN_PILLAR_META).map(([key, meta]) => (
-                        <option key={key} value={key}>
-                            {meta.label}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setPillarFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Pilar" },
+                        ...Object.entries(KADIN_PILLAR_META).map(([key, meta]) => ({
+                            value: key,
+                            label: meta.label,
+                        })),
+                    ]}
+                    placeholder="Semua Pilar"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={districtFilter}
-                    onChange={(event) => setDistrictFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Kabupaten</option>
-                    {districtOptions.map((district) => (
-                        <option key={district} value={district}>
-                            {district}
-                        </option>
-                    ))}
-                </select>
+                    onChange={setDistrictFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Kabupaten" },
+                        ...districtOptions.map((district) => ({
+                            value: district,
+                            label: district,
+                        })),
+                    ]}
+                    placeholder="Semua Kabupaten"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={groupBy}
-                    onChange={(event) => setGroupBy(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="SEKOLAH">Kelompok Per Sekolah</option>
-                    <option value="KABUPATEN">Kelompok Per Kabupaten</option>
-                </select>
+                    onChange={setGroupBy}
+                    items={[
+                        { value: "SEKOLAH", label: "Kelompok Per Sekolah" },
+                        { value: "KABUPATEN", label: "Kelompok Per Kabupaten" },
+                    ]}
+                    placeholder="Kelompok Per Sekolah"
+                />
 
-                <select
+                <KadinFilterDropdown
                     value={progressFilter}
-                    onChange={(event) => setProgressFilter(event.target.value)}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-wide text-slate-500 outline-none focus:border-cyan-400"
-                >
-                    <option value="ALL">Semua Status</option>
-                    <option value="PROSES">Sedang Berjalan</option>
-                    <option value="SELESAI">Selesai</option>
-                </select>
+                    onChange={setProgressFilter}
+                    items={[
+                        { value: "ALL", label: "Semua Status" },
+                        { value: "PROSES", label: "Sedang Berjalan" },
+                        { value: "SELESAI", label: "Selesai" },
+                    ]}
+                    placeholder="Semua Status"
+                />
             </div>
 
-            <div className="grid min-w-0 grid-cols-1 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                <div className="flex min-w-0 flex-col border-b border-slate-100 xl:border-b-0 xl:border-r">
+            <div className="grid min-w-0 grid-cols-1">
+                <div className="hidden">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                             Menampilkan {filteredRows.length === 0 ? 0 : startIndex + 1}-
@@ -4523,6 +4631,11 @@ export default function DashboardKepalaDinas() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [loadError, setLoadError] = useState("");
+    const [mapScope, setMapScope] = useState(null);
+
+    const handleMapScopeChange = useCallback((scope) => {
+        setMapScope(scope);
+    }, []);
 
     const fetchProgramDetail = async (program, headers) => {
         const id = getProgramId(program);
@@ -4746,6 +4859,7 @@ export default function DashboardKepalaDinas() {
             setWilayahList(wilayahList);
             setSchools(visibleSchools);
             setPrograms(visiblePrograms);
+            setMapScope(null);
         } catch (error) {
             console.error("Dashboard Kepala Dinas Error:", error);
             setLoadError(error?.message || "Gagal memuat Dashboard Kepala Dinas.");
@@ -4754,6 +4868,7 @@ export default function DashboardKepalaDinas() {
             setWilayahList([]);
             setSchools([]);
             setPrograms([]);
+            setMapScope(null);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -4764,15 +4879,45 @@ export default function DashboardKepalaDinas() {
         fetchDashboard();
     }, []);
 
+    const scopedSchools = useMemo(() => {
+        if (!mapScope) return schools;
+
+        const scopeName = cleanText(mapScope.name);
+        return schools.filter(
+            (school) => cleanText(getSchoolWilayahName(school)) === scopeName,
+        );
+    }, [schools, mapScope]);
+
+    const scopedSchoolIds = useMemo(
+        () =>
+            new Set(
+                scopedSchools
+                    .map((school) => getSchoolId(school))
+                    .filter(Boolean)
+                    .map(String),
+            ),
+        [scopedSchools],
+    );
+
+    const scopedPrograms = useMemo(() => {
+        if (!mapScope) return programs;
+
+        return programs.filter((program) =>
+            collectSchoolIdsFromProgram(program).some((schoolId) =>
+                scopedSchoolIds.has(String(schoolId)),
+            ),
+        );
+    }, [programs, mapScope, scopedSchoolIds]);
+
     const programsBySchool = useMemo(() => {
         const map = new Map();
 
-        schools.forEach((school) => {
+        scopedSchools.forEach((school) => {
             const schoolId = getSchoolId(school);
             if (schoolId) map.set(String(schoolId), []);
         });
 
-        programs.forEach((program) => {
+        scopedPrograms.forEach((program) => {
             collectSchoolIdsFromProgram(program).forEach((schoolId) => {
                 const key = String(schoolId);
                 if (map.has(key)) map.get(key).push(program);
@@ -4787,7 +4932,7 @@ export default function DashboardKepalaDinas() {
         });
 
         return map;
-    }, [schools, programs]);
+    }, [scopedSchools, scopedPrograms]);
 
     const runningPrograms = useMemo(
         () =>
@@ -4945,18 +5090,19 @@ export default function DashboardKepalaDinas() {
                             wilayah={wilayah}
                             wilayahList={wilayahList}
                             schools={schools}
+                            onScopeChange={handleMapScopeChange}
                         />
 
                         <KadinSchoolAnalyticsSection
-                            schools={schools}
+                            schools={scopedSchools}
                             programsBySchool={programsBySchool}
-                            provinceName={getWilayahName(wilayah)}
+                            provinceName={mapScope?.name || getWilayahName(wilayah)}
                         />
 
                         <KadinProgramOnlySection
-                            programs={programs}
-                            schools={schools}
-                            provinceName={getWilayahName(wilayah)}
+                            programs={scopedPrograms}
+                            schools={scopedSchools}
+                            provinceName={mapScope?.name || getWilayahName(wilayah)}
                         />
 
                         <div className="rounded-3xl bg-slate-900 p-6 text-white">

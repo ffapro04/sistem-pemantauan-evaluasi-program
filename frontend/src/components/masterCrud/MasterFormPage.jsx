@@ -20,6 +20,7 @@ import Label from "../Label";
 import MasterPageShell from "./MasterPageShell";
 import MasterAlert from "./MasterAlert";
 import MasterField from "./MasterField";
+import { getAuthToken } from "../../utils/authSession";
 
 import {
     buildApiUrl,
@@ -188,7 +189,7 @@ export default function MasterFormPage({ config, mode = "create" }) {
     const [userReady, setUserReady] = useState(false);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
 
         if (token) {
             try {

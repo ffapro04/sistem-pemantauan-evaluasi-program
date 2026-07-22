@@ -1,4 +1,5 @@
-﻿const BASE_URL = "";
+const BASE_URL =
+  import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 
 export async function loginUser(email, password) {
   const response = await fetch(`${BASE_URL}/auth/login`, {
@@ -10,7 +11,16 @@ export async function loginUser(email, password) {
   });
 
   if (!response.ok) {
-    throw new Error("Email atau password salah!");
+    let message = "Email atau password salah.";
+
+    try {
+      const errorBody = await response.json();
+      message = errorBody?.message || errorBody?.error || message;
+    } catch {
+      // Response error tidak selalu JSON.
+    }
+
+    throw new Error(message);
   }
 
   return response.json();
