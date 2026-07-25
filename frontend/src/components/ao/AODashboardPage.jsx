@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
+import { AnimatePresence, motion } from "framer-motion";
 import {
     AlertTriangle,
     BarChart3,
@@ -47,7 +48,9 @@ const API_BASE_URL = (
     ""
 ).replace(/\/$/, "");
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
+const PROGRAM_LIST_PAGE_SIZE = 5;
+const TERRITORY_LIST_PAGE_SIZE = 3;
 
 const COLORS = {
     cyan: CHART_STATUS_COLORS.info,
@@ -1232,11 +1235,7 @@ function Pagination({
 
 function FilterSelect({ label, value, onChange, options }) {
     return (
-        <label className="flex min-w-[180px] flex-col gap-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                {label}
-            </span>
-
+        <div className="min-w-0 [&_button>span]:whitespace-nowrap" title={label}>
             <Dropdown
                 value={value}
                 onChange={onChange}
@@ -1245,7 +1244,7 @@ function FilterSelect({ label, value, onChange, options }) {
                 width="w-full"
                 usePortal
             />
-        </label>
+        </div>
     );
 }
 
@@ -1255,11 +1254,7 @@ function DistrictDropdown({ label, value, onChange, options = [] }) {
         options[0];
 
     return (
-        <label className="flex min-w-0 flex-col gap-1.5 md:col-span-2 xl:col-span-2 2xl:col-span-2">
-            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                {label}
-            </span>
-
+        <div className="min-w-0 [&_button>span]:whitespace-nowrap" title={selectedOption?.label || label}>
             <Dropdown
                 value={value}
                 onChange={onChange}
@@ -1268,14 +1263,7 @@ function DistrictDropdown({ label, value, onChange, options = [] }) {
                 width="w-full"
                 usePortal
             />
-
-            <span
-                className="min-h-[16px] break-words text-[10px] font-bold leading-4 text-slate-500"
-                title={selectedOption?.label || ""}
-            >
-                {selectedOption?.label || "Semua Kabupaten/Kota"}
-            </span>
-        </label>
+        </div>
     );
 }
 
@@ -1440,7 +1428,7 @@ function SchoolTable({
                                 className="border-b border-slate-100 last:border-b-0 hover:bg-cyan-50/30"
                             >
                                 <td className="px-4 py-4 text-left">
-                                    <p className="max-w-[260px] truncate text-[12px] font-black text-slate-800">
+                                    <p className="max-w-[300px] break-words text-[12px] font-black leading-5 text-slate-800">
                                         {row.name}
                                     </p>
                                     {row.npsn && (
@@ -1457,7 +1445,7 @@ function SchoolTable({
                                 </td>
 
                                 <td className="px-4 py-4 text-left">
-                                    <p className="max-w-[220px] truncate text-[11px] font-bold text-slate-600">
+                                    <p className="max-w-[250px] break-words text-[11px] font-bold leading-5 text-slate-600">
                                         {row.districtName}
                                     </p>
                                 </td>
@@ -1471,8 +1459,8 @@ function SchoolTable({
                                 <td className="px-4 py-4 text-left">
                                     <span
                                         className={`inline-flex rounded-full px-3 py-1 text-[8px] font-black uppercase tracking-widest ${row.status === "Aktif"
-                                                ? "bg-emerald-50 text-emerald-600"
-                                                : "bg-slate-100 text-slate-500"
+                                            ? "bg-emerald-50 text-emerald-600"
+                                            : "bg-slate-100 text-slate-500"
                                             }`}
                                     >
                                         {row.status}
@@ -1484,12 +1472,14 @@ function SchoolTable({
                 </table>
             </div>
 
-            <Pagination
-                page={page}
-                totalPages={totalPages}
-                totalRows={totalRows}
-                onChange={onPageChange}
-            />
+            {totalPages > 1 && (
+                <Pagination
+                    page={page}
+                    totalPages={totalPages}
+                    totalRows={totalRows}
+                    onChange={onPageChange}
+                />
+            )}
         </>
     );
 }
@@ -1528,7 +1518,7 @@ function splitSchoolLabel(value, maxLength = 18, maxLines = 3) {
     if (lines.length <= maxLines) return lines;
 
     const visible = lines.slice(0, maxLines);
-    visible[maxLines - 1] = `${visible[maxLines - 1].slice(0, maxLength - 1)}"¦`;
+    visible[maxLines - 1] = `${visible[maxLines - 1].slice(0, maxLength - 1)}…`;
     return visible;
 }
 
@@ -1615,7 +1605,7 @@ function SchoolProgramBarChart({ rows }) {
      * Saat jumlah sekolah bertambah, lebar diagram mengikuti jumlah sekolah
      * sehingga pengguna dapat menggesernya secara horizontal tanpa batang bertubrukan.
      */
-    const chartWidth = Math.max(rows.length * 190, 1);
+    const chartWidth = Math.max(rows.length * 160, 1);
 
     return (
         <div className="program-chart-scroll w-full overflow-x-auto overflow-y-hidden pb-3 pt-5">
@@ -1624,7 +1614,7 @@ function SchoolProgramBarChart({ rows }) {
                 style={{
                     width: chartWidth,
                     minWidth: "100%",
-                    height: 430,
+                    height: 340,
                 }}
             >
                 <ResponsiveContainer width="100%" height="100%">
@@ -2038,6 +2028,694 @@ function ReviewUploadTable({
     );
 }
 
+
+function AODashboardPanel({ children, className = "" }) {
+    return (
+        <section
+            className={`overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm ${className}`}
+        >
+            {children}
+        </section>
+    );
+}
+
+function AOStatusPieCard({
+    title,
+    helper,
+    total,
+    rows = [],
+    icon,
+}) {
+    const visibleRows = rows.filter((row) => Number(row.value || 0) > 0);
+
+    return (
+        <AODashboardPanel className="flex min-h-[286px] flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                            {title}
+                        </p>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[8px] font-black uppercase tracking-wide text-slate-500">
+                            {helper}
+                        </span>
+                    </div>
+                    <p className="mt-1 text-[10px] font-semibold leading-4 text-slate-400">
+                        Distribusi status berdasarkan filter dashboard aktif.
+                    </p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
+                    {icon}
+                </div>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-4 p-4 sm:grid-cols-[minmax(160px,0.86fr)_minmax(190px,1.14fr)] sm:items-center">
+                <div className="flex min-w-0 -translate-y-1 flex-col items-center justify-center">
+                    <div className="relative h-[150px] w-full -translate-y-2 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-cyan-50/50">
+                        {visibleRows.length ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={visibleRows}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="46%"
+                                        innerRadius={0}
+                                        outerRadius={66}
+                                        paddingAngle={2}
+                                        cornerRadius={7}
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="#FFFFFF"
+                                        strokeWidth={2}
+                                    >
+                                        {visibleRows.map((row) => (
+                                            <Cell
+                                                key={row.key}
+                                                fill={row.color}
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip
+                                        formatter={(value, name) => [
+                                            `${value} data`,
+                                            name,
+                                        ]}
+                                        contentStyle={{
+                                            borderRadius: 14,
+                                            border: "1px solid #E2E8F0",
+                                            boxShadow: "0 14px 34px rgba(15,23,42,0.12)",
+                                            fontSize: 11,
+                                            fontWeight: 800,
+                                        }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex h-full items-center justify-center px-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                Belum ada data
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="relative z-10 -mt-3 inline-flex min-w-[118px] items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-white px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.10)]">
+                        <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-950 px-2 text-[16px] font-black text-white">
+                            {total}
+                        </span>
+                        <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            Total Data
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid gap-2">
+                    {rows.map((row) => {
+                        const active = Number(row.value || 0) > 0;
+
+                        return (
+                            <div
+                                key={row.key}
+                                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition ${active
+                                    ? "bg-white shadow-sm"
+                                    : "border-slate-100 bg-slate-50/60 opacity-55"
+                                    }`}
+                                style={{
+                                    borderColor: active
+                                        ? `${row.color}40`
+                                        : undefined,
+                                }}
+                            >
+                                <span className="inline-flex min-w-0 items-center gap-2 text-[8px] font-black uppercase tracking-wide text-slate-600">
+                                    <span
+                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                        style={{ backgroundColor: row.color }}
+                                    />
+                                    <span className="break-words">{row.name}</span>
+                                </span>
+                                <span
+                                    className="shrink-0 text-[13px] font-black"
+                                    style={{ color: active ? row.color : "#94A3B8" }}
+                                >
+                                    {row.value}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </AODashboardPanel>
+    );
+}
+
+function AOVisualProgramPanel({
+    program,
+    processSteps = [],
+    schoolRows = [],
+    progress = {},
+    query,
+    setQuery,
+    navigate,
+    detailPathPrefix,
+}) {
+    const hasQuery = normalizeText(query).length > 0;
+
+    if (!program) {
+        return (
+            <AODashboardPanel className="min-h-[350px]">
+                <div className="grid gap-3 border-b border-slate-100 px-5 py-4 xl:grid-cols-[minmax(260px,0.42fr)_minmax(320px,0.58fr)] xl:items-start">
+                    <div className="min-w-0 pt-1 xl:pt-3">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                            Visual Proses
+                        </p>
+                        <h2 className="mt-2 text-[18px] font-black text-slate-900">
+                            Pilih Program
+                        </h2>
+                    </div>
+                    <div className="min-w-0 xl:w-[420px] xl:justify-self-end">
+                        <SearchInput
+                            value={query}
+                            onChange={setQuery}
+                            placeholder="Ketik nama atau kode program..."
+                        />
+                    </div>
+                </div>
+                <div className="p-5">
+                    <EmptyState
+                        title={hasQuery ? "Program tidak ditemukan" : "Belum ada program sesuai filter"}
+                        description={
+                            hasQuery
+                                ? "Gunakan nama, kode, sekolah, atau wilayah lain untuk mencari program."
+                                : "Ubah filter untuk menampilkan visual proses program AO."
+                        }
+                        icon={<FolderOpen size={22} />}
+                    />
+                </div>
+            </AODashboardPanel>
+        );
+    }
+
+    const status = getProgramStatus(program);
+    const statusColor = getProgramStatusColor(status);
+    const districtNames = uniqueStrings(
+        schoolRows.map((school) => school.districtName),
+    );
+
+    return (
+        <AODashboardPanel className="min-h-[350px]">
+            <div className="grid gap-4 border-b border-slate-100 px-5 py-4 xl:grid-cols-[minmax(280px,0.44fr)_minmax(360px,0.56fr)] xl:items-start">
+                <div className="min-w-0 pt-1 xl:pt-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                        Visual Proses
+                    </p>
+                    <p className="mt-2 text-[8px] font-black uppercase tracking-[0.17em] text-slate-400">
+                        PRG-{getProgramId(program) || "-"}
+                    </p>
+                    <h2 className="mt-1 break-words text-[18px] font-black leading-6 text-slate-900">
+                        {getProgramTitle(program)}
+                    </h2>
+                </div>
+
+                <div className="grid min-w-0 gap-2 xl:w-[430px] xl:justify-self-end">
+                    <SearchInput
+                        value={query}
+                        onChange={setQuery}
+                        placeholder="Ketik nama atau kode program..."
+                    />
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <span
+                            className="inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-wide"
+                            style={{
+                                color: statusColor.color,
+                                backgroundColor: statusColor.background,
+                                borderColor: statusColor.border,
+                            }}
+                        >
+                            {formatStatusLabel(status)}
+                        </span>
+                        <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-wide text-cyan-700">
+                            {getProgramCategoryLabel(getProgramCategory(program))}
+                        </span>
+                        <span className="rounded-full bg-violet-50 px-3 py-1 text-[8px] font-black uppercase tracking-wide text-violet-600">
+                            {getProgramPillarLabel(getProgramPillar(program))}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                navigate(`${detailPathPrefix}/${getProgramId(program)}`)
+                            }
+                            className="inline-flex h-8 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-3 text-[8px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8]"
+                        >
+                            <Eye size={12} />
+                            Detail
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-5">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                    {processSteps.map((step, index) => (
+                        <div
+                            key={step.key}
+                            className="relative min-h-[78px] rounded-xl border px-3 py-2.5 shadow-sm"
+                            style={{
+                                backgroundColor: step.background,
+                                borderColor: step.border,
+                            }}
+                        >
+                            <span
+                                className="absolute -top-2 left-3 flex h-6 min-w-[24px] items-center justify-center rounded-full border-2 border-white px-1.5 text-[9px] font-black text-white shadow-sm"
+                                style={{ backgroundColor: step.color }}
+                            >
+                                {index + 1}
+                            </span>
+                            <p className="mt-2 break-words text-[10px] font-black leading-4 text-slate-800">
+                                {step.label}
+                            </p>
+                            <p
+                                className="mt-1 text-[8px] font-black uppercase tracking-wide"
+                                style={{ color: step.color }}
+                            >
+                                {step.stateLabel}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {[
+                        {
+                            label: "Sekolah Target",
+                            value: schoolRows.length,
+                            helper: schoolRows.map((row) => row.name).join(", ") || "Belum terhubung",
+                            color: COLORS.cyan,
+                            icon: <School size={15} />,
+                        },
+                        {
+                            label: "Kabupaten/Kota",
+                            value: districtNames.length,
+                            helper: districtNames.join(", ") || "Belum terpetakan",
+                            color: COLORS.violet,
+                            icon: <MapPin size={15} />,
+                        },
+                        {
+                            label: "Menunggu Review AO",
+                            value: Number(progress.waitingAo || 0),
+                            helper: `${Number(progress.waitingUpload || 0)} bukti belum diunggah`,
+                            color: COLORS.amber,
+                            icon: <Clock3 size={15} />,
+                        },
+                        {
+                            label: "Disetujui HO",
+                            value: Number(progress.approved || 0),
+                            helper: `${Number(progress.waitingHo || 0)} menunggu keputusan HO`,
+                            color: COLORS.emerald,
+                            icon: <CheckCircle2 size={15} />,
+                        },
+                    ].map((item) => (
+                        <div
+                            key={item.label}
+                            className="rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                        >
+                            <div className="flex items-center justify-between gap-3">
+                                <p
+                                    className="text-[8px] font-black uppercase tracking-[0.14em]"
+                                    style={{ color: item.color }}
+                                >
+                                    {item.label}
+                                </p>
+                                <span style={{ color: item.color }}>{item.icon}</span>
+                            </div>
+                            <p className="mt-2 text-[20px] font-black leading-none text-slate-900">
+                                {item.value}
+                            </p>
+                            <p className="mt-2 break-words text-[9px] font-semibold leading-4 text-slate-400">
+                                {item.helper}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-4 rounded-xl border border-slate-100 bg-white px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                                Progres Persyaratan Disetujui
+                            </p>
+                            <p className="mt-1 text-[11px] font-bold text-slate-600">
+                                {Number(progress.approved || 0)} dari {Number(progress.total || 0)} persyaratan
+                            </p>
+                        </div>
+                        <span className="text-[18px] font-black text-emerald-600">
+                            {Number(progress.percentage || 0)}%
+                        </span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                            style={{ width: `${Number(progress.percentage || 0)}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </AODashboardPanel>
+    );
+}
+
+function AOTerritoryCard({
+    rows = [],
+    totalSchools = 0,
+    provinceLabel,
+}) {
+    const chartRows = rows.length <= 6
+        ? rows
+        : [
+            ...rows.slice(0, 5),
+            {
+                key: "OTHER",
+                name: "Wilayah lainnya",
+                value: rows.slice(5).reduce((sum, row) => sum + Number(row.value || 0), 0),
+                color: COLORS.slate,
+            },
+        ];
+
+    return (
+        <AODashboardPanel className="flex min-h-[286px] flex-col">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                            Pemetaan Wilayah
+                        </p>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[8px] font-black uppercase tracking-wide text-slate-500">
+                            Cakupan Penugasan AO
+                        </span>
+                    </div>
+                    <p className="mt-1 break-words text-[10px] font-semibold leading-4 text-slate-400">
+                        Distribusi sekolah pada {provinceLabel} berdasarkan filter aktif.
+                    </p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
+                    <MapPinned size={18} />
+                </div>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-4 px-4 pb-4 pt-3 sm:grid-cols-[minmax(160px,0.86fr)_minmax(190px,1.14fr)] sm:items-center">
+                <div className="flex min-w-0 -translate-y-1 flex-col items-center justify-center">
+                    <div className="relative h-[150px] w-full -translate-y-2 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-cyan-50/50">
+                        {chartRows.length ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={chartRows}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="46%"
+                                        innerRadius={0}
+                                        outerRadius={66}
+                                        paddingAngle={2}
+                                        cornerRadius={7}
+                                        startAngle={90}
+                                        endAngle={-270}
+                                        stroke="#FFFFFF"
+                                        strokeWidth={2}
+                                    >
+                                        {chartRows.map((row) => (
+                                            <Cell key={row.key} fill={row.color} />
+                                        ))}
+                                    </Pie>
+                                    <RechartsTooltip
+                                        formatter={(value, name) => [`${value} sekolah`, name]}
+                                        contentStyle={{
+                                            borderRadius: 14,
+                                            border: "1px solid #E2E8F0",
+                                            boxShadow: "0 14px 34px rgba(15,23,42,0.12)",
+                                            fontSize: 11,
+                                            fontWeight: 800,
+                                        }}
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex h-full items-center justify-center px-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
+                                Belum ada sekolah
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="relative z-10 -mt-3 inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-white px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.10)]">
+                        <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-slate-950 px-2 text-[16px] font-black text-white">
+                            {totalSchools}
+                        </span>
+                        <span className="whitespace-nowrap text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            Total Sekolah
+                        </span>
+                    </div>
+                </div>
+
+                <div className="grid max-h-[190px] gap-2 overflow-y-auto pr-1">
+                    {rows.length ? rows.map((row) => (
+                        <div
+                            key={row.key}
+                            className="flex items-center justify-between gap-3 rounded-xl border bg-white px-3 py-2.5 shadow-sm"
+                            style={{ borderColor: `${row.color}40` }}
+                        >
+                            <span className="inline-flex min-w-0 items-center gap-2 text-[8px] font-black uppercase tracking-wide text-slate-600">
+                                <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: row.color }}
+                                />
+                                <span className="break-words">{row.name}</span>
+                            </span>
+                            <span className="shrink-0 text-[13px] font-black" style={{ color: row.color }}>
+                                {row.value}
+                            </span>
+                        </div>
+                    )) : (
+                        <p className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-slate-300">
+                            Wilayah belum dipetakan
+                        </p>
+                    )}
+                </div>
+            </div>
+        </AODashboardPanel>
+    );
+}
+
+function AOFlipMonitoringList({
+    activeView,
+    onFlip,
+    programRows = [],
+    programTotalRows = 0,
+    programPage,
+    programTotalPages,
+    onProgramPageChange,
+    schoolRows = [],
+    schoolTotalRows = 0,
+    schoolPage,
+    schoolTotalPages,
+    onSchoolPageChange,
+    selectedProgramId,
+    onSelectProgram,
+    programSchoolRowsMap,
+}) {
+    const isProgram = activeView === "PROGRAM";
+    const rows = isProgram ? programRows : schoolRows;
+    const totalRows = isProgram ? programTotalRows : schoolTotalRows;
+    const page = isProgram ? programPage : schoolPage;
+    const totalPages = isProgram ? programTotalPages : schoolTotalPages;
+    const pageSize = isProgram ? PROGRAM_LIST_PAGE_SIZE : TERRITORY_LIST_PAGE_SIZE;
+
+    return (
+        <AODashboardPanel className="flex min-h-0 flex-col xl:h-full">
+            <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                    key={activeView}
+                    initial={{ opacity: 0, rotateY: 80 }}
+                    animate={{ opacity: 1, rotateY: 0 }}
+                    exit={{ opacity: 0, rotateY: -80 }}
+                    transition={{ duration: 0.32, ease: "easeInOut" }}
+                    style={{ transformPerspective: 1200 }}
+                    className="flex h-full min-h-0 flex-col"
+                >
+                    <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                        <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                                {isProgram ? "List Program" : "Pemetaan Wilayah"}
+                            </p>
+                            <h2 className="mt-1 break-words text-[18px] font-black text-slate-900">
+                                {isProgram ? "Program Terfilter" : "Sekolah dan Wilayah"}
+                            </h2>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[9px] font-black text-slate-500">
+                                {totalRows} data
+                            </span>
+                            <button
+                                type="button"
+                                onClick={onFlip}
+                                title={isProgram ? "Lihat sekolah dan wilayah" : "Kembali ke list program"}
+                                className="group inline-flex h-9 items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-3 text-[8px] font-black uppercase tracking-wide text-[#0AC4E0] transition hover:border-[#0AC4E0] hover:bg-[#0AC4E0] hover:text-white active:scale-95"
+                            >
+                                <RefreshCcw
+                                    size={13}
+                                    className="transition-transform duration-500 group-hover:rotate-180"
+                                />
+                                Flip
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                        {rows.length ? (
+                            isProgram ? programRows.map((program) => {
+                                const id = String(getProgramId(program));
+                                const selected = String(selectedProgramId || "") === id;
+                                const progress = getProgramProgress(program);
+                                const linkedSchools = programSchoolRowsMap.get(id) || [];
+                                const status = getProgramStatus(program);
+                                const statusColor = getProgramStatusColor(status);
+
+                                return (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => onSelectProgram(program)}
+                                        className={`w-full rounded-2xl border px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${selected
+                                            ? "border-[#0AC4E0] bg-cyan-50/45 shadow-sm"
+                                            : "border-slate-100 bg-white"
+                                            }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-300">
+                                                    PRG-{id}
+                                                </p>
+                                                <h3 className="mt-1 break-words text-[12px] font-black leading-5 text-slate-900">
+                                                    {getProgramTitle(program)}
+                                                </h3>
+                                            </div>
+                                            <div className="flex shrink-0 flex-col items-end gap-2">
+                                                <span
+                                                    className="rounded-full border px-2.5 py-1 text-[7px] font-black uppercase tracking-wide"
+                                                    style={{
+                                                        color: statusColor.color,
+                                                        backgroundColor: statusColor.background,
+                                                        borderColor: statusColor.border,
+                                                    }}
+                                                >
+                                                    {formatStatusLabel(status)}
+                                                </span>
+                                                <ProgramRatingStars
+                                                    program={program}
+                                                    size={14}
+                                                    compact
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                                            <div className="flex items-start gap-2 text-[9px] font-bold leading-4 text-slate-500">
+                                                <School size={12} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                                <span className="break-words">
+                                                    {linkedSchools.map((row) => row.name).join(", ") || "Sekolah belum terbaca"}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-start gap-2 text-[9px] font-bold leading-4 text-slate-500">
+                                                <MapPin size={12} className="mt-0.5 shrink-0 text-violet-500" />
+                                                <span className="break-words">
+                                                    {uniqueStrings(linkedSchools.map((row) => row.districtName)).join(", ") || "Wilayah belum terbaca"}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-3 grid grid-cols-3 gap-2">
+                                            <div className="rounded-xl bg-amber-50 px-2 py-2 text-center">
+                                                <p className="text-[13px] font-black text-amber-600">{progress.waitingAo}</p>
+                                                <p className="mt-1 text-[7px] font-black uppercase tracking-wide text-amber-500">Menunggu AO</p>
+                                            </div>
+                                            <div className="rounded-xl bg-sky-50 px-2 py-2 text-center">
+                                                <p className="text-[13px] font-black text-sky-600">{progress.waitingHo}</p>
+                                                <p className="mt-1 text-[7px] font-black uppercase tracking-wide text-sky-500">Keputusan HO</p>
+                                            </div>
+                                            <div className="rounded-xl bg-emerald-50 px-2 py-2 text-center">
+                                                <p className="text-[13px] font-black text-emerald-600">{progress.approved}</p>
+                                                <p className="mt-1 text-[7px] font-black uppercase tracking-wide text-emerald-500">Approved</p>
+                                            </div>
+                                        </div>
+                                    </button>
+                                );
+                            }) : schoolRows.map((school) => (
+                                <div
+                                    key={school.id || `${school.name}-${school.districtName}`}
+                                    className="rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-300">
+                                                {school.npsn ? `NPSN ${school.npsn}` : "Sekolah Binaan AO"}
+                                            </p>
+                                            <h3 className="mt-1 break-words text-[12px] font-black leading-5 text-slate-900">
+                                                {school.name}
+                                            </h3>
+                                        </div>
+                                        <span className="shrink-0 rounded-full bg-cyan-50 px-2.5 py-1 text-[7px] font-black uppercase tracking-wide text-cyan-700">
+                                            {school.level || "-"}
+                                        </span>
+                                    </div>
+                                    <div className="mt-3 grid gap-2 rounded-xl bg-slate-50 px-3 py-2.5">
+                                        <div className="flex items-start gap-2 text-[9px] font-bold leading-4 text-slate-500">
+                                            <Building2 size={12} className="mt-0.5 shrink-0 text-violet-500" />
+                                            <span className="break-words">{school.districtName}</span>
+                                        </div>
+                                        <div className="flex items-start gap-2 text-[9px] font-bold leading-4 text-slate-500">
+                                            <MapPinned size={12} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                            <span className="break-words">{school.provinceName || "Provinsi belum terbaca"}</span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                                        <span className="text-[8px] font-black uppercase tracking-wide text-slate-400">
+                                            Akreditasi {school.accreditation || "-"}
+                                        </span>
+                                        <span className={`rounded-full px-2.5 py-1 text-[7px] font-black uppercase tracking-wide ${school.status === "Aktif"
+                                            ? "bg-emerald-50 text-emerald-600"
+                                            : "bg-slate-100 text-slate-500"
+                                            }`}>
+                                            {school.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <EmptyState
+                                title={isProgram ? "Belum ada program sesuai filter" : "Belum ada sekolah pada wilayah ini"}
+                                description={
+                                    isProgram
+                                        ? "Ubah filter untuk menampilkan program dalam cakupan AO."
+                                        : "Ubah filter area atau sekolah untuk menampilkan pemetaan wilayah."
+                                }
+                                icon={isProgram ? <FolderOpen size={22} /> : <MapPinned size={22} />}
+                            />
+                        )}
+                    </div>
+
+                    {totalPages > 1 && (
+                        <Pagination
+                            page={page}
+                            totalPages={totalPages}
+                            totalRows={totalRows}
+                            pageSize={pageSize}
+                            onChange={isProgram ? onProgramPageChange : onSchoolPageChange}
+                        />
+                    )}
+                </motion.div>
+            </AnimatePresence>
+        </AODashboardPanel>
+    );
+}
+
 function LoadingView() {
     return (
         <PageWrapper className="flex min-h-screen items-center justify-center bg-slate-100 !p-0">
@@ -2086,6 +2764,9 @@ function AODashboardPage({
     const [reviewStatusFilter, setReviewStatusFilter] = useState("WAITING_AO");
     const [programSearch, setProgramSearch] = useState("");
     const [programPage, setProgramPage] = useState(1);
+    const [selectedProgramId, setSelectedProgramId] = useState(null);
+    const [activeListView, setActiveListView] = useState("PROGRAM");
+    const [visualProgramQuery, setVisualProgramQuery] = useState("");
 
     const fetchAoData = async ({ silent = false } = {}) => {
         if (silent) setRefreshing(true);
@@ -2282,6 +2963,9 @@ function AODashboardPage({
             setReviewStatusFilter("WAITING_AO");
             setProgramSearch("");
             setProgramPage(1);
+            setSelectedProgramId(null);
+            setActiveListView("PROGRAM");
+            setVisualProgramQuery("");
 
             if (!nextAoScope.hasScope) {
                 setErrorMessage(
@@ -2659,21 +3343,142 @@ function AODashboardPage({
         programSearch,
     ]);
 
+    const programListPageSize = mode === "review" ? PAGE_SIZE : PROGRAM_LIST_PAGE_SIZE;
+
     const programTotalPages = Math.max(
         1,
-        Math.ceil(filteredPrograms.length / PAGE_SIZE),
+        Math.ceil(filteredPrograms.length / programListPageSize),
     );
 
     const programPageRows = useMemo(() => {
-        const start = (programPage - 1) * PAGE_SIZE;
-        return filteredPrograms.slice(start, start + PAGE_SIZE);
-    }, [filteredPrograms, programPage]);
+        const start = (programPage - 1) * programListPageSize;
+        return filteredPrograms.slice(start, start + programListPageSize);
+    }, [filteredPrograms, programPage, programListPageSize]);
 
     useEffect(() => {
         if (programPage > programTotalPages) {
             setProgramPage(programTotalPages);
         }
     }, [programPage, programTotalPages]);
+
+    const filteredProgramSchoolIds = useMemo(() => {
+        const ids = new Set();
+
+        filteredPrograms.forEach((program) => {
+            const linkedSchools =
+                programSchoolRowsMap.get(String(getProgramId(program))) || [];
+
+            linkedSchools.forEach((school) => {
+                if (school?.id !== null && school?.id !== undefined && school?.id !== "") {
+                    ids.add(String(school.id));
+                }
+            });
+        });
+
+        return ids;
+    }, [filteredPrograms, programSchoolRowsMap]);
+
+    const hasProgramSpecificTerritoryFilter =
+        programCategoryFilter !== "ALL" ||
+        programPillarFilter !== "ALL" ||
+        programStatusFilter !== "ALL";
+
+    const territorySchools = useMemo(() => {
+        const keyword = programSearch.toLowerCase().trim();
+
+        return normalizedSchools.filter((school) => {
+            const schoolId = String(school.id || "");
+            const districtKey =
+                school.districtId || school.districtName.toLowerCase();
+
+            const matchDistrict =
+                programDistrictFilter === "ALL" ||
+                districtKey === programDistrictFilter;
+
+            const matchSchool =
+                programSchoolFilter === "ALL" ||
+                schoolId === String(programSchoolFilter);
+
+            const linkedToFilteredProgram =
+                Boolean(schoolId) && filteredProgramSchoolIds.has(schoolId);
+
+            const matchProgramSpecificFilters =
+                !hasProgramSpecificTerritoryFilter || linkedToFilteredProgram;
+
+            const directSchoolSearchMatch = [
+                school.name,
+                school.npsn,
+                school.level,
+                school.districtName,
+                school.provinceName,
+                school.accreditation,
+            ]
+                .join(" ")
+                .toLowerCase()
+                .includes(keyword);
+
+            const matchSearch =
+                !keyword || directSchoolSearchMatch || linkedToFilteredProgram;
+
+            return (
+                matchDistrict &&
+                matchSchool &&
+                matchProgramSpecificFilters &&
+                matchSearch
+            );
+        });
+    }, [
+        normalizedSchools,
+        programDistrictFilter,
+        programSchoolFilter,
+        programCategoryFilter,
+        programPillarFilter,
+        programStatusFilter,
+        programSearch,
+        filteredProgramSchoolIds,
+        hasProgramSpecificTerritoryFilter,
+    ]);
+
+    const territoryTotalPages = Math.max(
+        1,
+        Math.ceil(territorySchools.length / TERRITORY_LIST_PAGE_SIZE),
+    );
+
+    const territoryPageRows = useMemo(() => {
+        const start = (schoolPage - 1) * TERRITORY_LIST_PAGE_SIZE;
+        return territorySchools.slice(start, start + TERRITORY_LIST_PAGE_SIZE);
+    }, [territorySchools, schoolPage]);
+
+    useEffect(() => {
+        if (schoolPage > territoryTotalPages) {
+            setSchoolPage(territoryTotalPages);
+        }
+    }, [schoolPage, territoryTotalPages]);
+
+    const territoryDistributionRows = useMemo(() => {
+        const counter = new Map();
+
+        territorySchools.forEach((school) => {
+            const key = school.districtId || school.districtName.toLowerCase();
+
+            if (!counter.has(key)) {
+                counter.set(key, {
+                    key,
+                    name: school.districtName,
+                    value: 0,
+                });
+            }
+
+            counter.get(key).value += 1;
+        });
+
+        return Array.from(counter.values())
+            .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name))
+            .map((row, index) => ({
+                ...row,
+                color: DISTRICT_CHART_COLORS[index % DISTRICT_CHART_COLORS.length],
+            }));
+    }, [territorySchools]);
 
     const reviewPrograms = useMemo(() => {
         return filteredPrograms.filter((program) => {
@@ -2700,6 +3505,222 @@ function AODashboardPage({
             setProgramPage(reviewTotalPages);
         }
     }, [mode, programPage, reviewTotalPages]);
+
+
+    const selectedProgram = useMemo(
+        () =>
+            selectedProgramId
+                ? filteredPrograms.find(
+                    (program) =>
+                        String(getProgramId(program)) ===
+                        String(selectedProgramId),
+                ) || null
+                : null,
+        [filteredPrograms, selectedProgramId],
+    );
+
+    useEffect(() => {
+        if (
+            selectedProgramId &&
+            !filteredPrograms.some(
+                (program) =>
+                    String(getProgramId(program)) ===
+                    String(selectedProgramId),
+            )
+        ) {
+            setSelectedProgramId(null);
+        }
+    }, [filteredPrograms, selectedProgramId]);
+
+    const visualProgram = useMemo(() => {
+        const keyword = normalizeText(visualProgramQuery).toLowerCase();
+
+        if (keyword) {
+            return (
+                filteredPrograms.find((program) => {
+                    const id = String(getProgramId(program));
+                    const linkedSchools = programSchoolRowsMap.get(id) || [];
+                    const searchable = [
+                        `PRG-${id}`,
+                        getProgramTitle(program),
+                        formatStatusLabel(getProgramStatus(program)),
+                        getProgramCategoryLabel(getProgramCategory(program)),
+                        getProgramPillarLabel(getProgramPillar(program)),
+                        ...linkedSchools.map((school) => school.name),
+                        ...linkedSchools.map((school) => school.districtName),
+                    ]
+                        .join(" ")
+                        .toLowerCase();
+
+                    return searchable.includes(keyword);
+                }) || null
+            );
+        }
+
+        return selectedProgram || filteredPrograms[0] || null;
+    }, [
+        visualProgramQuery,
+        selectedProgram,
+        filteredPrograms,
+        programSchoolRowsMap,
+    ]);
+
+    const visualProgramSchoolRows = useMemo(() => {
+        if (!visualProgram) return [];
+        return (
+            programSchoolRowsMap.get(String(getProgramId(visualProgram))) || []
+        );
+    }, [visualProgram, programSchoolRowsMap]);
+
+    const visualProgramProgress = useMemo(
+        () => getProgramProgress(visualProgram || {}),
+        [visualProgram],
+    );
+
+    const visualProgramSteps = useMemo(() => {
+        const currentStatus = visualProgram
+            ? getProgramStatus(visualProgram)
+            : "APPROVAL";
+        const currentIndex = Math.max(
+            0,
+            PROGRAM_STATUS_ORDER.indexOf(currentStatus),
+        );
+
+        return PROGRAM_STATUS_ORDER.map((status, index) => {
+            const completed = index < currentIndex;
+            const active = index === currentIndex;
+
+            return {
+                key: status,
+                label: formatStatusLabel(status),
+                stateLabel: completed
+                    ? "Selesai"
+                    : active
+                        ? "Tahap Aktif"
+                        : "Menunggu",
+                color: completed
+                    ? COLORS.emerald
+                    : active
+                        ? COLORS.cyan
+                        : COLORS.slate,
+                background: completed
+                    ? "#ECFDF5"
+                    : active
+                        ? "#ECFEFF"
+                        : "#F8FAFC",
+                border: completed
+                    ? "#A7F3D0"
+                    : active
+                        ? "#A5F3FC"
+                        : "#E2E8F0",
+            };
+        });
+    }, [visualProgram]);
+
+    const programPieSource = selectedProgram
+        ? [selectedProgram]
+        : filteredPrograms;
+
+    const programStatusPieRows = useMemo(
+        () =>
+            PROGRAM_STATUS_ORDER.map((status) => {
+                const meta = getProgramStatusColor(status);
+                return {
+                    key: status,
+                    name: formatStatusLabel(status),
+                    value: programPieSource.filter(
+                        (program) => getProgramStatus(program) === status,
+                    ).length,
+                    color: meta.color,
+                };
+            }),
+        [programPieSource],
+    );
+
+    const reviewStatusPieRows = useMemo(() => {
+        const source = selectedProgram ? [selectedProgram] : filteredPrograms;
+        const totals = source.reduce(
+            (acc, program) => {
+                const progress = getProgramProgress(program);
+                acc.waitingUpload += progress.waitingUpload;
+                acc.waitingAo += progress.waitingAo;
+                acc.waitingHo += progress.waitingHo;
+                acc.approved += progress.approved;
+                acc.rejected += progress.rejected;
+                return acc;
+            },
+            {
+                waitingUpload: 0,
+                waitingAo: 0,
+                waitingHo: 0,
+                approved: 0,
+                rejected: 0,
+            },
+        );
+
+        return [
+            {
+                key: "WAITING_UPLOAD",
+                name: "Belum Upload",
+                value: totals.waitingUpload,
+                color: COLORS.slate,
+            },
+            {
+                key: "WAITING_AO",
+                name: "Menunggu AO",
+                value: totals.waitingAo,
+                color: COLORS.amber,
+            },
+            {
+                key: "WAITING_HO",
+                name: "Keputusan HO",
+                value: totals.waitingHo,
+                color: COLORS.cyan,
+            },
+            {
+                key: "APPROVED",
+                name: "Approved",
+                value: totals.approved,
+                color: COLORS.emerald,
+            },
+            {
+                key: "REJECTED",
+                name: "Rejected",
+                value: totals.rejected,
+                color: COLORS.red,
+            },
+        ];
+    }, [filteredPrograms, selectedProgram]);
+
+    const reviewStatusPieTotal = reviewStatusPieRows.reduce(
+        (sum, row) => sum + row.value,
+        0,
+    );
+
+    const filteredDashboardTotals = useMemo(() => {
+        const schoolIds = new Set();
+        const districtKeys = new Set();
+        let waitingAo = 0;
+
+        filteredPrograms.forEach((program) => {
+            const id = String(getProgramId(program));
+            const linkedSchools = programSchoolRowsMap.get(id) || [];
+            linkedSchools.forEach((school) => {
+                if (school.id) schoolIds.add(String(school.id));
+                const districtKey =
+                    school.districtId || school.districtName?.toLowerCase();
+                if (districtKey) districtKeys.add(String(districtKey));
+            });
+            waitingAo += getProgramProgress(program).waitingAo;
+        });
+
+        return {
+            schools: schoolIds.size,
+            districts: districtKeys.size,
+            programs: filteredPrograms.length,
+            waitingAo,
+        };
+    }, [filteredPrograms, programSchoolRowsMap]);
 
     const schoolProgramChartRows = useMemo(() => {
         const counter = new Map();
@@ -2780,6 +3801,18 @@ function AODashboardPage({
         };
     }, [programs, normalizedSchools.length, districtRows.length]);
 
+    useEffect(() => {
+        setSchoolPage(1);
+        setVisualProgramQuery("");
+    }, [
+        programDistrictFilter,
+        programSchoolFilter,
+        programCategoryFilter,
+        programPillarFilter,
+        programStatusFilter,
+        programSearch,
+    ]);
+
     const activeProgramFilterCount = [
         programDistrictFilter,
         programSchoolFilter,
@@ -2797,6 +3830,9 @@ function AODashboardPage({
         setReviewStatusFilter("WAITING_AO");
         setProgramSearch("");
         setProgramPage(1);
+        setSchoolPage(1);
+        setSelectedProgramId(null);
+        setVisualProgramQuery("");
     };
 
     if (loading) return <LoadingView />;
@@ -2950,9 +3986,6 @@ function AODashboardPage({
                             <div className="border-b border-slate-100 bg-slate-50/50 p-5">
                                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
                                     <div className="md:col-span-2 xl:col-span-2 2xl:col-span-2">
-                                        <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                                            Pencarian
-                                        </span>
                                         <SearchInput
                                             value={programSearch}
                                             onChange={(value) => {
@@ -3058,7 +4091,7 @@ function AODashboardPage({
         <PageWrapper className="min-h-screen bg-slate-100 !p-0 font-sans text-slate-700">
             <Sidebar />
 
-            <main className="min-h-screen w-full pt-[76px]">
+            <main className="min-h-screen min-w-0 flex-1 overflow-y-auto pt-[76px] lg:pt-0">
                 <header className="border-b border-slate-200 bg-white">
                     <div className="flex w-full flex-col gap-4 px-5 py-5 lg:flex-row lg:items-center lg:justify-between lg:px-8">
                         <div className="flex min-w-0 items-center gap-4">
@@ -3068,12 +4101,12 @@ function AODashboardPage({
 
                             <div className="min-w-0">
                                 <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#0AC4E0]">
-                                    Area Officer · Wilayah Binaan
+                                    Area Officer · Monitoring Wilayah
                                 </p>
-                                <h1 className="mt-1 truncate text-2xl font-black tracking-[-0.04em] text-slate-900">
+                                <h1 className="mt-1 break-words text-2xl font-black tracking-[-0.04em] text-slate-900">
                                     {title}
                                 </h1>
-                                <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                <p className="mt-1 break-words text-[11px] font-semibold leading-5 text-slate-400">
                                     {currentUser?.nama ||
                                         currentUser?.name ||
                                         currentUser?.email ||
@@ -3098,15 +4131,12 @@ function AODashboardPage({
                     </div>
                 </header>
 
-                <section className="w-full space-y-6 px-5 py-6 lg:px-8">
+                <div className="space-y-4 px-4 py-5 sm:px-5 lg:px-8 lg:py-6">
                     {errorMessage && (
                         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-amber-700">
-                            <AlertTriangle
-                                size={18}
-                                className="mt-0.5 shrink-0"
-                            />
+                            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
                             <div>
-                                <p className="text-[11px] font-black uppercase tracking-widest">
+                                <p className="text-[10px] font-black uppercase tracking-widest">
                                     Perhatian
                                 </p>
                                 <p className="mt-1 text-[11px] font-semibold leading-5">
@@ -3116,122 +4146,39 @@ function AODashboardPage({
                         </div>
                     )}
 
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <MetricCard
-                            label="Sekolah Binaan"
-                            value={totals.schools}
-                            helper={`Dalam ${provinceLabel}`}
+                            label="Sekolah Terfilter"
+                            value={territorySchools.length}
+                            helper={`${normalizedSchools.length} sekolah dalam cakupan AO`}
                             icon={<School size={19} />}
                             color={COLORS.blue}
                         />
                         <MetricCard
                             label="Kabupaten/Kota"
-                            value={totals.districts}
-                            helper="Terdaftar pada provinsi binaan"
+                            value={territoryDistributionRows.length}
+                            helper={`${districtRows.length} wilayah terpetakan`}
                             icon={<Building2 size={19} />}
                             color={COLORS.violet}
                         />
                         <MetricCard
-                            label="Program Terbaca"
-                            value={totals.programs}
-                            helper="Program dalam cakupan AO"
+                            label="Program Terfilter"
+                            value={filteredDashboardTotals.programs}
+                            helper={`${programs.length} total program dalam cakupan AO`}
                             icon={<FolderOpen size={19} />}
                             color={COLORS.emerald}
                         />
                         <MetricCard
                             label="Menunggu Review AO"
-                            value={totals.waitingAo}
-                            helper="Bukti yang perlu ditindaklanjuti"
+                            value={filteredDashboardTotals.waitingAo}
+                            helper="Bukti yang perlu segera ditindaklanjuti"
                             icon={<Clock3 size={19} />}
                             color={COLORS.amber}
                         />
                     </div>
-
-                    <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
-                        <PanelHeader
-                            eyebrow="Pemetaan Wilayah"
-                            title="Distribusi Sekolah per Kabupaten/Kota"
-                            subtitle={`Seluruh kabupaten/kota yang didaftarkan Admin pada ${provinceLabel}, termasuk wilayah yang belum memiliki sekolah binaan.`}
-                            icon={<MapPin size={18} />}
-                        />
-
-                        <div className="grid gap-6 p-5 xl:grid-cols-[0.9fr_1.1fr]">
-                            <div>
-                                <SchoolDistributionChart
-                                    rows={districtRows}
-                                    totalSchools={normalizedSchools.length}
-                                />
-                            </div>
-
-                            <div className="overflow-hidden rounded-2xl border border-slate-100">
-                                <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center">
-                                    <SearchInput
-                                        value={schoolSearch}
-                                        onChange={(value) => {
-                                            setSchoolSearch(value);
-                                            setSchoolPage(1);
-                                        }}
-                                        placeholder="Cari nama sekolah, NPSN, jenjang..."
-                                    />
-
-                                    <FilterSelect
-                                        label="Kabupaten/Kota"
-                                        value={schoolDistrictFilter}
-                                        onChange={(value) => {
-                                            setSchoolDistrictFilter(value);
-                                            setSchoolPage(1);
-                                        }}
-                                        options={schoolDistrictOptions}
-                                    />
-                                </div>
-
-                                <SchoolTable
-                                    rows={schoolPageRows}
-                                    totalRows={filteredSchools.length}
-                                    page={schoolPage}
-                                    totalPages={schoolTotalPages}
-                                    onPageChange={setSchoolPage}
-                                />
-                            </div>
-                        </div>
-                    </section>
-
-                    <section className="overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm">
-                        <PanelHeader
-                            eyebrow="Monitoring Program"
-                            title="Program per Sekolah"
-                            subtitle="Diagram dapat digeser secara horizontal ketika jumlah sekolah lebih banyak dari lebar layar."
-                            icon={<BarChart3 size={18} />}
-                            right={
-                                activeProgramFilterCount > 0 ? (
-                                    <button
-                                        type="button"
-                                        onClick={resetProgramFilters}
-                                        className="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 text-[9px] font-black uppercase tracking-widest text-rose-500 transition hover:bg-rose-500 hover:text-white"
-                                    >
-                                        <SlidersHorizontal size={13} />
-                                        Reset {activeProgramFilterCount} Filter
-                                    </button>
-                                ) : null
-                            }
-                        />
-
-                        <div className="border-b border-slate-100 bg-slate-50/50 p-5">
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
-                                <div className="md:col-span-2 xl:col-span-2 2xl:col-span-2">
-                                    <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
-                                        Pencarian
-                                    </span>
-                                    <SearchInput
-                                        value={programSearch}
-                                        onChange={(value) => {
-                                            setProgramSearch(value);
-                                            setProgramPage(1);
-                                        }}
-                                        placeholder="Cari program, sekolah, kabupaten..."
-                                    />
-                                </div>
-
+                    <AODashboardPanel>
+                        <div className="flex flex-col gap-3 p-4 xl:flex-row xl:items-center">
+                            <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(210px,1.25fr)_minmax(180px,1fr)_minmax(165px,0.9fr)_minmax(180px,1fr)_minmax(220px,1.2fr)]">
                                 <DistrictDropdown
                                     label="Kabupaten/Kota"
                                     value={programDistrictFilter}
@@ -3239,6 +4186,8 @@ function AODashboardPage({
                                         setProgramDistrictFilter(value);
                                         setProgramSchoolFilter("ALL");
                                         setProgramPage(1);
+                                        setSchoolPage(1);
+                                        setSelectedProgramId(null);
                                     }}
                                     options={programDistrictOptions}
                                 />
@@ -3249,6 +4198,8 @@ function AODashboardPage({
                                     onChange={(value) => {
                                         setProgramSchoolFilter(value);
                                         setProgramPage(1);
+                                        setSchoolPage(1);
+                                        setSelectedProgramId(null);
                                     }}
                                     options={programSchoolOptions}
                                 />
@@ -3259,20 +4210,13 @@ function AODashboardPage({
                                     onChange={(value) => {
                                         setProgramCategoryFilter(value);
                                         setProgramPage(1);
+                                        setSchoolPage(1);
+                                        setSelectedProgramId(null);
                                     }}
                                     options={[
-                                        {
-                                            value: "ALL",
-                                            label: "Semua Bidang",
-                                        },
-                                        {
-                                            value: "AKADEMIK",
-                                            label: "Akademik",
-                                        },
-                                        {
-                                            value: "NON_AKADEMIK",
-                                            label: "Non Akademik",
-                                        },
+                                        { value: "ALL", label: "Semua Bidang" },
+                                        { value: "AKADEMIK", label: "Akademik" },
+                                        { value: "NON_AKADEMIK", label: "Non Akademik" },
                                     ]}
                                 />
 
@@ -3282,66 +4226,119 @@ function AODashboardPage({
                                     onChange={(value) => {
                                         setProgramPillarFilter(value);
                                         setProgramPage(1);
+                                        setSchoolPage(1);
+                                        setSelectedProgramId(null);
                                     }}
                                     options={[
-                                        {
-                                            value: "ALL",
-                                            label: "Semua Pilar",
-                                        },
-                                        {
-                                            value: "AKADEMIK",
-                                            label: "Akademik",
-                                        },
-                                        {
-                                            value: "KARAKTER",
-                                            label: "Karakter",
-                                        },
-                                        {
-                                            value: "SENI_BUDAYA",
-                                            label: "Seni Budaya",
-                                        },
-                                        {
-                                            value: "KECAKAPAN_HIDUP",
-                                            label: "Kecakapan Hidup",
-                                        },
+                                        { value: "ALL", label: "Semua Pilar" },
+                                        { value: "AKADEMIK", label: "Akademik" },
+                                        { value: "KARAKTER", label: "Karakter" },
+                                        { value: "SENI_BUDAYA", label: "Seni Budaya" },
+                                        { value: "KECAKAPAN_HIDUP", label: "Kecakapan Hidup" },
                                     ]}
                                 />
 
                                 <FilterSelect
-                                    label="Status"
+                                    label="Status Program"
                                     value={programStatusFilter}
                                     onChange={(value) => {
                                         setProgramStatusFilter(value);
                                         setProgramPage(1);
+                                        setSchoolPage(1);
+                                        setSelectedProgramId(null);
                                     }}
                                     options={programStatusOptions}
                                 />
                             </div>
-                        </div>
 
-                        <div className="px-5 pb-6 pt-4">
-                            <div className="flex flex-col gap-1 border-b border-slate-100 pb-3 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
-                                        Jumlah Program per Sekolah
-                                    </p>
-                                    <p className="mt-1 text-[10px] font-semibold text-slate-400">
-                                        Nama sekolah ditampilkan penuh di bawah batang. Geser diagram ke kanan untuk melihat sekolah berikutnya.
-                                    </p>
+                            {activeProgramFilterCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={resetProgramFilters}
+                                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-4 text-[9px] font-black uppercase tracking-widest text-rose-500 transition hover:bg-rose-500 hover:text-white"
+                                >
+                                    <SlidersHorizontal size={13} />
+                                    Reset {activeProgramFilterCount} Filter
+                                </button>
+                            )}
+                        </div>
+                    </AODashboardPanel>
+
+                    <section className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.36fr)] xl:items-stretch">
+                        <div className="grid min-h-0 gap-4 xl:grid-rows-[auto_minmax(350px,1fr)]">
+                            <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
+                                <div className="flex min-h-0 flex-col gap-4">
+                                    <div className="shrink-0 rounded-[1.35rem] border border-slate-200 bg-white p-3 shadow-sm">
+                                        <SearchInput
+                                            value={programSearch}
+                                            onChange={(value) => {
+                                                setProgramSearch(value);
+                                                setProgramPage(1);
+                                                setSchoolPage(1);
+                                                setSelectedProgramId(null);
+                                            }}
+                                            placeholder="Cari program, sekolah, atau kabupaten..."
+                                        />
+                                    </div>
+
+                                    <AOTerritoryCard
+                                        rows={territoryDistributionRows}
+                                        totalSchools={territorySchools.length}
+                                        provinceLabel={provinceLabel}
+                                    />
                                 </div>
 
-                                <p className="mt-2 text-[10px] font-black text-slate-500 sm:mt-0">
-                                    {schoolProgramChartRows.length} sekolah pada diagram
-                                </p>
+                                <AOStatusPieCard
+                                    title="Status Program"
+                                    helper={selectedProgram ? "Status data terpilih" : "Program terfilter"}
+                                    total={programPieSource.length}
+                                    rows={programStatusPieRows}
+                                    icon={<FolderOpen size={18} />}
+                                />
                             </div>
 
-                            <SchoolProgramBarChart
-                                rows={schoolProgramChartRows}
+                            <AOVisualProgramPanel
+                                program={visualProgram}
+                                processSteps={visualProgramSteps}
+                                schoolRows={visualProgramSchoolRows}
+                                progress={visualProgramProgress}
+                                query={visualProgramQuery}
+                                setQuery={(value) => {
+                                    setVisualProgramQuery(value);
+                                    setSelectedProgramId(null);
+                                }}
+                                navigate={navigate}
+                                detailPathPrefix={detailPathPrefix}
                             />
                         </div>
 
+                        <AOFlipMonitoringList
+                            activeView={activeListView}
+                            onFlip={() =>
+                                setActiveListView((current) =>
+                                    current === "PROGRAM" ? "WILAYAH" : "PROGRAM",
+                                )
+                            }
+                            programRows={programPageRows}
+                            programTotalRows={filteredPrograms.length}
+                            programPage={programPage}
+                            programTotalPages={programTotalPages}
+                            onProgramPageChange={setProgramPage}
+                            schoolRows={territoryPageRows}
+                            schoolTotalRows={territorySchools.length}
+                            schoolPage={schoolPage}
+                            schoolTotalPages={territoryTotalPages}
+                            onSchoolPageChange={setSchoolPage}
+                            selectedProgramId={selectedProgramId}
+                            onSelectProgram={(program) => {
+                                const id = getProgramId(program);
+                                setSelectedProgramId(id);
+                                setVisualProgramQuery(`PRG-${id}`);
+                            }}
+                            programSchoolRowsMap={programSchoolRowsMap}
+                        />
                     </section>
-                </section>
+                </div>
             </main>
 
             <style
@@ -3350,17 +4347,14 @@ function AODashboardPage({
                         .program-chart-scroll::-webkit-scrollbar {
                             height: 7px;
                         }
-
                         .program-chart-scroll::-webkit-scrollbar-track {
                             background: #F1F5F9;
                             border-radius: 999px;
                         }
-
                         .program-chart-scroll::-webkit-scrollbar-thumb {
                             background: rgba(10, 196, 224, 0.45);
                             border-radius: 999px;
                         }
-
                         .program-chart-scroll {
                             scrollbar-width: thin;
                             scrollbar-color: rgba(10, 196, 224, 0.45) #F1F5F9;
@@ -3373,4 +4367,3 @@ function AODashboardPage({
 }
 
 export default AODashboardPage;
-

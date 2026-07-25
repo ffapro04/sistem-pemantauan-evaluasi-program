@@ -44,7 +44,7 @@ const AGENDA_LOGO_PATHS = {
     satuIndonesia: satuIndonesiaLogo,
 };
 
-const AGENDA_TABLE_PAGE_SIZE = 10;
+const AGENDA_TABLE_PAGE_SIZE = 4;
 
 const MONTH_NAMES = [
     "Januari",
@@ -1537,8 +1537,7 @@ function PersonaCell({ event }) {
                         {schoolPersonas.map((persona, index) => (
                             <p
                                 key={`${persona.role}-${persona.name}-${index}`}
-                                className="min-w-0 truncate"
-                                title={persona.name}
+                                className="min-w-0 break-words"
                             >
                                 {persona.name}
                             </p>
@@ -1547,6 +1546,168 @@ function PersonaCell({ event }) {
                 </div>
             )}
         </div>
+    );
+}
+
+
+function AgendaMetaItem({ icon: Icon, label, value, children }) {
+    return (
+        <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white text-[#0AC4E0] shadow-sm">
+                    <Icon size={14} />
+                </span>
+                {label}
+            </div>
+            <div className="mt-2 break-words text-[11px] font-black leading-5 text-slate-700">
+                {children || value || "-"}
+            </div>
+        </div>
+    );
+}
+
+function AgendaDetailCard({
+    event,
+    canManageCOE = false,
+    onEditCOE,
+    onDoneCOE,
+    onDeleteCOE,
+}) {
+    const isCOE = event.type === "COE";
+    const isHoliday = event.type === "HOLIDAY";
+    const status = getEventStatus(event);
+    const visual = getEventVisual(event);
+    const statusLabel = isHoliday ? "Hari Libur" : getStatusLabel(status);
+    const timeLabel = event.startTime || event.endTime
+        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+        : "Sepanjang hari";
+
+    return (
+        <article className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_16px_40px_rgba(10,196,224,0.10)]">
+            <div className={`absolute inset-y-0 left-0 w-1.5 ${visual.dot}`} />
+
+            <div className="p-4 pl-5 sm:p-5 sm:pl-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.15em] ${visual.badge}`}>
+                                {visual.label}
+                            </span>
+                            {!isHoliday && (
+                                <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.15em] text-slate-500">
+                                    {statusLabel}
+                                </span>
+                            )}
+                        </div>
+
+                        <h3 className="mt-3 break-words text-[15px] font-black leading-6 text-slate-900">
+                            {event.title}
+                        </h3>
+
+                        {event.description && (
+                            <p className="mt-1.5 break-words text-[11px] font-semibold leading-5 text-slate-500">
+                                {event.description}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="shrink-0 rounded-2xl border border-cyan-100 bg-cyan-50/60 px-4 py-3 sm:max-w-[210px]">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-500">
+                            Tanggal Agenda
+                        </p>
+                        <p className="mt-1 text-[11px] font-black leading-5 text-slate-800">
+                            {formatReadableDate(event.date)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <AgendaMetaItem
+                        icon={Layers3}
+                        label="Pilar"
+                        value={isHoliday ? "-" : getPilarLabel(event.pilar)}
+                    />
+                    <AgendaMetaItem
+                        icon={Flag}
+                        label="Jenjang"
+                        value={isHoliday ? "-" : getEventJenjangLabel(event)}
+                    />
+                    {isCOE ? (
+                        <>
+                            <AgendaMetaItem icon={Clock3} label="Waktu">
+                                <span>{timeLabel}</span>
+                                <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-amber-600">
+                                    {getActivityTypeLabel(event.activityType)}
+                                </span>
+                            </AgendaMetaItem>
+                            <AgendaMetaItem icon={MapPin} label="Lokasi">
+                                <span>{event.location || "-"}</span>
+                                {event.meetingLink && (
+                                    <a
+                                        href={normalizeExternalUrl(event.meetingLink)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
+                                    >
+                                        Buka meeting
+                                    </a>
+                                )}
+                            </AgendaMetaItem>
+                        </>
+                    ) : (
+                        <>
+                            <AgendaMetaItem icon={CalendarDays} label="Jenis Agenda" value={visual.label} />
+                            <AgendaMetaItem icon={CheckCircle2} label="Status" value={statusLabel} />
+                        </>
+                    )}
+                </div>
+
+                {!isHoliday && (
+                    <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-3.5">
+                        <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0]">
+                                <UsersRound size={14} />
+                            </span>
+                            Pihak Terlibat
+                        </div>
+                        <PersonaCell event={event} />
+                    </div>
+                )}
+
+                {isCOE && canManageCOE && (
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                        <button
+                            type="button"
+                            onClick={() => onEditCOE?.(event)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-amber-600 transition hover:bg-amber-100"
+                        >
+                            <Pencil size={13} />
+                            Edit
+                        </button>
+
+                        {!['SELESAI', 'DIBATALKAN'].includes(status) && (
+                            <button
+                                type="button"
+                                onClick={() => onDoneCOE?.(event)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-emerald-600 transition hover:bg-emerald-100"
+                            >
+                                <CheckCircle2 size={13} />
+                                Selesai
+                            </button>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={() => onDeleteCOE?.(event)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-rose-600 transition hover:bg-rose-100"
+                        >
+                            <Trash2 size={13} />
+                            Hapus
+                        </button>
+                    </div>
+                )}
+            </div>
+        </article>
     );
 }
 
@@ -2042,6 +2203,7 @@ export default function AgendaCalendarBase({
     const navigate = useNavigate();
     const routeLocation = useLocation();
     const calendarRef = useRef(null);
+    const agendaDetailSectionRef = useRef(null);
     const openedAgendaRef = useRef("");
 
     const currentUser = useMemo(() => getCurrentUserFromToken(), []);
@@ -2827,33 +2989,33 @@ export default function AgendaCalendarBase({
         tableEvents.length,
     );
 
-    const hasCOEInCurrentTable = paginatedTableEvents.some(
-        (event) => event.type === "COE",
-    );
+    const changeAgendaPage = (nextPage) => {
+        const resolvedPage = Math.min(
+            tableTotalPages,
+            Math.max(1, Number(nextPage) || 1),
+        );
 
-    const agendaTableColumns = hasCOEInCurrentTable
-        ? [
-            "Nama Agenda",
-            "Tanggal",
-            "Jenis",
-            "Pilar",
-            "Jenjang",
-            "Waktu",
-            "Lokasi",
-            ...(canManageCOE ? ["Action"] : []),
-        ]
-        : [
-            "Nama Agenda",
-            "Tanggal",
-            "Jenis",
-            "Pilar",
-            "Jenjang",
-            "Persona",
-        ];
+        setTablePage(resolvedPage);
+
+        window.requestAnimationFrame(() => {
+            agendaDetailSectionRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            });
+        });
+    };
 
     useEffect(() => {
         setTablePage(1);
-    }, [tableSearchKeyword, activeFilter, activePilar, activeJenjang, activeActivityType, searchKeyword]);
+    }, [
+        selectedDateKey,
+        tableSearchKeyword,
+        activeFilter,
+        activePilar,
+        activeJenjang,
+        activeActivityType,
+        searchKeyword,
+    ]);
 
     useEffect(() => {
         if (tablePage > tableTotalPages) {
@@ -3339,14 +3501,17 @@ export default function AgendaCalendarBase({
 
                         </section>
 
-                        <section className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5 lg:p-6">
+                        <section
+                            ref={agendaDetailSectionRef}
+                            className="scroll-mt-4 rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5 lg:p-6"
+                        >
                             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                                 <div>
                                     <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                                         Detail Agenda
                                     </p>
                                     <h2 className="mt-1 text-[22px] font-black text-slate-900">
-                                        Tabel Agenda Tanggal Terpilih
+                                        Agenda Tanggal Terpilih
                                     </h2>
                                     <p className="mt-1 text-[11px] font-semibold text-slate-400">
                                         {formatReadableDate(selectedDateKey)} · menampilkan {tableFrom}-{tableTo} dari {tableEvents.length} agenda.
@@ -3358,173 +3523,65 @@ export default function AgendaCalendarBase({
                                     <input
                                         value={tableSearchKeyword}
                                         onChange={(event) => setTableSearchKeyword(event.target.value)}
-                                        placeholder="Cari di tabel agenda..."
+                                        placeholder="Cari agenda tanggal ini..."
                                         className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
                                     />
                                 </div>
                             </div>
 
-                            <div className="agenda-scroll overflow-x-auto rounded-2xl border border-slate-100">
-                                <table className="w-full min-w-[1040px] border-collapse text-left">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            {agendaTableColumns.map((column) => (
-                                                <th
-                                                    key={column}
-                                                    className="border-b border-slate-100 px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400"
-                                                >
-                                                    {column}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paginatedTableEvents.length ? (
-                                            paginatedTableEvents.map((event) => {
-                                                const isCOE = event.type === "COE";
-                                                const isHoliday = event.type === "HOLIDAY";
-                                                const status = getEventStatus(event);
-                                                const visual = getEventVisual(event);
-
-                                                return (
-                                                    <tr key={event.id} className="transition hover:bg-cyan-50/30">
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                            <p className="max-w-[280px] text-[12px] font-black leading-5 text-slate-800">
-                                                                {event.title}
-                                                            </p>
-                                                            {event.description && (
-                                                                <p className="mt-1 line-clamp-2 max-w-[280px] text-[10px] font-semibold leading-4 text-slate-400">
-                                                                    {event.description}
-                                                                </p>
-                                                            )}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-black text-slate-800">
-                                                            {formatReadableDate(event.date)}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${visual.badge}`}>
-                                                                {visual.label}
-                                                            </span>
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {isHoliday ? "-" : getPilarLabel(event.pilar)}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {isHoliday ? "-" : getEventJenjangLabel(event)}
-                                                        </td>
-
-                                                        {isCOE ? (
-                                                            <>
-                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                                    {event.startTime || event.endTime
-                                                                        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
-                                                                        : "Sepanjang hari"}
-
-                                                                    <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-amber-600">
-                                                                        {getActivityTypeLabel(event.activityType)}
-                                                                    </span>
-                                                                </td>
-
-                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                                    {event.location || "-"}
-
-                                                                    {event.meetingLink && (
-                                                                        <a
-                                                                            href={normalizeExternalUrl(event.meetingLink)}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
-                                                                        >
-                                                                            Buka meeting
-                                                                        </a>
-                                                                    )}
-                                                                </td>
-
-                                                                {canManageCOE && (
-                                                                    <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => openEditCOE(event)}
-                                                                                className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-600"
-                                                                            >
-                                                                                Edit
-                                                                            </button>
-
-                                                                            {!["SELESAI", "DIBATALKAN"].includes(status) && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleDoneCOE(event)}
-                                                                                    className="rounded-lg bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-emerald-600"
-                                                                                >
-                                                                                    Selesai
-                                                                                </button>
-                                                                            )}
-
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleDeleteCOE(event)}
-                                                                                className="rounded-lg bg-rose-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-rose-600"
-                                                                            >
-                                                                                Hapus
-                                                                            </button>
-                                                                        </div>
-                                                                    </td>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <td
-                                                                colSpan={hasCOEInCurrentTable ? (canManageCOE ? 3 : 2) : 1}
-                                                                className="border-b border-slate-50 px-4 py-3 align-top"
-                                                            >
-                                                                <PersonaCell event={event} />
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                    <td colSpan={agendaTableColumns.length} className="px-4 py-12 text-center">
-                                                    <p className="text-[12px] font-black text-slate-700">
-                                                        Agenda tidak ditemukan
-                                                    </p>
-                                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                                        Ubah filter kalender atau kata kunci pencarian tabel.
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                                    Halaman {safeTablePage} dari {tableTotalPages} · Maksimal {AGENDA_TABLE_PAGE_SIZE} data per halaman
-                                </p>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTablePage((page) => Math.max(1, page - 1))}
-                                        disabled={safeTablePage <= 1}
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        <ChevronLeft size={14} />
-                                        Prev
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTablePage((page) => Math.min(tableTotalPages, page + 1))}
-                                        disabled={safeTablePage >= tableTotalPages}
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        Next
-                                        <ChevronRight size={14} />
-                                    </button>
+                            {paginatedTableEvents.length ? (
+                                <div className={`grid gap-3 ${paginatedTableEvents.length > 1 ? "xl:grid-cols-2" : "grid-cols-1"}`}>
+                                    {paginatedTableEvents.map((event) => (
+                                        <AgendaDetailCard
+                                            key={event.id}
+                                            event={event}
+                                            canManageCOE={canManageCOE}
+                                            onEditCOE={openEditCOE}
+                                            onDoneCOE={handleDoneCOE}
+                                            onDeleteCOE={handleDeleteCOE}
+                                        />
+                                    ))}
                                 </div>
-                            </div>
+                            ) : (
+                                    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-12 text-center">
+                                        <CalendarDays size={26} className="mx-auto text-slate-300" />
+                                        <p className="mt-3 text-[12px] font-black text-slate-700">
+                                            Agenda tidak ditemukan
+                                        </p>
+                                        <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                            Ubah filter kalender atau kata kunci pencarian agenda.
+                                        </p>
+                                    </div>
+                            )}
+
+                            {tableEvents.length > AGENDA_TABLE_PAGE_SIZE && (
+                                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                        Halaman {safeTablePage} dari {tableTotalPages} · {AGENDA_TABLE_PAGE_SIZE} agenda per halaman
+                                    </p>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => changeAgendaPage(safeTablePage - 1)}
+                                            disabled={safeTablePage <= 1}
+                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            <ChevronLeft size={14} />
+                                            Prev
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => changeAgendaPage(safeTablePage + 1)}
+                                            disabled={safeTablePage >= tableTotalPages}
+                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                            Next
+                                            <ChevronRight size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </section>
                     </div>
                 </main>
@@ -3550,4 +3607,3 @@ export default function AgendaCalendarBase({
         </>
     );
 }
-

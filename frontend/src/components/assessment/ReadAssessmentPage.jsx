@@ -21,6 +21,7 @@ import {
     Loader2,
     Upload,
     Download,
+    School,
 } from "lucide-react";
 
 import Sidebar from "../Sidebar";
@@ -121,16 +122,97 @@ const formatDate = (value) => {
     });
 };
 
-const hitungRemaining = (sentAt, tenggat = 7) => {
-    if (!sentAt) return `${Number(tenggat) || 7} Hari`;
+const SECOND_MS = 1000;
+const DAY_MS = 24 * 60 * 60 * SECOND_MS;
 
-    const deadline = new Date(sentAt);
-    deadline.setDate(deadline.getDate() + (Number(tenggat) || 7));
+const getAssessmentRuntime = (assessment, nowMs = Date.now()) => {
+    if (!assessment?.sent_at) {
+        return {
+            stage: "DRAFT",
+            label: "Belum Dikirim",
+            remainingSeconds: null,
+            deadline: null,
+            paused: false,
+        };
+    }
 
-    const now = new Date();
-    const diff = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+    const sentAtMs = new Date(assessment.sent_at).getTime();
+    if (Number.isNaN(sentAtMs)) {
+        return {
+            stage: "DRAFT",
+            label: "Belum Dikirim",
+            remainingSeconds: null,
+            deadline: null,
+            paused: false,
+        };
+    }
 
-    return diff > 0 ? `${diff} Hari Lagi` : "Tenggat Habis";
+    const totalPausedSeconds = Math.max(
+        0,
+        Number(assessment?.total_paused_seconds || 0),
+    );
+    const baseDeadlineMs =
+        sentAtMs + (Number(assessment?.tenggat) || 7) * DAY_MS + totalPausedSeconds * SECOND_MS;
+    const paused = !isActiveValue(assessment?.aktif) && Boolean(assessment?.paused_at);
+    const pausedAtMs = paused ? new Date(assessment.paused_at).getTime() : null;
+    const referenceMs =
+        paused && pausedAtMs && !Number.isNaN(pausedAtMs) ? pausedAtMs : nowMs;
+    const remainingSeconds = Math.max(
+        0,
+        Math.ceil((baseDeadlineMs - referenceMs) / SECOND_MS),
+    );
+    const target = Number(assessment?.jumlah_guru_target || 0);
+    const filled = Number(assessment?.jumlah_pengisi || 0);
+    const allFilled = target > 0 && filled >= target;
+    const normalizedStatus = String(assessment?.status || "").toLowerCase();
+    const completedByStatus = normalizedStatus.includes("selesai");
+
+    if (remainingSeconds <= 0 || allFilled || completedByStatus) {
+        return {
+            stage: "SELESAI",
+            label: "Selesai",
+            remainingSeconds: 0,
+            deadline: new Date(baseDeadlineMs),
+            paused: false,
+        };
+    }
+
+    if (paused) {
+        return {
+            stage: "PENDING",
+            label: "Dipending HO",
+            remainingSeconds,
+            deadline: new Date(baseDeadlineMs + Math.max(0, nowMs - pausedAtMs)),
+            paused: true,
+        };
+    }
+
+    return {
+        stage: "PROSES",
+        label: "Proses Pengisian",
+        remainingSeconds,
+        deadline: new Date(baseDeadlineMs),
+        paused: false,
+    };
+};
+
+const formatCountdown = (remainingSeconds) => {
+    if (remainingSeconds === null || remainingSeconds === undefined) return "Belum Dimulai";
+    if (remainingSeconds <= 0) return "Tenggat Habis";
+
+    const days = Math.floor(remainingSeconds / 86400);
+    const hours = Math.floor((remainingSeconds % 86400) / 3600);
+    const minutes = Math.floor((remainingSeconds % 3600) / 60);
+    const seconds = remainingSeconds % 60;
+
+    return `${days} Hari ${hours} Jam ${minutes} Menit ${seconds} Detik`;
+};
+
+const getRuntimeTone = (stage) => {
+    if (stage === "PROSES") return "border-amber-200 bg-amber-50 text-amber-700";
+    if (stage === "PENDING") return "border-red-200 bg-red-50 text-red-600";
+    if (stage === "SELESAI") return "border-emerald-200 bg-emerald-50 text-emerald-600";
+    return "border-slate-200 bg-slate-50 text-slate-500";
 };
 
 const getStatusStyle = (status) => {
@@ -162,6 +244,10 @@ const normalizeAssessment = (item) => ({
     status: item?.status ?? "Siap Diajukan",
     aktif: item?.aktif ?? item?.status_aktif ?? true,
     sent_at: item?.sent_at ?? null,
+    paused_at: item?.paused_at ?? null,
+    total_paused_seconds: Number(item?.total_paused_seconds || 0),
+    remaining_seconds: item?.remaining_seconds ?? null,
+    deadline: item?.deadline ?? null,
     tenggat: item?.tenggat ?? 7,
     jenis: item?.jenis ?? "",
     pilar: item?.pilar ?? item?.raw?.pilar ?? "",
@@ -350,12 +436,13 @@ function ReadAssessmentPage({
     const [currentHo, setCurrentHo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState({});
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("semua");
     const [pilarFilter, setPilarFilter] = useState("semua");
     const [page, setPage] = useState(1);
 
-    const limit = 8;
+    const limit = 10;
 
     const fetchData = async () => {
         try {
@@ -432,16 +519,22 @@ function ReadAssessmentPage({
     }, [jenisAssessment]);
 
     useEffect(() => {
+        const timerId = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+        return () => window.clearInterval(timerId);
+    }, []);
+
+    useEffect(() => {
         setPage(1);
     }, [search, statusFilter, pilarFilter]);
 
     const filteredData = useMemo(() => {
         return assessments
             .filter((item) => {
-                if (statusFilter === "lanjut") return isActiveValue(item.aktif);
-                if (statusFilter === "pending") return !isActiveValue(item.aktif);
+                const runtime = getAssessmentRuntime(item, currentTime);
+                if (statusFilter === "lanjut") return runtime.stage === "PROSES";
+                if (statusFilter === "pending") return runtime.stage === "PENDING";
                 if (statusFilter === "terkirim") return Boolean(item.sent_at);
-                if (statusFilter === "draft") return !item.sent_at;
+                if (statusFilter === "draft") return runtime.stage === "DRAFT";
                 return true;
             })
             .filter((item) => {
@@ -457,7 +550,7 @@ function ReadAssessmentPage({
                     .includes(keyword);
             })
             .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
-    }, [assessments, search, statusFilter, pilarFilter]);
+    }, [assessments, search, statusFilter, pilarFilter, currentTime]);
 
     const totalPages = Math.ceil(filteredData.length / limit) || 1;
     const start = (page - 1) * limit;
@@ -523,7 +616,20 @@ function ReadAssessmentPage({
 
             setAssessments((prev) =>
                 prev.map((item) =>
-                    item.id === id ? { ...item, aktif: !isActiveValue(item.aktif) } : item,
+                    item.id === id
+                        ? {
+                            ...item,
+                            aktif: payload?.aktif,
+                            status: payload?.status || item.status,
+                            paused_at: payload?.paused_at ?? null,
+                            total_paused_seconds: Number(
+                                payload?.total_paused_seconds ?? item.total_paused_seconds ?? 0,
+                            ),
+                            remaining_seconds:
+                                payload?.remaining_seconds ?? item.remaining_seconds,
+                            deadline: payload?.deadline ?? item.deadline,
+                        }
+                        : item,
                 ),
             );
 
@@ -662,23 +768,149 @@ function ReadAssessmentPage({
     const summary = useMemo(() => {
         return assessments.reduce(
             (acc, item) => {
+                const runtime = getAssessmentRuntime(item, currentTime);
                 acc.total += 1;
-                if (isActiveValue(item.aktif)) acc.lanjut += 1;
-                else acc.pending += 1;
+                if (runtime.stage === "PROSES") acc.lanjut += 1;
+                if (runtime.stage === "PENDING") acc.pending += 1;
                 if (item.sent_at) acc.terkirim += 1;
-                else acc.draft += 1;
+                if (runtime.stage === "DRAFT") acc.draft += 1;
                 return acc;
             },
             { total: 0, lanjut: 0, pending: 0, terkirim: 0, draft: 0 },
         );
-    }, [assessments]);
+    }, [assessments, currentTime]);
+
+    const getSchoolList = (row) =>
+        row?.sekolah && row.sekolah !== "-"
+            ? String(row.sekolah)
+                .split(",")
+                .map((school) => school.trim())
+                .filter(Boolean)
+            : [];
+
+    const getProgressPercent = (row) =>
+        Math.min(Math.max(Number(row?.persentase_pengisian || 0), 0), 100);
+
+    const renderRowActions = (row, withLabel = false) => {
+        const runtime = getAssessmentRuntime(row, currentTime);
+        const active = runtime.stage === "PROSES";
+        const canToggle = ["PROSES", "PENDING"].includes(runtime.stage);
+        const alreadySent = Boolean(row.sent_at);
+        const isBusy = Boolean(actionLoading[row.id]);
+        const baseClass = withLabel
+            ? "inline-flex h-9 items-center justify-center gap-2 rounded-xl border px-3 text-[9px] font-black uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-50"
+            : "flex h-9 w-9 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-50";
+
+        return (
+            <div className={`flex flex-wrap items-center ${withLabel ? "gap-2" : "justify-center gap-1.5"}`}>
+                <button
+                    type="button"
+                    onClick={() => navigate(`${basePath}/detail/${row.id}`)}
+                    className={`${baseClass} border-slate-200 bg-slate-50 text-slate-500 hover:border-cyan-200 hover:bg-cyan-50 hover:text-[#0AC4E0]`}
+                    title="Lihat detail assessment"
+                >
+                    <Eye size={14} />
+                    {withLabel && <span>Detail</span>}
+                </button>
+
+                {!alreadySent && (
+                    <button
+                        type="button"
+                        onClick={() => navigate(`${basePath}/edit/${row.id}`)}
+                        className={`${baseClass} border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white`}
+                        title="Edit assessment"
+                    >
+                        <Edit3 size={14} />
+                        {withLabel && <span>Edit</span>}
+                    </button>
+                )}
+
+                <button
+                    type="button"
+                    onClick={() => handleExportResult(row)}
+                    disabled={isBusy}
+                    className={`${baseClass} border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white`}
+                    title="Export hasil assessment"
+                >
+                    {isBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                    {withLabel && <span>Export</span>}
+                </button>
+
+                {!alreadySent && (
+                    <button
+                        type="button"
+                        onClick={() => handleSend(row.id)}
+                        disabled={isBusy}
+                        className={`${baseClass} border-cyan-200 bg-cyan-50 text-[#0AC4E0] hover:bg-[#0AC4E0] hover:text-white`}
+                        title="Kirim assessment"
+                    >
+                        {isBusy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        {withLabel && <span>Kirim</span>}
+                    </button>
+                )}
+
+                {canToggle && (
+                    <button
+                        type="button"
+                        onClick={() => handleToggleAktif(row.id)}
+                        disabled={isBusy}
+                        className={`${baseClass} ${active
+                            ? "border-red-200 bg-red-50 text-red-600 hover:bg-red-500 hover:text-white"
+                            : "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white"
+                            }`}
+                        title={active ? "Pending-kan assessment" : "Lanjutkan assessment"}
+                    >
+                        {active ? <PauseCircle size={14} /> : <PlayCircle size={14} />}
+                        {withLabel && <span>{active ? "Pending" : "Lanjutkan"}</span>}
+                    </button>
+                )}
+            </div>
+        );
+    };
+
+    const summaryCards = [
+        {
+            key: "semua",
+            label: "Total Assessment",
+            value: summary.total,
+            helper: "Seluruh data dalam cakupan HO",
+            tone: "border-cyan-100 bg-cyan-50/70 text-cyan-700",
+        },
+        {
+            key: "lanjut",
+            label: "Proses Pengisian",
+            value: summary.lanjut,
+            helper: "Timer sedang berjalan",
+            tone: "border-amber-100 bg-amber-50/70 text-amber-700",
+        },
+        {
+            key: "pending",
+            label: "Dipending HO",
+            value: summary.pending,
+            helper: "Timer berhenti sementara",
+            tone: "border-red-100 bg-red-50/70 text-red-600",
+        },
+        {
+            key: "draft",
+            label: "Belum Dikirim",
+            value: summary.draft,
+            helper: "Masih dapat diedit",
+            tone: "border-slate-200 bg-slate-50 text-slate-600",
+        },
+        {
+            key: "terkirim",
+            label: "Sudah Dikirim",
+            value: summary.terkirim,
+            helper: "Pernah dikirim ke sekolah",
+            tone: "border-emerald-100 bg-emerald-50/70 text-emerald-700",
+        },
+    ];
 
     if (loading) {
         return (
             <PageWrapper className="flex h-screen items-center justify-center bg-white">
                 <div className="flex flex-col items-center gap-4">
                     <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#0AC4E0] border-t-transparent" />
-
                     <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#0AC4E0]">
                         Memuat assessment
                     </p>
@@ -691,93 +923,71 @@ function ReadAssessmentPage({
         <PageWrapper className="flex h-screen overflow-hidden bg-[#EEF5FF] !p-0 font-sans text-slate-800">
             <Sidebar />
 
-            <main className="flex h-full flex-1 flex-col overflow-hidden px-4 pb-6 pt-10 md:px-10">
-                <Card className="!m-0 flex flex-1 flex-col overflow-hidden rounded-[2.5rem] bg-white !p-0 shadow-2xl">
-                    <div className="shrink-0 px-10 pb-6 pt-8">
-                        <header className="mb-7 flex items-center justify-between">
-                            <div>
+            <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden px-3 pb-4 pt-8 sm:px-5 lg:px-8 xl:px-10">
+                <Card className="!m-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-white/80 bg-white !p-0 shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+                    <div className="shrink-0 border-b border-slate-100 px-5 pb-5 pt-6 sm:px-7 lg:px-9">
+                        <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
                                 <Label
                                     text="Assessment Management"
-                                    className="!text-[8px] !font-black !italic uppercase !text-[#0AC4E0]"
+                                    className="!text-[9px] !font-black !italic uppercase !tracking-[0.18em] !text-[#0AC4E0]"
                                 />
-
-                                <h1 className="text-xl font-black uppercase text-gray-800">
+                                <h1 className="mt-1 break-words text-[24px] font-black leading-tight tracking-[-0.03em] text-slate-900 sm:text-[28px]">
                                     {title}{" "}
                                     <span className="text-[#0AC4E0]">{labelAssessment}</span>
                                 </h1>
+                                <p className="mt-2 max-w-3xl text-[11px] font-semibold leading-5 text-slate-400">
+                                    Kelola pengiriman, target sekolah, progres pengisian guru, tenggat, serta status pending assessment dalam satu halaman.
+                                </p>
                             </div>
 
                             <Button
                                 text="Tambah Assessment"
-                                icon={<Plus size={14} />}
+                                icon={<Plus size={15} />}
                                 onClick={() => navigate(`${basePath}/create`)}
-                                className="!rounded-full !bg-[#0AC4E0] !px-6 !py-2.5 !text-[9px] font-black !uppercase text-white shadow-lg active:scale-95"
+                                className="!w-full !rounded-2xl !bg-[#0AC4E0] !px-6 !py-3 !text-[10px] font-black !uppercase tracking-wide text-white shadow-lg transition active:scale-95 sm:!w-auto"
                             />
                         </header>
 
-                        <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-cyan-600">
-                                    Total Data
-                                </p>
+                        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                            {summaryCards.map((card) => {
+                                const selected = statusFilter === card.key;
 
-                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.total}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-emerald-600">
-                                    Lanjut
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.lanjut}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-orange-600">
-                                    Pending
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.pending}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-amber-600">
-                                    Belum Dikirim
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.draft}
-                                </p>
-                            </div>
-
-                            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-blue-600">
-                                    Terkirim
-                                </p>
-
-                                <p className="mt-2 text-2xl font-black text-slate-900">
-                                    {summary.terkirim}
-                                </p>
-                            </div>
+                                return (
+                                    <button
+                                        key={card.key}
+                                        type="button"
+                                        onClick={() => setStatusFilter(card.key)}
+                                        className={`min-w-0 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${card.tone} ${selected ? "ring-2 ring-[#0AC4E0]/30" : ""}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="whitespace-normal break-words text-[9px] font-black uppercase tracking-[0.14em]">
+                                                    {card.label}
+                                                </p>
+                                                <p className="mt-1 text-[9px] font-semibold leading-4 opacity-70">
+                                                    {card.helper}
+                                                </p>
+                                            </div>
+                                            <span className="shrink-0 text-[28px] font-black leading-none text-slate-900">
+                                                {card.value}
+                                            </span>
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
 
-                        <div className="flex flex-col gap-3 md:flex-row">
-                            <div className="relative flex-1">
+                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(320px,1fr)_190px_190px_44px]">
+                            <div className="relative min-w-0">
                                 <Input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Cari nama assessment, HO, sekolah, atau status..."
-                                    className="w-full !rounded-xl !bg-gray-50/70 !py-2.5 !pl-11 !text-[11px] font-bold"
+                                    placeholder="Cari nama assessment, HO, sekolah, pilar, atau status..."
+                                    className="w-full !rounded-xl !border-slate-200 !bg-slate-50/80 !py-2.5 !pl-11 !pr-4 !text-[11px] font-bold"
                                 />
-
                                 <Search
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300"
+                                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"
                                     size={16}
                                 />
                             </div>
@@ -787,13 +997,13 @@ function ReadAssessmentPage({
                                 onChange={setStatusFilter}
                                 items={[
                                     { value: "semua", label: "Semua Status" },
-                                    { value: "lanjut", label: "Lanjut" },
-                                    { value: "pending", label: "Pending" },
+                                    { value: "lanjut", label: "Proses Pengisian" },
+                                    { value: "pending", label: "Dipending HO" },
                                     { value: "draft", label: "Belum Dikirim" },
-                                    { value: "terkirim", label: "Terkirim" },
+                                    { value: "terkirim", label: "Sudah Dikirim" },
                                 ]}
                                 placeholder="Semua Status"
-                                width="w-full md:w-[170px]"
+                                width="w-full"
                                 usePortal
                             />
 
@@ -805,326 +1015,301 @@ function ReadAssessmentPage({
                                     ...getPilarOptions(jenisAssessment),
                                 ]}
                                 placeholder="Semua Pilar"
-                                width="w-full md:w-[170px]"
+                                width="w-full"
                                 usePortal
                             />
 
                             <button
                                 type="button"
                                 onClick={resetFilter}
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200/60 bg-gray-50 text-gray-400 shadow-sm transition-all hover:bg-rose-50 hover:text-rose-500 active:rotate-180"
-                                title="Reset filter"
+                                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[9px] font-black uppercase tracking-wide text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 xl:w-11 xl:px-0"
+                                title="Reset seluruh filter"
                             >
                                 <RotateCcw size={16} />
+                                <span className="xl:hidden">Reset Filter</span>
                             </button>
                         </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-auto px-5 pb-5 md:px-8">
-                        <div className="overflow-x-auto rounded-3xl border border-gray-100 bg-white shadow-sm custom-scrollbar">
-                            <table className="w-full min-w-[1060px] table-fixed border-collapse text-left">
-                                <colgroup>
-                                    <col className="w-[48px]" />
-                                    <col className="w-[292px]" />
-                                    <col className="w-[104px]" />
-                                    <col className="w-[140px]" />
-                                    <col className="w-[162px]" />
-                                    <col className="w-[118px]" />
-                                    <col className="w-[124px]" />
-                                    <col className="w-[112px]" />
-                                </colgroup>
-                                <thead>
-                                    <tr className="border-b border-gray-100 bg-gray-50/70">
-                                        <th className="px-2 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            No
-                                        </th>
-
-                                        <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Assessment
-                                        </th>
-
-                                        <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Pilar
-                                        </th>
-
-                                        <th className="px-5 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            HO
-                                        </th>
-
-                                        <th className="px-3 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Target Sekolah
-                                        </th>
-
-                                        <th className="px-5 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Progress
-                                        </th>
-
-                                        <th className="px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Deadline
-                                        </th>
-
-                                        <th className="px-3 py-4 text-center text-[9px] font-black uppercase tracking-widest text-gray-400">
-                                            Aksi
-                                        </th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
+                    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 lg:px-8">
+                        {currentData.length > 0 ? (
+                            <>
+                                <div className="grid gap-4 lg:hidden">
                                     {currentData.map((row, index) => {
-                                        const active = isActiveValue(row.aktif);
-
-                                        const alreadySent =
-                                            Boolean(row.sent_at) ||
-                                            ["TERKIRIM", "PROSES PENGISIAN"].includes(
-                                                String(row.status || "").trim().toUpperCase(),
-                                            );
-
-                                        const sekolahList =
-                                            row.sekolah && row.sekolah !== "-"
-                                                ? String(row.sekolah)
-                                                    .split(",")
-                                                    .map((school) => school.trim())
-                                                : [];
+                                        const runtime = getAssessmentRuntime(row, currentTime);
+                                        const sekolahList = getSchoolList(row);
+                                        const progress = getProgressPercent(row);
 
                                         return (
-                                            <tr
+                                            <article
                                                 key={row.id}
-                                                className="border-b border-gray-50 transition hover:bg-cyan-50/30 last:border-b-0"
+                                                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                                             >
-                                                <td className="px-2 py-4 text-center font-mono text-[10px] font-bold text-gray-400">
-                                                    {String(start + index + 1).padStart(2, "0")}
-                                                </td>
-
-                                                <td className="px-4 py-4">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0AC4E0]/10 text-[#0AC4E0]">
-                                                            <ClipboardCheck size={16} />
-                                                        </div>
-
-                                                        <div className="min-w-0">
-                                                            <p className="line-clamp-2 text-[12px] font-black uppercase leading-snug text-slate-800">
-                                                                {row.nama}
-                                                            </p>
-
-                                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                                <span
-                                                                    className={`rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${getStatusStyle(
-                                                                        row.status,
-                                                                    )}`}
-                                                                >
-                                                                    {row.status}
-                                                                </span>
-
-                                                                <span
-                                                                    className={`rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${active
-                                                                        ? "border-emerald-100 bg-emerald-50 text-emerald-600"
-                                                                        : "border-orange-100 bg-orange-50 text-orange-600"
-                                                                        }`}
-                                                                >
-                                                                    {active ? "Lanjut" : "Pending"}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-300">
+                                                            ASM-{row.id} · Data {String(start + index + 1).padStart(2, "0")}
+                                                        </p>
+                                                        <h2 className="mt-1 whitespace-normal break-words text-[16px] font-black leading-6 text-slate-900">
+                                                            {row.nama}
+                                                        </h2>
                                                     </div>
-                                                </td>
+                                                    <span className={`shrink-0 rounded-full border px-3 py-1.5 text-[8px] font-black uppercase tracking-wide ${getRuntimeTone(runtime.stage)}`}>
+                                                        {runtime.label}
+                                                    </span>
+                                                </div>
 
-                                                <td className="px-3 py-4">
-                                                    <span className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-widest ${getPilarTone(row.pilar)}`}>
+                                                <div className="mt-3 flex flex-wrap gap-2">
+                                                    <span className={`inline-flex rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-wide ${getPilarTone(row.pilar)}`}>
                                                         {getPilarLabel(row.pilar)}
                                                     </span>
-                                                </td>
-
-                                                <td className="px-3 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <Users size={14} className="text-[#0AC4E0]" />
-
-                                                        <span className="line-clamp-2 text-[11px] font-bold leading-snug text-slate-600">
-                                                            {row.ho}
+                                                    {runtime.stage === "PENDING" && (
+                                                        <span className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-[8px] font-black uppercase tracking-wide text-red-500">
+                                                            Timer berhenti
                                                         </span>
-                                                    </div>
-                                                </td>
+                                                    )}
+                                                </div>
 
-                                                <td className="px-3 py-4 align-top">
-                                                    <div className="w-full">
-                                                        {sekolahList.length > 0 ? (
-                                                            <Dropdown
-                                                                placeholder={`${sekolahList.length} Target Sekolah`}
-                                                                value=""
-                                                                onChange={() => { }}
-                                                                width="w-full"
-                                                                usePortal={true}
-                                                                items={sekolahList.map((nama, idx) => ({
-                                                                    label: nama,
-                                                                    value: `${idx}-${nama}`,
-                                                                }))}
-                                                            />
-                                                        ) : (
-                                                            <span className="text-[10px] font-bold text-gray-300">
-                                                                Belum ada target
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-
-                                                <td className="px-3 py-4 text-center">
-                                                    <p className="text-[12px] font-black text-slate-700">
-                                                        {row.jumlah_pengisi}/{row.jumlah_guru_target || 0} Guru
-                                                    </p>
-                                                    <p className="mt-1 text-[9px] font-bold uppercase tracking-widest text-amber-500">
-                                                        {row.belum_mengisi || 0} belum isi
-                                                    </p>
-
-                                                    <div className="mx-auto mt-2 h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
-                                                        <div
-                                                            className="h-full bg-[#0AC4E0]"
-                                                            style={{
-                                                                width: `${Math.min(
-                                                                    Number(row.persentase_pengisian || 0),
-                                                                    100,
-                                                                )}%`,
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <p className="mt-1 text-[9px] font-black text-slate-400">
-                                                        {row.persentase_pengisian || 0}%
-                                                    </p>
-                                                </td>
-
-                                                <td className="px-3 py-4 text-center">
-                                                    <div className="inline-flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 px-2.5 py-1.5">
-                                                        <Clock
-                                                            size={12}
-                                                            className={
-                                                                row.sent_at ? "text-[#0AC4E0]" : "text-slate-300"
-                                                            }
-                                                        />
-
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">
-                                                            {hitungRemaining(row.sent_at, row.tenggat)}
-                                                        </span>
+                                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                                    <div className="rounded-xl bg-slate-50 p-3">
+                                                        <p className="text-[8px] font-black uppercase tracking-wide text-slate-400">Head Office</p>
+                                                        <div className="mt-2 flex items-start gap-2">
+                                                            <Users size={14} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                                            <p className="whitespace-normal break-words text-[11px] font-bold leading-5 text-slate-700">{row.ho}</p>
+                                                        </div>
                                                     </div>
 
-                                                    <p className="mt-2 text-[9px] font-bold text-slate-300">
-                                                        {formatDate(row.sent_at)}
-                                                    </p>
-                                                </td>
-
-                                                <td className="px-3 py-4">
-                                                    <div className="flex justify-center gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                navigate(`${basePath}/detail/${row.id}`)
-                                                            }
-                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-[#0AC4E0]"
-                                                            title="Detail"
-                                                        >
-                                                            <Eye size={14} />
-                                                        </button>
-
-                                                        {!alreadySent && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => navigate(`${basePath}/edit/${row.id}`)}
-                                                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 hover:bg-white hover:text-amber-500"
-                                                                title="Edit"
-                                                            >
-                                                                <Edit3 size={14} />
-                                                            </button>
-                                                        )}
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleExportResult(row)}
-                                                            disabled={actionLoading[row.id]}
-                                                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white disabled:opacity-50"
-                                                            title="Export hasil assessment"
-                                                        >
-                                                            <Download size={14} />
-                                                        </button>
-
-                                                        {!row.sent_at && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleSend(row.id)}
-                                                                disabled={actionLoading[row.id]}
-                                                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-100 bg-cyan-50 text-[#0AC4E0] hover:bg-[#0AC4E0] hover:text-white disabled:opacity-50"
-                                                                title="Kirim"
-                                                            >
-                                                                {actionLoading[row.id] ? (
-                                                                    <Loader2 size={14} className="animate-spin" />
-                                                                ) : (
-                                                                    <Send size={14} />
-                                                                )}
-                                                            </button>
-                                                        )}
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleToggleAktif(row.id)}
-                                                            disabled={actionLoading[row.id]}
-                                                            className={`flex h-8 w-8 items-center justify-center rounded-lg border disabled:opacity-50 ${active
-                                                                ? "border-orange-100 bg-orange-50 text-orange-500 hover:bg-orange-500 hover:text-white"
-                                                                : "border-emerald-100 bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white"
-                                                                }`}
-                                                            title={active ? "Pending-kan assessment" : "Lanjutkan assessment"}
-                                                        >
-                                                            {active ? (
-                                                                <PauseCircle size={14} />
-                                                            ) : (
-                                                                <PlayCircle size={14} />
+                                                    <div className="rounded-xl bg-slate-50 p-3">
+                                                        <p className="text-[8px] font-black uppercase tracking-wide text-slate-400">Target Sekolah</p>
+                                                        <div className="mt-2 space-y-1.5">
+                                                            {sekolahList.length ? sekolahList.slice(0, 3).map((school, schoolIndex) => (
+                                                                <div key={`${row.id}-${schoolIndex}`} className="flex items-start gap-2">
+                                                                    <School size={13} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                                                    <p className="whitespace-normal break-words text-[10px] font-bold leading-4 text-slate-600">{school}</p>
+                                                                </div>
+                                                            )) : (
+                                                                <p className="text-[10px] font-bold text-slate-300">Belum ada target sekolah</p>
                                                             )}
-                                                        </button>
+                                                            {sekolahList.length > 3 && (
+                                                                <p className="text-[9px] font-black text-[#0AC4E0]">+{sekolahList.length - 3} sekolah lainnya</p>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </td>
-                                            </tr>
+
+                                                    <div className="rounded-xl bg-slate-50 p-3">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <div>
+                                                                <p className="text-[8px] font-black uppercase tracking-wide text-slate-400">Progress Guru</p>
+                                                                <p className="mt-1 text-[14px] font-black text-slate-900">
+                                                                    {row.jumlah_pengisi}/{row.jumlah_guru_target || 0} guru
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-[13px] font-black text-[#0AC4E0]">{progress}%</span>
+                                                        </div>
+                                                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+                                                            <div className="h-full rounded-full bg-[#0AC4E0]" style={{ width: `${progress}%` }} />
+                                                        </div>
+                                                        <p className="mt-2 text-[9px] font-bold text-amber-500">{row.belum_mengisi || 0} guru belum mengisi</p>
+                                                    </div>
+
+                                                    <div className={`rounded-xl border p-3 ${getRuntimeTone(runtime.stage)}`}>
+                                                        <p className="text-[8px] font-black uppercase tracking-wide opacity-70">Sisa Waktu</p>
+                                                        <div className="mt-2 flex items-start gap-2">
+                                                            <Clock size={14} className="mt-0.5 shrink-0" />
+                                                            <p className="whitespace-normal break-words text-[10px] font-black leading-5">
+                                                                {formatCountdown(runtime.remainingSeconds)}
+                                                            </p>
+                                                        </div>
+                                                        <p className="mt-2 text-[8px] font-bold uppercase tracking-wide opacity-70">
+                                                            {runtime.stage === "PENDING" ? "Waktu berhenti sementara" : formatDate(row.sent_at)}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 border-t border-slate-100 pt-4">
+                                                    {renderRowActions(row, true)}
+                                                </div>
+                                            </article>
                                         );
                                     })}
-                                </tbody>
-                            </table>
-
-                            {currentData.length === 0 && (
-                                <div className="flex flex-col items-center justify-center py-24 text-slate-300">
-                                    <Database size={54} strokeWidth={1} />
-
-                                    <p className="mt-5 text-[10px] font-black uppercase tracking-widest">
-                                        Data assessment tidak ditemukan
-                                    </p>
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="hidden overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm lg:block custom-scrollbar">
+                                    <table className="w-full min-w-[1460px] table-fixed border-collapse text-left">
+                                        <colgroup>
+                                            <col className="w-[56px]" />
+                                            <col className="w-[320px]" />
+                                            <col className="w-[150px]" />
+                                            <col className="w-[190px]" />
+                                            <col className="w-[250px]" />
+                                            <col className="w-[170px]" />
+                                            <col className="w-[205px]" />
+                                            <col className="w-[155px]" />
+                                        </colgroup>
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="border-b border-slate-100 bg-slate-50/95 backdrop-blur">
+                                                {["No", "Assessment", "Pilar", "Head Office", "Target Sekolah", "Progress Guru", "Sisa Waktu", "Aksi"].map((heading) => (
+                                                    <th
+                                                        key={heading}
+                                                        className={`px-4 py-4 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400 ${["No", "Progress Guru", "Sisa Waktu", "Aksi"].includes(heading) ? "text-center" : ""}`}
+                                                    >
+                                                        {heading}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+
+                                        <tbody>
+                                            {currentData.map((row, index) => {
+                                                const runtime = getAssessmentRuntime(row, currentTime);
+                                                const sekolahList = getSchoolList(row);
+                                                const progress = getProgressPercent(row);
+
+                                                return (
+                                                    <tr
+                                                        key={row.id}
+                                                        className="border-b border-slate-100 align-top transition hover:bg-cyan-50/30 last:border-b-0"
+                                                    >
+                                                        <td className="px-3 py-5 text-center font-mono text-[10px] font-bold text-slate-300">
+                                                            {String(start + index + 1).padStart(2, "0")}
+                                                        </td>
+
+                                                        <td className="px-4 py-5">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0]">
+                                                                    <ClipboardCheck size={17} />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-300">ASM-{row.id}</p>
+                                                                    <p className="mt-1 whitespace-normal break-words text-[12px] font-black leading-5 text-slate-800">
+                                                                        {row.nama}
+                                                                    </p>
+                                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                                        <span className={`rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-wide ${getRuntimeTone(runtime.stage)}`}>
+                                                                            {runtime.label}
+                                                                        </span>
+                                                                        {runtime.stage === "PENDING" && (
+                                                                            <span className="rounded-full border border-red-100 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-wide text-red-500">
+                                                                                Timer berhenti
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="px-4 py-5">
+                                                            <span className={`inline-flex max-w-full whitespace-normal break-words rounded-full border px-3 py-1.5 text-[8px] font-black uppercase leading-4 tracking-wide ${getPilarTone(row.pilar)}`}>
+                                                                {getPilarLabel(row.pilar)}
+                                                            </span>
+                                                        </td>
+
+                                                        <td className="px-4 py-5">
+                                                            <div className="flex items-start gap-2">
+                                                                <Users size={14} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                                                <span className="whitespace-normal break-words text-[11px] font-bold leading-5 text-slate-600">
+                                                                    {row.ho}
+                                                                </span>
+                                                            </div>
+                                                        </td>
+
+                                                        <td className="px-4 py-5">
+                                                            {sekolahList.length ? (
+                                                                <div className="space-y-2" title={sekolahList.join(", ")}>
+                                                                    {sekolahList.slice(0, 2).map((school, schoolIndex) => (
+                                                                        <div key={`${row.id}-${schoolIndex}`} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-2">
+                                                                            <School size={13} className="mt-0.5 shrink-0 text-[#0AC4E0]" />
+                                                                            <span className="whitespace-normal break-words text-[9px] font-bold leading-4 text-slate-600">{school}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                    {sekolahList.length > 2 && (
+                                                                        <span className="inline-flex rounded-full bg-cyan-50 px-2.5 py-1 text-[8px] font-black text-[#0AC4E0]">
+                                                                            +{sekolahList.length - 2} sekolah lainnya
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-[10px] font-bold text-slate-300">Belum ada target sekolah</span>
+                                                            )}
+                                                        </td>
+
+                                                        <td className="px-4 py-5 text-center">
+                                                            <p className="text-[13px] font-black text-slate-800">
+                                                                {row.jumlah_pengisi}/{row.jumlah_guru_target || 0} guru
+                                                            </p>
+                                                            <p className="mt-1 text-[9px] font-bold text-amber-500">
+                                                                {row.belum_mengisi || 0} belum mengisi
+                                                            </p>
+                                                            <div className="mx-auto mt-3 h-2 w-24 overflow-hidden rounded-full bg-slate-100">
+                                                                <div className="h-full rounded-full bg-[#0AC4E0]" style={{ width: `${progress}%` }} />
+                                                            </div>
+                                                            <p className="mt-1 text-[9px] font-black text-slate-400">{progress}%</p>
+                                                        </td>
+
+                                                        <td className="px-4 py-5 text-center">
+                                                            <div className={`mx-auto inline-flex max-w-[180px] items-start gap-2 rounded-xl border px-3 py-2.5 text-left ${getRuntimeTone(runtime.stage)}`}>
+                                                                <Clock size={13} className="mt-0.5 shrink-0" />
+                                                                <span className="whitespace-normal break-words text-[9px] font-black leading-4">
+                                                                    {formatCountdown(runtime.remainingSeconds)}
+                                                                </span>
+                                                            </div>
+                                                            <p className="mt-2 whitespace-normal break-words text-[8px] font-bold uppercase leading-4 tracking-wide text-slate-300">
+                                                                {runtime.stage === "PENDING" ? "Waktu berhenti sementara" : formatDate(row.sent_at)}
+                                                            </p>
+                                                        </td>
+
+                                                        <td className="px-3 py-5">
+                                                            {renderRowActions(row)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 text-center text-slate-300">
+                                <Database size={52} strokeWidth={1.2} />
+                                <p className="mt-4 text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">
+                                    Data assessment tidak ditemukan
+                                </p>
+                                    <p className="mt-2 max-w-md text-[10px] font-semibold leading-5 text-slate-400">
+                                        Coba ubah kata pencarian atau reset filter status dan pilar.
+                                    </p>
+                            </div>
+                        )}
                     </div>
 
-                    <div className="mt-auto flex shrink-0 items-center justify-between border-t border-gray-100 bg-gray-50/30 px-10 py-5">
-                        <p className="text-[10px] font-bold text-slate-400">
-                            Menampilkan {currentData.length} dari {filteredData.length} data
+                    <div className="mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-7 lg:px-9">
+                        <p className="text-center text-[10px] font-bold text-slate-400 sm:text-left">
+                            Menampilkan <span className="font-black text-slate-700">{currentData.length}</span> dari{" "}
+                            <span className="font-black text-slate-700">{filteredData.length}</span> data
                         </p>
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-                                disabled={page <= 1}
-                                className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase text-slate-500 disabled:opacity-40"
-                            >
-                                Prev
-                            </button>
-
-                            <span className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black uppercase text-white">
-                                {page} / {totalPages}
-                            </span>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    setPage((prev) => Math.min(prev + 1, totalPages))
-                                }
-                                disabled={page >= totalPages}
-                                className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase text-slate-500 disabled:opacity-40"
-                            >
-                                Next
-                            </button>
-                        </div>
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                                    disabled={page <= 1}
+                                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Prev
+                                </button>
+                                <span className="min-w-[72px] rounded-xl bg-slate-900 px-4 py-2.5 text-center text-[9px] font-black uppercase tracking-wide text-white">
+                                    {page} / {totalPages}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
+                                    disabled={page >= totalPages}
+                                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    Next
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </main>
