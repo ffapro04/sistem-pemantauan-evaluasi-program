@@ -356,7 +356,7 @@ function getCurrentUserRoleFromToken() {
 
             isGuru:
                 idRole === 8 ||
-                roleText.includes("guru"),
+                roleText.includes("guru assessment"),
         };
     } catch {
         return {
@@ -2035,6 +2035,17 @@ function DetailProgramPage({
 
     const openRatingModal = (row) => {
         if (!row?.parentId) return;
+
+        if (!currentRole.isGuru && !currentRole.isVendor) {
+            toast.info("Rating hanya dapat diberikan oleh Guru Assessment atau Vendor.");
+            return;
+        }
+
+        if (row.type !== "kegiatan" || getRowStatus(row) !== "APPROVED") {
+            toast.info("Rating tersedia setelah step kegiatan selesai dan disetujui HO.");
+            return;
+        }
+
         const ownRating = getOwnRating(row, currentRole);
         setRatingRow(row);
         setRatingValue(ownRating?.rating || row.guruRating || 0);
@@ -2043,7 +2054,17 @@ function DetailProgramPage({
     };
 
     const submitRating = async () => {
-        if (!ratingValue || ratingValue < 1 || !ratingRow?.parentId) {
+        if (!currentRole.isGuru && !currentRole.isVendor) {
+            toast.info("Rating hanya dapat diberikan oleh Guru Assessment atau Vendor.");
+            return;
+        }
+
+        if (!ratingRow?.parentId || getRowStatus(ratingRow) !== "APPROVED") {
+            toast.info("Rating tersedia setelah step kegiatan selesai dan disetujui HO.");
+            return;
+        }
+
+        if (!ratingValue || ratingValue < 1) {
             toast.warning("Pilih rating terlebih dahulu (1-5 bintang)");
             return;
         }
@@ -3162,177 +3183,177 @@ function ArrowPhaseSteps({
             <div className="pb-1">
                 <div className="simple-scroll overflow-x-auto overflow-y-hidden pb-2">
                     <div className="flex min-w-max items-stretch gap-2">
-                    {phases.length === 0 && (
-                        <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
-                            <p className="text-[12px] font-bold text-slate-400">
-                                Belum ada periode pada program ini.
-                            </p>
-                        </div>
-                    )}
+                        {phases.length === 0 && (
+                            <div className="w-full rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                                <p className="text-[12px] font-bold text-slate-400">
+                                    Belum ada periode pada program ini.
+                                </p>
+                            </div>
+                        )}
 
-                    {phases.map((phase, index) => {
-                        const phaseRows = getFlowRows(index);
-                        const unlocked = checkPhaseUnlocked(index);
-                        const completed = isPhaseCompleted(index);
-                        const status = getPhaseWorkflowStatus(index);
-                        const phaseActive =
-                            activePhase === index && flowFilter?.type !== "row";
-                        const phaseTone = getFlowTone({
-                            active: phaseActive,
-                            completed,
-                            locked: !unlocked,
-                            type: "phase",
-                        });
+                        {phases.map((phase, index) => {
+                            const phaseRows = getFlowRows(index);
+                            const unlocked = checkPhaseUnlocked(index);
+                            const completed = isPhaseCompleted(index);
+                            const status = getPhaseWorkflowStatus(index);
+                            const phaseActive =
+                                activePhase === index && flowFilter?.type !== "row";
+                            const phaseTone = getFlowTone({
+                                active: phaseActive,
+                                completed,
+                                locked: !unlocked,
+                                type: "phase",
+                            });
 
-                        const openingRows = phaseRows.filter((row) => row.type === "termin");
-                        const activityRows = phaseRows.filter((row) => row.type === "kegiatan");
+                            const openingRows = phaseRows.filter((row) => row.type === "termin");
+                            const activityRows = phaseRows.filter((row) => row.type === "kegiatan");
 
-                        return (
-                            <div
-                                key={`${phase.id}-${index}`}
-                                className="flex shrink-0 items-stretch gap-2"
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => onPhaseClick(index)}
-                                    className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
+                            return (
+                                <div
+                                    key={`${phase.id}-${index}`}
+                                    className="flex shrink-0 items-stretch gap-2"
                                 >
-                                    <div
-                                        style={arrowInnerStyle}
-                                        className={`min-h-[82px] py-3 pl-9 pr-10 ${phaseTone.wrapper}`}
+                                    <button
+                                        type="button"
+                                        onClick={() => onPhaseClick(index)}
+                                        className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
                                     >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span
-                                                className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
-                                            >
-                                                {!unlocked ? (
-                                                    <Lock size={14} />
-                                                ) : completed ? (
+                                        <div
+                                            style={arrowInnerStyle}
+                                            className={`min-h-[82px] py-3 pl-9 pr-10 ${phaseTone.wrapper}`}
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`flex h-8 w-8 items-center justify-center rounded-2xl ${phaseTone.icon}`}
+                                                >
+                                                    {!unlocked ? (
+                                                        <Lock size={14} />
+                                                    ) : completed ? (
                                                         <CheckCircle2 size={14} />
                                                     ) : (
-                                                    <Layers3 size={14} />
-                                                )}
-                                            </span>
+                                                        <Layers3 size={14} />
+                                                    )}
+                                                </span>
 
-                                            <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                Fase {String(index + 1).padStart(2, "0")}
-                                            </span>
+                                                <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                    Fase {String(index + 1).padStart(2, "0")}
+                                                </span>
+                                            </div>
+
+                                            <h4 className="mt-2 truncate text-[12px] font-black">
+                                                {phase.nama || `Periode ${index + 1}`}
+                                            </h4>
+
+                                            <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                {status.label}
+                                            </p>
                                         </div>
+                                        <ChevronBorder />
+                                    </button>
 
-                                        <h4 className="mt-2 truncate text-[12px] font-black">
-                                            {phase.nama || `Periode ${index + 1}`}
-                                        </h4>
+                                    {openingRows.map((row) => {
+                                        const rowStatus = getRowStatus(row);
+                                        const rowActive =
+                                            flowFilter?.type === "row" &&
+                                            flowFilter?.rowId === row.id;
+                                        const rowTone = getFlowTone({
+                                            active: rowActive,
+                                            completed: rowStatus === "APPROVED",
+                                            locked: !unlocked,
+                                            rowStatus,
+                                            type: row.type,
+                                        });
 
-                                        <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
-                                            {status.label}
-                                        </p>
-                                    </div>
-                                    <ChevronBorder />
-                                </button>
-
-                                {openingRows.map((row) => {
-                                    const rowStatus = getRowStatus(row);
-                                    const rowActive =
-                                        flowFilter?.type === "row" &&
-                                        flowFilter?.rowId === row.id;
-                                    const rowTone = getFlowTone({
-                                        active: rowActive,
-                                        completed: rowStatus === "APPROVED",
-                                        locked: !unlocked,
-                                        rowStatus,
-                                        type: row.type,
-                                    });
-
-                                    return (
-                                        <button
-                                            key={row.id}
-                                            type="button"
-                                            onClick={() => onRowClick(row, index)}
-                                            className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
-                                        >
-                                            <div
-                                                style={arrowInnerStyle}
-                                                className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                        return (
+                                            <button
+                                                key={row.id}
+                                                type="button"
+                                                onClick={() => onRowClick(row, index)}
+                                                className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked ? "cursor-not-allowed opacity-70" : ""}`}
                                             >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span
-                                                        className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
-                                                    >
-                                                        <UploadCloud size={14} />
-                                                    </span>
+                                                <div
+                                                    style={arrowInnerStyle}
+                                                    className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span
+                                                            className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                        >
+                                                            <UploadCloud size={14} />
+                                                        </span>
 
-                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                        Administrasi
-                                                    </span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                            Administrasi
+                                                        </span>
+                                                    </div>
+
+                                                    <h4 className="mt-2 truncate text-[12px] font-black">
+                                                        {row.title}
+                                                    </h4>
+
+                                                    <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                        {STATUS_LABEL[rowStatus] || rowStatus}
+                                                    </p>
                                                 </div>
+                                                <ChevronBorder />
+                                            </button>
+                                        );
+                                    })}
 
-                                                <h4 className="mt-2 truncate text-[12px] font-black">
-                                                    {row.title}
-                                                </h4>
+                                    {activityRows.map((row, activityIndex) => {
+                                        const rowStatus = getRowStatus(row);
+                                        const phaseContentOpen = isPhaseContentOpen(index);
+                                        const rowActive =
+                                            flowFilter?.type === "row" &&
+                                            flowFilter?.rowId === row.id;
+                                        const rowTone = getFlowTone({
+                                            active: rowActive,
+                                            completed: rowStatus === "APPROVED",
+                                            locked: !unlocked || !phaseContentOpen,
+                                            rowStatus,
+                                            type: row.type,
+                                        });
 
-                                                <p className="mt-1 truncate text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                    {STATUS_LABEL[rowStatus] || rowStatus}
-                                                </p>
-                                            </div>
-                                            <ChevronBorder />
-                                        </button>
-                                    );
-                                })}
-
-                                {activityRows.map((row, activityIndex) => {
-                                    const rowStatus = getRowStatus(row);
-                                    const phaseContentOpen = isPhaseContentOpen(index);
-                                    const rowActive =
-                                        flowFilter?.type === "row" &&
-                                        flowFilter?.rowId === row.id;
-                                    const rowTone = getFlowTone({
-                                        active: rowActive,
-                                        completed: rowStatus === "APPROVED",
-                                        locked: !unlocked || !phaseContentOpen,
-                                        rowStatus,
-                                        type: row.type,
-                                    });
-
-                                    return (
-                                        <button
-                                            key={row.id}
-                                            type="button"
-                                            onClick={() => onRowClick(row, index)}
-                                            className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
-                                        >
-                                            <div
-                                                style={arrowInnerStyle}
-                                                className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                        return (
+                                            <button
+                                                key={row.id}
+                                                type="button"
+                                                onClick={() => onRowClick(row, index)}
+                                                className={`relative min-h-[82px] w-[236px] shrink-0 bg-transparent p-0 text-left drop-shadow-[0_10px_18px_rgba(10,196,224,0.10)] transition ${!unlocked || !phaseContentOpen ? "cursor-not-allowed opacity-70" : ""}`}
                                             >
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <span
-                                                        className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
-                                                    >
-                                                        <FileText size={14} />
-                                                    </span>
+                                                <div
+                                                    style={arrowInnerStyle}
+                                                    className={`min-h-[82px] py-3 pl-9 pr-10 ${rowTone.wrapper}`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <span
+                                                            className={`flex h-8 w-8 items-center justify-center rounded-2xl ${rowTone.icon}`}
+                                                        >
+                                                            <FileText size={14} />
+                                                        </span>
 
-                                                    <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                        Aktivitas {activityIndex + 1}
-                                                    </span>
+                                                        <span className="text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                            Aktivitas {activityIndex + 1}
+                                                        </span>
+                                                    </div>
+
+                                                    <h4 className="mt-2 truncate text-[12px] font-black">
+                                                        {row.title}
+                                                    </h4>
+
+                                                    <div className="mt-1 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest opacity-70">
+                                                        <span>{(row.meetings || []).length} Pertemuan</span>
+                                                        <span>·</span>
+                                                        <span>{STATUS_LABEL[rowStatus] || rowStatus}</span>
+                                                    </div>
                                                 </div>
-
-                                                <h4 className="mt-2 truncate text-[12px] font-black">
-                                                    {row.title}
-                                                </h4>
-
-                                                <div className="mt-1 flex items-center gap-2 text-[8px] font-black uppercase tracking-widest opacity-70">
-                                                    <span>{(row.meetings || []).length} Pertemuan</span>
-                                                    <span>·</span>
-                                                    <span>{STATUS_LABEL[rowStatus] || rowStatus}</span>
-                                                </div>
-                                            </div>
-                                            <ChevronBorder />
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })}
+                                                <ChevronBorder />
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
@@ -3755,22 +3776,22 @@ function SelectedRowDetailPanel({
                                     </div>
 
                                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => openEvidenceReviewModal(selectedRow, evidence, index)}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
-                                    >
-                                        <Eye size={13} />
-                                        Lihat
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => openChatForRow(selectedRow, evidence)}
-                                        className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
-                                    >
-                                        <MessageSquare size={13} />
-                                        Chat
-                                    </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => openEvidenceReviewModal(selectedRow, evidence, index)}
+                                            className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
+                                        >
+                                            <Eye size={13} />
+                                            Lihat
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => openChatForRow(selectedRow, evidence)}
+                                            className="inline-flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
+                                        >
+                                            <MessageSquare size={13} />
+                                            Chat
+                                        </button>
                                     </div>
                                 </div>
 
@@ -4228,4 +4249,3 @@ function EvidenceReviewModal({
 
 
 export default DetailProgramPage;
-

@@ -358,6 +358,47 @@ function getVendorId(user = {}) {
     );
 }
 
+function resolveVendorForUser(vendorList = [], user = {}) {
+    const userId = normalizeId(getUserId(user));
+    const email = String(user?.email || "").trim().toLowerCase();
+    const name = String(user?.nama || user?.name || "").trim().toLowerCase();
+
+    return (
+        vendorList.find((vendor) => {
+            const linkedUserIds = [
+                vendor?.id_user,
+                vendor?.user_id,
+                vendor?.user?.id_user,
+                vendor?.user?.id,
+            ]
+                .map(normalizeId)
+                .filter(Boolean);
+
+            return userId && linkedUserIds.includes(userId);
+        }) ||
+        vendorList.find((vendor) => {
+            const vendorEmail = String(
+                vendor?.email ||
+                vendor?.email_vendor ||
+                vendor?.user?.email ||
+                "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return email && vendorEmail === email;
+        }) ||
+        vendorList.find((vendor) => {
+            const vendorName = String(vendor?.nama_vendor || "")
+                .trim()
+                .toLowerCase();
+
+            return name && vendorName === name;
+        }) ||
+        null
+    );
+}
+
 
 function getMentionKey(item = {}) {
     const type = String(
@@ -1711,6 +1752,158 @@ function AgendaDetailCard({
     );
 }
 
+function CompactAgendaDetail({
+    event,
+    canManageCOE = false,
+    onEditCOE,
+    onDoneCOE,
+    onDeleteCOE,
+}) {
+    const isCOE = event.type === "COE";
+    const isHoliday = event.type === "HOLIDAY";
+    const status = getEventStatus(event);
+    const visual = getEventVisual(event);
+    const statusLabel = isHoliday ? "Hari Libur" : getStatusLabel(status);
+    const timeLabel = event.startTime || event.endTime
+        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+        : "Sepanjang hari";
+    const personas = getEventPersonas(event);
+    const mainPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() !== "sekolah",
+    );
+    const schoolPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() === "sekolah",
+    );
+
+    return (
+        <article className="flex h-full min-h-[286px] flex-col p-4">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] ${visual.badge}`}>
+                            {visual.label}
+                        </span>
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            {statusLabel}
+                        </span>
+                    </div>
+
+                    <h3 className="mt-2 line-clamp-2 text-[15px] font-black leading-5 text-slate-900">
+                        {event.title}
+                    </h3>
+                    {event.description && (
+                        <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-4 text-slate-500">
+                            {event.description}
+                        </p>
+                    )}
+                </div>
+
+                <div className="shrink-0 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-right">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-cyan-500">
+                        Tanggal
+                    </p>
+                    <p className="mt-0.5 max-w-[150px] text-[10px] font-black leading-4 text-slate-800">
+                        {formatReadableDate(event.date)}
+                    </p>
+                </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Pilar</p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isHoliday ? "-" : getPilarLabel(event.pilar)}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Jenjang</p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isHoliday ? "-" : getEventJenjangLabel(event)}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        {isCOE ? "Waktu" : "Jenis"}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isCOE ? timeLabel : visual.label}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        {isCOE ? "Lokasi" : "Status"}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isCOE ? event.location || "-" : statusLabel}
+                    </p>
+                </div>
+            </div>
+
+            {!isHoliday && (
+                <div className="mt-3 min-h-0 flex-1 rounded-xl border border-slate-100 bg-white px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Pihak Terlibat
+                        </p>
+                        <span className="text-[8px] font-black text-cyan-500">
+                            {personas.length} data
+                        </span>
+                    </div>
+
+                    <div className="mt-2 max-h-[76px] overflow-y-auto pr-1 text-[10px] font-bold leading-4 text-slate-600">
+                        {mainPersonas.length > 0 && (
+                            <p className="break-words">
+                                {mainPersonas
+                                    .map((persona) => `${persona.role}: ${persona.name}`)
+                                    .join(" · ")}
+                            </p>
+                        )}
+
+                        {schoolPersonas.length > 0 && (
+                            <p className="mt-1.5 break-words">
+                                <span className="font-black text-slate-800">Sekolah:</span>{" "}
+                                {schoolPersonas.map((persona) => persona.name).join(", ")}
+                            </p>
+                        )}
+
+                        {!personas.length && (
+                            <p className="text-slate-400">Data pihak terlibat belum tersedia.</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {isCOE && canManageCOE && (
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    <button
+                        type="button"
+                        onClick={() => onEditCOE?.(event)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-amber-600 transition hover:bg-amber-100"
+                    >
+                        <Pencil size={12} /> Edit
+                    </button>
+                    {!['SELESAI', 'DIBATALKAN'].includes(status) && (
+                        <button
+                            type="button"
+                            onClick={() => onDoneCOE?.(event)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-emerald-600 transition hover:bg-emerald-100"
+                        >
+                            <CheckCircle2 size={12} /> Selesai
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => onDeleteCOE?.(event)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-rose-600 transition hover:bg-rose-100"
+                    >
+                        <Trash2 size={12} /> Hapus
+                    </button>
+                </div>
+            )}
+        </article>
+    );
+}
+
 function AgendaDaySection({
     title,
     events,
@@ -2227,7 +2420,7 @@ export default function AgendaCalendarBase({
     const [activeActivityType, setActiveActivityType] = useState("SEMUA");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [tableSearchKeyword, setTableSearchKeyword] = useState("");
-    const [tablePage, setTablePage] = useState(1);
+    const [selectedDetailAgendaId, setSelectedDetailAgendaId] = useState("");
 
     const [showCOEModal, setShowCOEModal] = useState(false);
     const [editingCOE, setEditingCOE] = useState(null);
@@ -2311,6 +2504,38 @@ export default function AgendaCalendarBase({
     const fetchDefaultPrograms = async (headers) => {
         if (!showProgram) return [];
 
+        let roleIdentity = currentUser;
+
+        if (scope === "VENDOR") {
+            try {
+                const vendorResponse = await fetch(`${API_BASE_URL}/vendor`, {
+                    headers,
+                });
+                const vendorPayload = await safeJson(vendorResponse);
+                const currentVendor = resolveVendorForUser(
+                    normalizeArray(vendorPayload),
+                    currentUser,
+                );
+
+                if (!vendorResponse.ok || !currentVendor?.id_vendor) {
+                    console.warn(
+                        "Agenda Vendor: relasi akun ke master vendor tidak ditemukan",
+                    );
+                    return [];
+                }
+
+                roleIdentity = {
+                    ...currentUser,
+                    id_vendor: currentVendor.id_vendor,
+                    vendor_id: currentVendor.id_vendor,
+                    vendor: currentVendor,
+                };
+            } catch (error) {
+                console.error("Agenda Vendor: gagal membaca identitas vendor", error);
+                return [];
+            }
+        }
+
         if (scope === "SEKOLAH") {
             const schoolId = getSchoolId(currentUser);
             const userId = getUserId(currentUser);
@@ -2357,7 +2582,7 @@ export default function AgendaCalendarBase({
         );
 
         rows = rows.filter((program) =>
-            shouldKeepProgramByRole(program, currentUser, scope),
+            shouldKeepProgramByRole(program, roleIdentity, scope),
         );
 
         const details = await Promise.all(
@@ -2509,11 +2734,11 @@ export default function AgendaCalendarBase({
 
         return mapProgramsToEvents(programs, {
             lockedBidang: bidang,
-            showFase: false,
+            showFase,
             roleScope: scope,
             buildProgramPath,
         });
-    }, [programs, bidang, showProgram, scope, buildProgramPath]);
+    }, [programs, bidang, showProgram, showFase, scope, buildProgramPath]);
 
     const assessmentEvents = useMemo(() => {
         if (!showAssessment) return [];
@@ -2973,55 +3198,30 @@ export default function AgendaCalendarBase({
                 .includes(keyword),
         );
     }, [selectedEvents, tableSearchKeyword]);
-    const tableTotalPages = Math.max(
-        1,
-        Math.ceil(tableEvents.length / AGENDA_TABLE_PAGE_SIZE),
-    );
-    const safeTablePage = Math.min(tablePage, tableTotalPages);
-    const tableStartIndex = (safeTablePage - 1) * AGENDA_TABLE_PAGE_SIZE;
-    const paginatedTableEvents = tableEvents.slice(
-        tableStartIndex,
-        tableStartIndex + AGENDA_TABLE_PAGE_SIZE,
-    );
-    const tableFrom = tableEvents.length ? tableStartIndex + 1 : 0;
-    const tableTo = Math.min(
-        tableStartIndex + paginatedTableEvents.length,
-        tableEvents.length,
-    );
+    const selectedDetailAgenda = useMemo(() => {
+        if (!tableEvents.length) return null;
 
-    const changeAgendaPage = (nextPage) => {
-        const resolvedPage = Math.min(
-            tableTotalPages,
-            Math.max(1, Number(nextPage) || 1),
+        return (
+            tableEvents.find(
+                (event) => String(event.id) === String(selectedDetailAgendaId),
+            ) || tableEvents[0]
+        );
+    }, [tableEvents, selectedDetailAgendaId]);
+
+    useEffect(() => {
+        if (!tableEvents.length) {
+            setSelectedDetailAgendaId("");
+            return;
+        }
+
+        const selectionStillExists = tableEvents.some(
+            (event) => String(event.id) === String(selectedDetailAgendaId),
         );
 
-        setTablePage(resolvedPage);
-
-        window.requestAnimationFrame(() => {
-            agendaDetailSectionRef.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-            });
-        });
-    };
-
-    useEffect(() => {
-        setTablePage(1);
-    }, [
-        selectedDateKey,
-        tableSearchKeyword,
-        activeFilter,
-        activePilar,
-        activeJenjang,
-        activeActivityType,
-        searchKeyword,
-    ]);
-
-    useEffect(() => {
-        if (tablePage > tableTotalPages) {
-            setTablePage(tableTotalPages);
+        if (!selectionStillExists) {
+            setSelectedDetailAgendaId(String(tableEvents[0].id));
         }
-    }, [tablePage, tableTotalPages]);
+    }, [tableEvents, selectedDetailAgendaId]);
 
     if (loading) {
         return (
@@ -3503,83 +3703,103 @@ export default function AgendaCalendarBase({
 
                         <section
                             ref={agendaDetailSectionRef}
-                            className="scroll-mt-4 rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5 lg:p-6"
+                            className="scroll-mt-4 rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5"
                         >
-                            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                                <div>
+                            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="min-w-0">
                                     <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                                         Detail Agenda
                                     </p>
-                                    <h2 className="mt-1 text-[22px] font-black text-slate-900">
-                                        Agenda Tanggal Terpilih
-                                    </h2>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <h2 className="text-[20px] font-black text-slate-900">
+                                            Agenda Tanggal Terpilih
+                                        </h2>
+                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black text-[#0AC4E0]">
+                                            {tableEvents.length} agenda
+                                        </span>
+                                    </div>
                                     <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                        {formatReadableDate(selectedDateKey)} · menampilkan {tableFrom}-{tableTo} dari {tableEvents.length} agenda.
+                                        {formatReadableDate(selectedDateKey)} · pilih agenda untuk melihat detail.
                                     </p>
                                 </div>
 
-                                <div className="relative h-11 w-full lg:w-[420px]">
-                                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
+                                <div className="relative h-10 w-full lg:w-[360px]">
+                                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
                                     <input
                                         value={tableSearchKeyword}
                                         onChange={(event) => setTableSearchKeyword(event.target.value)}
-                                        placeholder="Cari agenda tanggal ini..."
-                                        className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                                        placeholder="Cari agenda..."
+                                        className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
                                     />
                                 </div>
                             </div>
 
-                            {paginatedTableEvents.length ? (
-                                <div className={`grid gap-3 ${paginatedTableEvents.length > 1 ? "xl:grid-cols-2" : "grid-cols-1"}`}>
-                                    {paginatedTableEvents.map((event) => (
-                                        <AgendaDetailCard
-                                            key={event.id}
-                                            event={event}
-                                            canManageCOE={canManageCOE}
-                                            onEditCOE={openEditCOE}
-                                            onDoneCOE={handleDoneCOE}
-                                            onDeleteCOE={handleDeleteCOE}
-                                        />
-                                    ))}
+                            {tableEvents.length ? (
+                                <div className="grid gap-3 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.45fr)]">
+                                    <div className="max-h-[286px] space-y-2 overflow-y-auto rounded-[1.35rem] border border-slate-100 bg-slate-50/70 p-2 pr-1.5">
+                                        {tableEvents.map((event) => {
+                                            const isActive = String(event.id) === String(selectedDetailAgenda?.id);
+                                            const visual = getEventVisual(event);
+                                            const statusLabel = event.type === "HOLIDAY"
+                                                ? "Hari Libur"
+                                                : getStatusLabel(getEventStatus(event));
+                                            const timeLabel = event.startTime || event.endTime
+                                                ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+                                                : "Sepanjang hari";
+
+                                            return (
+                                                <button
+                                                    key={event.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedDetailAgendaId(String(event.id))}
+                                                    className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition ${isActive
+                                                        ? "border-[#0AC4E0] bg-white shadow-[0_10px_24px_rgba(10,196,224,0.12)]"
+                                                        : "border-transparent bg-white/70 hover:border-cyan-100 hover:bg-white"
+                                                        }`}
+                                                >
+                                                    <span className={`h-9 w-1.5 shrink-0 rounded-full ${visual.dot}`} />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-[11px] font-black text-slate-800">
+                                                            {event.title}
+                                                        </p>
+                                                        <div className="mt-1 flex min-w-0 items-center gap-2 text-[9px] font-bold text-slate-400">
+                                                            <span className="shrink-0">{timeLabel}</span>
+                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                                                            <span className="truncate">{visual.label}</span>
+                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                                                            <span className="truncate">{statusLabel}</span>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight
+                                                        size={14}
+                                                        className={`shrink-0 transition ${isActive ? "text-[#0AC4E0]" : "text-slate-300 group-hover:text-cyan-400"}`}
+                                                    />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="min-h-[286px] rounded-[1.35rem] border border-slate-100 bg-white">
+                                        {selectedDetailAgenda ? (
+                                            <CompactAgendaDetail
+                                                event={selectedDetailAgenda}
+                                                canManageCOE={canManageCOE}
+                                                onEditCOE={openEditCOE}
+                                                onDoneCOE={handleDoneCOE}
+                                                onDeleteCOE={handleDeleteCOE}
+                                            />
+                                        ) : null}
+                                    </div>
                                 </div>
                             ) : (
-                                    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-12 text-center">
-                                        <CalendarDays size={26} className="mx-auto text-slate-300" />
+                                    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+                                        <CalendarDays size={24} className="mx-auto text-slate-300" />
                                         <p className="mt-3 text-[12px] font-black text-slate-700">
                                             Agenda tidak ditemukan
                                         </p>
                                         <p className="mt-1 text-[11px] font-semibold text-slate-400">
                                             Ubah filter kalender atau kata kunci pencarian agenda.
                                         </p>
-                                    </div>
-                            )}
-
-                            {tableEvents.length > AGENDA_TABLE_PAGE_SIZE && (
-                                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                                        Halaman {safeTablePage} dari {tableTotalPages} · {AGENDA_TABLE_PAGE_SIZE} agenda per halaman
-                                    </p>
-
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => changeAgendaPage(safeTablePage - 1)}
-                                            disabled={safeTablePage <= 1}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                            <ChevronLeft size={14} />
-                                            Prev
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => changeAgendaPage(safeTablePage + 1)}
-                                            disabled={safeTablePage >= tableTotalPages}
-                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                            Next
-                                            <ChevronRight size={14} />
-                                        </button>
-                                    </div>
                                 </div>
                             )}
                         </section>

@@ -1,6 +1,9 @@
 /* eslint-disable no-unused-vars */
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -9,12 +12,18 @@ import {
   Factory,
   GraduationCap,
   Landmark,
+  Globe2,
+  Layers3,
   LayoutDashboard,
   Loader2,
   MapPin,
   RefreshCcw,
   Search,
   School,
+  ShieldAlert,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserCheck,
   UserCog,
   UsersRound,
 } from "lucide-react";
@@ -2628,25 +2637,29 @@ function DashboardPanel({
 
   return (
     <section
-      className={`overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm ${className}`}
+      className={`min-w-0 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm ${className}`}
     >
       {(title || right) && (
-        <div className="flex min-h-[62px] items-center justify-between gap-4 border-b border-slate-100 px-5">
+        <div className="grid min-h-[62px] min-w-0 gap-3 border-b border-slate-100 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
           <div className="min-w-0">
             {title && (
-              <h2 className="break-words whitespace-normal text-[16px] font-black tracking-tight text-slate-700">
+              <h2 className="break-words text-[16px] font-black tracking-tight text-slate-800">
                 {title}
               </h2>
             )}
 
             {subtitle && (
-              <p className="mt-0.5 break-words whitespace-normal text-[11px] font-bold text-slate-400">
+              <p className="mt-1 break-words text-[10px] font-semibold leading-4 text-slate-400">
                 {subtitle}
               </p>
             )}
           </div>
 
-          {right && <div className="shrink-0">{right}</div>}
+          {right && (
+            <div className="min-w-0 max-w-full overflow-x-auto sm:justify-self-end">
+              {right}
+            </div>
+          )}
         </div>
       )}
 
@@ -2656,31 +2669,29 @@ function DashboardPanel({
 }
 
 function KartuAngka({ label, value, icon, active = false, helper, color }) {
+  const tone = color || WARNA.cyan;
+
   return (
-    <div
-      className="relative min-h-[112px] border-r border-slate-100 border-t-[3px] bg-white px-5 py-5 transition"
-      style={{ borderTopColor: active ? color || WARNA.cyan : "transparent" }}
-    >
+    <div className="relative min-h-[104px] overflow-hidden border-r border-slate-100 bg-white px-5 py-4 last:border-r-0">
+      <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: tone }} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="break-words whitespace-normal text-[11px] font-black text-slate-500">
+          <p className="truncate text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: tone }}>
             {label}
           </p>
-
-          <h3 className="mt-2 text-[34px] font-black leading-none tracking-[-0.06em] text-slate-700">
+          <h3 className="mt-2 text-[31px] font-black leading-none tracking-[-0.05em] text-slate-800">
             {value}
           </h3>
-
           {helper && (
-            <p className="mt-2 break-words whitespace-normal text-[10px] font-bold text-slate-400">
+            <p className="mt-2 truncate text-[9px] font-semibold text-slate-400">
               {helper}
             </p>
           )}
         </div>
 
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-50"
-          style={{ color: color || WARNA.cyan }}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+          style={{ backgroundColor: `${tone}16`, color: tone }}
         >
           {icon}
         </div>
@@ -2759,67 +2770,150 @@ function ChartBox({ children, height = "h-[280px]" }) {
   );
 }
 
-function PieWithLegend({ data, emptyText, icon, compact = false }) {
-  if (!data || data.length === 0) {
+function PieWithLegend({
+  data,
+  emptyText,
+  icon,
+  compact = false,
+  selectedName = "",
+  onSelect,
+}) {
+  const safeData = Array.isArray(data) ? data : [];
+  const total = safeData.reduce(
+    (sum, item) => sum + (Number(item?.value) || 0),
+    0,
+  );
+
+  if (safeData.length === 0 || total <= 0) {
     return <EmptyChart icon={icon} text={emptyText} />;
   }
 
   return (
     <div
-      className={`grid grid-cols-1 items-center gap-4 ${compact
-        ? "min-h-[255px]"
-        : "min-h-[285px] xl:grid-cols-[1fr_190px]"
+      className={`grid min-w-0 items-start gap-3 ${compact
+        ? "grid-cols-1 sm:grid-cols-[minmax(150px,0.82fr)_minmax(0,1.18fr)]"
+        : "grid-cols-1 lg:grid-cols-[minmax(220px,0.9fr)_minmax(0,1.1fr)]"
         }`}
     >
-      <ChartBox height={compact ? "h-[190px]" : "h-[260px]"}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={0}
-              outerRadius={compact ? 78 : 104}
-              paddingAngle={2}
-              stroke="#ffffff"
-              strokeWidth={3}
-            >
-              {data.map((entry, index) => (
-                <Cell
-                  key={entry.name}
-                  fill={entry.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length]}
-                />
-              ))}
-            </Pie>
-            <Tooltip content={<TooltipDiagram />} />
-          </PieChart>
-        </ResponsiveContainer>
-      </ChartBox>
+      <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50 via-white to-cyan-50/60 p-3">
+        <div className={compact ? "h-[168px]" : "h-[230px]"}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={40}>
+            {({ width, height }) => {
+              const radiusBase = Math.min(Number(width) || 0, Number(height) || 0);
+              const outerRadius = Math.max(
+                compact ? 48 : 64,
+                Math.min(compact ? 70 : 94, radiusBase * (compact ? 0.36 : 0.38)),
+              );
 
-      <div className={compact ? "grid grid-cols-1 gap-2" : "space-y-2"}>
-        {data.map((item, index) => (
-          <div
-            key={item.name}
-            className="flex items-center justify-between gap-3"
-          >
-            <span className="flex min-w-0 items-center gap-2">
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{
-                  backgroundColor:
-                    item.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
-                }}
-              />
-              <span className="break-words whitespace-normal text-[10px] font-black uppercase text-slate-500">
-                {item.name}
+              return (
+                <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                  <Pie
+                    data={safeData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={0}
+                    outerRadius={outerRadius}
+                    paddingAngle={2}
+                    cornerRadius={7}
+                    startAngle={90}
+                    endAngle={-270}
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    onClick={(entry) => onSelect?.(entry)}
+                    style={{ cursor: onSelect ? "pointer" : "default" }}
+                  >
+                    {safeData.map((entry, index) => {
+                      const isSelected = selectedName === entry.name;
+                      const isDimmed = selectedName && !isSelected;
+                      return (
+                        <Cell
+                          key={entry.name}
+                          fill={entry.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length]}
+                          opacity={isDimmed ? 0.28 : 1}
+                          stroke={isSelected ? entry.color || WARNA.cyan : "#ffffff"}
+                          strokeWidth={isSelected ? 5 : 2}
+                        />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip content={<TooltipDiagram />} />
+                </PieChart>
+              );
+            }}
+          </ResponsiveContainer>
+        </div>
+
+        <div className="mt-3 flex items-center justify-center">
+          <div className="inline-flex min-w-[132px] items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-white px-3 py-2 shadow-[0_10px_24px_rgba(10,196,224,0.12)]">
+            <span className="flex h-8 min-w-8 items-center justify-center rounded-lg bg-[#0AC4E0] px-2 text-[15px] font-black leading-none text-white">
+              {total}
+            </span>
+            <span className="text-left leading-tight">
+              <span className="block text-[7px] font-black uppercase tracking-[0.16em] text-slate-400">
+                Total
+              </span>
+              <span className="block text-[9px] font-black text-slate-700">
+                data aktif
               </span>
             </span>
-
-            <span className="text-[10px] font-black text-slate-700">
-              {item.value}
-            </span>
           </div>
-        ))}
+        </div>
+      </div>
+
+      <div
+        className={`admin-scroll min-w-0 space-y-2 overflow-y-auto pr-1 ${compact ? "max-h-[234px]" : "max-h-[302px]"
+          }`}
+      >
+        {safeData.map((item, index) => {
+          const value = Number(item.value) || 0;
+          const percent = total > 0 ? Math.round((value / total) * 100) : 0;
+          const active = selectedName === item.name;
+          const color = item.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length];
+
+          return (
+            <button
+              key={item.name}
+              type="button"
+              onClick={() => onSelect?.(item)}
+              className={`group w-full min-w-0 rounded-xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${active
+                ? "border-cyan-200 bg-cyan-50 shadow-sm"
+                : "border-slate-100 bg-white hover:border-cyan-100 hover:shadow-sm"
+                }`}
+            >
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <span className="flex min-w-0 flex-1 items-start gap-2.5">
+                  <span
+                    className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span
+                    className={`min-w-0 break-words text-[9px] font-black leading-4 ${active ? "text-[#0AC4E0]" : "text-slate-600"
+                      }`}
+                  >
+                    {item.name}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[12px] font-black text-slate-800">
+                  {value}
+                </span>
+              </div>
+
+              <div className="mt-2 flex items-center gap-2">
+                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: `${percent}%`, backgroundColor: color }}
+                  />
+                </div>
+                <span className="w-8 shrink-0 text-right text-[8px] font-black text-slate-400">
+                  {percent}%
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -4403,7 +4497,7 @@ function CompactSchoolLeafletMap({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-full min-h-[640px] flex-col gap-4">
       <div className="hidden">
         <div className="relative">
           <Search
@@ -4494,7 +4588,7 @@ function CompactSchoolLeafletMap({
         </div>
       )}
 
-      <div className="relative h-[540px] overflow-hidden rounded-3xl border border-slate-100 bg-slate-200 shadow-sm">
+      <div className="relative min-h-[500px] flex-1 overflow-hidden rounded-3xl border border-slate-100 bg-slate-200 shadow-sm">
         <MapContainer
           center={mapCenter}
           zoom={zoom}
@@ -4607,7 +4701,7 @@ function CompactSchoolLeafletMap({
                           }
                           className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
                         >
-                          Lihat Program Wilayah Ini
+                          Pilih Wilayah
                         </button>
                       </div>
                     </Popup>
@@ -4761,7 +4855,7 @@ function CompactSchoolLeafletMap({
                           onClick={() => pilihKabupaten(kabupaten)}
                           className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
                         >
-                          Lihat Program Wilayah Ini
+                          Pilih Wilayah
                         </button>
 
                         {kabupaten.coordinateSource !==
@@ -4846,6 +4940,246 @@ function CompactSchoolLeafletMap({
   );
 }
 
+function resolveAdminDepartment(user = {}) {
+  const explicit = nilaiTampil(
+    user?.departemen,
+    user?.department,
+    user?.nama_departemen,
+    user?.unit_kerja,
+    user?.unit,
+    user?.divisi,
+    user?.bidang,
+    user?.bagian,
+  );
+
+  if (explicit !== "Belum Diisi") return explicit;
+
+  const roleId = ambilIdRole(user);
+  if (roleId === 1) return "Administrasi Sistem";
+  if (roleId === 2) return "Pengurus";
+  if (roleId === 3) return tampilHOCategory(getHOCategory(user));
+  if (roleId === 4) return "Pendampingan Area";
+  if ([5, 8, 9, 10].includes(roleId)) return "Sekolah";
+  if (roleId === 6) return "Kemitraan Vendor";
+  if (roleId === 7) return "Dinas Pendidikan";
+  return "Lainnya";
+}
+
+function compactPieData(data = [], limit = 8) {
+  const sorted = [...data]
+    .filter((item) => Number(item?.value) > 0)
+    .sort((a, b) => Number(b.value) - Number(a.value));
+
+  if (sorted.length <= limit) {
+    return sorted.map((item, index) => ({
+      ...item,
+      color: item.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
+    }));
+  }
+
+  const visible = sorted.slice(0, Math.max(1, limit - 1));
+  const remaining = sorted.slice(Math.max(1, limit - 1));
+  const otherValue = remaining.reduce(
+    (total, item) => total + (Number(item?.value) || 0),
+    0,
+  );
+
+  return [
+    ...visible.map((item, index) => ({
+      ...item,
+      color: item.color || WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
+    })),
+    {
+      name: "Lainnya",
+      value: otherValue,
+      color: WARNA_DIAGRAM[(limit - 1) % WARNA_DIAGRAM.length],
+    },
+  ];
+}
+
+function resolveItemYear(item = {}) {
+  const direct =
+    item?.tahun ??
+    item?.tahun_program ??
+    item?.tahun_assessment ??
+    item?.periode_tahun;
+
+  if (direct) return String(direct);
+
+  const rawDate =
+    item?.created_at ??
+    item?.tanggal_mulai ??
+    item?.start_date ??
+    item?.sent_at ??
+    item?.tenggat;
+  const parsed = rawDate ? new Date(rawDate) : null;
+  return parsed && !Number.isNaN(parsed.getTime())
+    ? String(parsed.getFullYear())
+    : "Belum Diisi";
+}
+
+function collectRelatedSchools(items = [], schools = []) {
+  const refs = { ids: new Set(), names: new Set(), rawNames: new Set() };
+
+  items.forEach((item) => {
+    const next = collectSchoolRefsFromItem(item);
+    next.ids.forEach((value) => refs.ids.add(value));
+    next.names.forEach((value) => refs.names.add(value));
+    next.rawNames.forEach((value) => refs.rawNames.add(value));
+  });
+
+  return schools.filter((school) =>
+    entityMatchesReferences(
+      school,
+      refs,
+      ambilIdSekolah,
+      ambilNamaSekolah,
+      [ambilNpsn(school)],
+    ),
+  );
+}
+
+function buildNationalKabupatenGroups(schools = [], wilayahMap) {
+  const groups = new Map();
+
+  schools.forEach((school, index) => {
+    const provinceName = ambilProvinsiSekolah(school, wilayahMap);
+    const countyName = ambilKabupatenSekolah(school, wilayahMap);
+    if (!countyName || countyName === "Belum Dipetakan" || countyName === "Belum Diisi") return;
+
+    const key = `${normalisasiUpper(provinceName)}::${normalisasiUpper(countyName)}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        name: countyName,
+        provinceName,
+        schools: [],
+      });
+    }
+    groups.get(key).schools.push(school);
+  });
+
+  return Array.from(groups.values())
+    .map((group, index) => {
+      const points = group.schools
+        .map((school) => ({
+          latitude: angka(school?.latitude ?? school?.lat),
+          longitude: angka(school?.longitude ?? school?.lng ?? school?.long),
+        }))
+        .filter((point) =>
+          isValidIndonesiaCoordinate(point.latitude, point.longitude),
+        );
+
+      const fallback = ambilKoordinatFallback(
+        `${group.name} ${group.provinceName}`,
+        index,
+      );
+      const latitude = points.length
+        ? points.reduce((total, point) => total + point.latitude, 0) / points.length
+        : fallback?.latitude;
+      const longitude = points.length
+        ? points.reduce((total, point) => total + point.longitude, 0) / points.length
+        : fallback?.longitude;
+
+      return {
+        ...group,
+        id: group.key,
+        latitude,
+        longitude,
+        totalSekolah: group.schools.length,
+        coordinateSource: points.length ? "school-average" : "regional-fallback",
+      };
+    })
+    .filter((item) =>
+      isValidIndonesiaCoordinate(item.latitude, item.longitude),
+    )
+    .sort(
+      (a, b) =>
+        b.totalSekolah - a.totalSekolah ||
+        a.name.localeCompare(b.name, "id"),
+    );
+}
+
+function SegmentedSwitch({ items = [], value, onChange }) {
+  return (
+    <div className="inline-flex max-w-full flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+      {items.map((item) => {
+        const active = value === item.value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`min-w-[62px] flex-1 rounded-lg px-3 py-2 text-[8px] font-black uppercase tracking-[0.08em] transition active:scale-[0.98] sm:flex-none ${active
+              ? "bg-white text-[#0AC4E0] shadow-sm ring-1 ring-cyan-100"
+              : "text-slate-400 hover:bg-white hover:text-slate-600"
+              }`}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ControlTabs({ items, value, onChange, dense = false }) {
+  const columnClass = items.length === 3
+    ? "grid-cols-1 sm:grid-cols-3"
+    : dense
+      ? "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4"
+      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+
+  return (
+    <div className={`grid min-w-0 gap-2 ${columnClass}`}>
+      {items.map((item) => {
+        const active = value === item.value;
+        const Icon = item.icon;
+        const color = item.color || WARNA.cyan;
+
+        return (
+          <button
+            key={item.value}
+            type="button"
+            onClick={() => onChange(item.value)}
+            className={`group flex min-h-[46px] min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition active:scale-[0.98] ${active
+              ? "shadow-[0_7px_20px_rgba(15,23,42,0.07)]"
+              : "border-slate-200 bg-white hover:border-cyan-200 hover:shadow-sm"
+              }`}
+            style={active ? { borderColor: `${color}66`, backgroundColor: `${color}0D` } : undefined}
+          >
+            {Icon && (
+              <span
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition ${active
+                  ? "text-white"
+                  : "bg-slate-100 text-slate-500 group-hover:bg-cyan-50 group-hover:text-[#0AC4E0]"
+                  }`}
+                style={active ? { backgroundColor: color } : undefined}
+              >
+                <Icon size={13} />
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span
+                className={`block break-words text-[8px] font-black uppercase leading-3 tracking-[0.06em] ${active ? "" : "text-slate-600"
+                  }`}
+                style={active ? { color } : undefined}
+              >
+                {item.label}
+              </span>
+              {item.count !== undefined && (
+                <span className="mt-0.5 block text-[11px] font-black text-slate-800">
+                  {item.count}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardAdmin() {
   const [users, setUsers] = useState([]);
   const [wilayah, setWilayah] = useState([]);
@@ -4855,29 +5189,29 @@ export default function DashboardAdmin() {
   const [assessments, setAssessments] = useState([]);
   const [agendas, setAgendas] = useState([]);
 
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState("SEMUA");
   const [searchValue, setSearchValue] = useState("");
-  const [visualFilterOpen, setVisualFilterOpen] = useState(false);
-  const [visualMode, setVisualMode] = useState("assessment");
-  const [selectedAssessmentVisualId, setSelectedAssessmentVisualId] = useState("");
-  const [selectedProgramVisualId, setSelectedProgramVisualId] = useState("");
 
-  const [roleExplorerFilter, setRoleExplorerFilter] = useState("SEMUA");
-  const [hoFilter, setHoFilter] = useState("SEMUA");
-  const [aoFilter, setAoFilter] = useState("SEMUA");
-  const [aoAreaFilter, setAoAreaFilter] = useState("SEMUA");
-  const [kadinFilter, setKadinFilter] = useState("SEMUA");
-  const [vendorFilter, setVendorFilter] = useState("SEMUA");
-  const [operatorFilter, setOperatorFilter] = useState("SEMUA");
-  const [userTableRoleFilter, setUserTableRoleFilter] = useState("SEMUA");
+  const [userView, setUserView] = useState("role");
+  const [userFocus, setUserFocus] = useState("");
+
+  const [activityMode, setActivityMode] = useState("program");
+  const [activityView, setActivityView] = useState("status");
+  const [activityFocus, setActivityFocus] = useState("");
+
+  const [mapSource, setMapSource] = useState("semua");
+  const [mapView, setMapView] = useState("provinsi");
+  const [mapFocus, setMapFocus] = useState("");
+
+  const [vendorGroup, setVendorGroup] = useState("AKADEMIK");
+  const [vendorView, setVendorView] = useState("status");
+  const [vendorFocus, setVendorFocus] = useState("");
 
   const [selectedWilayah, setSelectedWilayah] = useState(null);
   const [mapCenter, setMapCenter] = useState(INDONESIA_CENTER);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   const fetchDashboardData = async () => {
     setRefreshing(true);
@@ -4920,15 +5254,11 @@ export default function DashboardAdmin() {
           "/vendor?kategori=AKADEMIK",
           "/vendor?kategori=akademik",
           "/vendor?jenis=AKADEMIK",
-          "/vendor?jenis=akademik",
         ], headers),
         ambilDataDenganFallback([
           "/vendor?kategori=NON_AKADEMIK",
           "/vendor?kategori=non-akademik",
           "/vendor?kategori=non akademik",
-          "/vendor?jenis=NON_AKADEMIK",
-          "/vendor?jenis=non-akademik",
-          "/vendor?jenis=non akademik",
         ], headers),
         ambilDataDenganFallback(["/program"], headers),
         ambilDataDenganFallback([
@@ -4945,47 +5275,41 @@ export default function DashboardAdmin() {
           "/assessment?jenis=AKADEMIK",
           "/assessment?jenis=akademik",
           "/assessment?pilar=AKADEMIK",
-          "/assessment?pilar=akademik",
         ], headers),
         ambilDataDenganFallback([
           "/assessment?jenis=NON_AKADEMIK",
           "/assessment?jenis=non-akademik",
-          "/assessment?jenis=non akademik",
           "/assessment?pilar=NON_AKADEMIK",
-          "/assessment?pilar=non-akademik",
-          "/assessment?pilar=non akademik",
         ], headers),
         ambilDataDenganFallback(["/admin-agenda"], headers),
       ]);
 
-      const mergedUsers = mergeUsersWithRoleData(userData, [
-        { roleId: 4, data: aoData },
-      ]);
-
-      const mergedVendors = mergeVendorsWithCategoryHints(
-        vendorData,
-        vendorAkademikData,
-        vendorNonAkademikData,
+      setUsers(
+        mergeUsersWithRoleData(userData, [{ roleId: 4, data: aoData }]),
       );
-
-      const mergedPrograms = mergeProgramsWithCategoryHints(
-        programData,
-        programAkademikData,
-        programNonAkademikData,
-      );
-
-      const mergedAssessments = mergeAssessmentsWithCategoryHints(
-        assessmentData,
-        assessmentAkademikData,
-        assessmentNonAkademikData,
-      );
-
-      setUsers(mergedUsers);
       setWilayah(wilayahData);
       setSchools(schoolData);
-      setVendors(mergedVendors);
-      setPrograms(mergedPrograms);
-      setAssessments(mergedAssessments);
+      setVendors(
+        mergeVendorsWithCategoryHints(
+          vendorData,
+          vendorAkademikData,
+          vendorNonAkademikData,
+        ),
+      );
+      setPrograms(
+        mergeProgramsWithCategoryHints(
+          programData,
+          programAkademikData,
+          programNonAkademikData,
+        ),
+      );
+      setAssessments(
+        mergeAssessmentsWithCategoryHints(
+          assessmentData,
+          assessmentAkademikData,
+          assessmentNonAkademikData,
+        ),
+      );
       setAgendas(agendaData);
     } catch (error) {
       console.error("Dashboard Admin Error:", error);
@@ -5006,734 +5330,602 @@ export default function DashboardAdmin() {
     fetchDashboardData();
   }, []);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedWilayah, searchValue, activeFilter]);
-
   const keyword = normalisasiText(searchValue);
-  const sectionKeyword = "";
-
-  const sectionMatches = (...terms) => {
-    if (!sectionKeyword) return true;
-
-    return terms
-      .flat()
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase()
-      .includes(sectionKeyword);
-  };
-
-  const visibleSectionCount = [
-    sectionMatches("Komposisi Akun", "akun sistem", "role", "user"),
-    sectionMatches("Head Office", "head office", "ho", "akademik", "non akademik"),
-    sectionMatches("Area Officer", "area officer", "ao", "wilayah penugasan"),
-    sectionMatches("Kepala Dinas", "kepala dinas", "kadin", "dinas", "wilayah"),
-    sectionMatches("Data Vendor", "vendor", "akademik", "non akademik"),
-    sectionMatches("Binaan Sekolah", "sekolah", "jenjang", "wilayah"),
-    sectionMatches("Data User", "user terbaru", "akun", "role"),
-    sectionMatches("Peta Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi"),
-  ].filter(Boolean).length;
-
   const wilayahMap = useMemo(() => buatWilayahMap(wilayah), [wilayah]);
 
-  const wilayahForMap = useMemo(() => {
-    return wilayah
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .map(normalisasiWilayahUntukMap);
-  }, [wilayah, activeFilter]);
-
-  const allSchoolsWithMap = useMemo(() => {
-    return schools.map((sekolah, index) =>
-      normalisasiSekolahUntukMap(sekolah, index, wilayahMap),
-    );
-  }, [schools, wilayahMap]);
-
-  const filteredUsers = useMemo(() => {
-    return users
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .filter((item) =>
-        cocokSearch(item, keyword, [
-          "nama",
-          "email",
-          "jabatan",
-          "jenis",
-          "sub_jenis",
-          ambilNamaRole,
-          (user) => resolveNamaWilayahUser(user, wilayahMap),
-        ]),
-      );
-  }, [users, activeFilter, keyword, wilayahMap]);
-
-  const filteredWilayah = useMemo(() => {
-    return wilayahForMap.filter((item) =>
-      cocokSearch(item, keyword, [
-        "nama_wilayah",
-        "nama",
-        "kode_wilayah",
-        "jenis",
-        "jenis_wilayah",
-        ambilJenisWilayah,
-      ]),
-    );
-  }, [wilayahForMap, keyword]);
-
-  const filteredSchools = useMemo(() => {
-    return allSchoolsWithMap
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .filter((item) =>
-        cocokSearch(item, keyword, [
-          "nama_sekolah",
-          "nama",
-          "npsn",
-          "jenjang",
-          "alamat",
-          (sekolah) => resolveNamaWilayahSekolah(sekolah, wilayahMap),
-          (sekolah) => ambilProvinsiSekolah(sekolah, wilayahMap),
-          (sekolah) => ambilKabupatenSekolah(sekolah, wilayahMap),
-        ]),
-      );
-  }, [allSchoolsWithMap, activeFilter, keyword, wilayahMap]);
-
-  const vendorsWithCategory = useMemo(() => {
-    return vendors.map((vendor) => ({
-      ...vendor,
-      _resolved_category: inferVendorCategoryFromPrograms(vendor, programs),
-    }));
-  }, [vendors, programs]);
-
-  const filteredVendors = useMemo(() => {
-    return vendorsWithCategory
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .filter((item) =>
-        cocokSearch(item, keyword, [
-          "nama_vendor",
-          "nama",
-          "email",
-          "kategori",
-          "kategori_vendor",
-          "jenis",
-          "jenis_vendor",
-          "kontak",
-          getVendorCategory,
-        ]),
-      );
-  }, [vendorsWithCategory, activeFilter, keyword]);
-
-  const filteredPrograms = useMemo(() => {
-    return programs
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .filter((item) =>
-        itemMasukWilayahTerpilih(item, selectedWilayah, allSchoolsWithMap, wilayahMap),
-      )
-      .filter((item) =>
-        cocokSearch(item, keyword, [
-          "nama_program",
-          "nama",
-          "kode_program",
-          "nomor_mou",
-          "tahun",
-          "jenis_program",
-          "kategori",
-          "kategori_program",
-          "pilar_program",
-          "status",
-          "status_program",
-          ambilKategoriProgram,
-          ambilStatusProgram,
-        ]),
-      );
-  }, [programs, activeFilter, selectedWilayah, allSchoolsWithMap, wilayahMap, keyword]);
-
-  const filteredAssessments = useMemo(() => {
-    return assessments
-      .filter((item) => sesuaiFilterStatus(item, activeFilter))
-      .filter((item) =>
-        itemMasukWilayahTerpilih(item, selectedWilayah, allSchoolsWithMap, wilayahMap),
-      )
-      .filter((item) =>
-        cocokSearch(item, keyword, [
-          "nama_assessment",
-          "nama",
-          "jenis",
-          "pilar",
-          "status",
-          "status_assessment",
-          "nama_ho",
-          "nama_sekolah",
-          "daftar_sekolah",
-          ambilKategoriAssessment,
-          ambilStatusAssessment,
-        ]),
-      );
-  }, [assessments, activeFilter, selectedWilayah, allSchoolsWithMap, wilayahMap, keyword]);
-
-  const filteredAgendas = useMemo(() => {
-    return agendas.filter((item) =>
-      cocokSearch(item, keyword, [
-        "judul",
-        "title",
-        "nama_agenda",
-        "agenda",
-        "status",
-        "deskripsi",
-        "keterangan",
-      ]),
-    );
-  }, [agendas, keyword]);
-
-  const pengurus = useMemo(
-    () => filteredUsers.filter((item) => ambilIdRole(item) === 2),
-    [filteredUsers],
-  );
-
-  const headOffice = useMemo(
-    () => filteredUsers.filter((item) => ambilIdRole(item) === 3),
-    [filteredUsers],
-  );
-
-  const areaOfficer = useMemo(
-    () => filteredUsers.filter((item) => ambilIdRole(item) === 4),
-    [filteredUsers],
-  );
-
-  const kepalaDinas = useMemo(
-    () => filteredUsers.filter((item) => ambilIdRole(item) === 7),
-    [filteredUsers],
-  );
-
-  const guruAssessment = useMemo(
-    () => filteredUsers.filter((item) => ambilIdRole(item) === 8),
-    [filteredUsers],
-  );
-
-  const kepalaSekolah = useMemo(
+  const filteredWilayah = useMemo(
     () =>
-      filteredUsers.filter((item) => {
-        const roleId = ambilIdRole(item);
-        const role = normalisasiText(ambilNamaRole(item));
-        const jabatan = normalisasiText(ambilJabatan(item));
-
-        return roleId === 10 || role.includes("kepala sekolah") || jabatan.includes("kepala sekolah");
-      }),
-    [filteredUsers],
+      wilayah
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .map(normalisasiWilayahUntukMap),
+    [wilayah, activeFilter],
   );
 
-  const operatorSekolah = useMemo(
+  const normalizedSchools = useMemo(
     () =>
-      filteredUsers.filter((item) => {
-        const roleId = ambilIdRole(item);
-        const jabatan = normalisasiText(ambilJabatan(item));
-
-        return (
-          roleId === 5 ||
-          roleId === 9 ||
-          jabatan.includes("operator sekolah")
-        );
-      }),
-    [filteredUsers],
+      schools.map((school, index) =>
+        normalisasiSekolahUntukMap(school, index, wilayahMap),
+      ),
+    [schools, wilayahMap],
   );
 
-  const sekolahDenganOperatorIds = useMemo(() => {
-    const ids = new Set();
-
-    operatorSekolah.forEach((operator) => {
-      const id =
-        operator?.id_sekolah ||
-        operator?.sekolah_id ||
-        operator?.school_id ||
-        operator?.sekolah?.id_sekolah ||
-        operator?.sekolah?.id;
-
-      if (id) ids.add(String(id));
-    });
-
-    return ids;
-  }, [operatorSekolah]);
-
-  const sekolahDenganOperator = useMemo(() => {
-    return filteredSchools.filter((sekolah) =>
-      sekolahDenganOperatorIds.has(String(ambilIdSekolah(sekolah))),
-    );
-  }, [filteredSchools, sekolahDenganOperatorIds]);
-
-  const sekolahBelumOperator = useMemo(() => {
-    return filteredSchools.filter(
-      (sekolah) =>
-        !sekolahDenganOperatorIds.has(String(ambilIdSekolah(sekolah))),
-    );
-  }, [filteredSchools, sekolahDenganOperatorIds]);
-
-  const roleExplorerUsers = useMemo(() => {
-    if (roleExplorerFilter === "SEMUA") return filteredUsers;
-    return filteredUsers.filter(
-      (user) => Number(ambilIdRole(user)) === Number(roleExplorerFilter),
-    );
-  }, [filteredUsers, roleExplorerFilter]);
-
-  const roleExplorerChart = useMemo(() => {
-    const roleYangDitampilkan = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-    return roleYangDitampilkan
-      .map((idRole) => ({
-        name: ROLE_LABEL[idRole],
-        value: roleExplorerUsers.filter((user) => ambilIdRole(user) === idRole)
-          .length,
-        color: ROLE_COLOR[idRole],
-      }))
-      .filter((item) => item.value > 0);
-  }, [roleExplorerUsers]);
-
-  const hoTableData = useMemo(() => {
-    return headOffice.filter((user) => matchHOFilter(user, hoFilter));
-  }, [headOffice, hoFilter]);
-
-  const hoChartData = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(hoTableData, (item) =>
-        tampilHOCategory(getHOCategory(item)),
+  const filteredSchools = useMemo(
+    () =>
+      normalizedSchools
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .filter((item) =>
+          cocokSearch(item, keyword, [
+            "nama_sekolah",
+            "nama",
+            "npsn",
+            "jenjang",
+            "alamat",
+            (school) => ambilProvinsiSekolah(school, wilayahMap),
+            (school) => ambilKabupatenSekolah(school, wilayahMap),
+          ]),
       ),
-    );
-  }, [hoTableData]);
+    [normalizedSchools, activeFilter, keyword, wilayahMap],
+  );
 
-  const aoTableData = useMemo(() => {
-    return areaOfficer.filter((item) => {
-      const statusMatch =
-        aoFilter === "SEMUA" || AssignmentStatus(item, wilayahMap) === aoFilter;
-      const areaMatch =
-        aoAreaFilter === "SEMUA" ||
-        collectAreaBinaanUser(item, wilayahMap).some(
-          (area) => String(area) === String(aoAreaFilter),
-        );
-
-      return statusMatch && areaMatch;
-    });
-  }, [areaOfficer, aoFilter, aoAreaFilter, wilayahMap]);
-
-  const aoAreaOptions = useMemo(() => {
-    const areas = [
-      ...new Set(
-        areaOfficer.flatMap((item) => collectAreaBinaanUser(item, wilayahMap)),
+  const scopeSchools = useMemo(
+    () =>
+      filteredSchools.filter((school) =>
+        isSekolahMasukWilayah(school, selectedWilayah, wilayahMap),
       ),
-    ].sort((a, b) => a.localeCompare(b));
+    [filteredSchools, selectedWilayah, wilayahMap],
+  );
 
-    return [
-      { value: "SEMUA", label: "Semua Area Binaan" },
-      ...areas.map((area) => ({
-        value: area,
-        label: area,
+  const filteredUsers = useMemo(
+    () =>
+      users
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .filter((item) =>
+          cocokSearch(item, keyword, [
+            "nama",
+            "email",
+            "jabatan",
+            "departemen",
+            "department",
+            ambilNamaRole,
+            resolveAdminDepartment,
+            (user) => resolveNamaWilayahUser(user, wilayahMap),
+          ]),
+      ),
+    [users, activeFilter, keyword, wilayahMap],
+  );
+
+  const scopedUsers = useMemo(() => {
+    if (!selectedWilayah) return filteredUsers;
+
+    const selectedId = ambilIdWilayah(selectedWilayah);
+    const selectedName = normalizeReferenceText(
+      selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "",
+    );
+    const selectedProvinceName = normalizeReferenceText(
+      isProvinsi(selectedWilayah)
+        ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || ""
+        : selectedWilayah?._parent_province_name ||
+        ambilProvinsiDariWilayah(selectedWilayah, wilayahMap) ||
+        "",
+    );
+    const schoolIds = new Set(
+      scopeSchools
+        .map((school) => String(ambilIdSekolah(school)))
+        .filter(Boolean),
+    );
+
+    return filteredUsers.filter((user) => {
+      const ids = collectWilayahIds(user).map(String);
+      if (selectedId && ids.includes(String(selectedId))) return true;
+
+      const names = collectWilayahNames(user).map(normalizeReferenceText);
+      if (
+        names.some(
+          (name) =>
+            name === selectedName ||
+            (selectedProvinceName && name === selectedProvinceName),
+        )
+      ) {
+        return true;
+      }
+
+      return ambilSchoolIdsUser(user).some((id) => schoolIds.has(String(id)));
+    });
+  }, [filteredUsers, selectedWilayah, scopeSchools, wilayahMap]);
+
+  const filteredPrograms = useMemo(
+    () =>
+      programs
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .filter((item) =>
+          itemMasukWilayahTerpilih(item, selectedWilayah, normalizedSchools, wilayahMap),
+        )
+        .filter((item) =>
+          cocokSearch(item, keyword, [
+            "nama_program",
+            "nama",
+            "nomor_mou",
+            "tahun",
+            "kategori",
+            "status_program",
+            ambilKategoriProgram,
+            ambilStatusProgram,
+          ]),
+      ),
+    [programs, activeFilter, selectedWilayah, normalizedSchools, wilayahMap, keyword],
+  );
+
+  const filteredAssessments = useMemo(
+    () =>
+      assessments
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .filter((item) =>
+          itemMasukWilayahTerpilih(item, selectedWilayah, normalizedSchools, wilayahMap),
+        )
+        .filter((item) =>
+          cocokSearch(item, keyword, [
+            "nama_assessment",
+            "nama",
+            "jenis",
+            "pilar",
+            "status_assessment",
+            ambilKategoriAssessment,
+            ambilStatusAssessment,
+          ]),
+      ),
+    [assessments, activeFilter, selectedWilayah, normalizedSchools, wilayahMap, keyword],
+  );
+
+  const vendorsWithCategory = useMemo(
+    () =>
+      vendors.map((vendor) => ({
+        ...vendor,
+        _resolved_category: inferVendorCategoryFromPrograms(vendor, programs),
       })),
-    ];
-  }, [areaOfficer, wilayahMap]);
+    [vendors, programs],
+  );
 
-  useEffect(() => {
-    const stillExists = aoAreaOptions.some(
-      (item) => String(item.value) === String(aoAreaFilter),
-    );
-    if (!stillExists) setAoAreaFilter("SEMUA");
-  }, [aoAreaFilter, aoAreaOptions]);
-
-  const aoChartData = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(aoTableData, (item) => {
-        const areas = collectAreaBinaanUser(item, wilayahMap);
-        return areas.length ? areas.join(", ") : "Belum Ada Area";
-      }),
-    );
-  }, [aoTableData, wilayahMap]);
-
-  const kadinTableData = useMemo(() => {
-    return kepalaDinas.filter((item) => {
-      if (kadinFilter === "SEMUA") return true;
-      return AssignmentStatus(item, wilayahMap) === kadinFilter;
-    });
-  }, [kepalaDinas, kadinFilter, wilayahMap]);
-
-  const kadinChartData = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(kadinTableData, (item) => {
-        const status = AssignmentStatus(item, wilayahMap);
-        return status === "DIPETAKAN" ? "Sudah Dipetakan" : "Belum Dipetakan";
-      }),
-    );
-  }, [kadinTableData, wilayahMap]);
-
-  const vendorTableData = useMemo(() => {
-    return filteredVendors.filter((vendor) => {
-      if (vendorFilter === "SEMUA") return true;
-      return getVendorCategory(vendor) === vendorFilter;
-    });
-  }, [filteredVendors, vendorFilter]);
-
-  const vendorChartData = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(vendorTableData, (vendor) =>
-        tampilVendorCategory(getVendorCategory(vendor)),
+  const filteredVendors = useMemo(
+    () =>
+      vendorsWithCategory
+        .filter((item) => sesuaiFilterStatus(item, activeFilter))
+        .filter((item) =>
+          cocokSearch(item, keyword, [
+            "nama_vendor",
+            "nama",
+            "email",
+            "kategori",
+            "kontak",
+            getVendorCategory,
+          ]),
       ),
-    );
-  }, [vendorTableData]);
+    [vendorsWithCategory, activeFilter, keyword],
+  );
 
-  const operatorTableSchools = useMemo(() => {
-    if (operatorFilter === "SUDAH") return sekolahDenganOperator;
-    if (operatorFilter === "BELUM") return sekolahBelumOperator;
-    return filteredSchools;
-  }, [operatorFilter, sekolahDenganOperator, sekolahBelumOperator, filteredSchools]);
-
-  const userTableData = useMemo(() => {
-    return filteredUsers
-      .filter((user) => {
-        if (userTableRoleFilter === "SEMUA") return true;
-        return Number(ambilIdRole(user)) === Number(userTableRoleFilter);
-      })
-      .sort((a, b) => {
-        const aDate = new Date(ambilTanggal(a) || 0).getTime();
-        const bDate = new Date(ambilTanggal(b) || 0).getTime();
-        return bDate - aDate;
-      });
-  }, [filteredUsers, userTableRoleFilter]);
-
-  const userLatestChartData = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(userTableData, (user) => ambilNamaRole(user)),
-    );
-  }, [userTableData]);
-
-  const assessmentProcessChartData = useMemo(() => {
-    return warnaDataStatus(
-      kelompokkanData(filteredAssessments, ambilStatusAssessment),
-    );
-  }, [filteredAssessments]);
-
-  const programProcessChartData = useMemo(() => {
-    return warnaDataStatus(
-      kelompokkanData(filteredPrograms, ambilStatusProgram),
-    );
+  const scopedVendorRefs = useMemo(() => {
+    const refs = { ids: new Set(), names: new Set(), rawNames: new Set() };
+    filteredPrograms.forEach((program) => {
+      const next = collectVendorRefsFromItem(program);
+      next.ids.forEach((value) => refs.ids.add(value));
+      next.names.forEach((value) => refs.names.add(value));
+      next.rawNames.forEach((value) => refs.rawNames.add(value));
+    });
+    return refs;
   }, [filteredPrograms]);
 
-  useEffect(() => {
-    const source = visualMode === "assessment" ? filteredAssessments : filteredPrograms;
-    const getIdentity = visualMode === "assessment" ? ambilIdentityAssessment : ambilIdentityProgram;
-    const currentId = visualMode === "assessment" ? selectedAssessmentVisualId : selectedProgramVisualId;
-    const setCurrentId = visualMode === "assessment" ? setSelectedAssessmentVisualId : setSelectedProgramVisualId;
-
-    if (!source.length) {
-      setCurrentId(VISUAL_ALL_VALUE);
-      return;
-    }
-
-    const ids = new Set(source.map((item) => getIdentity(item)));
-    if (!currentId || (currentId !== VISUAL_ALL_VALUE && !ids.has(String(currentId)))) {
-      setCurrentId(VISUAL_ALL_VALUE);
-    }
-  }, [
-    visualMode,
-    filteredAssessments,
-    filteredPrograms,
-    selectedAssessmentVisualId,
-    selectedProgramVisualId,
-  ]);
-
-  const visualItemOptions = useMemo(() => {
-    const isAssessment = visualMode === "assessment";
-    const source = isAssessment ? filteredAssessments : filteredPrograms;
-    const getIdentity = isAssessment ? ambilIdentityAssessment : ambilIdentityProgram;
-    const getName = isAssessment ? ambilNamaAssessment : ambilNamaProgram;
-    const getStatus = isAssessment ? ambilStatusAssessment : ambilStatusProgram;
-
-    const aggregateOption = {
-      value: VISUAL_ALL_VALUE,
-      title: `Semua ${isAssessment ? "Assessment" : "Program"}`,
-      code: selectedWilayah
-        ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "Wilayah Terpilih"
-        : "Semua Wilayah",
-      status: "Semua",
-      category: `${source.length} data`,
-      label: `00 - Semua ${isAssessment ? "Assessment" : "Program"} - ${source.length} data`,
-    };
-
-    return [aggregateOption, ...source.map((item, index) => {
-      const title = getName(item);
-      const status = getStatus(item);
-      const code = ambilKodeVisualItem(item, visualMode);
-      const category = isAssessment
-        ? tampilVendorCategory(ambilKategoriAssessment(item))
-        : tampilVendorCategory(ambilKategoriProgram(item));
-
-      return {
-        value: getIdentity(item),
-        title,
-        code,
-        status,
-        category,
-      label: `${String(index + 1).padStart(2, "0")} · ${potongLabel(getName(item), 54)} · ${getStatus(item)}`,
-      };
-    })];
-  }, [visualMode, filteredAssessments, filteredPrograms, selectedWilayah]);
-
-  const selectedVisualItemId =
-    (visualMode === "assessment" ? selectedAssessmentVisualId : selectedProgramVisualId) || VISUAL_ALL_VALUE;
-
-  const selectedVisualOption = useMemo(
-    () =>
-      visualItemOptions.find(
-        (item) => String(item.value) === String(selectedVisualItemId),
+  const scopedVendors = useMemo(() => {
+    if (!selectedWilayah) return filteredVendors;
+    return filteredVendors.filter((vendor) =>
+      entityMatchesReferences(
+        vendor,
+        scopedVendorRefs,
+        ambilIdVendor,
+        ambilNamaVendor,
+        [ambilEmail(vendor)],
       ),
-    [visualItemOptions, selectedVisualItemId],
+    );
+  }, [filteredVendors, scopedVendorRefs, selectedWilayah]);
+
+  const userChartData = useMemo(() => {
+    const grouped = kelompokkanData(
+      scopedUsers,
+      userView === "role" ? ambilNamaRole : resolveAdminDepartment,
+    );
+    return compactPieData(warnaDataKonsisten(grouped), 9);
+  }, [scopedUsers, userView]);
+
+  const selectedUserChart =
+    userChartData.find((item) => item.name === userFocus) || null;
+
+  const activityItems = activityMode === "program"
+    ? filteredPrograms
+    : filteredAssessments;
+
+  const activityRelatedSchools = useMemo(
+    () => collectRelatedSchools(activityItems, scopeSchools),
+    [activityItems, scopeSchools],
   );
 
-  const selectedVisualItem = useMemo(() => {
-    if (selectedVisualItemId === VISUAL_ALL_VALUE) return null;
+  const activityChartData = useMemo(() => {
+    if (activityView === "wilayah") {
+      return compactPieData(
+        warnaDataKonsisten(
+          kelompokkanData(
+            activityRelatedSchools,
+            (school) => ambilProvinsiSekolah(school, wilayahMap),
+          ),
+        ),
+        8,
+      );
+    }
 
-    const isAssessment = visualMode === "assessment";
-    const source = isAssessment ? filteredAssessments : filteredPrograms;
-    const getIdentity = isAssessment ? ambilIdentityAssessment : ambilIdentityProgram;
+    const resolver = activityView === "status"
+      ? (item) => activityMode === "program"
+        ? ambilStatusProgram(item)
+        : ambilStatusAssessment(item)
+      : activityView === "pilar"
+        ? (item) => tampilVendorCategory(
+          activityMode === "program"
+            ? ambilKategoriProgram(item)
+            : ambilKategoriAssessment(item),
+        )
+        : resolveItemYear;
 
-    return source.find((item) => getIdentity(item) === selectedVisualItemId) || null;
-  }, [visualMode, filteredAssessments, filteredPrograms, selectedVisualItemId]);
-
-  const visualProcess = useMemo(() => {
-    const isAssessment = visualMode === "assessment";
-    const data = isAssessment ? filteredAssessments : filteredPrograms;
-    const isAggregate = selectedVisualItemId === VISUAL_ALL_VALUE || !selectedVisualItem;
-    const scopeName = selectedWilayah
-      ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "Wilayah Terpilih"
-      : "Semua Wilayah";
-    const status = selectedVisualItem
-      ? isAssessment
-        ? ambilStatusAssessment(selectedVisualItem)
-        : ambilStatusProgram(selectedVisualItem)
-      : "Semua Data";
-    const category = selectedVisualItem
-      ? isAssessment
-        ? tampilVendorCategory(ambilKategoriAssessment(selectedVisualItem))
-        : tampilVendorCategory(ambilKategoriProgram(selectedVisualItem))
-      : `${data.length} data`;
-    const selectedTitle = selectedVisualItem
-      ? isAssessment
-        ? ambilNamaAssessment(selectedVisualItem)
-        : ambilNamaProgram(selectedVisualItem)
-      : `Semua ${isAssessment ? "Assessment" : "Program"}`;
-    const selectedCode = selectedVisualItem
-      ? ambilKodeVisualItem(selectedVisualItem, visualMode)
-      : scopeName;
-    const participantGroups = isAggregate
-      ? buildVisualAggregateInvolvement({
-        mode: visualMode,
-        items: data,
-        schools: filteredSchools,
-        vendors: filteredVendors,
-        headOffice,
-        areaOfficer,
-        guruAssessment,
-        operatorSekolah,
-        kepalaSekolah,
-        wilayahMap,
-      })
-      : buildVisualItemInvolvement({
-        mode: visualMode,
-        item: selectedVisualItem,
-        schools: filteredSchools,
-        vendors: filteredVendors,
-        headOffice,
-        areaOfficer,
-        guruAssessment,
-        operatorSekolah,
-        kepalaSekolah,
-        wilayahMap,
-      });
-    const chartData = participantGroups
-      .filter((group) => group.value > 0)
-      .map((group) => ({
-        name: group.label,
-        value: group.value,
-        color: group.color,
-      }));
-    const totalInvolved = participantGroups.reduce((total, group) => total + group.value, 0);
-    const dominant = chartData[0];
-
-    return {
-      key: visualMode,
-      label: isAssessment ? "Assessment" : "Program",
-      total: data.length,
-      selectedTitle,
-      selectedCode,
-      status,
-      category,
-      totalInvolved,
-      chartData,
-      dominantLabel: dominant?.name || "Belum Ada",
-      dominantValue: dominant?.value || 0,
-      participantGroups,
-      emptyText: data.length
-        ? "Relasi stakeholder pada data ini belum terbaca"
-        : isAssessment
-          ? "Belum ada data assessment"
-          : "Belum ada data program",
-      barName: isAssessment ? "Stakeholder Assessment" : "Stakeholder Program",
-    };
-  }, [
-    visualMode,
-    filteredAssessments,
-    filteredPrograms,
-    selectedVisualItemId,
-    selectedVisualItem,
-    selectedWilayah,
-    filteredSchools,
-    headOffice,
-    areaOfficer,
-    guruAssessment,
-    operatorSekolah,
-    kepalaSekolah,
-    filteredVendors,
-    wilayahMap,
-  ]);
-
-  const operatorCoverageChartData = useMemo(() => {
-    return [
-      {
-        name: "Sudah Ada Operator",
-        value: sekolahDenganOperator.length,
-        color: WARNA.hijau,
-      },
-      {
-        name: "Belum Ada Operator",
-        value: sekolahBelumOperator.length,
-        color: WARNA.amber,
-      },
-    ].filter((item) => item.value > 0);
-  }, [sekolahDenganOperator, sekolahBelumOperator]);
-
-  const schoolExplorerList = useMemo(() => {
-    return filteredSchools.filter((sekolah) =>
-      isSekolahMasukWilayah(sekolah, selectedWilayah, wilayahMap),
+    return compactPieData(
+      activityView === "status"
+        ? warnaDataStatus(kelompokkanData(activityItems, resolver))
+        : warnaDataKonsisten(kelompokkanData(activityItems, resolver)),
+      8,
     );
-  }, [filteredSchools, selectedWilayah, wilayahMap]);
+  }, [activityItems, activityMode, activityView, activityRelatedSchools, wilayahMap]);
 
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(schoolExplorerList.length / ITEMS_PER_PAGE));
-  }, [schoolExplorerList]);
+  const activityFocusedItems = useMemo(() => {
+    if (!activityFocus || activityFocus === "Lainnya") return activityItems;
 
-  const currentSchools = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return schoolExplorerList.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [schoolExplorerList, currentPage]);
+    if (activityView === "wilayah") {
+      return activityItems.filter((item) =>
+        collectRelatedSchools([item], scopeSchools).some(
+          (school) =>
+            normalisasiText(ambilProvinsiSekolah(school, wilayahMap)) ===
+            normalisasiText(activityFocus),
+        ),
+      );
+    }
 
-  const schoolExplorerJenjang = useMemo(() => {
-    return warnaDataKonsisten(
-      kelompokkanData(schoolExplorerList, ambilJenjangSekolah),
-    );
-  }, [schoolExplorerList]);
+    return activityItems.filter((item) => {
+      const label = activityView === "status"
+        ? activityMode === "program"
+          ? ambilStatusProgram(item)
+          : ambilStatusAssessment(item)
+        : activityView === "pilar"
+          ? tampilVendorCategory(
+            activityMode === "program"
+              ? ambilKategoriProgram(item)
+              : ambilKategoriAssessment(item),
+          )
+          : resolveItemYear(item);
+      return normalisasiText(label) === normalisasiText(activityFocus);
+    });
+  }, [activityItems, activityFocus, activityView, activityMode, scopeSchools, wilayahMap]);
 
-  const explorerStats = useMemo(() => {
-    const provinsiSet = new Set();
-    const kabupatenSet = new Set();
+  const activityContextSchools = useMemo(() => {
+    if (activityView === "wilayah" && activityFocus && activityFocus !== "Lainnya") {
+      return activityRelatedSchools.filter(
+        (school) =>
+          normalisasiText(ambilProvinsiSekolah(school, wilayahMap)) ===
+          normalisasiText(activityFocus),
+      );
+    }
+    return collectRelatedSchools(activityFocusedItems, scopeSchools);
+  }, [activityView, activityFocus, activityRelatedSchools, activityFocusedItems, scopeSchools, wilayahMap]);
 
-    schoolExplorerList.forEach((sekolah) => {
-      provinsiSet.add(ambilProvinsiSekolah(sekolah, wilayahMap));
-      kabupatenSet.add(ambilKabupatenSekolah(sekolah, wilayahMap));
+  const vendorGroupVendors = useMemo(
+    () =>
+      scopedVendors.filter((vendor) => getVendorCategory(vendor) === vendorGroup),
+    [scopedVendors, vendorGroup],
+  );
+
+  const vendorPrograms = useMemo(
+    () =>
+      filteredPrograms.filter((program) => {
+        const refs = collectVendorRefsFromItem(program);
+        return vendorGroupVendors.some((vendor) =>
+          entityMatchesReferences(
+            vendor,
+            refs,
+            ambilIdVendor,
+            ambilNamaVendor,
+            [ambilEmail(vendor)],
+          ),
+        );
+      }),
+    [filteredPrograms, vendorGroupVendors],
+  );
+
+  const vendorSchools = useMemo(
+    () => collectRelatedSchools(vendorPrograms, scopeSchools),
+    [vendorPrograms, scopeSchools],
+  );
+
+  const vendorChartData = useMemo(() => {
+    if (vendorView === "status") {
+      return compactPieData(
+        warnaDataKonsisten(
+          kelompokkanData(vendorGroupVendors, (vendor) =>
+            isDataAktif(vendor) ? "Aktif" : "Nonaktif",
+          ),
+        ),
+        6,
+      );
+    }
+
+    if (vendorView === "wilayah") {
+      return compactPieData(
+        warnaDataKonsisten(
+          kelompokkanData(
+            vendorSchools,
+            (school) => ambilProvinsiSekolah(school, wilayahMap),
+          ),
+        ),
+        8,
+      );
+    }
+
+    const byVendor = vendorGroupVendors.map((vendor) => {
+      const refsForVendor = {
+        ids: new Set([String(ambilIdVendor(vendor) || "")].filter(Boolean)),
+        names: new Set([normalizeReferenceText(ambilNamaVendor(vendor))].filter(Boolean)),
+        rawNames: new Set([ambilNamaVendor(vendor)].filter(Boolean)),
+      };
+      return {
+        name: ambilNamaVendor(vendor),
+        value: filteredPrograms.filter((program) => {
+          const refs = collectVendorRefsFromItem(program);
+          return entityMatchesReferences(
+            vendor,
+            refs,
+            ambilIdVendor,
+            ambilNamaVendor,
+            [ambilEmail(vendor)],
+          );
+        }).length,
+      };
     });
 
-    return {
-      totalProvinsi: provinsiSet.size,
-      totalKabupaten: kabupatenSet.size,
-      totalSekolah: schoolExplorerList.length,
-    };
-  }, [schoolExplorerList, wilayahMap]);
+    return compactPieData(warnaDataKonsisten(byVendor), 8);
+  }, [vendorView, vendorGroupVendors, vendorSchools, wilayahMap, filteredPrograms]);
 
-  const provinceMapMarkers = useMemo(() => {
-    return buildProvinsiMarkerData(
-      filteredWilayah,
-      filteredSchools,
-      wilayahMap,
+  const vendorContextSchools = useMemo(() => {
+    if (!vendorFocus || vendorFocus === "Lainnya") return vendorSchools;
+
+    if (vendorView === "wilayah") {
+      return vendorSchools.filter(
+        (school) =>
+          normalisasiText(ambilProvinsiSekolah(school, wilayahMap)) ===
+          normalisasiText(vendorFocus),
+      );
+    }
+
+    if (vendorView === "status") {
+      const selectedVendors = vendorGroupVendors.filter((vendor) =>
+        normalisasiText(isDataAktif(vendor) ? "Aktif" : "Nonaktif") ===
+        normalisasiText(vendorFocus),
+      );
+      const selectedPrograms = filteredPrograms.filter((program) => {
+        const refs = collectVendorRefsFromItem(program);
+        return selectedVendors.some((vendor) =>
+          entityMatchesReferences(
+            vendor,
+            refs,
+            ambilIdVendor,
+            ambilNamaVendor,
+            [ambilEmail(vendor)],
+          ),
+        );
+      });
+      return collectRelatedSchools(selectedPrograms, scopeSchools);
+    }
+
+    const vendor = vendorGroupVendors.find(
+      (item) => normalisasiText(ambilNamaVendor(item)) === normalisasiText(vendorFocus),
     );
-  }, [filteredWilayah, filteredSchools, wilayahMap]);
+    if (!vendor) return vendorSchools;
+    const selectedPrograms = filteredPrograms.filter((program) => {
+      const refs = collectVendorRefsFromItem(program);
+      return entityMatchesReferences(
+        vendor,
+        refs,
+        ambilIdVendor,
+        ambilNamaVendor,
+        [ambilEmail(vendor)],
+      );
+    });
+    return collectRelatedSchools(selectedPrograms, scopeSchools);
+  }, [vendorFocus, vendorView, vendorSchools, vendorGroupVendors, filteredPrograms, scopeSchools, wilayahMap]);
 
-  const diagramWilayahCoverageProvinsi = useMemo(() => {
-    return provinceMapMarkers.map((province, index) => ({
-      name: province.name,
-      value: province.totalKabupaten,
-      sekolah: province.totalSekolah,
+  const mapSourceSchools = mapSource === "aktivitas"
+    ? activityContextSchools
+    : mapSource === "vendor"
+      ? vendorContextSchools
+      : scopeSchools;
+
+  const mapDisplayedSchools = useMemo(() => {
+    if (mapView !== "jenjang" || !mapFocus) return mapSourceSchools;
+    return mapSourceSchools.filter(
+      (school) =>
+        normalisasiUpper(ambilJenjangSekolah(school)) ===
+        normalisasiUpper(mapFocus),
+    );
+  }, [mapSourceSchools, mapView, mapFocus]);
+
+  const provinceMarkers = useMemo(
+    () => buildProvinsiMarkerData(filteredWilayah, mapDisplayedSchools, wilayahMap),
+    [filteredWilayah, mapDisplayedSchools, wilayahMap],
+  );
+
+  const selectedProvinceName = useMemo(() => {
+    if (!selectedWilayah) return "";
+    if (isProvinsi(selectedWilayah)) {
+      return selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "";
+    }
+    return selectedWilayah?._parent_province_name ||
+      ambilProvinsiDariWilayah(selectedWilayah, wilayahMap) || "";
+  }, [selectedWilayah, wilayahMap]);
+
+  const selectedProvinceSummary = useMemo(
+    () =>
+      provinceMarkers.find(
+        (province) =>
+          kunciNamaProvinsi(province.name) ===
+          kunciNamaProvinsi(selectedProvinceName),
+      ) || null,
+    [provinceMarkers, selectedProvinceName],
+  );
+
+  const countyGroups = useMemo(
+    () =>
+      selectedProvinceSummary
+        ? buildKabupatenMarkerData(selectedProvinceSummary, wilayahMap)
+        : buildNationalKabupatenGroups(mapDisplayedSchools, wilayahMap),
+    [selectedProvinceSummary, mapDisplayedSchools, wilayahMap],
+  );
+
+  const mapChartData = useMemo(() => {
+    if (mapView === "provinsi") {
+      return compactPieData(
+        provinceMarkers.map((province, index) => ({
+          name: province.name,
+          value: province.totalSekolah,
+          color: WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
+          payload: province,
+        })),
+        9,
+      );
+    }
+
+    if (mapView === "kabupaten") {
+      return compactPieData(
+        countyGroups.map((county, index) => ({
+          name: county.name,
+          value: county.totalSekolah,
+          color: WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
+          payload: county,
+        })),
+        9,
+      );
+    }
+
+    return ["SD", "SMP", "SMK"].map((name, index) => ({
+      name,
+      value: mapSourceSchools.filter(
+        (school) => normalisasiUpper(ambilJenjangSekolah(school)) === name,
+      ).length,
       color: WARNA_DIAGRAM[index % WARNA_DIAGRAM.length],
     }));
-  }, [provinceMapMarkers]);
-
-  const ringkasan = useMemo(() => {
-    return {
-      pengurus: pengurus.length,
-      ho: headOffice.length,
-      ao: areaOfficer.length,
-      wilayah: filteredWilayah.length,
-      sekolah: filteredSchools.length,
-      operator: operatorSekolah.length,
-      vendor: filteredVendors.length,
-      kadin: kepalaDinas.length,
-      assessment: filteredAssessments.length,
-      program: filteredPrograms.length,
-      agenda: filteredAgendas.length,
-      totalUser: filteredUsers.length,
-    };
-  }, [
-    pengurus,
-    headOffice,
-    areaOfficer,
-    filteredWilayah,
-    filteredSchools,
-    operatorSekolah,
-    filteredVendors,
-    kepalaDinas,
-    filteredAssessments,
-    filteredPrograms,
-    filteredAgendas,
-    filteredUsers,
-  ]);
+  }, [mapView, provinceMarkers, countyGroups, mapSourceSchools]);
 
   const selectProvinsi = (province) => {
     if (!province) return;
-
-    const selectedProvince = {
+    setSelectedWilayah({
       ...(province?.wilayah || {}),
-      nama_wilayah: province?.name,
+      nama_wilayah: province.name,
       jenis_wilayah: "PROVINSI",
-      latitude: province?.latitude,
-      longitude: province?.longitude,
+      latitude: province.latitude,
+      longitude: province.longitude,
       _province_summary: province,
       _focus_nonce: Date.now(),
-    };
-
-    setSelectedWilayah(selectedProvince);
+    });
     setMapCenter([province.latitude, province.longitude]);
     setZoom(PROVINCE_ZOOM);
-    setCurrentPage(1);
+    setMapFocus(province.name);
   };
 
-  const selectKabupaten = (kabupaten) => {
-    if (!kabupaten) return;
-
-    const selectedKabupaten = {
-      ...(kabupaten?.wilayah || {}),
-      nama_wilayah: kabupaten?.name,
+  const selectKabupaten = (county) => {
+    if (!county) return;
+    setSelectedWilayah({
+      ...(county?.wilayah || {}),
+      nama_wilayah: county.name,
       jenis_wilayah: "KABUPATEN/KOTA",
-      latitude: kabupaten?.latitude,
-      longitude: kabupaten?.longitude,
-      _parent_province_name: kabupaten?.provinceName,
-      _selected_kabupaten_key: kabupaten?.key,
+      latitude: county.latitude,
+      longitude: county.longitude,
+      _parent_province_name: county.provinceName,
+      _selected_kabupaten_key: county.key,
       _focus_nonce: Date.now(),
-    };
-
-    setSelectedWilayah(selectedKabupaten);
-    setMapCenter([kabupaten.latitude, kabupaten.longitude]);
+    });
+    setMapCenter([county.latitude, county.longitude]);
     setZoom(KABUPATEN_ZOOM);
-    setCurrentPage(1);
+    setMapFocus(county.name);
   };
 
-  const resetFilterMap = () => {
+  const resetMap = () => {
     setSelectedWilayah(null);
     setMapCenter(INDONESIA_CENTER);
     setZoom(DEFAULT_ZOOM);
-    setCurrentPage(1);
+    setMapFocus("");
   };
 
-  const openSchoolModal = () => { };
+  const handleMapChartSelect = (entry) => {
+    const item = mapChartData.find((row) => row.name === entry?.name) || entry;
+    if (!item) return;
+
+    if (mapView === "provinsi") {
+      if (mapFocus === item.name) {
+        resetMap();
+      } else {
+        selectProvinsi(item.payload);
+      }
+      return;
+    }
+
+    if (mapView === "kabupaten") {
+      if (mapFocus === item.name) {
+        resetMap();
+      } else {
+        selectKabupaten(item.payload);
+      }
+      return;
+    }
+
+    setMapFocus((current) => current === item.name ? "" : item.name);
+  };
+
+  const resetDashboard = () => {
+    setSearchValue("");
+    setActiveFilter("SEMUA");
+    setUserView("role");
+    setUserFocus("");
+    setActivityMode("program");
+    setActivityView("status");
+    setActivityFocus("");
+    setMapSource("semua");
+    setMapView("provinsi");
+    setMapFocus("");
+    setVendorGroup("AKADEMIK");
+    setVendorView("status");
+    setVendorFocus("");
+    resetMap();
+  };
+
+  const scopeLabel = selectedWilayah
+    ? selectedWilayah?.nama_wilayah || selectedWilayah?.nama || "Wilayah"
+    : "Nasional";
+  const totalRegions = new Set(
+    scopeSchools.map((school) => ambilProvinsiSekolah(school, wilayahMap)),
+  ).size;
+  const activeVendors = scopedVendors.filter(isDataAktif).length;
+  const activitySelected =
+    activityChartData.find((item) => item.name === activityFocus) || null;
+  const vendorSelected =
+    vendorChartData.find((item) => item.name === vendorFocus) || null;
+  const mapSelected = mapChartData.find((item) => item.name === mapFocus) || null;
+
+  const activityModeLabel = activityMode === "program" ? "Program" : "Assessment";
+  const activityNameResolver = activityMode === "program"
+    ? ambilNamaProgram
+    : ambilNamaAssessment;
+  const activityStatusResolver = activityMode === "program"
+    ? ambilStatusProgram
+    : ambilStatusAssessment;
 
   if (loading) {
     return (
@@ -5742,8 +5934,8 @@ export default function DashboardAdmin() {
         <main className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="h-11 w-11 animate-spin text-[#0AC4E0]" />
-            <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-500/70">
-              Memuat Dashboard Admin...
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-500/70">
+              Memuat Dashboard Admin
             </p>
           </div>
         </main>
@@ -5761,6 +5953,7 @@ export default function DashboardAdmin() {
 
         .admin-scroll::-webkit-scrollbar {
           width: 6px;
+          height: 6px;
         }
 
         .admin-scroll::-webkit-scrollbar-track {
@@ -5768,21 +5961,17 @@ export default function DashboardAdmin() {
         }
 
         .admin-scroll::-webkit-scrollbar-thumb {
-          background: rgba(10, 196, 224, 0.35);
+          background: rgba(10, 196, 224, 0.34);
           border-radius: 999px;
         }
 
-        .recharts-wrapper text {
-          font-family: 'Poppins', sans-serif !important;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
+        .recharts-wrapper text,
         .leaflet-container {
-          font-family: 'Poppins', sans-serif;
+          font-family: 'Poppins', sans-serif !important;
         }
 
-        .admin-province-marker-wrapper {
+        .admin-province-marker-wrapper,
+        .admin-kabupaten-marker-wrapper {
           border: 0 !important;
           background: transparent !important;
         }
@@ -5799,10 +5988,6 @@ export default function DashboardAdmin() {
         .admin-province-marker:hover,
         .admin-province-marker.is-active {
           transform: scale(1.12);
-        }
-
-        .admin-province-marker.is-active {
-          filter: drop-shadow(0 12px 18px rgba(239, 68, 68, 0.36));
         }
 
         .admin-province-marker__pin {
@@ -5845,12 +6030,6 @@ export default function DashboardAdmin() {
           font-size: 9px;
           font-weight: 900;
           color: #ffffff;
-          line-height: 1;
-        }
-
-        .admin-kabupaten-marker-wrapper {
-          border: 0 !important;
-          background: transparent !important;
         }
 
         .admin-kabupaten-marker {
@@ -5887,15 +6066,9 @@ export default function DashboardAdmin() {
           transform: translateX(-50%);
         }
 
-        .admin-kabupaten-marker.is-active .admin-kabupaten-marker__dot {
-          background: #0891b2;
-          box-shadow: 0 9px 22px rgba(8, 145, 178, 0.42);
-        }
-
         .admin-kabupaten-marker__dot span {
           font-size: 9px;
           font-weight: 900;
-          line-height: 1;
         }
 
         .admin-kabupaten-marker__label {
@@ -5911,817 +6084,512 @@ export default function DashboardAdmin() {
           font-size: 8px;
           font-weight: 900;
           color: #475569;
-          line-height: 1.15;
           text-overflow: ellipsis;
           white-space: nowrap;
           box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
           transform: translateX(-50%);
         }
 
-        .admin-kabupaten-marker.is-active .admin-kabupaten-marker__label {
-          border-color: rgba(10, 196, 224, 0.4);
-          background: #083344;
-          color: #ffffff;
+        .admin-map-stage > div {
+          width: 100%;
+          height: 100%;
+          min-height: 640px;
         }
 
-        .admin-map-action-pulse {
-          animation: adminMapActionPulse 1.45s ease-in-out infinite;
-        }
-
-        @keyframes adminMapActionPulse {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(10, 196, 224, 0.28);
-            transform: translateY(0);
-          }
-
-          50% {
-            box-shadow: 0 0 0 7px rgba(10, 196, 224, 0);
-            transform: translateY(-1px);
-          }
-        }
-
-        .admin-compact-map .leaflet-container {
-          height: 220px !important;
-          min-height: 220px !important;
-        }
-
-        .admin-compact-map [class*="h-[520px]"],
-        .admin-compact-map [class*="h-[500px]"],
-        .admin-compact-map [class*="h-[480px]"],
-        .admin-compact-map [class*="h-[460px]"] {
-          height: 220px !important;
-          min-height: 220px !important;
+        .admin-map-stage .leaflet-container {
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 500px !important;
         }
       `}</style>
 
-      <PageWrapper className="flex min-h-screen w-full bg-slate-100 !p-0">
+      <PageWrapper className="flex min-h-screen w-full bg-slate-50 !p-0">
         <Sidebar />
 
-        <main className="admin-scroll h-screen flex-1 overflow-y-auto p-6">
-          <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5">
-            <DashboardPanel className="rounded-md" bodyClassName="p-0">
-              <header className="flex flex-col gap-5 border-b border-slate-100 px-6 py-5 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex min-w-0 items-start gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-sm">
-                    <LayoutDashboard size={24} />
+        <main className="admin-scroll h-screen min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-5 xl:p-6">
+          <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-4 xl:gap-5">
+            <DashboardPanel bodyClassName="p-0">
+              <header className="relative overflow-hidden border-b border-slate-100 px-6 py-5">
+                <div className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-cyan-100/70 blur-3xl" />
+                <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white shadow-lg shadow-cyan-100">
+                      <LayoutDashboard size={24} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                          Admin
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+                          {scopeLabel}
+                        </span>
+                      </div>
+                      <h1 className="mt-2 text-[25px] font-black tracking-tight text-slate-900">
+                        Dashboard Admin
+                      </h1>
+                      <p className="mt-1 text-[11px] font-bold text-slate-400">
+                        Data, wilayah, aktivitas.
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <div className="mb-2 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
-                        Dashboard Admin
-                      </span>
-                      <span className="rounded-full bg-slate-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                        Master Data Control Center
-                      </span>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                    <div className="relative min-w-[300px] flex-1 lg:w-[420px]">
+                      <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
+                      <input
+                        value={searchValue}
+                        onChange={(event) => setSearchValue(event.target.value)}
+                        placeholder="Cari semua data..."
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white/90 pl-10 pr-4 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-2 focus:ring-cyan-100"
+                      />
                     </div>
-
-                    <h1 className="text-[24px] font-black tracking-tight text-slate-800">
-                      Pusat Kontrol Data Master
-                    </h1>
-
-                    <p className="mt-1 max-w-2xl text-[12px] font-semibold leading-5 text-slate-400">
-                      Seluruh data master, filter, pencarian, dan peta sekolah
-                      binaan terhubung langsung dengan data backend.
-                    </p>
+                    <button
+                      type="button"
+                      onClick={resetDashboard}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0]"
+                    >
+                      <SlidersHorizontal size={14} />
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={fetchDashboardData}
+                      disabled={refreshing}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-60"
+                    >
+                      <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+                      {refreshing ? "Memuat" : "Refresh"}
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                  <div className="relative flex h-10 min-w-[300px] items-center">
-                    <Search
-                      size={15}
-                      className="absolute left-3.5 text-[#0AC4E0]"
-                    />
-                    <input
-                      value={searchValue}
-                      onChange={(event) => setSearchValue(event.target.value)}
-                      placeholder="Cari seluruh data: nama, email, sekolah, wilayah, vendor..."
-                      className="h-10 w-full rounded-md border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={fetchDashboardData}
-                    disabled={refreshing}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white shadow-sm transition hover:bg-cyan-500 active:scale-95 disabled:opacity-60"
-                  >
-                    <RefreshCcw
-                      size={14}
-                      className={refreshing ? "animate-spin" : ""}
-                    />
-                    {refreshing ? "Memuat" : "Refresh"}
-                  </button>
+                <div className="relative mt-4 flex flex-wrap gap-2">
+                  {STATUS_FILTERS.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setActiveFilter(item.value)}
+                      className={`rounded-xl px-4 py-2 text-[9px] font-black uppercase tracking-widest transition ${activeFilter === item.value
+                        ? "bg-[#0AC4E0] text-white shadow-sm"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-cyan-200 hover:text-[#0AC4E0]"
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </header>
 
-              <section className="grid grid-cols-1 border-b border-slate-100 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <KartuAngka
-                  active
-                  color={ROLE_COLOR[2]}
-                  label="Pengurus"
-                  value={ringkasan.pengurus}
-                  helper="User pengurus"
-                  icon={<UsersRound size={18} />}
-                />
-                <KartuAngka
-                  color={ROLE_COLOR[3]}
-                  label="Head Office"
-                  value={ringkasan.ho}
-                  helper="HO akademik/non-akademik"
-                  icon={<Building2 size={18} />}
-                />
-                <KartuAngka
-                  color={ROLE_COLOR[4]}
-                  label="Area Officer"
-                  value={ringkasan.ao}
-                  helper="AO wilayah binaan"
-                  icon={<UserCog size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.pink}
-                  label="Wilayah"
-                  value={ringkasan.wilayah}
-                  helper="Provinsi/kabupaten"
-                  icon={<MapPin size={18} />}
-                />
-                <KartuAngka
-                  color={ROLE_COLOR[5]}
-                  label="Sekolah"
-                  value={ringkasan.sekolah}
-                  helper="Sekolah terdaftar"
-                  icon={<School size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.biru}
-                  label="Assessment"
-                  value={ringkasan.assessment}
-                  helper="Data assessment"
-                  icon={<ClipboardList size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.cyan}
-                  label="Program"
-                  value={ringkasan.program}
-                  helper="Data program"
-                  icon={<LayoutDashboard size={18} />}
-                />
-                <KartuAngka
-                  color={ROLE_COLOR[9]}
-                  label="Operator Sekolah"
-                  value={ringkasan.operator}
-                  helper={`${sekolahDenganOperator.length} sekolah tercakup`}
-                  icon={<GraduationCap size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.orange}
-                  label="Vendor"
-                  value={ringkasan.vendor}
-                  helper="Mitra program"
-                  icon={<Factory size={18} />}
-                />
-                <KartuAngka
-                  color={ROLE_COLOR[7]}
-                  label="Kepala Dinas"
-                  value={ringkasan.kadin}
-                  helper="User wilayah dinas"
-                  icon={<Landmark size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.amber}
-                  label="Agenda"
-                  value={ringkasan.agenda}
-                  helper="Agenda admin"
-                  icon={<CalendarDays size={18} />}
-                />
-                <KartuAngka
-                  color={WARNA.slate}
-                  label="Total User"
-                  value={ringkasan.totalUser}
-                  helper="Akun sistem terbaca"
-                  icon={<Database size={18} />}
-                />
+              <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                {[
+                  ["User", scopedUsers.length, UsersRound, WARNA.slate],
+                  ["Sekolah", scopeSchools.length, School, WARNA.cyan],
+                  ["Program", filteredPrograms.length, LayoutDashboard, WARNA.biru],
+                  ["Assessment", filteredAssessments.length, ClipboardList, WARNA.ungu],
+                  ["Vendor", scopedVendors.length, Factory, WARNA.orange],
+                  ["Provinsi", totalRegions, Globe2, WARNA.pink],
+                ].map(([label, value, Icon, color], index) => (
+                  <KartuAngka
+                    key={label}
+                    label={label}
+                    value={value}
+                    helper={index === 0 ? "Cakupan aktif" : scopeLabel}
+                    color={color}
+                    active={index === 0}
+                    icon={<Icon size={18} />}
+                  />
+                ))}
               </section>
             </DashboardPanel>
 
-            {sectionKeyword && visibleSectionCount === 0 && (
-              <DashboardPanel
-                title="Section Tidak Ditemukan"
-                subtitle="Coba kata kunci lain seperti Head Office, Vendor, Sekolah, Operator, Area Officer, atau Kepala Dinas."
-                className="min-h-[180px]"
-                bodyClassName="p-6"
-              >
-                <div className="flex min-h-[120px] flex-col items-center justify-center text-center">
-                  <Search size={28} className="text-[#0AC4E0]" />
-                  <p className="mt-3 text-[12px] font-black uppercase tracking-widest text-slate-500">
-                    Tidak ada diagram yang cocok dengan pencarian
-                  </p>
-                </div>
-              </DashboardPanel>
-            )}
-
             <DashboardPanel
-              hidden={!sectionMatches("Peta Sekolah Binaan", "sekolah", "map", "peta", "wilayah", "kabupaten", "provinsi")}
-              title="Peta Sekolah Binaan"
-              right={<MapPin size={18} className="text-[#0AC4E0]" />}
-              className="min-h-[580px]"
-              bodyClassName="p-4"
+              title="User"
+              subtitle="Role dan departemen."
+              right={
+                <SegmentedSwitch
+                  value={userView}
+                  onChange={(value) => {
+                    setUserView(value);
+                    setUserFocus("");
+                  }}
+                  items={[
+                    { value: "role", label: "Role" },
+                    { value: "departemen", label: "Dept." },
+                  ]}
+                />
+              }
+              bodyClassName="p-4 xl:p-5"
             >
-              <CompactSchoolLeafletMap
-                schools={schoolExplorerList}
-                wilayahMap={wilayahMap}
-                provinceMarkers={provinceMapMarkers}
-                selectedWilayah={selectedWilayah}
-                mapCenter={mapCenter}
-                zoom={zoom}
-                onSelectProvinsi={selectProvinsi}
-                onSelectKabupaten={selectKabupaten}
-                onResetFilter={resetFilterMap}
-              />
-            </DashboardPanel>
-
-            <DashboardPanel
-              hidden={visibleSectionCount === 0}
-              title="Visualisasi Data"
-              right={<LayoutDashboard size={18} className="text-[#0AC4E0]" />}
-              className="admin-dashboard-visual-panel"
-              bodyClassName="p-0"
-            >
-              <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
-                    Drill Down Visual
-                  </p>
-                  <h2 className="mt-1 text-[20px] font-black text-slate-900">
-                    {visualProcess.label}
-                  </h2>
-                </div>
-
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-1">
-                    {[
-                      { label: "Assessment", value: "assessment" },
-                      { label: "Program", value: "program" },
-                    ].map((item) => {
-                      const active = visualMode === item.value;
-
-                      return (
-                        <button
-                          key={item.value}
-                          type="button"
-                          onClick={() => {
-                            setVisualMode(item.value);
-                            setVisualFilterOpen(false);
-                          }}
-                          className={`inline-flex h-9 items-center justify-center rounded-md px-4 text-[10px] font-black uppercase tracking-wide transition ${active
-                            ? "bg-[#0AC4E0] text-white shadow-sm"
-                            : "text-slate-500 hover:bg-white hover:text-[#0AC4E0]"
-                            }`}
-                        >
-                          {item.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="min-w-0 rounded-md border border-slate-100 bg-slate-50 px-4 py-2 sm:w-[420px]">
-                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                      Data Aktif
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] font-black text-slate-700">
-                      {selectedVisualOption?.title ||
-                        selectedVisualOption?.label ||
-                        `Pilih ${visualProcess.label}`}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setVisualFilterOpen((value) => !value)}
-                    className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-cyan-100 bg-cyan-50 px-4 text-[10px] font-black uppercase tracking-wide text-[#0AC4E0] transition hover:border-[#0AC4E0] hover:bg-white"
-                  >
-                    <LayoutDashboard size={14} />
-                    {visualFilterOpen ? "Tutup" : "Pilih Data"}
-                  </button>
-                </div>
-              </div>
-
-              {visualFilterOpen && (
-                <div className="border-b border-slate-100 bg-slate-50/70 p-5">
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-                    <VisualItemChooser
-                      key={visualMode}
-                      modeLabel={visualProcess.label}
-                      options={visualItemOptions}
-                      value={selectedVisualItemId}
-                      onChange={(value) => {
-                        if (visualMode === "assessment") {
-                          setSelectedAssessmentVisualId(value);
-                          return;
-                        }
-
-                        setSelectedProgramVisualId(value);
-                      }}
-                    />
-
-                    <VisualFilterField label="Status Data">
-                      <FilterButtonGroup
-                        options={STATUS_FILTERS}
-                        value={activeFilter}
-                        onChange={setActiveFilter}
-                        dark
-                      />
-                    </VisualFilterField>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_390px]">
-                <div className="min-w-0 rounded-[1rem] border border-cyan-100 bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.045)]">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.18fr)_minmax(300px,0.82fr)]">
+                <div className="min-w-0 rounded-3xl border border-slate-100 bg-slate-50/70 p-4 xl:p-5">
+                  <div className="mb-3 flex items-start justify-between gap-3 px-1">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
-                        Komposisi Keterlibatan
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                        {userView === "role" ? "Role" : "Departemen"}
                       </p>
-                      <h3 className="mt-1 break-words text-[20px] font-black leading-tight text-slate-900">
-                        {visualProcess.selectedTitle}
+                      <h3 className="mt-1 break-words text-[16px] font-black leading-5 text-slate-800">
+                        {selectedUserChart?.name || "Semua user"}
                       </h3>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0]">
-                          {visualProcess.selectedCode}
-                        </span>
-                        <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500">
-                          {visualProcess.category}
-                        </span>
-                        <span
-                          className="rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-wide text-white"
-                          style={{ backgroundColor: warnaStatusVisual(visualProcess.status) || WARNA.cyan }}
-                        >
-                          {visualProcess.status}
-                        </span>
-                      </div>
                     </div>
-
-                    <div className="rounded-md border border-cyan-100 bg-cyan-50 px-4 py-3 text-right">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-[#0AC4E0]">
-                        Total Terlibat
-                      </p>
-                      <p className="mt-1 text-[28px] font-black leading-none text-slate-900">
-                        {visualProcess.totalInvolved}
-                      </p>
-                    </div>
+                    <span className="shrink-0 rounded-xl bg-white px-3 py-2 text-[17px] font-black text-slate-800 shadow-sm">
+                      {selectedUserChart?.value ?? scopedUsers.length}
+                    </span>
                   </div>
-
                   <PieWithLegend
-                    data={visualProcess.chartData}
-                    emptyText={visualProcess.emptyText}
+                    data={userChartData}
+                    emptyText="Data user belum tersedia"
                     icon={<UsersRound size={24} />}
+                    selectedName={userFocus}
+                    onSelect={(item) => setUserFocus((current) => current === item.name ? "" : item.name)}
                   />
                 </div>
 
-                <aside className="min-w-0 rounded-[1rem] border border-slate-100 bg-white p-5 shadow-[0_14px_32px_rgba(15,23,42,0.045)]">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
-                    Siapa Saja yang Terlibat
-                  </p>
-                  <h3 className="mt-1 break-words text-[18px] font-black text-slate-900">
-                    {potongLabel(visualProcess.selectedTitle, 42)}
-                  </h3>
-
-                  <div className="mt-5 max-h-[390px] space-y-3 overflow-y-auto pr-1">
-                    {visualProcess.participantGroups.map((role) => (
-                      <div
-                        key={role.label}
-                        className="rounded-md border border-slate-100 bg-slate-50 px-4 py-3"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span
-                              className="h-3 w-3 shrink-0 rounded-full"
-                              style={{ backgroundColor: role.color || WARNA.cyan }}
-                            />
-                            <p className="break-words whitespace-normal text-[12px] font-black text-slate-700">
-                              {role.label}
-                            </p>
-                          </div>
-                          <p className="shrink-0 text-[20px] font-black text-slate-900">
-                            {role.value}
-                          </p>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {role.names.length > 0 ? (
-                            role.names.slice(0, 8).map((name) => (
-                              <span
-                                key={`${role.label}-${name}`}
-                                className="max-w-full break-words rounded-full border border-white bg-white px-3 py-1 text-[9px] font-black uppercase tracking-wide text-slate-500 shadow-sm"
-                              >
-                                {potongLabel(name, 32)}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="rounded-full border border-dashed border-slate-200 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                              Belum terbaca
-                            </span>
-                          )}
-
-                          {role.names.length > 8 && (
-                            <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-[#0AC4E0]">
-                              +{role.names.length - 8} lainnya
-                            </span>
-                          )}
-                        </div>
+                <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                  <div className="relative overflow-hidden rounded-3xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-sky-50 p-5">
+                    <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full bg-cyan-100/70 blur-2xl" />
+                    <div className="relative flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">Fokus</p>
+                        <h3 className="mt-2 break-words text-[18px] font-black leading-6 text-slate-800">
+                          {selectedUserChart?.name || (userView === "role" ? "Semua role" : "Semua dept.")}
+                        </h3>
                       </div>
-                    ))}
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#0AC4E0] shadow-sm">
+                        <UsersRound size={18} />
+                      </span>
+                    </div>
+                    <p className="relative mt-5 text-[38px] font-black leading-none text-slate-800">
+                      {selectedUserChart?.value ?? scopedUsers.length}
+                    </p>
+                    <p className="relative mt-2 text-[9px] font-black uppercase tracking-widest text-slate-400">akun</p>
                   </div>
 
-                  <div className="mt-5 rounded-md border border-cyan-100 bg-cyan-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wide text-[#0AC4E0]">
-                      Data Terfilter
-                    </p>
-                    <p className="mt-2 text-[36px] font-black leading-none text-slate-900">
-                      {visualProcess.total}
-                    </p>
-                    <p className="mt-2 text-[11px] font-bold text-slate-500">
-                      Pilihan item mengikuti mode, pencarian, dan filter aktif.
-                    </p>
+                  <div className="rounded-3xl border border-slate-100 bg-white p-4">
+                    <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Ringkas</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {[
+                        ["Aktif", scopedUsers.filter(isDataAktif).length],
+                        ["Role", new Set(scopedUsers.map(ambilNamaRole)).size],
+                        ["Dept.", new Set(scopedUsers.map(resolveAdminDepartment)).size],
+                        ["Area", totalRegions],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl bg-slate-50 px-3 py-3">
+                          <p className="text-[8px] font-black uppercase tracking-wide text-slate-400">{label}</p>
+                          <p className="mt-1 text-[22px] font-black text-slate-800">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DashboardPanel>
+
+            <DashboardPanel
+              title="Aktivitas"
+              subtitle="Program dan assessment."
+              right={
+                <SegmentedSwitch
+                  value={activityMode}
+                  onChange={(value) => {
+                    setActivityMode(value);
+                    setActivityFocus("");
+                    setMapSource("aktivitas");
+                  }}
+                  items={[
+                    { value: "program", label: "Program" },
+                    { value: "assessment", label: "Assess" },
+                  ]}
+                />
+              }
+              bodyClassName="p-4 xl:p-5"
+            >
+              <div className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.16fr)_minmax(330px,0.84fr)]">
+                <div className="min-w-0 rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
+                        {activityModeLabel}
+                      </p>
+                      <h3 className="mt-1 break-words text-[16px] font-black leading-5 text-slate-800">
+                        {activityFocus || "Semua data"}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-xl bg-white px-3 py-2 text-[17px] font-black text-slate-800 shadow-sm">
+                      {activitySelected?.value ?? activityItems.length}
+                    </span>
+                  </div>
+                  <PieWithLegend
+                    data={activityChartData}
+                    emptyText={`${activityModeLabel} belum tersedia`}
+                    icon={<ClipboardList size={24} />}
+                    selectedName={activityFocus}
+                    onSelect={(item) => {
+                      setActivityFocus((current) => current === item.name ? "" : item.name);
+                      setMapSource("aktivitas");
+                    }}
+                  />
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-3">
+                  <ControlTabs
+                    dense
+                    value={activityView}
+                    onChange={(value) => {
+                      setActivityView(value);
+                      setActivityFocus("");
+                      setMapSource("aktivitas");
+                    }}
+                    items={[
+                      { value: "status", label: "Status", icon: CheckCircle2 },
+                      { value: "pilar", label: "Pilar", icon: Layers3 },
+                      { value: "tahun", label: "Tahun", icon: CalendarDays },
+                      { value: "wilayah", label: "Area", icon: Globe2 },
+                    ]}
+                  />
+
+                  <div className="min-h-0 flex-1 rounded-3xl border border-slate-100 bg-white p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Daftar</p>
+                      <span className="rounded-lg bg-cyan-50 px-2.5 py-1 text-[10px] font-black text-[#0AC4E0]">
+                        {activityFocusedItems.length}
+                      </span>
+                    </div>
+                    <div className="admin-scroll mt-3 max-h-[252px] space-y-2 overflow-y-auto pr-1">
+                      {activityFocusedItems.slice(0, 7).map((item, index) => (
+                        <div key={`${activityNameResolver(item)}-${index}`} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-3">
+                          <p className="break-words text-[10px] font-black leading-4 text-slate-700">
+                            {activityNameResolver(item)}
+                          </p>
+                          <div className="mt-2 flex items-center justify-between gap-3">
+                            <span className="text-[8px] font-black uppercase tracking-wide text-slate-400">
+                              {resolveItemYear(item)}
+                            </span>
+                            <StatusPill status={activityStatusResolver(item)} />
+                          </div>
+                        </div>
+                      ))}
+                      {activityFocusedItems.length === 0 && (
+                        <EmptyChart text="Tidak ada data" icon={<ClipboardList size={22} />} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </DashboardPanel>
+
+            <DashboardPanel
+              title="Binaan"
+              subtitle="Peta dan sekolah."
+              right={
+                <SegmentedSwitch
+                  value={mapSource}
+                  onChange={(value) => {
+                    setMapSource(value);
+                    setMapFocus("");
+                  }}
+                  items={[
+                    { value: "semua", label: "Semua" },
+                    { value: "aktivitas", label: activityMode === "program" ? "Program" : "Assess" },
+                    { value: "vendor", label: "Vendor" },
+                  ]}
+                />
+              }
+              bodyClassName="p-4 xl:p-5"
+            >
+              <div className="mb-4">
+                <ControlTabs
+                  value={mapView}
+                  onChange={(value) => {
+                    setMapView(value);
+                    setMapFocus("");
+                  }}
+                  items={[
+                    { value: "provinsi", label: "Prov.", icon: Globe2, count: provinceMarkers.length, color: WARNA.cyan },
+                    { value: "kabupaten", label: "Kab.", icon: Building2, count: countyGroups.length, color: WARNA.biru },
+                    { value: "jenjang", label: "Jenjang", icon: School, count: 3, color: WARNA.ungu },
+                  ]}
+                />
+              </div>
+
+              <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 2xl:grid-cols-[minmax(0,1.34fr)_minmax(380px,0.66fr)]">
+                <div className="admin-map-stage flex min-h-[640px] min-w-0 overflow-hidden rounded-3xl border border-slate-100 bg-slate-50">
+                  <CompactSchoolLeafletMap
+                    schools={mapDisplayedSchools}
+                    wilayahMap={wilayahMap}
+                    provinceMarkers={provinceMarkers}
+                    selectedWilayah={selectedWilayah}
+                    mapCenter={mapCenter}
+                    zoom={zoom}
+                    onSelectProvinsi={selectProvinsi}
+                    onSelectKabupaten={selectKabupaten}
+                    onResetFilter={resetMap}
+                  />
+                </div>
+
+                <aside className="grid min-w-0 items-start gap-4 lg:grid-cols-2 2xl:grid-cols-1">
+                  <div className="min-w-0 rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                    <div className="mb-3 flex items-start justify-between gap-3 px-1">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">Sebaran</p>
+                        <h3 className="mt-1 break-words text-[15px] font-black leading-5 text-slate-800">{mapFocus || scopeLabel}</h3>
+                      </div>
+                      <span className="shrink-0 rounded-xl bg-white px-3 py-2 text-[16px] font-black text-slate-800 shadow-sm">
+                        {mapSelected?.value ?? mapDisplayedSchools.length}
+                      </span>
+                    </div>
+                    <PieWithLegend
+                      compact
+                      data={mapChartData}
+                      emptyText="Sekolah belum terpetakan"
+                      icon={<MapPin size={24} />}
+                      selectedName={mapFocus}
+                      onSelect={handleMapChartSelect}
+                    />
+                  </div>
+
+                  <div className="min-w-0 rounded-3xl border border-slate-100 bg-white p-4 xl:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">Sekolah</p>
+                        <h3 className="mt-1 break-words text-[15px] font-black leading-5 text-slate-800">{scopeLabel}</h3>
+                      </div>
+                      <span className="shrink-0 rounded-xl bg-cyan-50 px-3 py-2 text-[13px] font-black text-[#0AC4E0]">
+                        {mapDisplayedSchools.length}
+                      </span>
+                    </div>
+
+                    <div className="admin-scroll mt-3 max-h-[232px] space-y-2 overflow-y-auto pr-1">
+                      {mapDisplayedSchools.slice(0, 8).map((school) => (
+                        <div key={ambilIdSekolah(school) || ambilNamaSekolah(school)} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+                          <p className="break-words text-[10px] font-black leading-4 text-slate-700">{ambilNamaSekolah(school)}</p>
+                          <p className="mt-1 text-[8px] font-bold uppercase tracking-wide text-slate-400">
+                            {ambilJenjangSekolah(school)} · {ambilKabupatenSekolah(school, wilayahMap)}
+                          </p>
+                        </div>
+                      ))}
+                      {mapDisplayedSchools.length === 0 && (
+                        <EmptyChart text="Sekolah tidak ditemukan" icon={<School size={22} />} />
+                      )}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {[
+                        ["SD", WARNA.cyan],
+                        ["SMP", WARNA.biru],
+                        ["SMK", WARNA.ungu],
+                      ].map(([level, color]) => (
+                        <div
+                          key={level}
+                          className="rounded-2xl border px-2 py-2.5 text-center"
+                          style={{ borderColor: `${color}2E`, backgroundColor: `${color}0D` }}
+                        >
+                          <p className="text-[8px] font-black uppercase tracking-wide" style={{ color }}>{level}</p>
+                          <p className="mt-1 text-[19px] font-black text-slate-800">
+                            {mapDisplayedSchools.filter((school) => normalisasiUpper(ambilJenjangSekolah(school)) === level).length}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </aside>
               </div>
             </DashboardPanel>
 
-            <ChartTableSection
-              hidden
-              title="Detail Sekolah Binaan Terpilih"
-              subtitle="Chart kiri dan tabel kanan mengikuti pilihan wilayah pada peta."
-              icon={<School size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Komposisi Jenjang"
-              tableTitle="List Sekolah pada Wilayah Terpilih"
-              chart={
-                <PieWithLegend
-                  data={schoolExplorerJenjang}
-                  emptyText="Belum ada sekolah pada wilayah ini"
-                  icon={<School size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={schoolExplorerList}
-                  getSearchText={(sekolah) =>
-                    `${ambilNamaSekolah(sekolah)} ${ambilJenjangSekolah(sekolah)} ${sekolah?.npsn || ""} ${ambilKabupatenSekolah(sekolah, wilayahMap)} ${ambilProvinsiSekolah(sekolah, wilayahMap)} ${statusLabel(sekolah)}`
-                  }
-                  searchPlaceholder="Cari sekolah, NPSN, jenjang, atau wilayah..."
-                  emptyText="Belum ada sekolah pada wilayah ini"
-                  columns={[
-                    {
-                      key: "sekolah",
-                      label: "Sekolah",
-                      render: (sekolah) => (
-                        <div>
-                          <p className="max-w-[260px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaSekolah(sekolah)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilJenjangSekolah(sekolah)} · NPSN {ambilNpsn(sekolah)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "wilayah",
-                      label: "Kabupaten",
-                      render: (sekolah) => (
-                        <p className="max-w-[180px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {ambilKabupatenSekolah(sekolah, wilayahMap)}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "provinsi",
-                      label: "Provinsi",
-                      render: (sekolah) => (
-                        <p className="max-w-[180px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {ambilProvinsiSekolah(sekolah, wilayahMap)}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (sekolah) => <StatusPill status={statusLabel(sekolah)} />,
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden
-              title="Coverage Kabupaten Binaan per Provinsi"
-              subtitle="Chart kiri menunjukkan jumlah kabupaten binaan; tabel kanan menunjukkan detail provinsi dan sekolah."
-              icon={<MapPin size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Kabupaten Binaan"
-              tableTitle="Detail Provinsi Binaan"
-              withTable
-              chart={
-                <ColumnBarMaster
-                  data={diagramWilayahCoverageProvinsi}
-                  emptyText="Belum ada coverage wilayah"
-                  icon={<MapPin size={24} />}
-                  barName="Kabupaten"
-                />
-              }
-              table={
-                <TableMini
-                  data={diagramWilayahCoverageProvinsi}
-                  getSearchText={(item) =>
-                    `${item?.name || ""} ${item?.value || ""} ${item?.sekolah || ""}`
-                  }
-                  searchPlaceholder="Cari provinsi atau jumlah coverage..."
-                  emptyText="Belum ada data provinsi binaan"
-                  columns={[
-                    {
-                      key: "provinsi",
-                      label: "Provinsi",
-                      render: (item) => (
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <p className="max-w-[220px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {item.name}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "kabupaten",
-                      label: "Kabupaten",
-                      render: (item) => (
-                        <p className="text-[11px] font-bold text-slate-500">
-                          {item.value}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "sekolah",
-                      label: "Sekolah",
-                      render: (item) => (
-                        <p className="text-[11px] font-bold text-slate-500">
-                          {item.sekolah}
-                        </p>
-                      ),
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden
-              title="Data Vendor"
-              subtitle="Filter kategori vendor di kanan akan ikut mengubah chart di kiri."
-              icon={<Factory size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Komposisi Vendor"
-              tableTitle="List Vendor"
-              filters={
-                <FilterButtonGroup
-                  options={VENDOR_FILTERS}
-                  value={vendorFilter}
-                  onChange={setVendorFilter}
-                  dark
-                />
-              }
-              chart={
-                <PieWithLegend
-                  data={vendorChartData}
-                  emptyText="Belum ada vendor sesuai filter"
-                  icon={<Factory size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={vendorTableData}
-                  getSearchText={(vendor) =>
-                    `${ambilNamaVendor(vendor)} ${vendor?.kontak || ""} ${vendor?.email || ""} ${tampilVendorCategory(getVendorCategory(vendor))} ${statusLabel(vendor)}`
-                  }
-                  searchPlaceholder="Cari vendor, kontak, kategori, atau status..."
-                  emptyText="Belum ada vendor sesuai filter"
-                  columns={[
-                    {
-                      key: "nama",
-                      label: "Vendor",
-                      render: (vendor) => (
-                        <div>
-                          <p className="max-w-[250px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaVendor(vendor)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilKontak(vendor)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "kategori",
-                      label: "Kategori",
-                      render: (vendor) => (
-                        <p className="max-w-[160px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                          {tampilVendorCategory(getVendorCategory(vendor))}
-                        </p>
-                      ),
-                    },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (vendor) => (
-                        <StatusPill status={statusLabel(vendor)} />
-                      ),
-                    },
-                  ]}
-                />
-              }
-            />
-
-            <ChartTableSection
-              hidden
-              title="Coverage Operator Sekolah"
-              subtitle="Kiri menampilkan coverage, kanan menampilkan daftar sekolah berdasarkan filter."
-              icon={<GraduationCap size={18} className="text-[#0AC4E0]" />}
-              chartTitle="Coverage Operator"
-              tableTitle="List Sekolah"
-              withTable
-              filters={
-                <FilterButtonGroup
-                  options={OPERATOR_FILTERS}
-                  value={operatorFilter}
-                  onChange={setOperatorFilter}
-                  dark
-                />
-              }
-              chart={
-                <PieWithLegend
-                  data={operatorCoverageChartData}
-                  emptyText="Belum ada coverage operator"
-                  icon={<GraduationCap size={24} />}
-                />
-              }
-              table={
-                <TableMini
-                  data={operatorTableSchools}
-                  getSearchText={(sekolah) => {
-                    const hasOperator = sekolahDenganOperatorIds.has(
-                      String(ambilIdSekolah(sekolah)),
-                    );
-
-                    return `${ambilNamaSekolah(sekolah)} ${ambilJenjangSekolah(sekolah)} ${resolveNamaWilayahSekolah(sekolah, wilayahMap)} ${hasOperator ? "Sudah Ada Operator" : "Belum Ada Operator"}`;
-                  }}
-                  searchPlaceholder="Cari sekolah, jenjang, wilayah, atau operator..."
-                  emptyText="Belum ada sekolah sesuai filter"
-                  columns={[
-                    {
-                      key: "sekolah",
-                      label: "Sekolah",
-                      render: (sekolah) => (
-                        <div>
-                          <p className="max-w-[250px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                            {ambilNamaSekolah(sekolah)}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-slate-400">
-                            {ambilJenjangSekolah(sekolah)} · {resolveNamaWilayahSekolah(sekolah, wilayahMap)}
-                          </p>
-                        </div>
-                      ),
-                    },
-                    {
-                      key: "operator",
-                      label: "Operator",
-                      render: (sekolah) => {
-                        const hasOperator = sekolahDenganOperatorIds.has(
-                          String(ambilIdSekolah(sekolah)),
-                        );
-
-                        return (
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${hasOperator
-                              ? "bg-emerald-50 text-emerald-600"
-                              : "bg-amber-50 text-amber-600"
-                              }`}
-                          >
-                            {hasOperator ? "Sudah Ada" : "Belum Ada"}
-                          </span>
-                        );
-                      },
-                    },
-                  ]}
-                />
-              }
-            />
-
             <DashboardPanel
-              hidden
-              title="Data User Terbaru"
-              subtitle="Tabel akun sistem terbaru. Gunakan filter role untuk melihat data spesifik."
-              className="min-h-[330px]"
-              bodyClassName="p-0"
-              right={<UsersRound size={18} className="text-[#0AC4E0]" />}
-            >
-              <div className="border-b border-slate-100 px-5 py-4">
-                <FilterButtonGroup
-                  options={ROLE_FILTERS}
-                  value={userTableRoleFilter}
-                  onChange={setUserTableRoleFilter}
-                  dark
+              title="Vendor"
+              subtitle="Kategori dan jangkauan."
+              right={
+                <SegmentedSwitch
+                  value={vendorGroup}
+                  onChange={(value) => {
+                    setVendorGroup(value);
+                    setVendorFocus("");
+                    setMapSource("vendor");
+                  }}
+                  items={[
+                    { value: "AKADEMIK", label: "Akad." },
+                    { value: "NON_AKADEMIK", label: "Nonak." },
+                  ]}
                 />
-              </div>
+              }
+              bodyClassName="p-4 xl:p-5"
+            >
+              <div className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,1.16fr)_minmax(330px,0.84fr)]">
+                <div className="min-w-0 rounded-3xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">Vendor</p>
+                      <h3 className="mt-1 break-words text-[16px] font-black leading-5 text-slate-800">
+                        {vendorSelected?.name || (vendorGroup === "AKADEMIK" ? "Akademik" : "Non Akademik")}
+                      </h3>
+                    </div>
+                    <span className="shrink-0 rounded-xl bg-white px-3 py-2 text-[17px] font-black text-slate-800 shadow-sm">
+                      {vendorSelected?.value ?? vendorGroupVendors.length}
+                    </span>
+                  </div>
+                  <PieWithLegend
+                    data={vendorChartData}
+                    emptyText="Vendor belum tersedia"
+                    icon={<Factory size={24} />}
+                    selectedName={vendorFocus}
+                    onSelect={(item) => {
+                      setVendorFocus((current) => current === item.name ? "" : item.name);
+                      setMapSource("vendor");
+                    }}
+                  />
+                </div>
 
-              <TableMini
-                data={userTableData}
-                getSearchText={(user) =>
-                  `${ambilNamaUser(user)} ${user?.email || ""} ${ambilNamaRole(user)} ${user?.jabatan || ""} ${user?.jenis || ""} ${user?.sub_jenis || ""} ${resolveNamaWilayahUser(user, wilayahMap)} ${statusLabel(user)}`
-                }
-                searchPlaceholder="Cari nama, email, role, jabatan, wilayah, atau status..."
-                emptyText="Belum ada user terbaru"
-                maxHeight="max-h-[420px]"
-                columns={[
-                  {
-                    key: "user",
-                    label: "User",
-                    render: (user) => (
-                      <div>
-                        <p className="max-w-[320px] break-words whitespace-normal text-[12px] font-black text-slate-700">
-                          {ambilNamaUser(user)}
-                        </p>
-                        <p className="mt-1 text-[10px] font-bold text-slate-400">
-                          {ambilEmail(user)}
+                <div className="flex min-w-0 flex-col gap-3">
+                  <ControlTabs
+                    value={vendorView}
+                    onChange={(value) => {
+                      setVendorView(value);
+                      setVendorFocus("");
+                      setMapSource("vendor");
+                    }}
+                    items={[
+                      { value: "status", label: "Status", icon: ShieldCheck, count: vendorGroupVendors.length },
+                      { value: "program", label: "Program", icon: LayoutDashboard, count: vendorPrograms.length },
+                      { value: "wilayah", label: "Area", icon: MapPin, count: vendorSchools.length },
+                    ]}
+                  />
+
+                  <div className="grid flex-1 grid-cols-2 gap-3">
+                    {[
+                      ["Vendor", vendorGroupVendors.length, Factory, WARNA.orange],
+                      ["Aktif", vendorGroupVendors.filter(isDataAktif).length, ShieldCheck, WARNA.hijau],
+                      ["Program", vendorPrograms.length, LayoutDashboard, WARNA.biru],
+                      ["Sekolah", vendorSchools.length, School, WARNA.cyan],
+                    ].map(([label, value, Icon, color]) => (
+                      <div key={label} className="rounded-3xl border border-slate-100 bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-50" style={{ color }}>
+                            <Icon size={16} />
+                          </span>
+                          <span className="text-[23px] font-black text-slate-800">{value}</span>
+                        </div>
+                        <p className="mt-3 text-[8px] font-black uppercase tracking-wide text-slate-400">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="rounded-3xl border border-cyan-100 bg-gradient-to-r from-cyan-50 via-white to-sky-50 px-4 py-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">Fokus</p>
+                        <p className="mt-1 truncate text-[13px] font-black text-slate-800">
+                          {vendorSelected?.name || (vendorGroup === "AKADEMIK" ? "Akademik" : "Non Akademik")}
                         </p>
                       </div>
-                    ),
-                  },
-                  {
-                    key: "role",
-                    label: "Role",
-                    render: (user) => {
-                      const idRole = ambilIdRole(user);
-
-                      return (
-                        <span
-                          className="inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white"
-                          style={{
-                            backgroundColor: ROLE_COLOR[idRole] || WARNA.slate,
-                          }}
-                        >
-                          {ambilNamaRole(user)}
-                        </span>
-                      );
-                    },
-                  },
-                  {
-                    key: "jabatan",
-                    label: "Jabatan",
-                    render: (user) => (
-                      <p className="max-w-[180px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                        {ambilJabatan(user)}
-                      </p>
-                    ),
-                  },
-                  {
-                    key: "wilayah",
-                    label: "Wilayah",
-                    render: (user) => (
-                      <p className="max-w-[180px] break-words whitespace-normal text-[11px] font-bold text-slate-500">
-                        {resolveNamaWilayahUser(user, wilayahMap)}
-                      </p>
-                    ),
-                  },
-                  {
-                    key: "status",
-                    label: "Status",
-                    render: (user) => <StatusPill status={statusLabel(user)} />,
-                  },
-                ]}
-              />
-            </DashboardPanel>
-
-            <DashboardPanel
-              hidden
-              title="Peta Sekolah Binaan"
-              right={<MapPin size={18} className="text-[#0AC4E0]" />}
-              className="min-h-[660px]"
-              bodyClassName="p-5"
-            >
-              <CompactSchoolLeafletMap
-                schools={schoolExplorerList}
-                wilayahMap={wilayahMap}
-                provinceMarkers={provinceMapMarkers}
-                selectedWilayah={selectedWilayah}
-                mapCenter={mapCenter}
-                zoom={zoom}
-                onSelectProvinsi={selectProvinsi}
-                onSelectKabupaten={selectKabupaten}
-                onResetFilter={resetFilterMap}
-              />
+                      <div className="rounded-2xl bg-white px-3 py-2 text-right shadow-sm">
+                        <p className="text-[24px] font-black leading-none text-slate-800">{activeVendors}</p>
+                        <p className="mt-1 text-[8px] font-black uppercase tracking-wide text-slate-400">aktif</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </DashboardPanel>
           </div>
         </main>
@@ -6729,4 +6597,3 @@ export default function DashboardAdmin() {
     </>
   );
 }
-
