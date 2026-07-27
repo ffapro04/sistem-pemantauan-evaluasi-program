@@ -46,27 +46,80 @@ function normalizeAssessmentJenisKey(value?: string) {
     .replace(/[-\s]+/g, '_');
 }
 
-function getAssessmentDeadline(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
+type AssessmentTiming = Pick<
+  Assessment,
+  'sent_at' | 'tenggat' | 'aktif' | 'paused_at' | 'total_paused_seconds'
+>;
+
+const SECOND_MS = 1000;
+const DAY_MS = 24 * 60 * 60 * SECOND_MS;
+
+function getAssessmentBaseDeadline(assessment: AssessmentTiming) {
   if (!assessment.sent_at) return null;
 
-  const deadline = new Date(assessment.sent_at);
-  if (Number.isNaN(deadline.getTime())) return null;
+  const sentAt = new Date(assessment.sent_at);
+  if (Number.isNaN(sentAt.getTime())) return null;
 
-  deadline.setDate(deadline.getDate() + Number(assessment.tenggat ?? 7));
-  return deadline;
+  const durationMs = Number(assessment.tenggat ?? 7) * DAY_MS;
+  const pausedMs =
+    Math.max(0, Number(assessment.total_paused_seconds || 0)) * SECOND_MS;
+
+  return new Date(sentAt.getTime() + durationMs + pausedMs);
 }
 
-function getAssessmentRemainingDays(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
-  const deadline = getAssessmentDeadline(assessment);
-  if (!deadline) return null;
+function getAssessmentReferenceTime(
+  assessment: AssessmentTiming,
+  nowMs = Date.now(),
+) {
+  if (assessment.aktif === false && assessment.paused_at) {
+    const pausedAt = new Date(assessment.paused_at).getTime();
+    if (!Number.isNaN(pausedAt)) return pausedAt;
+  }
 
-  const diff = deadline.getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  return nowMs;
 }
 
-function isAssessmentExpired(assessment: Pick<Assessment, 'sent_at' | 'tenggat'>) {
-  const deadline = getAssessmentDeadline(assessment);
-  return Boolean(deadline && Date.now() > deadline.getTime());
+function getAssessmentRemainingSeconds(
+  assessment: AssessmentTiming,
+  nowMs = Date.now(),
+) {
+  const baseDeadline = getAssessmentBaseDeadline(assessment);
+  if (!baseDeadline) return null;
+
+  const referenceMs = getAssessmentReferenceTime(assessment, nowMs);
+  return Math.max(
+    0,
+    Math.ceil((baseDeadline.getTime() - referenceMs) / SECOND_MS),
+  );
+}
+
+function getAssessmentDeadline(
+  assessment: AssessmentTiming,
+  nowMs = Date.now(),
+) {
+  const baseDeadline = getAssessmentBaseDeadline(assessment);
+  if (!baseDeadline) return null;
+
+  if (assessment.aktif === false && assessment.paused_at) {
+    const pausedAt = new Date(assessment.paused_at).getTime();
+    if (!Number.isNaN(pausedAt)) {
+      return new Date(baseDeadline.getTime() + Math.max(0, nowMs - pausedAt));
+    }
+  }
+
+  return baseDeadline;
+}
+
+function getAssessmentRemainingDays(assessment: AssessmentTiming) {
+  const remainingSeconds = getAssessmentRemainingSeconds(assessment);
+  if (remainingSeconds === null) return null;
+
+  return Math.max(0, Math.ceil(remainingSeconds / (24 * 60 * 60)));
+}
+
+function isAssessmentExpired(assessment: AssessmentTiming) {
+  const remainingSeconds = getAssessmentRemainingSeconds(assessment);
+  return remainingSeconds !== null && remainingSeconds <= 0;
 }
 
 @Injectable()
@@ -372,7 +425,9 @@ export class AssessmentService {
     questions.forEach((question, index) => {
       const text = String(question?.question || '').trim();
       const options = Array.isArray(question?.options)
-        ? question.options.map((option) => String(option || '').trim()).filter(Boolean)
+        ? question.options
+            .map((option) => String(option || '').trim())
+            .filter(Boolean)
         : [];
 
       if (!text) {
@@ -402,6 +457,8 @@ export class AssessmentService {
             status: 'Siap Diajukan',
             aktif: true,
             sent_at: null,
+            paused_at: null,
+            total_paused_seconds: 0,
           }),
         );
 
@@ -473,6 +530,10 @@ export class AssessmentService {
         'a.status AS status',
         'a.aktif AS aktif',
         'a.sent_at AS sent_at',
+        'a.paused_at AS paused_at',
+        'a.total_paused_seconds AS total_paused_seconds',
+        'a.created_at AS created_at',
+        'a.updated_at AS updated_at',
         'a.tenggat AS tenggat',
         'a.jenis AS jenis',
         'a.pilar AS pilar',
@@ -566,8 +627,15 @@ export class AssessmentService {
       const jumlahPengisi = Number(row.jumlah_pengisi || 0);
       const jumlahGuruTarget = Number(row.jumlah_guru_target || 0);
 
+      const timing = row as AssessmentTiming;
+      const remainingSeconds = getAssessmentRemainingSeconds(timing);
+
       return {
         ...row,
+        total_paused_seconds: Number(row.total_paused_seconds || 0),
+        remaining_seconds: remainingSeconds,
+        deadline: getAssessmentDeadline(timing),
+        is_paused: Boolean(row.sent_at && row.aktif === false),
         jumlah_pengisi: jumlahPengisi,
         jumlah_guru_target: jumlahGuruTarget,
         belum_mengisi: Math.max(jumlahGuruTarget - jumlahPengisi, 0),
@@ -595,13 +663,8 @@ export class AssessmentService {
       order: { urutan: 'ASC' },
     });
 
-    const tanggalSelesai = assessment.sent_at
-      ? new Date(
-          new Date(assessment.sent_at).setDate(
-            new Date(assessment.sent_at).getDate() + (assessment.tenggat ?? 7),
-          ),
-        )
-      : null;
+    const tanggalSelesai = getAssessmentDeadline(assessment);
+    const remainingSeconds = getAssessmentRemainingSeconds(assessment);
 
     const result = {
       id_assessment: assessment.id_assessment,
@@ -610,6 +673,10 @@ export class AssessmentService {
       status: assessment.status,
       aktif: assessment.aktif,
       sent_at: assessment.sent_at,
+      paused_at: assessment.paused_at,
+      total_paused_seconds: assessment.total_paused_seconds || 0,
+      remaining_seconds: remainingSeconds,
+      is_paused: Boolean(assessment.sent_at && !assessment.aktif),
       tenggat: assessment.tenggat,
       jenis: assessment.jenis,
       pilar:
@@ -764,19 +831,18 @@ export class AssessmentService {
 
     const belumMengisi = Math.max(totalResponden - sudahMengisi, 0);
 
-    const deadline = assessment.sent_at
-      ? new Date(
-          new Date(assessment.sent_at).setDate(
-            new Date(assessment.sent_at).getDate() + (assessment.tenggat ?? 7),
-          ),
-        )
-      : null;
+    const deadline = getAssessmentDeadline(assessment);
+    const remainingSeconds = getAssessmentRemainingSeconds(assessment);
 
     return {
       id_assessment: assessment.id_assessment,
       nama_assessment: assessment.nama,
       jenis: assessment.jenis,
       sent_at: assessment.sent_at || null,
+      paused_at: assessment.paused_at || null,
+      total_paused_seconds: assessment.total_paused_seconds || 0,
+      remaining_seconds: remainingSeconds,
+      is_paused: Boolean(assessment.sent_at && !assessment.aktif),
       tenggat: assessment.tenggat || 7,
       deadline,
 
@@ -864,6 +930,18 @@ export class AssessmentService {
 
     if (!assessment) {
       throw new NotFoundException('Assessment tidak ditemukan');
+    }
+
+    if (!assessment.sent_at) {
+      throw new BadRequestException(
+        'Assessment belum dikirim dan belum dapat menerima hasil.',
+      );
+    }
+
+    if (!assessment.aktif) {
+      throw new BadRequestException(
+        'Assessment sedang pending. Lanjutkan assessment sebelum import hasil.',
+      );
     }
 
     if (isAssessmentExpired(assessment)) {
@@ -1150,9 +1228,21 @@ export class AssessmentService {
       throw new NotFoundException('Assessment tidak ditemukan');
     }
 
+    if (!assessment.sent_at) {
+      throw new BadRequestException(
+        'Assessment belum dikirim dan belum dapat diisi.',
+      );
+    }
+
     if (!assessment.aktif) {
       throw new BadRequestException(
         'Assessment sedang pending. Guru belum bisa mengisi assessment ini.',
+      );
+    }
+
+    if (isAssessmentExpired(assessment)) {
+      throw new BadRequestException(
+        'Tenggat assessment sudah selesai. Jawaban tidak bisa dikirim lagi.',
       );
     }
 
@@ -1271,6 +1361,8 @@ export class AssessmentService {
           'a.status AS status',
           'a.aktif AS aktif',
           'a.sent_at AS sent_at',
+          'a.paused_at AS paused_at',
+          'a.total_paused_seconds AS total_paused_seconds',
           'a.tenggat AS tenggat',
           'a.jenis AS jenis',
           'a.pilar AS pilar',
@@ -1287,8 +1379,10 @@ export class AssessmentService {
         const deadline = getAssessmentDeadline(a as any);
         const isExpired = isAssessmentExpired(a as any);
         a.deadline = deadline;
+        a.remaining_seconds = getAssessmentRemainingSeconds(a as any);
         a.sisa_hari = getAssessmentRemainingDays(a as any);
         a.is_expired = isExpired;
+        a.is_paused = Boolean(a.sent_at && a.aktif === false);
         a.status_display = isExpired ? 'Selesai' : a.status;
 
         const pertanyaan = await this.pertanyaanRepo.find({
@@ -1326,8 +1420,17 @@ export class AssessmentService {
       throw new NotFoundException('Assessment tidak ditemukan');
     }
 
+    if (assessment.sent_at) {
+      throw new BadRequestException('Assessment sudah pernah dikirim.');
+    }
+
+    const now = new Date();
     assessment.status = 'Proses Pengisian';
-    assessment.sent_at = new Date();
+    assessment.sent_at = now;
+    assessment.aktif = true;
+    assessment.paused_at = null;
+    assessment.total_paused_seconds = 0;
+    assessment.updated_at = now;
 
     await this.assessmentRepo.save(assessment);
     await this.notifyAssessmentSent(assessment).catch((error) => {
@@ -1337,6 +1440,13 @@ export class AssessmentService {
 
     return {
       message: 'Assessment berhasil dikirim',
+      aktif: assessment.aktif,
+      sent_at: assessment.sent_at,
+      paused_at: assessment.paused_at,
+      total_paused_seconds: assessment.total_paused_seconds,
+      remaining_seconds: getAssessmentRemainingSeconds(assessment),
+      deadline: getAssessmentDeadline(assessment),
+      status_pengisian: 'Proses Pengisian',
     };
   }
 
@@ -1349,8 +1459,51 @@ export class AssessmentService {
       throw new NotFoundException('Assessment tidak ditemukan');
     }
 
-    assessment.aktif = !assessment.aktif;
+    if (!assessment.sent_at) {
+      throw new BadRequestException(
+        'Assessment belum dikirim sehingga belum dapat dipending.',
+      );
+    }
 
+    if (isAssessmentExpired(assessment)) {
+      throw new BadRequestException(
+        'Assessment sudah selesai atau tenggatnya telah habis.',
+      );
+    }
+
+    const normalizedStatus = String(assessment.status || '').toLowerCase();
+    if (normalizedStatus.includes('selesai')) {
+      throw new BadRequestException(
+        'Assessment yang sudah selesai tidak dapat diubah.',
+      );
+    }
+
+    const now = new Date();
+
+    if (assessment.aktif) {
+      assessment.aktif = false;
+      assessment.paused_at = now;
+      assessment.status = 'Pending';
+    } else {
+      if (assessment.paused_at) {
+        const pausedAtMs = new Date(assessment.paused_at).getTime();
+        if (!Number.isNaN(pausedAtMs)) {
+          const pausedDurationSeconds = Math.max(
+            0,
+            Math.floor((now.getTime() - pausedAtMs) / SECOND_MS),
+          );
+          assessment.total_paused_seconds =
+            Number(assessment.total_paused_seconds || 0) +
+            pausedDurationSeconds;
+        }
+      }
+
+      assessment.aktif = true;
+      assessment.paused_at = null;
+      assessment.status = 'Proses Pengisian';
+    }
+
+    assessment.updated_at = now;
     await this.assessmentRepo.save(assessment);
 
     return {
@@ -1358,7 +1511,12 @@ export class AssessmentService {
         ? 'Assessment berhasil dilanjutkan'
         : 'Assessment berhasil dipending',
       aktif: assessment.aktif,
-      status_pengisian: assessment.aktif ? 'Lanjut' : 'Pending',
+      status: assessment.status,
+      paused_at: assessment.paused_at,
+      total_paused_seconds: assessment.total_paused_seconds || 0,
+      remaining_seconds: getAssessmentRemainingSeconds(assessment),
+      deadline: getAssessmentDeadline(assessment),
+      status_pengisian: assessment.aktif ? 'Proses Pengisian' : 'Pending',
     };
   }
 }

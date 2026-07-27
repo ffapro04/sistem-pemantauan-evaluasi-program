@@ -4,44 +4,27 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import {
-    ArrowRight,
     BadgeCheck,
-    BriefcaseBusiness,
     CheckCircle2,
-    ChevronLeft,
-    ChevronRight,
-    Clock3,
-    Eye,
-    FileClock,
     FolderOpen,
-    Gauge,
     Layers3,
     RefreshCcw,
     School,
-    Search,
-    UploadCloud,
-    UserCheck,
+    Star,
 } from "lucide-react";
+import {
+    Cell,
+    Pie,
+    PieChart,
+    Tooltip,
+} from "recharts";
 
-import { Sidebar, PageWrapper, Button, Input } from "../common";
+import { Sidebar, PageWrapper, Button } from "../common";
+import Dropdown from "../Dropdown";
+import SafeResponsiveContainer from "../charts/SafeResponsiveContainer";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
-
-function getVendorInitials(vendor) {
-    const source =
-        vendor?.nama_vendor ||
-        vendor?.pj_1 ||
-        vendor?.user?.nama ||
-        "Vendor";
-
-    return String(source)
-        .split(" ")
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((word) => word.charAt(0).toUpperCase())
-        .join("");
-}
+const API_BASE_URL = "http://localhost:3000";
+const COLORS = ["#0AC4E0", "#2563EB", "#7C3AED", "#F97316", "#10B981", "#64748B", "#EC4899", "#F59E0B"];
 
 function normalizeArray(payload) {
     if (Array.isArray(payload?.data)) return payload.data;
@@ -53,933 +36,574 @@ function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
 }
 
-function getRequirementFile(requirement) {
-    return (
-        requirement?.file ||
-        requirement?.file_url ||
-        requirement?.file_path ||
-        requirement?.path ||
-        requirement?.file_mou ||
-        null
-    );
-}
-
-function getRequirementStatus(requirement) {
-    const currentStatus = String(requirement?.status || "").toUpperCase();
-
-    if (currentStatus === "APPROVED") return "APPROVED";
-    if (currentStatus === "REJECTED") return "REJECTED";
-    if (currentStatus === "WAITING_HO") return "WAITING_HO";
-
-    if (getRequirementFile(requirement)) return "WAITING_HO";
-
-    return "WAITING_UPLOAD";
-}
-
 function getProgramVendorIds(program) {
-    if (Array.isArray(program?.vendor_ids)) {
-        return program.vendor_ids.map(String);
-    }
-
-    if (Array.isArray(program?.id_vendor)) {
-        return program.id_vendor.map(String);
-    }
-
-    if (program?.id_vendor) {
-        return [String(program.id_vendor)];
-    }
-
+    if (Array.isArray(program?.vendor_ids)) return program.vendor_ids.map(String);
+    if (Array.isArray(program?.id_vendor)) return program.id_vendor.map(String);
+    if (program?.id_vendor) return [String(program.id_vendor)];
     return [];
 }
 
-function getProgramRequirements(program) {
-    const fases = getArray(program?.fases);
-
-    return fases.flatMap((fase) => {
-        const terminList = getArray(fase.termin, fase.termins, fase.t_termin);
-
-        const kegiatanList = getArray(
-            fase.kegiatans,
-            fase.kegiatan,
-            fase.t_kegiatans,
-        );
-
-        const terminRequirements = terminList.flatMap((termin) =>
-            getArray(
-                termin.persyaratan,
-                termin.persyaratan_termin,
-                termin.requirements,
-                termin.t_persyaratan_termin,
-            ).map((item) => ({
-                ...item,
-                parentType: "termin",
-            })),
-        );
-
-        const kegiatanRequirements = kegiatanList.flatMap((kegiatan) =>
-            getArray(
-                kegiatan.persyaratan,
-                kegiatan.persyaratan_kegiatan,
-                kegiatan.requirements,
-                kegiatan.t_persyaratan_kegiatan,
-            ).map((item) => ({
-                ...item,
-                parentType: "kegiatan",
-            })),
-        );
-
-        return [...terminRequirements, ...kegiatanRequirements];
-    });
+function getProgramSchoolIds(program) {
+    const ids = getArray(program?.sekolah_ids, program?.target_sekolah_ids).map(String);
+    if (program?.id_sekolah) ids.push(String(program.id_sekolah));
+    return [...new Set(ids)];
 }
 
-function getProgramProgress(program) {
-    const requirements = getProgramRequirements(program);
+function getProgramPillar(program) {
+    const raw = String(
+        program?.pilar ||
+        program?.kategori_program ||
+        program?.sub_kategori ||
+        program?.kategori ||
+        "Belum ditentukan",
+    ).trim();
 
-    const total = requirements.length;
-
-    const approved = requirements.filter(
-        (item) => getRequirementStatus(item) === "APPROVED",
-    ).length;
-
-    const waitingHo = requirements.filter(
-        (item) => getRequirementStatus(item) === "WAITING_HO",
-    ).length;
-
-    const waitingUpload = requirements.filter(
-        (item) => getRequirementStatus(item) === "WAITING_UPLOAD",
-    ).length;
-
-    const rejected = requirements.filter(
-        (item) => getRequirementStatus(item) === "REJECTED",
-    ).length;
-
-    const actionable = waitingUpload + rejected;
-
-    return {
-        total,
-        approved,
-        waitingHo,
-        waitingUpload,
-        rejected,
-        actionable,
-        percentage: total ? Math.round((approved / total) * 100) : 0,
-    };
+    const normalized = raw.toLowerCase().replace(/[_-]+/g, " ");
+    if (normalized.includes("akademik") && !normalized.includes("non")) return "Akademik";
+    if (normalized.includes("karakter")) return "Karakter";
+    if (normalized.includes("seni")) return "Seni Budaya";
+    if (normalized.includes("kecakapan")) return "Kecakapan Hidup";
+    return raw || "Belum ditentukan";
 }
 
-function getPhaseRows(fase) {
-    const terminList = getArray(fase.termin, fase.termins, fase.t_termin);
+function getProgramYear(program) {
+    return String(program?.tahun || program?.tahun_program || program?.periode || "-");
+}
 
-    const kegiatanList = getArray(
-        fase.kegiatans,
-        fase.kegiatan,
-        fase.t_kegiatans,
-    );
+function normalizeVendorCategory(vendor) {
+    const raw = String(
+        vendor?.kategori ||
+        vendor?.pilar ||
+        vendor?.jenis_vendor ||
+        vendor?.kategori_vendor ||
+        "",
+    )
+        .trim()
+        .toLowerCase()
+        .replace(/[_-]+/g, " ");
 
-    const openingRows = terminList.map((termin) => {
-        const requirements = getArray(
-            termin.persyaratan,
-            termin.persyaratan_termin,
-            termin.requirements,
-            termin.t_persyaratan_termin,
-        );
+    if (raw.includes("non") && raw.includes("akademik")) return "NON_AKADEMIK";
+    if (raw.includes("akademik")) return "AKADEMIK";
+    return "UNKNOWN";
+}
 
-        return {
-            type: "termin",
-            requirements,
-        };
+function getVendorPillarOptions(vendor, programs = []) {
+    const category = normalizeVendorCategory(vendor);
+    if (category === "AKADEMIK") return ["Akademik", "Karakter"];
+    if (category === "NON_AKADEMIK") return ["Seni Budaya", "Kecakapan Hidup"];
+
+    const canonical = ["Akademik", "Karakter", "Seni Budaya", "Kecakapan Hidup"];
+    const available = new Set(programs.map(getProgramPillar));
+    return canonical.filter((pillar) => available.has(pillar));
+}
+
+function normalizeGradeLevel(value) {
+    const raw = String(value || "").trim().toUpperCase();
+    if (/\bSD\b|SEKOLAH DASAR/.test(raw)) return "SD";
+    if (/\bSMP\b|SEKOLAH MENENGAH PERTAMA/.test(raw)) return "SMP";
+    if (/\bSMK\b|SEKOLAH MENENGAH KEJURUAN/.test(raw)) return "SMK";
+    return "";
+}
+
+function getProgramGradeLevels(program, schools = []) {
+    const levels = new Set();
+    const directValues = [
+        program?.jenjang,
+        program?.jenjang_sekolah,
+        ...(Array.isArray(program?.jenjang_ids) ? program.jenjang_ids : []),
+        ...(Array.isArray(program?.jenjangs) ? program.jenjangs : []),
+    ];
+
+    directValues.forEach((value) => {
+        const normalized = normalizeGradeLevel(value);
+        if (normalized) levels.add(normalized);
     });
 
-    const innerRows = kegiatanList.map((kegiatan) => {
-        const requirements = getArray(
-            kegiatan.persyaratan,
-            kegiatan.persyaratan_kegiatan,
-            kegiatan.requirements,
-            kegiatan.t_persyaratan_kegiatan,
+    const schoolIds = new Set(getProgramSchoolIds(program));
+    schools.forEach((school) => {
+        if (!schoolIds.has(String(school?.id_sekolah))) return;
+        const normalized = normalizeGradeLevel(
+            school?.jenjang || school?.tingkat || school?.jenis_sekolah,
         );
-
-        return {
-            type: "kegiatan",
-            requirements,
-        };
+        if (normalized) levels.add(normalized);
     });
 
-    return {
-        openingRows,
-        innerRows,
-    };
+    return [...levels];
 }
 
-function isRowApproved(row) {
-    if (!row?.requirements?.length) return false;
-
-    return row.requirements.every(
-        (item) => getRequirementStatus(item) === "APPROVED",
-    );
+function getProgramStatus(program) {
+    const raw = String(program?.status_program || program?.status || "Belum ditentukan")
+        .trim()
+        .toLowerCase();
+    if (raw.includes("approval")) return "Approval";
+    if (raw.includes("sosialisasi")) return "Sosialisasi";
+    if (raw.includes("implementasi")) return "Implementasi";
+    if (raw.includes("evaluasi")) return "Evaluasi";
+    if (raw.includes("selesai") || raw.includes("complete")) return "Selesai";
+    return raw ? raw.replace(/\b\w/g, (char) => char.toUpperCase()) : "Belum ditentukan";
 }
 
-function isPhaseCompleted(fase) {
-    const { openingRows, innerRows } = getPhaseRows(fase);
+function getProgramRating(program) {
+    const candidates = [
+        program?.rating_program,
+        program?.rating,
+        program?.nilai_rating,
+        program?.average_rating,
+        program?.rata_rata_rating,
+        program?.evaluasi?.rating,
+    ];
+    const value = candidates.map(Number).find((item) => Number.isFinite(item) && item >= 0);
+    if (!Number.isFinite(value)) return null;
+    return Math.min(value, 5);
+}
 
-    if (!openingRows.length || !innerRows.length) return false;
+function getVendorName(vendor, fallback) {
+    return vendor?.nama_vendor || vendor?.nama || fallback || "Vendor";
+}
+
+function groupCounts(items, keyGetter) {
+    const map = new Map();
+    items.forEach((item) => {
+        const key = keyGetter(item) || "Belum ditentukan";
+        map.set(key, (map.get(key) || 0) + 1);
+    });
+    return [...map.entries()]
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+}
+
+function SummaryCard({ label, value, helper, icon, tone = "cyan" }) {
+    const color = {
+        cyan: "#0AC4E0",
+        blue: "#2563EB",
+        emerald: "#10B981",
+        amber: "#F59E0B",
+    }[tone] || "#0AC4E0";
 
     return (
-        openingRows.every((row) => isRowApproved(row)) &&
-        innerRows.every((row) => isRowApproved(row))
-    );
-}
-
-function isOpeningCompleted(fase) {
-    const { openingRows } = getPhaseRows(fase);
-
-    if (!openingRows.length) return false;
-
-    return openingRows.every((row) => isRowApproved(row));
-}
-
-function getActivePhaseInfo(program) {
-    const fases = getArray(program?.fases);
-
-    if (!fases.length) {
-        return {
-            label: "Belum ada fase",
-            index: 0,
-            totalPhase: 0,
-            isLocked: true,
-            openingDone: false,
-            completed: false,
-        };
-    }
-
-    const activeIndex = fases.findIndex((fase, index) => {
-        const previousCompleted =
-            index === 0 ||
-            fases.slice(0, index).every((item) => isPhaseCompleted(item));
-
-        if (!previousCompleted) return false;
-
-        return !isPhaseCompleted(fase);
-    });
-
-    const index = activeIndex === -1 ? fases.length - 1 : activeIndex;
-    const fase = fases[index];
-
-    return {
-        label: fase?.nama_fase || `Fase ${index + 1}`,
-        index: index + 1,
-        totalPhase: fases.length,
-        isLocked:
-            index > 0 &&
-            !fases.slice(0, index).every((item) => isPhaseCompleted(item)),
-        openingDone: isOpeningCompleted(fase),
-        completed: isPhaseCompleted(fase),
-    };
-}
-
-function getProgramProcessStatus(program) {
-    const progress = getProgramProgress(program);
-    const activePhase = getActivePhaseInfo(program);
-
-    if (!progress.total) {
-        return {
-            label: "Belum Ada Dokumen",
-            className: "border-slate-100 bg-slate-50 text-slate-400",
-        };
-    }
-
-    if (progress.rejected > 0) {
-        return {
-            label: "Perlu Revisi",
-            className: "border-red-100 bg-red-50 text-red-500",
-        };
-    }
-
-    if (progress.waitingUpload > 0) {
-        return {
-            label: activePhase.openingDone
-                ? "Perlu Upload Bukti"
-                : "Upload Administrasi",
-            className: "border-cyan-100 bg-cyan-50 text-[#0AC4E0]",
-        };
-    }
-
-    if (progress.waitingHo > 0) {
-        return {
-            label: "Menunggu HO",
-            className: "border-amber-100 bg-amber-50 text-amber-600",
-        };
-    }
-
-    if (progress.approved === progress.total) {
-        return {
-            label: "Selesai",
-            className: "border-emerald-100 bg-emerald-50 text-emerald-600",
-        };
-    }
-
-    return {
-        label: "Berjalan",
-        className: "border-slate-100 bg-slate-50 text-slate-500",
-    };
-}
-
-function ProgressBar({ value }) {
-    return (
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-            <div
-                className="h-full rounded-full bg-[#0AC4E0] transition-all"
-                style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-            />
-        </div>
-    );
-}
-
-function StatCard({ label, value, helper, icon, tone = "cyan" }) {
-    const toneClass =
-        tone === "amber"
-            ? "bg-amber-50 text-amber-600"
-            : tone === "emerald"
-                ? "bg-emerald-50 text-emerald-600"
-                : tone === "red"
-                    ? "bg-red-50 text-red-500"
-                    : "bg-cyan-50 text-[#0AC4E0]";
-
-    return (
-        <div className="min-h-0 rounded-[1.35rem] border border-cyan-100 bg-white p-4 shadow-[0_14px_38px_rgba(10,196,224,0.08)]">
-            <div className="flex items-center justify-between gap-3">
+        <article className="relative min-h-[102px] overflow-hidden border-r border-slate-100 bg-white px-5 py-4 last:border-r-0">
+            <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: color }} />
+            <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                    <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    <p
+                        className="truncate text-[10px] font-black uppercase tracking-[0.14em]"
+                        style={{ color }}
+                    >
                         {label}
                     </p>
-
-                    <p className="mt-2 text-[28px] font-black leading-none text-slate-900">
+                    <p className="mt-2 text-[31px] font-black leading-none tracking-[-0.05em] text-slate-800">
                         {value}
                     </p>
-
-                    <p className="mt-1 truncate text-[12px] font-bold text-slate-500">
+                    <p className="mt-2 truncate text-[10px] font-semibold text-slate-400">
                         {helper}
                     </p>
                 </div>
-
                 <div
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: `${color}16`, color }}
                 >
                     {icon}
                 </div>
             </div>
-        </div>
+        </article>
     );
 }
 
-function StatusBadge({ status }) {
+function ChartLegend({ data, total, valueSuffix = "program" }) {
     return (
-        <span
-            className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${status.className}`}
-        >
-            {status.label}
-        </span>
-    );
-}
-
-function MiniStatus({ label, value }) {
-    return (
-        <div className="rounded-xl bg-slate-50 px-2 py-2 text-center">
-            <p className="text-[13px] font-black leading-none text-slate-800">
-                {value}
-            </p>
-
-            <p className="mt-1 text-[7px] font-black uppercase tracking-widest text-slate-300">
-                {label}
-            </p>
-        </div>
-    );
-}
-
-function InfoPill({ icon, label }) {
-    return (
-        <div className="flex min-w-0 items-center gap-2 rounded-xl bg-cyan-50/60 px-3 py-2 text-[#0AC4E0]">
-            <span className="shrink-0">{icon}</span>
-
-            <p className="truncate text-[10px] font-bold text-slate-600">
-                {label}
-            </p>
-        </div>
-    );
-}
-
-function ProgramCard({ program, getSchoolName, getHoName, onDetail }) {
-    const progress = getProgramProgress(program);
-    const processStatus = getProgramProcessStatus(program);
-    const activePhase = getActivePhaseInfo(program);
-
-    return (
-        <div className="group flex h-full min-h-0 flex-col rounded-[1.15rem] border border-cyan-100 bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.045)] transition hover:border-[#0AC4E0] hover:shadow-[0_18px_45px_rgba(10,196,224,0.12)]">
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <p className="line-clamp-1 text-[14px] font-black text-slate-900">
-                        {program.nama_program || "-"}
-                    </p>
-
-                    <p className="mt-1 truncate text-[11px] font-black uppercase tracking-widest text-slate-400">
-                        {program.kode_program || `PRG-${program.id_program}`}
-                    </p>
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
-                <div className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                        {activePhase.index}/{activePhase.totalPhase} Fase
+        <div className="space-y-2">
+            {data.map((item, index) => {
+                const percentage = total ? Math.round((item.value / total) * 100) : 0;
+                return (
+                    <div key={item.name} className="rounded-xl border border-cyan-100 bg-white px-3 py-2">
+                        <div className="flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                            <p className="min-w-0 flex-1 truncate text-[9px] font-black uppercase tracking-wide text-slate-600" title={item.name}>{item.name}</p>
+                            <p className="text-[10px] font-black text-slate-950">{item.value}</p>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: COLORS[index % COLORS.length] }} />
+                            </div>
+                            <span className="text-[8px] font-black text-slate-400">{percentage}%</span>
+                        </div>
+                        <p className="sr-only">{item.value} {valueSuffix}</p>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={() => onDetail(program)}
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 transition group-hover:border-[#0AC4E0] group-hover:text-[#0AC4E0]"
-                        title="Lihat detail program"
-                    >
-                        <Eye size={15} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="mt-2 grid grid-cols-2 gap-2">
-                <InfoPill icon={<School size={13} />} label={getSchoolName(program)} />
-                <InfoPill icon={<UserCheck size={13} />} label={getHoName(program)} />
-            </div>
-
-            <div className="mt-2 rounded-2xl bg-slate-50 p-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                    <p className="truncate text-[11px] font-black uppercase tracking-widest text-slate-400">
-                        {activePhase.label}
-                    </p>
-
-                    <p className="text-[15px] font-black text-[#0AC4E0]">
-                        {progress.percentage}%
-                    </p>
-                </div>
-
-                <ProgressBar value={progress.percentage} />
-
-                <div className="mt-3 grid grid-cols-4 gap-1">
-                    <MiniStatus label="Upload" value={progress.waitingUpload} />
-                    <MiniStatus label="HO" value={progress.waitingHo} />
-                    <MiniStatus label="ACC" value={progress.approved} />
-                    <MiniStatus label="Reject" value={progress.rejected} />
-                </div>
-            </div>
+                );
+            })}
         </div>
     );
 }
 
-function TaskItem({ program, getSchoolName, onDetail }) {
-    const processStatus = getProgramProcessStatus(program);
-    const activePhase = getActivePhaseInfo(program);
-
+function DashboardPieCard({ eyebrow, title, description, data, total, centerLabel, emptyText, valueSuffix = "program" }) {
     return (
-        <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-[#0AC4E0]">
-                    <UploadCloud size={18} />
-                </div>
+        <section className="flex min-h-0 flex-col rounded-[1.55rem] border border-cyan-100 bg-white shadow-sm">
+            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">{eyebrow}</p>
+                <h2 className="mt-1 text-[17px] font-black text-slate-950">{title}</h2>
+                <p className="mt-1 text-[9px] font-bold text-slate-400">{description}</p>
+            </div>
 
-                <div className="min-w-0">
-                    <p className="line-clamp-1 text-[12px] font-black text-slate-800">
-                        {program.nama_program}
-                    </p>
+            {data.length ? (
+                <div className="grid min-h-0 flex-1 grid-cols-[minmax(250px,0.95fr)_minmax(260px,1.05fr)] items-center gap-4 p-4">
+                    <div className="flex min-h-0 flex-col items-center justify-center">
+                        <div className="h-[290px] w-full min-w-0">
+                            <SafeResponsiveContainer
+                                width="100%"
+                                height="100%"
+                                minWidth={0}
+                                minHeight={270}
+                                debounce={50}
+                            >
+                                {({ width, height }) => {
+                                    const radiusBase = Math.min(Number(width) || 0, Number(height) || 0);
+                                    const outerRadius = Math.max(
+                                        92,
+                                        Math.min(122, Math.round(radiusBase * 0.41)),
+                                    );
 
-                    <p className="mt-1 truncate text-[10px] font-semibold text-slate-400">
-                        {getSchoolName(program)} · {activePhase.label}
-                    </p>
+                                    return (
+                                        <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                                            <Pie
+                                                data={data}
+                                                dataKey="value"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="52%"
+                                                innerRadius={0}
+                                                outerRadius={outerRadius}
+                                                startAngle={90}
+                                                endAngle={-270}
+                                                paddingAngle={data.length > 1 ? 2 : 0}
+                                                cornerRadius={data.length > 1 ? 6 : 0}
+                                                stroke="#ffffff"
+                                                strokeWidth={3}
+                                                labelLine={false}
+                                                isAnimationActive={false}
+                                            >
+                                                {data.map((item, index) => (
+                                                    <Cell
+                                                        key={`${item.name}-${index}`}
+                                                        fill={COLORS[index % COLORS.length]}
+                                                    />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                formatter={(value, name) => [`${value} ${valueSuffix}`, name]}
+                                                contentStyle={{
+                                                    borderRadius: 14,
+                                                    border: "1px solid #CFFAFE",
+                                                    boxShadow: "0 14px 34px rgba(15, 23, 42, 0.12)",
+                                                    fontSize: 11,
+                                                    fontWeight: 800,
+                                                }}
+                                            />
+                                        </PieChart>
+                                    );
+                                }}
+                            </SafeResponsiveContainer>
+                        </div>
 
-                    <div className="mt-2">
-                        <StatusBadge status={processStatus} />
+                        <div className="mt-1 inline-flex items-center gap-3 rounded-2xl border border-cyan-100 bg-white px-4 py-2 shadow-[0_10px_25px_rgba(15,23,42,0.06)]">
+                            <span className="flex h-9 min-w-9 items-center justify-center rounded-xl bg-slate-950 px-2 text-[15px] font-black text-white">{total}</span>
+                            <div>
+                                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">Total Data</p>
+                                <p className="mt-0.5 text-[10px] font-black text-slate-700">{centerLabel}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto pr-1">
+                        <ChartLegend data={data} total={total} valueSuffix={valueSuffix} />
                     </div>
                 </div>
-            </div>
-
-            <button
-                type="button"
-                onClick={() => onDetail(program)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0]"
-                title="Lihat detail program"
-            >
-                <ArrowRight size={15} />
-            </button>
-        </div>
+            ) : (
+                <div className="flex min-h-[280px] flex-1 items-center justify-center text-center">
+                    <div>
+                        <Layers3 className="mx-auto text-slate-300" size={34} />
+                        <p className="mt-3 text-[11px] font-black text-slate-500">{emptyText}</p>
+                    </div>
+                </div>
+            )}
+        </section>
     );
 }
 
-function WorkflowStep({ number, text }) {
+function ControlGroup({ label, value, onChange, items }) {
     return (
-        <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-2.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#0AC4E0] text-[10px] font-black text-white">
-                {number}
+        <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/60 p-1.5">
+            <p className="px-1.5 pb-1 text-[7px] font-black uppercase tracking-[0.14em] text-slate-400">
+                {label}
+            </p>
+            <div className="flex min-w-0 gap-1">
+                {items.map((item) => {
+                    const active = String(item.value) === String(value);
+                    return (
+                        <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => onChange(item.value)}
+                            className={`min-w-0 flex-1 truncate rounded-lg border px-2 py-1.5 text-[8px] font-black transition ${active
+                                ? "border-[#0AC4E0] bg-cyan-50 text-[#0AC4E0] shadow-sm"
+                                : "border-transparent bg-white text-slate-600 hover:border-cyan-100"
+                                }`}
+                            title={item.label}
+                        >
+                            {item.label}
+                        </button>
+                    );
+                })}
             </div>
-
-            <p className="text-[11px] font-bold text-slate-600">{text}</p>
         </div>
     );
 }
 
-function DashboardVendorPage({
+export default function DashboardVendorPage({
     title = "Dashboard Vendor",
     listPath = "/vendor/program",
-    detailPathPrefix = "/vendor/program/detail",
 }) {
     const navigate = useNavigate();
-
     const [programs, setPrograms] = useState([]);
     const [schools, setSchools] = useState([]);
-    const [hos, setHos] = useState([]);
     const [currentVendor, setCurrentVendor] = useState(null);
-
     const [loading, setLoading] = useState(true);
-    const [searchKeyword, setSearchKeyword] = useState("");
-    const [programPage, setProgramPage] = useState(1);
-
-    const PROGRAMS_PER_PAGE = 4;
-
-    useEffect(() => {
-        fetchDashboardData();
-    }, []);
+    const [pillarFilter, setPillarFilter] = useState("ALL");
+    const [gradeFilter, setGradeFilter] = useState("ALL");
+    const [yearFilter, setYearFilter] = useState("ALL");
+    const [viewMode, setViewMode] = useState("PILLAR");
 
     const getTokenPayload = () => {
         const token = localStorage.getItem("token");
         if (!token) return null;
-
-        try {
-            return jwtDecode(token);
-        } catch {
-            return null;
-        }
+        try { return jwtDecode(token); } catch { return null; }
     };
 
     const resolveCurrentVendor = (vendorList, payload) => {
-        if (!payload) return null;
-
-        const userId = String(payload.sub || payload.id_user || payload.id || "");
-        const email = String(payload.email || "").toLowerCase().trim();
-        const name = String(payload.nama || "").toLowerCase().trim();
-
-        return (
-            vendorList.find(
-                (vendor) =>
-                    String(vendor.id_user || "") === userId ||
-                    String(vendor.user_id || "") === userId ||
-                    String(vendor.id_vendor || "") === userId,
-            ) ||
-            vendorList.find(
-                (vendor) =>
-                    email &&
-                    String(vendor.email || vendor.email_vendor || "")
-                        .toLowerCase()
-                        .trim() === email,
-            ) ||
-            vendorList.find(
-                (vendor) =>
-                    name &&
-                    String(vendor.nama_vendor || "").toLowerCase().trim() === name,
-            ) ||
-            null
-        );
+        const userId = String(payload?.sub || payload?.id_user || payload?.id || "");
+        const email = String(payload?.email || "").toLowerCase().trim();
+        const name = String(payload?.nama || "").toLowerCase().trim();
+        return vendorList.find((vendor) => [vendor?.id_user, vendor?.user_id, vendor?.id_vendor].filter(Boolean).map(String).includes(userId))
+            || vendorList.find((vendor) => email && String(vendor?.email || vendor?.email_vendor || vendor?.user?.email || "").toLowerCase().trim() === email)
+            || vendorList.find((vendor) => name && String(vendor?.nama_vendor || vendor?.nama || "").toLowerCase().trim() === name)
+            || null;
     };
 
     const fetchDashboardData = async () => {
         setLoading(true);
-
         try {
             const token = localStorage.getItem("token");
             const headers = { Authorization: `Bearer ${token}` };
             const payload = getTokenPayload();
-
-            const [resProgram, resSekolah, resHo, resVendor] = await Promise.all([
+            const [programResponse, schoolResponse, vendorResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/program`, { headers }),
                 fetch(`${API_BASE_URL}/sekolah`, { headers }),
-                fetch(`${API_BASE_URL}/users/ho`, { headers }),
                 fetch(`${API_BASE_URL}/vendor`, { headers }),
             ]);
-
-            const dataProgram = normalizeArray(await resProgram.json());
-            const dataSekolah = normalizeArray(await resSekolah.json());
-            const dataHo = normalizeArray(await resHo.json());
-            const dataVendor = normalizeArray(await resVendor.json());
-
-            const vendor = resolveCurrentVendor(dataVendor, payload);
-
+            const programList = normalizeArray(await programResponse.json());
+            const schoolList = normalizeArray(await schoolResponse.json());
+            const vendorList = normalizeArray(await vendorResponse.json());
+            const vendor = resolveCurrentVendor(vendorList, payload);
             const vendorPrograms = vendor
-                ? dataProgram.filter((program) =>
-                    getProgramVendorIds(program).includes(
-                        String(vendor.id_vendor),
-                    ),
-                )
-                : dataProgram.filter(
-                    (program) => getProgramVendorIds(program).length > 0,
-                );
-
-            const detailedPrograms = await Promise.all(
-                vendorPrograms.map(async (program) => {
-                    try {
-                        const response = await fetch(
-                            `${API_BASE_URL}/program/${program.id_program}`,
-                            { headers },
-                        );
-
-                        const result = await response.json();
-
-                        return result?.data || result || program;
-                    } catch {
-                        return program;
-                    }
-                }),
-            );
-
+                ? programList.filter((program) => getProgramVendorIds(program).includes(String(vendor.id_vendor)))
+                : [];
+            const detailedPrograms = await Promise.all(vendorPrograms.map(async (program) => {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/program/${program.id_program}`, { headers });
+                    const result = await response.json();
+                    return result?.data || result || program;
+                } catch { return program; }
+            }));
             setPrograms(detailedPrograms);
-            setSchools(dataSekolah);
-            setHos(dataHo);
+            setSchools(schoolList);
             setCurrentVendor(vendor);
         } catch (error) {
             console.error("Gagal mengambil dashboard vendor:", error);
             toast.error("Gagal mengambil dashboard vendor");
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     };
 
-    const getSchoolName = (program) => {
-        const school = schools.find(
-            (item) => String(item.id_sekolah) === String(program?.id_sekolah),
-        );
+    useEffect(() => { fetchDashboardData(); }, []);
 
-        return (
-            program?.sekolah?.nama_sekolah ||
-            program?.nama_sekolah ||
-            school?.nama_sekolah ||
-            "-"
-        );
-    };
-
-    const getHoName = (program) => {
-        const ho = hos.find(
-            (item) =>
-                String(item.id_user || item.id) === String(program?.dibuat_oleh),
-        );
-
-        return program?.ho?.nama || program?.created_by?.nama || ho?.nama || "-";
-    };
-
-    const goToDetail = (program) => {
-        navigate(`${detailPathPrefix}/${program.id_program}`);
-    };
-
-    const filteredPrograms = useMemo(() => {
-        const keyword = searchKeyword.toLowerCase().trim();
-
-        if (!keyword) return programs;
-
-        return programs.filter((program) => {
-            const progressStatus = getProgramProcessStatus(program).label;
-            const activePhase = getActivePhaseInfo(program).label;
-
-            return [
-                program.nama_program,
-                program.kode_program,
-                program.tahun,
-                getSchoolName(program),
-                getHoName(program),
-                progressStatus,
-                activePhase,
-            ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-                .includes(keyword);
-        });
-    }, [programs, searchKeyword, schools, hos]);
+    const vendorPillarControls = useMemo(
+        () => getVendorPillarOptions(currentVendor, programs),
+        [currentVendor, programs],
+    );
 
     useEffect(() => {
-        setProgramPage(1);
-    }, [searchKeyword, programs.length]);
+        if (
+            pillarFilter !== "ALL" &&
+            !vendorPillarControls.includes(pillarFilter)
+        ) {
+            setPillarFilter("ALL");
+        }
+    }, [pillarFilter, vendorPillarControls]);
 
-    const stats = useMemo(() => {
-        const allRequirements = programs.flatMap(getProgramRequirements);
-
-        const waitingUpload = allRequirements.filter(
-            (item) => getRequirementStatus(item) === "WAITING_UPLOAD",
-        ).length;
-
-        const waitingHo = allRequirements.filter(
-            (item) => getRequirementStatus(item) === "WAITING_HO",
-        ).length;
-
-        const approved = allRequirements.filter(
-            (item) => getRequirementStatus(item) === "APPROVED",
-        ).length;
-
-        return {
-            totalProgram: programs.length,
-            waitingUpload,
-            waitingHo,
-            approved,
-        };
+    const yearOptions = useMemo(() => {
+        const values = [...new Set(programs.map(getProgramYear).filter((value) => value && value !== "-"))].sort((a, b) => Number(b) - Number(a));
+        return [{ value: "ALL", label: "Semua Tahun" }, ...values.map((value) => ({ value, label: value }))];
     }, [programs]);
 
-    const priorityTasks = useMemo(() => {
-        return programs
-            .filter((program) => getProgramProgress(program).actionable > 0)
-            .sort(
-                (a, b) =>
-                    getProgramProgress(b).actionable -
-                    getProgramProgress(a).actionable,
-            )
-            .slice(0, 3);
-    }, [programs]);
-
-    const totalProgramPages = Math.max(
-        1,
-        Math.ceil(filteredPrograms.length / PROGRAMS_PER_PAGE),
+    const filteredPrograms = useMemo(
+        () =>
+            programs.filter((program) => {
+                const pillarMatch =
+                    pillarFilter === "ALL" || getProgramPillar(program) === pillarFilter;
+                const yearMatch =
+                    yearFilter === "ALL" || getProgramYear(program) === yearFilter;
+                const gradeMatch =
+                    gradeFilter === "ALL" ||
+                    getProgramGradeLevels(program, schools).includes(gradeFilter);
+                return pillarMatch && yearMatch && gradeMatch;
+            }),
+        [programs, schools, pillarFilter, gradeFilter, yearFilter],
     );
 
-    const safeProgramPage = Math.min(programPage, totalProgramPages);
+    const filteredSchoolIds = useMemo(() => [...new Set(filteredPrograms.flatMap(getProgramSchoolIds))], [filteredPrograms]);
+    const completedCount = useMemo(() => filteredPrograms.filter((program) => getProgramStatus(program) === "Selesai").length, [filteredPrograms]);
+    const ratings = useMemo(() => filteredPrograms.map(getProgramRating).filter((value) => value !== null), [filteredPrograms]);
+    const averageRating = ratings.length ? (ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(1) : "-";
 
-    const visiblePrograms = filteredPrograms.slice(
-        (safeProgramPage - 1) * PROGRAMS_PER_PAGE,
-        safeProgramPage * PROGRAMS_PER_PAGE,
-    );
+    const statusData = useMemo(() => groupCounts(filteredPrograms, getProgramStatus), [filteredPrograms]);
+    const pillarData = useMemo(() => groupCounts(filteredPrograms, getProgramPillar), [filteredPrograms]);
 
-    const hasProgramPagination = filteredPrograms.length > PROGRAMS_PER_PAGE;
+    const schoolData = useMemo(() => {
+        const counter = new Map();
+        filteredPrograms.forEach((program) => {
+            getProgramSchoolIds(program).forEach((id) => counter.set(id, (counter.get(id) || 0) + 1));
+        });
+        return [...counter.entries()].map(([id, value]) => {
+            const school = schools.find((item) => String(item.id_sekolah) === String(id));
+            return { name: school?.nama_sekolah || `Sekolah ${id}`, value };
+        }).sort((a, b) => b.value - a.value);
+    }, [filteredPrograms, schools]);
 
-    const vendorInitials = getVendorInitials(currentVendor);
+    const ratingData = useMemo(() => {
+        const buckets = [
+            { name: "4.5–5.0", min: 4.5, max: 5.01, value: 0 },
+            { name: "4.0–4.4", min: 4, max: 4.5, value: 0 },
+            { name: "3.0–3.9", min: 3, max: 4, value: 0 },
+            { name: "< 3.0", min: 0, max: 3, value: 0 },
+        ];
+        let unrated = 0;
+        filteredPrograms.forEach((program) => {
+            const rating = getProgramRating(program);
+            if (rating === null) { unrated += 1; return; }
+            const bucket = buckets.find((item) => rating >= item.min && rating < item.max);
+            if (bucket) bucket.value += 1;
+        });
+        const result = buckets.filter((item) => item.value > 0).map(({ name, value }) => ({ name, value }));
+        if (unrated > 0) result.push({ name: "Belum Dinilai", value: unrated });
+        return result;
+    }, [filteredPrograms]);
+
+    const secondaryConfig = {
+        PILLAR: { eyebrow: "Komposisi Program", title: "Program per Pilar", description: "Perbandingan Program Vendor berdasarkan pilar.", data: pillarData, total: filteredPrograms.length, centerLabel: "Program", valueSuffix: "program" },
+        SCHOOL: { eyebrow: "Sekolah Terlibat", title: "Program per Sekolah", description: "Nama sekolah dan jumlah Program Vendor yang diterima.", data: schoolData, total: schoolData.reduce((sum, item) => sum + item.value, 0), centerLabel: "Penugasan", valueSuffix: "program" },
+        RATING: { eyebrow: "Penilaian Program", title: "Rating Program", description: "Sebaran rating Program Vendor. Program tanpa rating tetap ditandai.", data: ratingData, total: filteredPrograms.length, centerLabel: "Program", valueSuffix: "program" },
+    }[viewMode];
+
+    const vendorName = getVendorName(currentVendor, title);
 
     if (loading) {
         return (
             <PageWrapper className="flex h-screen items-center justify-center bg-white">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="h-11 w-11 animate-spin rounded-full border-4 border-[#0AC4E0] border-t-transparent" />
-
-                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">
-                        Loading Dashboard Vendor...
-                    </p>
+                <div className="text-center">
+                    <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-[#0AC4E0] border-t-transparent" />
+                    <p className="mt-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Memuat Dashboard Vendor</p>
                 </div>
             </PageWrapper>
         );
     }
 
     return (
-        <PageWrapper className="flex h-screen overflow-hidden bg-[#F6F8FB] !p-0 font-sans text-slate-800">
+        <PageWrapper className="flex h-screen overflow-hidden bg-[#F5FBFD] !p-0 font-sans text-slate-900">
             <Sidebar />
-
-            <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <header className="relative shrink-0 overflow-hidden border-b border-cyan-100 bg-white px-6 py-4 text-slate-900 shadow-[0_10px_36px_rgba(10,196,224,0.08)]">
-                    <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0AC4E0]/18 blur-3xl" />
-                    <div className="pointer-events-none absolute left-1/3 top-10 h-28 w-28 rounded-full bg-emerald-200/20 blur-2xl" />
-
-                    <div className="relative flex items-center justify-between gap-6">
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <header className="shrink-0 border-b border-cyan-100 bg-white px-6 py-3.5">
+                    <div className="flex items-center justify-between gap-5">
                         <div className="flex min-w-0 items-center gap-4">
-                            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1.2rem] border border-cyan-100 bg-cyan-50 text-lg font-black text-[#0AC4E0] shadow-[0_18px_45px_rgba(10,196,224,0.16)]">
-                                {vendorInitials}
-                            </div>
-
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50 text-lg font-black text-[#0AC4E0]">{vendorName.charAt(0).toUpperCase()}</div>
                             <div className="min-w-0">
-                                <h1 className="truncate text-[28px] font-black tracking-tight text-slate-950">
-                                    {currentVendor?.nama_vendor || title}
-                                </h1>
-
-                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600">
-                                        <BadgeCheck size={13} />
-                                        {currentVendor?.status || "Bermitra"}
-                                    </span>
-
-                                    <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#0AC4E0]">
-                                        <BriefcaseBusiness size={13} />
-                                        {currentVendor?.pilar || "Bidang Vendor"}
-                                    </span>
+                                <h1 className="truncate text-[22px] font-black tracking-tight text-slate-950">{vendorName}</h1>
+                                <div className="mt-1.5 flex flex-wrap gap-2">
+                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-700"><BadgeCheck size={11} /> Bermitra</span>
+                                    <span className="rounded-full bg-cyan-50 px-3 py-1 text-[8px] font-black uppercase tracking-wider text-[#0AC4E0]">{currentVendor?.pilar || currentVendor?.kategori || "Vendor"}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-3">
-                            <Button
-                                text="Program"
-                                icon={<FolderOpen size={15} />}
-                                onClick={() => navigate(listPath)}
-                                className="!rounded-xl !border !border-cyan-100 !bg-white !px-5 !py-2.5 !text-sm !font-bold !text-[#0AC4E0] !shadow-[0_12px_28px_rgba(10,196,224,0.08)] hover:!bg-cyan-50"
+                        <div className="flex shrink-0 items-center gap-2">
+                            <Dropdown
+                                value={yearFilter}
+                                onChange={setYearFilter}
+                                items={yearOptions}
+                                placeholder="Semua Tahun"
+                                label="Filter Tahun"
+                                width="w-[170px]"
                             />
-
-                            <Button
-                                text="Refresh"
-                                icon={<RefreshCcw size={15} />}
-                                onClick={fetchDashboardData}
-                                className="!rounded-xl !bg-[#0AC4E0] !px-5 !py-2.5 !text-sm !font-bold !text-white hover:!bg-cyan-400"
-                            />
+                            <Button text="Program" icon={<FolderOpen size={14} />} onClick={() => navigate(listPath)} className="!rounded-xl !border !border-cyan-100 !bg-white !px-4 !py-2.5 !text-[9px] !font-black !uppercase !tracking-wider !text-[#0AC4E0] !shadow-sm" />
+                            <Button text="Refresh" icon={<RefreshCcw size={14} />} onClick={fetchDashboardData} className="!rounded-xl !bg-[#0AC4E0] !px-4 !py-2.5 !text-[9px] !font-black !uppercase !tracking-wider !text-white" />
                         </div>
                     </div>
                 </header>
 
-                <section className="grid min-h-0 flex-1 grid-cols-12 gap-3 overflow-hidden px-6 py-4">
-                    <div className="col-span-12 flex min-h-0 flex-col gap-3 xl:col-span-9">
-                        <div className="grid shrink-0 grid-cols-4 gap-3">
-                            <StatCard
-                                label="Total Program"
-                                value={stats.totalProgram}
-                                helper="Ditugaskan"
-                                icon={<Layers3 size={21} />}
-                            />
-
-                            <StatCard
-                                label="Perlu Upload"
-                                value={stats.waitingUpload}
-                                helper="Belum dikirim"
-                                icon={<UploadCloud size={21} />}
-                            />
-
-                            <StatCard
-                                label="Menunggu HO"
-                                value={stats.waitingHo}
-                                helper="Validasi"
-                                icon={<FileClock size={21} />}
-                                tone="amber"
-                            />
-
-                            <StatCard
-                                label="Approved"
-                                value={stats.approved}
-                                helper="Disetujui"
-                                icon={<CheckCircle2 size={21} />}
-                                tone="emerald"
-                            />
+                <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6 py-4">
+                    <section className="shrink-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">
+                        <div className="grid sm:grid-cols-2 xl:grid-cols-4">
+                            <SummaryCard label="Program Vendor" value={filteredPrograms.length} helper="Sesuai filter aktif" icon={<Layers3 size={19} />} />
+                            <SummaryCard label="Sekolah Terlibat" value={filteredSchoolIds.length} helper="Sekolah unik dalam Program" icon={<School size={19} />} tone="blue" />
+                            <SummaryCard label="Program Selesai" value={completedCount} helper="Telah menyelesaikan proses" icon={<CheckCircle2 size={19} />} tone="emerald" />
+                            <SummaryCard label="Rating Rata-rata" value={averageRating === "-" ? "-" : `${averageRating}/5`} helper={ratings.length ? `${ratings.length} Program telah dinilai` : "Belum ada rating Program"} icon={<Star size={19} />} tone="amber" />
                         </div>
+                    </section>
 
-                        <div className="min-h-0 flex-1 rounded-[1.45rem] border border-cyan-100 bg-white p-5 shadow-[0_18px_55px_rgba(10,196,224,0.08)]">
-                            <div className="mb-3 flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-[21px] font-black text-slate-900">
-                                        Visual Status Program
-                                    </h2>
-                                </div>
-
-                                <span className="rounded-full border border-cyan-100 bg-cyan-50 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                                    {stats.totalProgram} Program
-                                </span>
-                            </div>
-
-                            <div className="grid h-[calc(100%-52px)] min-h-[360px] gap-4 lg:grid-cols-2">
-                                {[
-                                    ["Perlu Upload", stats.waitingUpload, "#0AC4E0"],
-                                    ["Menunggu HO", stats.waitingHo, "#F59E0B"],
-                                    ["Approved", stats.approved, "#10B981"],
-                                    ["Total Program", stats.totalProgram, "#2563EB"],
-                                ].map(([label, value, color]) => {
-                                    const numericValue = Number(value || 0);
-                                    const maxValue = Math.max(
-                                        stats.totalProgram,
-                                        stats.waitingUpload,
-                                        stats.waitingHo,
-                                        stats.approved,
-                                        1,
-                                    );
-                                    const percent = Math.max(8, Math.round((numericValue / maxValue) * 100));
-
-                                    return (
-                                        <div key={label} className="flex min-h-[150px] flex-col justify-between rounded-[1.35rem] border border-slate-100 bg-slate-50/70 p-5">
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div>
-                                                    <p className="text-[12px] font-black uppercase tracking-widest text-slate-500">
-                                                        {label}
-                                                    </p>
-                                                    <p className="mt-3 text-[42px] font-black leading-none text-slate-950">
-                                                        {numericValue}
-                                                    </p>
-                                                </div>
-                                                <span className="h-12 w-12 rounded-2xl" style={{ backgroundColor: `${color}1A`, border: `1px solid ${color}55` }} />
-                                            </div>
-                                            <div className="h-4 overflow-hidden rounded-full bg-white">
-                                                <div
-                                                    className="h-full rounded-full"
-                                                    style={{ width: `${percent}%`, backgroundColor: color }}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                    <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+                        <DashboardPieCard eyebrow="Status Program" title="Tahapan Program Vendor" description="Status seluruh Program yang terkait dengan Vendor ini." data={statusData} total={filteredPrograms.length} centerLabel="Program" emptyText="Belum ada Program pada filter ini" />
+                        <DashboardPieCard {...secondaryConfig} emptyText="Belum ada data pada filter ini" />
                     </div>
 
-                    <aside className="col-span-12 flex min-h-0 flex-col gap-3 xl:col-span-3">
-                        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.45rem] border border-cyan-100 bg-white shadow-[0_22px_70px_rgba(10,196,224,0.10)]">
-                            <div className="relative overflow-hidden bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-4 text-slate-900">
-                                <div className="pointer-events-none absolute -right-12 -top-16 h-40 w-40 rounded-full bg-[#0AC4E0]/25 blur-3xl" />
-
-                                <div className="relative flex items-center gap-4">
-                                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[1.25rem] border border-cyan-100 bg-white text-[#0AC4E0] shadow-[0_18px_45px_rgba(10,196,224,0.18)]">
-                                        <Gauge size={30} />
-                                    </div>
-
-                                    <div className="min-w-0">
-                                        <h2 className="text-[19px] font-black leading-tight text-slate-950">
-                                            Cockpit Vendor
-                                        </h2>
-
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                            <span className="rounded-full border border-cyan-100 bg-cyan-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0AC4E0]">
-                                                {currentVendor?.pilar || "Bidang Vendor"}
-                                            </span>
-
-                                            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-emerald-600">
-                                                {currentVendor?.status || "Bermitra"}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                    <section className="shrink-0 rounded-[1.35rem] border border-cyan-100 bg-white p-2.5 shadow-sm">
+                        <div className="grid grid-cols-[150px_minmax(0,1.15fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] items-center gap-2">
+                            <div className="px-2">
+                                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">Kontrol Data</p>
+                                <p className="mt-1 text-[9px] font-bold text-slate-400">Klik untuk mengubah diagram.</p>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 p-4">
-                                <MiniStatus label="Program" value={stats.totalProgram} />
-                                <MiniStatus label="Upload" value={stats.waitingUpload} />
-                                <MiniStatus label="Validasi" value={stats.waitingHo} />
-                                <MiniStatus label="Approved" value={stats.approved} />
-                            </div>
+                            <ControlGroup
+                                label="Pilar"
+                                value={pillarFilter}
+                                onChange={setPillarFilter}
+                                items={[
+                                    { value: "ALL", label: "Semua" },
+                                    ...vendorPillarControls.map((pillar) => ({ value: pillar, label: pillar })),
+                                ]}
+                            />
+
+                            <ControlGroup
+                                label="Jenjang"
+                                value={gradeFilter}
+                                onChange={setGradeFilter}
+                                items={[
+                                    { value: "ALL", label: "Semua" },
+                                    { value: "SD", label: "SD" },
+                                    { value: "SMP", label: "SMP" },
+                                    { value: "SMK", label: "SMK" },
+                                ]}
+                            />
+
+                            <ControlGroup
+                                label="Diagram Kanan"
+                                value={viewMode}
+                                onChange={setViewMode}
+                                items={[
+                                    { value: "PILLAR", label: "Pilar" },
+                                    { value: "SCHOOL", label: "Sekolah" },
+                                    { value: "RATING", label: "Rating" },
+                                ]}
+                            />
                         </div>
-
-                        <div className="shrink-0 rounded-[1.45rem] border border-cyan-100 bg-cyan-50/70 p-4">
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <WorkflowStep number="01" text="Buka program berjalan" />
-                                <WorkflowStep number="02" text="Pilih fase terbuka" />
-                                <WorkflowStep number="03" text="Upload bukti" />
-                                <WorkflowStep number="04" text="Tunggu validasi HO" />
-                            </div>
-                        </div>
-                    </aside>
+                    </section>
                 </section>
             </main>
-
-            <style
-                dangerouslySetInnerHTML={{
-                    __html: `
-                        html,
-                        body,
-                        #root {
-                            height: 100%;
-                            overflow: hidden;
-                        }
-
-                        .line-clamp-1 {
-                            display: -webkit-box;
-                            -webkit-line-clamp: 1;
-                            -webkit-box-orient: vertical;
-                            overflow: hidden;
-                        }
-
-                        .line-clamp-2 {
-                            display: -webkit-box;
-                            -webkit-line-clamp: 2;
-                            -webkit-box-orient: vertical;
-                            overflow: hidden;
-                        }
-                    `,
-                }}
-            />
         </PageWrapper>
     );
 }
-
-export default DashboardVendorPage;

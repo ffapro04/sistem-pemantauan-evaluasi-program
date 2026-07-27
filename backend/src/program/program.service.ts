@@ -345,6 +345,91 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async resolveRatingActor(id_user: number, body: any = {}) {
+    const userId = Number(id_user || 0);
+
+    if (!userId) {
+      throw new BadRequestException('Identitas pemberi rating tidak valid.');
+    }
+
+    const userRows = await this.programRepo.manager.query(
+      `SELECT id_role, id_sekolah FROM m_users WHERE id_user = $1 LIMIT 1`,
+      [userId],
+    );
+    const userRow = userRows?.[0] || null;
+    const roleId = Number(userRow?.id_role || 0);
+
+    const vendorRows = await this.programRepo.manager.query(
+      `SELECT id_vendor FROM m_vendor WHERE id_user = $1 LIMIT 1`,
+      [userId],
+    );
+    const vendorId = vendorRows?.[0]?.id_vendor
+      ? Number(vendorRows[0].id_vendor)
+      : null;
+
+    if (roleId === 6 || (!userRow && vendorId)) {
+      if (!vendorId) {
+        throw new BadRequestException(
+          'Akun Vendor tidak terhubung dengan data Vendor.',
+        );
+      }
+
+      return {
+        raterType: 'VENDOR' as const,
+        idVendor: vendorId,
+        idGuruAssessment: null,
+        idSekolah: null,
+      };
+    }
+
+    if (userRow && roleId !== 8) {
+      throw new BadRequestException(
+        'Rating hanya dapat diberikan oleh Guru Assessment atau Vendor.',
+      );
+    }
+
+    const guruId = Number(body?.id_guru_assessment || userId || 0);
+
+    if (!guruId) {
+      throw new BadRequestException(
+        'Akun Guru Assessment tidak terhubung dengan data guru.',
+      );
+    }
+
+    // Untuk token khusus Guru Assessment, sub/id_user harus sama dengan
+    // id_guru_assessment agar akun lain tidak dapat menyamar sebagai guru.
+    if (!userRow && guruId !== userId) {
+      throw new BadRequestException(
+        'Identitas Guru Assessment tidak sesuai dengan akun yang login.',
+      );
+    }
+
+    const guruRows = await this.programRepo.manager.query(
+      `
+        SELECT id_guru_assessment, id_sekolah
+        FROM assessment_guru
+        WHERE id_guru_assessment = $1
+          AND is_active = true
+        LIMIT 1
+      `,
+      [guruId],
+    );
+    const guru = guruRows?.[0] || null;
+
+    if (!guru) {
+      throw new BadRequestException(
+        'Akun Guru Assessment tidak aktif atau tidak ditemukan.',
+      );
+    }
+
+    return {
+      raterType: 'GURU' as const,
+      idVendor: null,
+      idGuruAssessment: Number(guru.id_guru_assessment),
+      idSekolah: guru.id_sekolah ? Number(guru.id_sekolah) : null,
+    };
+  }
+
   private isHORole(role: any) {
     const value = this.normalizeRole(role);
     return (
@@ -851,7 +936,12 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   private async notifyProgramEvidenceWorkflow(
     program: Program | any,
     options: {
-      audience: 'UPLOAD' | 'AO_APPROVED' | 'AO_REJECTED' | 'HO_APPROVED' | 'HO_REJECTED';
+      audience:
+        | 'UPLOAD'
+        | 'AO_APPROVED'
+        | 'AO_REJECTED'
+        | 'HO_APPROVED'
+        | 'HO_REJECTED';
       idPersyaratan: number;
       evidenceType: 'ADMINISTRASI' | 'KEGIATAN';
       requirementName?: string;
@@ -956,7 +1046,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       pushUserRows(audience.vendorUserIds, 'vendor', payload);
     }
 
-    if (options.audience === 'HO_APPROVED' || options.audience === 'HO_REJECTED') {
+    if (
+      options.audience === 'HO_APPROVED' ||
+      options.audience === 'HO_REJECTED'
+    ) {
       pushUserRows(audience.aoUserIds, 'ao', payload);
       pushUserRows(audience.vendorUserIds, 'vendor', payload);
     }
@@ -1226,7 +1319,11 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       };
 
       pushUserRows(audience.hoUserIds, 'ho', this.getHoProgramTargetUrl(item));
-      pushUserRows(audience.aoUserIds, 'ao', `/ao/program/detail/${item.id_program}`);
+      pushUserRows(
+        audience.aoUserIds,
+        'ao',
+        `/ao/program/detail/${item.id_program}`,
+      );
       pushUserRows(
         audience.vendorUserIds,
         'vendor',
@@ -1279,7 +1376,11 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       };
 
       pushUserRows(audience.hoUserIds, 'ho', this.getHoProgramTargetUrl(item));
-      pushUserRows(audience.aoUserIds, 'ao', `/ao/program/detail/${item.id_program}`);
+      pushUserRows(
+        audience.aoUserIds,
+        'ao',
+        `/ao/program/detail/${item.id_program}`,
+      );
       pushUserRows(
         audience.vendorUserIds,
         'vendor',
@@ -1348,8 +1449,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       const idPengawas =
         this.toNumber(createProgramDto.id_pengawas) || aoIds[0] || null;
 
-      if (!idSekolah) throw new BadRequestException('Sekolah sasaran wajib dipilih.');
-      if (!idPengawas) throw new BadRequestException('Area Officer wajib dipilih.');
+      if (!idSekolah)
+        throw new BadRequestException('Sekolah sasaran wajib dipilih.');
+      if (!idPengawas)
+        throw new BadRequestException('Area Officer wajib dipilih.');
 
       const finalSekolahIds = sekolahIds.length ? sekolahIds : [idSekolah];
       const finalAoIds = aoIds.length ? aoIds : [idPengawas];
@@ -1368,12 +1471,16 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
 
       if (fases.length === 0) {
-        throw new BadRequestException('Minimal satu periode program wajib diisi.');
+        throw new BadRequestException(
+          'Minimal satu periode program wajib diisi.',
+        );
       }
 
       for (const fase of fases) {
         const terminList = Array.isArray(fase.termin) ? fase.termin : [];
-        const kegiatanList = Array.isArray(fase.kegiatans) ? fase.kegiatans : [];
+        const kegiatanList = Array.isArray(fase.kegiatans)
+          ? fase.kegiatans
+          : [];
 
         if (terminList.length === 0) {
           throw new BadRequestException(
@@ -2726,7 +2833,24 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       ? body.comment_type
       : 'AO_REVIEW';
 
+    let normalizedRoleUser = role_user;
+
     if (['GURU_RATING', 'VENDOR_RATING'].includes(commentType)) {
+      const expectedRaterType =
+        commentType === 'VENDOR_RATING' ? 'VENDOR' : 'GURU';
+      const actor = await this.resolveRatingActor(id_user, {
+        ...body,
+        rater_type: expectedRaterType,
+      });
+
+      if (actor.raterType !== expectedRaterType) {
+        throw new BadRequestException(
+          'Jenis feedback tidak sesuai dengan akun yang login.',
+        );
+      }
+
+      normalizedRoleUser =
+        actor.raterType === 'VENDOR' ? 'Vendor' : 'Guru Assessment';
       await this.ensureProgramFeedbackOpenByKegiatan(id_kegiatan);
     }
 
@@ -2735,7 +2859,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       id_persyaratan: body.id_persyaratan ? Number(body.id_persyaratan) : null,
       id_user,
       nama_user,
-      role_user,
+      role_user: normalizedRoleUser,
       comment_text: body.comment_text.trim(),
       comment_type: commentType,
       attachment_file: null,
@@ -2773,50 +2897,94 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   ) {
     const kegiatan = await this.kegiatansRepo.findOne({
       where: { id_kegiatans: id_kegiatan },
+      relations: ['persyaratan'],
     });
 
     if (!kegiatan) {
       throw new NotFoundException('Kegiatan tidak ditemukan');
     }
 
-    if (kegiatan.status_kegiatan !== 'APPROVED') {
+    const statusKegiatan = String(kegiatan.status_kegiatan || '').toUpperCase();
+    const hasUnapprovedRequirement = (kegiatan.persyaratan || []).some(
+      (item) => String(item.status || '').toUpperCase() !== 'APPROVED',
+    );
+
+    if (statusKegiatan !== 'APPROVED' || hasUnapprovedRequirement) {
       throw new BadRequestException(
-        'Kegiatan belum selesai, guru belum bisa memberi rating',
+        'Step kegiatan belum selesai. Rating baru dapat diberikan setelah seluruh bukti disetujui HO.',
       );
     }
 
-    await this.ensureProgramFeedbackOpenByKegiatan(id_kegiatan);
+    const program = await this.ensureProgramFeedbackOpenByKegiatan(id_kegiatan);
+    const actor = await this.resolveRatingActor(id_user, body);
+
+    const requestedRaterType = body?.rater_type
+      ? String(body.rater_type).toUpperCase()
+      : actor.raterType;
+
+    if (requestedRaterType !== actor.raterType) {
+      throw new BadRequestException(
+        'Jenis pemberi rating tidak sesuai dengan akun yang login.',
+      );
+    }
 
     const rating = Number(body.rating);
     if (!rating || rating < 1 || rating > 5) {
       throw new BadRequestException('Rating harus antara 1 sampai 5');
     }
 
-    const raterType = String(
-      body.rater_type || (body.id_vendor ? 'VENDOR' : 'GURU'),
-    ).toUpperCase();
-    const idGuruAssessment = body.id_guru_assessment
-      ? Number(body.id_guru_assessment)
-      : null;
-    const idVendor = body.id_vendor ? Number(body.id_vendor) : null;
-    const idSekolah = body.id_sekolah ? Number(body.id_sekolah) : null;
+    const raterType = actor.raterType;
+    const idGuruAssessment = actor.idGuruAssessment;
+    const idVendor = actor.idVendor;
+    const idSekolah = actor.idSekolah;
+
+    if (raterType === 'VENDOR') {
+      const programVendorIds = Array.from(
+        new Set([
+          ...this.toArray(program?.id_vendor),
+          ...this.toArray(program?.vendor_ids),
+        ]),
+      );
+
+      if (!idVendor || !programVendorIds.includes(idVendor)) {
+        throw new BadRequestException(
+          'Vendor tidak terhubung dengan program pada step ini.',
+        );
+      }
+    } else {
+      if (!idGuruAssessment || !idSekolah) {
+        throw new BadRequestException(
+          'Guru Assessment tidak terhubung dengan sekolah.',
+        );
+      }
+
+      const programSchoolIds = Array.from(
+        new Set([
+          ...this.toArray(program?.sekolah_ids),
+          ...this.toArray(program?.target_sekolah_ids),
+          ...(program?.id_sekolah ? [Number(program.id_sekolah)] : []),
+        ]),
+      );
+
+      if (!programSchoolIds.includes(idSekolah)) {
+        throw new BadRequestException(
+          'Sekolah Guru Assessment tidak terhubung dengan program pada step ini.',
+        );
+      }
+    }
 
     let existingRating: KegiatanRating = null;
 
-    if (idGuruAssessment) {
+    if (raterType === 'GURU') {
       existingRating = await this.kegiatanRatingRepo.findOne({
         where: {
           id_kegiatans: id_kegiatan,
           id_guru_assessment: idGuruAssessment,
         },
       });
-    } else if (idVendor) {
-      existingRating = await this.kegiatanRatingRepo.findOne({
-        where: { id_kegiatans: id_kegiatan, id_vendor: idVendor },
-      });
     } else {
       existingRating = await this.kegiatanRatingRepo.findOne({
-        where: { id_kegiatans: id_kegiatan, id_user },
+        where: { id_kegiatans: id_kegiatan, id_vendor: idVendor },
       });
     }
 
@@ -2892,7 +3060,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         rating,
         average_rating: Number(average.toFixed(2)),
         total_rating: ratings.length,
-        comment: body.comment || body.komentar,
+        rater_type: raterType,
       },
     };
   }

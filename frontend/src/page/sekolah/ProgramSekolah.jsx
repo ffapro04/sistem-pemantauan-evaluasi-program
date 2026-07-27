@@ -156,12 +156,6 @@ function getRatingStats(activity = {}) {
 function getOwnGuruRating(activity = {}, user = {}) {
     const guruId = String(getGuruAssessmentId(user) || "");
     const userId = String(user?.id_user || user?.sub || user?.id || "");
-    const roleId = Number(user?.id_role || 0);
-    const roleText = String(user?.role || user?.nama_role || "").toLowerCase();
-    const expectedType =
-        roleId === 10 || roleText.includes("kepala sekolah")
-            ? "KEPALA_SEKOLAH"
-            : "GURU";
     const ratings = getArray(activity.ratings, activity.rating_items);
 
     return ratings.find((item) => {
@@ -170,7 +164,7 @@ function getOwnGuruRating(activity = {}, user = {}) {
         const itemUserId = String(item?.id_user || "");
 
         return (
-            type === expectedType &&
+            type === "GURU" &&
             ((guruId && itemGuruId === guruId) || (userId && itemUserId === userId))
         );
     }) || null;
@@ -585,10 +579,14 @@ export default function ProgramSekolah() {
     }, []);
 
     const idRole = Number(user?.id_role || 0);
-    const roleText = String(user?.role || user?.nama_role || "").toLowerCase();
-    const isGuru = idRole === 8 || user?.type === "guru-assessment";
-    const isKepalaSekolah = idRole === 10 || roleText.includes("kepala sekolah");
-    const canRateProgram = isGuru || isKepalaSekolah;
+    const roleText = String(
+        user?.role || user?.nama_role || user?.jabatan || "",
+    ).toLowerCase();
+    const isGuru =
+        idRole === 8 ||
+        user?.type === "guru-assessment" ||
+        roleText.includes("guru assessment");
+    const canRateProgram = isGuru;
 
     const fetchList = useCallback(async () => {
         if (!user?.id_sekolah) return;
@@ -696,6 +694,24 @@ export default function ProgramSekolah() {
     };
 
     const openRating = (activity) => {
+        if (!isGuru) {
+            setNote({
+                show: true,
+                type: "info",
+                message: "Rating hanya dapat diberikan oleh Guru Assessment.",
+            });
+            return;
+        }
+
+        if (getActivityStatus(activity) !== "APPROVED") {
+            setNote({
+                show: true,
+                type: "info",
+                message: "Rating tersedia setelah step kegiatan selesai dan disetujui HO.",
+            });
+            return;
+        }
+
         const ownRating = getOwnGuruRating(activity, user);
         setRatingModal(activity);
         setRatingValue(ownRating?.rating || activity.guru_rating || 0);
@@ -703,6 +719,24 @@ export default function ProgramSekolah() {
     };
 
     const submitRating = async () => {
+        if (!isGuru) {
+            setNote({
+                show: true,
+                type: "info",
+                message: "Rating hanya dapat diberikan oleh Guru Assessment.",
+            });
+            return;
+        }
+
+        if (!ratingModal || getActivityStatus(ratingModal) !== "APPROVED") {
+            setNote({
+                show: true,
+                type: "info",
+                message: "Rating tersedia setelah step kegiatan selesai dan disetujui HO.",
+            });
+            return;
+        }
+
         if (!ratingValue || ratingValue < 1) {
             setNote({
                 show: true,
@@ -722,8 +756,8 @@ export default function ProgramSekolah() {
                 {
                     rating: ratingValue,
                     comment: ratingComment,
-                    rater_type: isKepalaSekolah ? "KEPALA_SEKOLAH" : "GURU",
-                    id_guru_assessment: isGuru ? getGuruAssessmentId(user) : null,
+                    rater_type: "GURU",
+                    id_guru_assessment: getGuruAssessmentId(user),
                     id_sekolah: user?.id_sekolah || ratingModal?.id_sekolah || selectedProgram?.id_sekolah,
                 },
                 { headers: { Authorization: `Bearer ${token}` } },
@@ -1739,4 +1773,3 @@ function CommentDrawer({
         </div>
     );
 }
-

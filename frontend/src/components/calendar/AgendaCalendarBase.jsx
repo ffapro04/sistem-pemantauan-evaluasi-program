@@ -44,7 +44,7 @@ const AGENDA_LOGO_PATHS = {
     satuIndonesia: satuIndonesiaLogo,
 };
 
-const AGENDA_TABLE_PAGE_SIZE = 10;
+const AGENDA_TABLE_PAGE_SIZE = 4;
 
 const MONTH_NAMES = [
     "Januari",
@@ -355,6 +355,47 @@ function getVendorId(user = {}) {
         user?.vendor?.id_vendor ??
         user?.vendor?.id ??
         ""
+    );
+}
+
+function resolveVendorForUser(vendorList = [], user = {}) {
+    const userId = normalizeId(getUserId(user));
+    const email = String(user?.email || "").trim().toLowerCase();
+    const name = String(user?.nama || user?.name || "").trim().toLowerCase();
+
+    return (
+        vendorList.find((vendor) => {
+            const linkedUserIds = [
+                vendor?.id_user,
+                vendor?.user_id,
+                vendor?.user?.id_user,
+                vendor?.user?.id,
+            ]
+                .map(normalizeId)
+                .filter(Boolean);
+
+            return userId && linkedUserIds.includes(userId);
+        }) ||
+        vendorList.find((vendor) => {
+            const vendorEmail = String(
+                vendor?.email ||
+                vendor?.email_vendor ||
+                vendor?.user?.email ||
+                "",
+            )
+                .trim()
+                .toLowerCase();
+
+            return email && vendorEmail === email;
+        }) ||
+        vendorList.find((vendor) => {
+            const vendorName = String(vendor?.nama_vendor || "")
+                .trim()
+                .toLowerCase();
+
+            return name && vendorName === name;
+        }) ||
+        null
     );
 }
 
@@ -1537,8 +1578,7 @@ function PersonaCell({ event }) {
                         {schoolPersonas.map((persona, index) => (
                             <p
                                 key={`${persona.role}-${persona.name}-${index}`}
-                                className="min-w-0 truncate"
-                                title={persona.name}
+                                className="min-w-0 break-words"
                             >
                                 {persona.name}
                             </p>
@@ -1547,6 +1587,320 @@ function PersonaCell({ event }) {
                 </div>
             )}
         </div>
+    );
+}
+
+
+function AgendaMetaItem({ icon: Icon, label, value, children }) {
+    return (
+        <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
+            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-white text-[#0AC4E0] shadow-sm">
+                    <Icon size={14} />
+                </span>
+                {label}
+            </div>
+            <div className="mt-2 break-words text-[11px] font-black leading-5 text-slate-700">
+                {children || value || "-"}
+            </div>
+        </div>
+    );
+}
+
+function AgendaDetailCard({
+    event,
+    canManageCOE = false,
+    onEditCOE,
+    onDoneCOE,
+    onDeleteCOE,
+}) {
+    const isCOE = event.type === "COE";
+    const isHoliday = event.type === "HOLIDAY";
+    const status = getEventStatus(event);
+    const visual = getEventVisual(event);
+    const statusLabel = isHoliday ? "Hari Libur" : getStatusLabel(status);
+    const timeLabel = event.startTime || event.endTime
+        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+        : "Sepanjang hari";
+
+    return (
+        <article className="group relative overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_16px_40px_rgba(10,196,224,0.10)]">
+            <div className={`absolute inset-y-0 left-0 w-1.5 ${visual.dot}`} />
+
+            <div className="p-4 pl-5 sm:p-5 sm:pl-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.15em] ${visual.badge}`}>
+                                {visual.label}
+                            </span>
+                            {!isHoliday && (
+                                <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.15em] text-slate-500">
+                                    {statusLabel}
+                                </span>
+                            )}
+                        </div>
+
+                        <h3 className="mt-3 break-words text-[15px] font-black leading-6 text-slate-900">
+                            {event.title}
+                        </h3>
+
+                        {event.description && (
+                            <p className="mt-1.5 break-words text-[11px] font-semibold leading-5 text-slate-500">
+                                {event.description}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="shrink-0 rounded-2xl border border-cyan-100 bg-cyan-50/60 px-4 py-3 sm:max-w-[210px]">
+                        <p className="text-[8px] font-black uppercase tracking-[0.18em] text-cyan-500">
+                            Tanggal Agenda
+                        </p>
+                        <p className="mt-1 text-[11px] font-black leading-5 text-slate-800">
+                            {formatReadableDate(event.date)}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <AgendaMetaItem
+                        icon={Layers3}
+                        label="Pilar"
+                        value={isHoliday ? "-" : getPilarLabel(event.pilar)}
+                    />
+                    <AgendaMetaItem
+                        icon={Flag}
+                        label="Jenjang"
+                        value={isHoliday ? "-" : getEventJenjangLabel(event)}
+                    />
+                    {isCOE ? (
+                        <>
+                            <AgendaMetaItem icon={Clock3} label="Waktu">
+                                <span>{timeLabel}</span>
+                                <span className="mt-0.5 block text-[9px] font-black uppercase tracking-wide text-amber-600">
+                                    {getActivityTypeLabel(event.activityType)}
+                                </span>
+                            </AgendaMetaItem>
+                            <AgendaMetaItem icon={MapPin} label="Lokasi">
+                                <span>{event.location || "-"}</span>
+                                {event.meetingLink && (
+                                    <a
+                                        href={normalizeExternalUrl(event.meetingLink)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
+                                    >
+                                        Buka meeting
+                                    </a>
+                                )}
+                            </AgendaMetaItem>
+                        </>
+                    ) : (
+                        <>
+                            <AgendaMetaItem icon={CalendarDays} label="Jenis Agenda" value={visual.label} />
+                            <AgendaMetaItem icon={CheckCircle2} label="Status" value={statusLabel} />
+                        </>
+                    )}
+                </div>
+
+                {!isHoliday && (
+                    <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-3.5">
+                        <div className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-cyan-50 text-[#0AC4E0]">
+                                <UsersRound size={14} />
+                            </span>
+                            Pihak Terlibat
+                        </div>
+                        <PersonaCell event={event} />
+                    </div>
+                )}
+
+                {isCOE && canManageCOE && (
+                    <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                        <button
+                            type="button"
+                            onClick={() => onEditCOE?.(event)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-amber-600 transition hover:bg-amber-100"
+                        >
+                            <Pencil size={13} />
+                            Edit
+                        </button>
+
+                        {!['SELESAI', 'DIBATALKAN'].includes(status) && (
+                            <button
+                                type="button"
+                                onClick={() => onDoneCOE?.(event)}
+                                className="inline-flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-emerald-600 transition hover:bg-emerald-100"
+                            >
+                                <CheckCircle2 size={13} />
+                                Selesai
+                            </button>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={() => onDeleteCOE?.(event)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-rose-600 transition hover:bg-rose-100"
+                        >
+                            <Trash2 size={13} />
+                            Hapus
+                        </button>
+                    </div>
+                )}
+            </div>
+        </article>
+    );
+}
+
+function CompactAgendaDetail({
+    event,
+    canManageCOE = false,
+    onEditCOE,
+    onDoneCOE,
+    onDeleteCOE,
+}) {
+    const isCOE = event.type === "COE";
+    const isHoliday = event.type === "HOLIDAY";
+    const status = getEventStatus(event);
+    const visual = getEventVisual(event);
+    const statusLabel = isHoliday ? "Hari Libur" : getStatusLabel(status);
+    const timeLabel = event.startTime || event.endTime
+        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+        : "Sepanjang hari";
+    const personas = getEventPersonas(event);
+    const mainPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() !== "sekolah",
+    );
+    const schoolPersonas = personas.filter(
+        (persona) => String(persona.role || "").toLowerCase() === "sekolah",
+    );
+
+    return (
+        <article className="flex h-full min-h-[286px] flex-col p-4">
+            <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] ${visual.badge}`}>
+                            {visual.label}
+                        </span>
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            {statusLabel}
+                        </span>
+                    </div>
+
+                    <h3 className="mt-2 line-clamp-2 text-[15px] font-black leading-5 text-slate-900">
+                        {event.title}
+                    </h3>
+                    {event.description && (
+                        <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-4 text-slate-500">
+                            {event.description}
+                        </p>
+                    )}
+                </div>
+
+                <div className="shrink-0 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2 text-right">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-cyan-500">
+                        Tanggal
+                    </p>
+                    <p className="mt-0.5 max-w-[150px] text-[10px] font-black leading-4 text-slate-800">
+                        {formatReadableDate(event.date)}
+                    </p>
+                </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Pilar</p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isHoliday ? "-" : getPilarLabel(event.pilar)}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Jenjang</p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isHoliday ? "-" : getEventJenjangLabel(event)}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        {isCOE ? "Waktu" : "Jenis"}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isCOE ? timeLabel : visual.label}
+                    </p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        {isCOE ? "Lokasi" : "Status"}
+                    </p>
+                    <p className="mt-1 truncate text-[10px] font-black text-slate-700">
+                        {isCOE ? event.location || "-" : statusLabel}
+                    </p>
+                </div>
+            </div>
+
+            {!isHoliday && (
+                <div className="mt-3 min-h-0 flex-1 rounded-xl border border-slate-100 bg-white px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            Pihak Terlibat
+                        </p>
+                        <span className="text-[8px] font-black text-cyan-500">
+                            {personas.length} data
+                        </span>
+                    </div>
+
+                    <div className="mt-2 max-h-[76px] overflow-y-auto pr-1 text-[10px] font-bold leading-4 text-slate-600">
+                        {mainPersonas.length > 0 && (
+                            <p className="break-words">
+                                {mainPersonas
+                                    .map((persona) => `${persona.role}: ${persona.name}`)
+                                    .join(" · ")}
+                            </p>
+                        )}
+
+                        {schoolPersonas.length > 0 && (
+                            <p className="mt-1.5 break-words">
+                                <span className="font-black text-slate-800">Sekolah:</span>{" "}
+                                {schoolPersonas.map((persona) => persona.name).join(", ")}
+                            </p>
+                        )}
+
+                        {!personas.length && (
+                            <p className="text-slate-400">Data pihak terlibat belum tersedia.</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {isCOE && canManageCOE && (
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                    <button
+                        type="button"
+                        onClick={() => onEditCOE?.(event)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-amber-600 transition hover:bg-amber-100"
+                    >
+                        <Pencil size={12} /> Edit
+                    </button>
+                    {!['SELESAI', 'DIBATALKAN'].includes(status) && (
+                        <button
+                            type="button"
+                            onClick={() => onDoneCOE?.(event)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-emerald-600 transition hover:bg-emerald-100"
+                        >
+                            <CheckCircle2 size={12} /> Selesai
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => onDeleteCOE?.(event)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-2 text-[8px] font-black uppercase tracking-wide text-rose-600 transition hover:bg-rose-100"
+                    >
+                        <Trash2 size={12} /> Hapus
+                    </button>
+                </div>
+            )}
+        </article>
     );
 }
 
@@ -2042,6 +2396,7 @@ export default function AgendaCalendarBase({
     const navigate = useNavigate();
     const routeLocation = useLocation();
     const calendarRef = useRef(null);
+    const agendaDetailSectionRef = useRef(null);
     const openedAgendaRef = useRef("");
 
     const currentUser = useMemo(() => getCurrentUserFromToken(), []);
@@ -2065,7 +2420,7 @@ export default function AgendaCalendarBase({
     const [activeActivityType, setActiveActivityType] = useState("SEMUA");
     const [searchKeyword, setSearchKeyword] = useState("");
     const [tableSearchKeyword, setTableSearchKeyword] = useState("");
-    const [tablePage, setTablePage] = useState(1);
+    const [selectedDetailAgendaId, setSelectedDetailAgendaId] = useState("");
 
     const [showCOEModal, setShowCOEModal] = useState(false);
     const [editingCOE, setEditingCOE] = useState(null);
@@ -2149,6 +2504,38 @@ export default function AgendaCalendarBase({
     const fetchDefaultPrograms = async (headers) => {
         if (!showProgram) return [];
 
+        let roleIdentity = currentUser;
+
+        if (scope === "VENDOR") {
+            try {
+                const vendorResponse = await fetch(`${API_BASE_URL}/vendor`, {
+                    headers,
+                });
+                const vendorPayload = await safeJson(vendorResponse);
+                const currentVendor = resolveVendorForUser(
+                    normalizeArray(vendorPayload),
+                    currentUser,
+                );
+
+                if (!vendorResponse.ok || !currentVendor?.id_vendor) {
+                    console.warn(
+                        "Agenda Vendor: relasi akun ke master vendor tidak ditemukan",
+                    );
+                    return [];
+                }
+
+                roleIdentity = {
+                    ...currentUser,
+                    id_vendor: currentVendor.id_vendor,
+                    vendor_id: currentVendor.id_vendor,
+                    vendor: currentVendor,
+                };
+            } catch (error) {
+                console.error("Agenda Vendor: gagal membaca identitas vendor", error);
+                return [];
+            }
+        }
+
         if (scope === "SEKOLAH") {
             const schoolId = getSchoolId(currentUser);
             const userId = getUserId(currentUser);
@@ -2195,7 +2582,7 @@ export default function AgendaCalendarBase({
         );
 
         rows = rows.filter((program) =>
-            shouldKeepProgramByRole(program, currentUser, scope),
+            shouldKeepProgramByRole(program, roleIdentity, scope),
         );
 
         const details = await Promise.all(
@@ -2347,11 +2734,11 @@ export default function AgendaCalendarBase({
 
         return mapProgramsToEvents(programs, {
             lockedBidang: bidang,
-            showFase: false,
+            showFase,
             roleScope: scope,
             buildProgramPath,
         });
-    }, [programs, bidang, showProgram, scope, buildProgramPath]);
+    }, [programs, bidang, showProgram, showFase, scope, buildProgramPath]);
 
     const assessmentEvents = useMemo(() => {
         if (!showAssessment) return [];
@@ -2811,55 +3198,30 @@ export default function AgendaCalendarBase({
                 .includes(keyword),
         );
     }, [selectedEvents, tableSearchKeyword]);
-    const tableTotalPages = Math.max(
-        1,
-        Math.ceil(tableEvents.length / AGENDA_TABLE_PAGE_SIZE),
-    );
-    const safeTablePage = Math.min(tablePage, tableTotalPages);
-    const tableStartIndex = (safeTablePage - 1) * AGENDA_TABLE_PAGE_SIZE;
-    const paginatedTableEvents = tableEvents.slice(
-        tableStartIndex,
-        tableStartIndex + AGENDA_TABLE_PAGE_SIZE,
-    );
-    const tableFrom = tableEvents.length ? tableStartIndex + 1 : 0;
-    const tableTo = Math.min(
-        tableStartIndex + paginatedTableEvents.length,
-        tableEvents.length,
-    );
+    const selectedDetailAgenda = useMemo(() => {
+        if (!tableEvents.length) return null;
 
-    const hasCOEInCurrentTable = paginatedTableEvents.some(
-        (event) => event.type === "COE",
-    );
-
-    const agendaTableColumns = hasCOEInCurrentTable
-        ? [
-            "Nama Agenda",
-            "Tanggal",
-            "Jenis",
-            "Pilar",
-            "Jenjang",
-            "Waktu",
-            "Lokasi",
-            ...(canManageCOE ? ["Action"] : []),
-        ]
-        : [
-            "Nama Agenda",
-            "Tanggal",
-            "Jenis",
-            "Pilar",
-            "Jenjang",
-            "Persona",
-        ];
+        return (
+            tableEvents.find(
+                (event) => String(event.id) === String(selectedDetailAgendaId),
+            ) || tableEvents[0]
+        );
+    }, [tableEvents, selectedDetailAgendaId]);
 
     useEffect(() => {
-        setTablePage(1);
-    }, [tableSearchKeyword, activeFilter, activePilar, activeJenjang, activeActivityType, searchKeyword]);
-
-    useEffect(() => {
-        if (tablePage > tableTotalPages) {
-            setTablePage(tableTotalPages);
+        if (!tableEvents.length) {
+            setSelectedDetailAgendaId("");
+            return;
         }
-    }, [tablePage, tableTotalPages]);
+
+        const selectionStillExists = tableEvents.some(
+            (event) => String(event.id) === String(selectedDetailAgendaId),
+        );
+
+        if (!selectionStillExists) {
+            setSelectedDetailAgendaId(String(tableEvents[0].id));
+        }
+    }, [tableEvents, selectedDetailAgendaId]);
 
     if (loading) {
         return (
@@ -3339,192 +3701,107 @@ export default function AgendaCalendarBase({
 
                         </section>
 
-                        <section className="rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5 lg:p-6">
-                            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                                <div>
+                        <section
+                            ref={agendaDetailSectionRef}
+                            className="scroll-mt-4 rounded-[2rem] border border-slate-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.08)] sm:p-5"
+                        >
+                            <div className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="min-w-0">
                                     <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                                         Detail Agenda
                                     </p>
-                                    <h2 className="mt-1 text-[22px] font-black text-slate-900">
-                                        Tabel Agenda Tanggal Terpilih
-                                    </h2>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <h2 className="text-[20px] font-black text-slate-900">
+                                            Agenda Tanggal Terpilih
+                                        </h2>
+                                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[9px] font-black text-[#0AC4E0]">
+                                            {tableEvents.length} agenda
+                                        </span>
+                                    </div>
                                     <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                        {formatReadableDate(selectedDateKey)} · menampilkan {tableFrom}-{tableTo} dari {tableEvents.length} agenda.
+                                        {formatReadableDate(selectedDateKey)} · pilih agenda untuk melihat detail.
                                     </p>
                                 </div>
 
-                                <div className="relative h-11 w-full lg:w-[420px]">
-                                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
+                                <div className="relative h-10 w-full lg:w-[360px]">
+                                    <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#0AC4E0]" />
                                     <input
                                         value={tableSearchKeyword}
                                         onChange={(event) => setTableSearchKeyword(event.target.value)}
-                                        placeholder="Cari di tabel agenda..."
-                                        className="h-11 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[12px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
+                                        placeholder="Cari agenda..."
+                                        className="h-10 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-3 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-1 focus:ring-[#0AC4E0]"
                                     />
                                 </div>
                             </div>
 
-                            <div className="agenda-scroll overflow-x-auto rounded-2xl border border-slate-100">
-                                <table className="w-full min-w-[1040px] border-collapse text-left">
-                                    <thead className="bg-slate-50">
-                                        <tr>
-                                            {agendaTableColumns.map((column) => (
-                                                <th
-                                                    key={column}
-                                                    className="border-b border-slate-100 px-4 py-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400"
+                            {tableEvents.length ? (
+                                <div className="grid gap-3 lg:grid-cols-[minmax(250px,0.72fr)_minmax(0,1.45fr)]">
+                                    <div className="max-h-[286px] space-y-2 overflow-y-auto rounded-[1.35rem] border border-slate-100 bg-slate-50/70 p-2 pr-1.5">
+                                        {tableEvents.map((event) => {
+                                            const isActive = String(event.id) === String(selectedDetailAgenda?.id);
+                                            const visual = getEventVisual(event);
+                                            const statusLabel = event.type === "HOLIDAY"
+                                                ? "Hari Libur"
+                                                : getStatusLabel(getEventStatus(event));
+                                            const timeLabel = event.startTime || event.endTime
+                                                ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
+                                                : "Sepanjang hari";
+
+                                            return (
+                                                <button
+                                                    key={event.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedDetailAgendaId(String(event.id))}
+                                                    className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition ${isActive
+                                                        ? "border-[#0AC4E0] bg-white shadow-[0_10px_24px_rgba(10,196,224,0.12)]"
+                                                        : "border-transparent bg-white/70 hover:border-cyan-100 hover:bg-white"
+                                                        }`}
                                                 >
-                                                    {column}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {paginatedTableEvents.length ? (
-                                            paginatedTableEvents.map((event) => {
-                                                const isCOE = event.type === "COE";
-                                                const isHoliday = event.type === "HOLIDAY";
-                                                const status = getEventStatus(event);
-                                                const visual = getEventVisual(event);
+                                                    <span className={`h-9 w-1.5 shrink-0 rounded-full ${visual.dot}`} />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-[11px] font-black text-slate-800">
+                                                            {event.title}
+                                                        </p>
+                                                        <div className="mt-1 flex min-w-0 items-center gap-2 text-[9px] font-bold text-slate-400">
+                                                            <span className="shrink-0">{timeLabel}</span>
+                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                                                            <span className="truncate">{visual.label}</span>
+                                                            <span className="h-1 w-1 shrink-0 rounded-full bg-slate-300" />
+                                                            <span className="truncate">{statusLabel}</span>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight
+                                                        size={14}
+                                                        className={`shrink-0 transition ${isActive ? "text-[#0AC4E0]" : "text-slate-300 group-hover:text-cyan-400"}`}
+                                                    />
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
 
-                                                return (
-                                                    <tr key={event.id} className="transition hover:bg-cyan-50/30">
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                            <p className="max-w-[280px] text-[12px] font-black leading-5 text-slate-800">
-                                                                {event.title}
-                                                            </p>
-                                                            {event.description && (
-                                                                <p className="mt-1 line-clamp-2 max-w-[280px] text-[10px] font-semibold leading-4 text-slate-400">
-                                                                    {event.description}
-                                                                </p>
-                                                            )}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-black text-slate-800">
-                                                            {formatReadableDate(event.date)}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${visual.badge}`}>
-                                                                {visual.label}
-                                                            </span>
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {isHoliday ? "-" : getPilarLabel(event.pilar)}
-                                                        </td>
-                                                        <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                            {isHoliday ? "-" : getEventJenjangLabel(event)}
-                                                        </td>
-
-                                                        {isCOE ? (
-                                                            <>
-                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                                    {event.startTime || event.endTime
-                                                                        ? `${event.startTime || "00:00"}${event.endTime ? ` - ${event.endTime}` : ""}`
-                                                                        : "Sepanjang hari"}
-
-                                                                    <span className="mt-1 block text-[10px] font-black uppercase tracking-wide text-amber-600">
-                                                                        {getActivityTypeLabel(event.activityType)}
-                                                                    </span>
-                                                                </td>
-
-                                                                <td className="border-b border-slate-50 px-4 py-3 align-top text-[11px] font-bold text-slate-600">
-                                                                    {event.location || "-"}
-
-                                                                    {event.meetingLink && (
-                                                                        <a
-                                                                            href={normalizeExternalUrl(event.meetingLink)}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            className="mt-1 block text-[10px] font-black text-[#0AC4E0] underline underline-offset-2"
-                                                                        >
-                                                                            Buka meeting
-                                                                        </a>
-                                                                    )}
-                                                                </td>
-
-                                                                {canManageCOE && (
-                                                                    <td className="border-b border-slate-50 px-4 py-3 align-top">
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => openEditCOE(event)}
-                                                                                className="rounded-lg bg-amber-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-amber-600"
-                                                                            >
-                                                                                Edit
-                                                                            </button>
-
-                                                                            {!["SELESAI", "DIBATALKAN"].includes(status) && (
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => handleDoneCOE(event)}
-                                                                                    className="rounded-lg bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-emerald-600"
-                                                                                >
-                                                                                    Selesai
-                                                                                </button>
-                                                                            )}
-
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleDeleteCOE(event)}
-                                                                                className="rounded-lg bg-rose-50 px-3 py-2 text-[9px] font-black uppercase tracking-wide text-rose-600"
-                                                                            >
-                                                                                Hapus
-                                                                            </button>
-                                                                        </div>
-                                                                    </td>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <td
-                                                                colSpan={hasCOEInCurrentTable ? (canManageCOE ? 3 : 2) : 1}
-                                                                className="border-b border-slate-50 px-4 py-3 align-top"
-                                                            >
-                                                                <PersonaCell event={event} />
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                );
-                                            })
-                                        ) : (
-                                            <tr>
-                                                    <td colSpan={agendaTableColumns.length} className="px-4 py-12 text-center">
-                                                    <p className="text-[12px] font-black text-slate-700">
-                                                        Agenda tidak ditemukan
-                                                    </p>
-                                                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
-                                                        Ubah filter kalender atau kata kunci pencarian tabel.
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                                    Halaman {safeTablePage} dari {tableTotalPages} · Maksimal {AGENDA_TABLE_PAGE_SIZE} data per halaman
-                                </p>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setTablePage((page) => Math.max(1, page - 1))}
-                                        disabled={safeTablePage <= 1}
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        <ChevronLeft size={14} />
-                                        Prev
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setTablePage((page) => Math.min(tableTotalPages, page + 1))}
-                                        disabled={safeTablePage >= tableTotalPages}
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                        Next
-                                        <ChevronRight size={14} />
-                                    </button>
+                                    <div className="min-h-[286px] rounded-[1.35rem] border border-slate-100 bg-white">
+                                        {selectedDetailAgenda ? (
+                                            <CompactAgendaDetail
+                                                event={selectedDetailAgenda}
+                                                canManageCOE={canManageCOE}
+                                                onEditCOE={openEditCOE}
+                                                onDoneCOE={handleDoneCOE}
+                                                onDeleteCOE={handleDeleteCOE}
+                                            />
+                                        ) : null}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50/60 px-4 py-10 text-center">
+                                        <CalendarDays size={24} className="mx-auto text-slate-300" />
+                                        <p className="mt-3 text-[12px] font-black text-slate-700">
+                                            Agenda tidak ditemukan
+                                        </p>
+                                        <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                                            Ubah filter kalender atau kata kunci pencarian agenda.
+                                        </p>
+                                </div>
+                            )}
                         </section>
                     </div>
                 </main>
@@ -3550,4 +3827,3 @@ export default function AgendaCalendarBase({
         </>
     );
 }
-

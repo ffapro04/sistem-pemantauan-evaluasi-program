@@ -3602,8 +3602,8 @@ function KadinAnalyticsSection({
                                 type="button"
                                 onClick={() => setChartType("BAR")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <BarChart3 size={14} /> Batang
@@ -3613,8 +3613,8 @@ function KadinAnalyticsSection({
                                 type="button"
                                 onClick={() => setChartType("PIE")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <Layers size={14} /> Pie
@@ -3703,8 +3703,8 @@ function KadinAnalyticsSection({
                                         <div className="flex shrink-0 flex-col items-end gap-2">
                                             <span
                                                 className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${row.progress === "SELESAI"
-                                                        ? "bg-emerald-50 text-emerald-600"
-                                                        : "bg-amber-50 text-amber-600"
+                                                    ? "bg-emerald-50 text-emerald-600"
+                                                    : "bg-amber-50 text-amber-600"
                                                     }`}
                                             >
                                                 {row.progress === "SELESAI"
@@ -3743,8 +3743,8 @@ function KadinAnalyticsSection({
                                     type="button"
                                     onClick={() => setPage(pageNumber)}
                                     className={`h-9 min-w-9 rounded-xl border px-2 text-[10px] font-black ${page === pageNumber
-                                            ? "border-[#0AC4E0] bg-[#0AC4E0] text-white"
-                                            : "border-slate-200 bg-white text-slate-500"
+                                        ? "border-[#0AC4E0] bg-[#0AC4E0] text-white"
+                                        : "border-slate-200 bg-white text-slate-500"
                                         }`}
                                 >
                                     {pageNumber}
@@ -3769,16 +3769,70 @@ function KadinAnalyticsSection({
     );
 }
 
-function normalizeKadinJenjang(value) {
-    const raw = String(value || "")
-        .trim()
-        .toUpperCase()
-        .replaceAll(" ", "");
+function normalizeKadinJenjang(valueOrSchool) {
+    const school =
+        valueOrSchool && typeof valueOrSchool === "object" ? valueOrSchool : null;
 
-    if (raw.includes("SMK") || raw.includes("SMA/K")) return "SMK";
-    if (raw.includes("SMP")) return "SMP";
-    if (raw.includes("SD")) return "SD";
+    const candidates = school
+        ? [
+            getSchoolJenjang(school),
+            school?.kode_jenjang,
+            school?.kodeJenjang,
+            school?.satuan_pendidikan,
+            school?.satuanPendidikan,
+            school?.profil_sekolah?.jenjang,
+            school?.profilSekolah?.jenjang,
+            getSchoolName(school),
+        ]
+        : [valueOrSchool];
+
+    const raw = candidates
+        .filter(Boolean)
+        .map((value) => String(value).trim().toUpperCase())
+        .join(" ")
+        .replaceAll("-", " ")
+        .replaceAll("_", " ");
+
+    if (/\bSMK[N]?\b|SEKOLAH\s+MENENGAH\s+KEJURUAN|SMA\s*\/?\s*K/.test(raw)) {
+        return "SMK";
+    }
+    if (/\bSMP[N]?\b|SEKOLAH\s+MENENGAH\s+PERTAMA|\bMTS[N]?\b/.test(raw)) {
+        return "SMP";
+    }
+    if (/\bSD[N]?\b|SEKOLAH\s+DASAR|\bMI[N]?\b/.test(raw)) {
+        return "SD";
+    }
+
     return "LAINNYA";
+}
+
+function getKadinDistrictName(school) {
+    const kabupaten = school?.kabupaten || {};
+    const wilayah = school?.wilayah || {};
+    const wilayahType = String(
+        wilayah?.jenis_wilayah || wilayah?.tipe_wilayah || wilayah?.type || "",
+    ).toUpperCase();
+
+    const candidates = [
+        school?.nama_kabupaten,
+        school?.namaKabupaten,
+        school?.kabupaten_kota,
+        school?.kabupatenKota,
+        kabupaten?.nama_wilayah,
+        kabupaten?.namaWilayah,
+        kabupaten?.nama,
+        kabupaten?.name,
+        wilayahType.includes("KAB") || wilayahType.includes("KOTA")
+            ? getSchoolWilayahFullName(school)
+            : "",
+    ];
+
+    const name = candidates.find((value) => {
+        const text = String(value || "").trim();
+        return text && !/^belum\s+diisi$/i.test(text);
+    });
+
+    return cleanLeafName(name || "Belum Diisi");
 }
 
 function getPaginationNumbers(page, totalPages) {
@@ -3813,8 +3867,8 @@ function DashboardPagination({ page, totalPages, onChange }) {
                     type="button"
                     onClick={() => onChange(number)}
                     className={`h-9 min-w-9 rounded-xl px-2 text-[10px] font-black transition ${number === page
-                            ? "bg-[#0AC4E0] text-white shadow-lg shadow-cyan-500/20"
-                            : "border border-slate-200 bg-white text-slate-400 hover:border-cyan-200 hover:text-cyan-600"
+                        ? "bg-[#0AC4E0] text-white shadow-lg shadow-cyan-500/20"
+                        : "border border-slate-200 bg-white text-slate-400 hover:border-cyan-200 hover:text-cyan-600"
                         }`}
                 >
                     {number}
@@ -4197,8 +4251,8 @@ function KadinSchoolAnalyticsSection({ schools, programsBySchool, provinceName }
                                 type="button"
                                 onClick={() => setChartType("BAR")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <BarChart3 size={14} /> Batang
@@ -4207,8 +4261,8 @@ function KadinSchoolAnalyticsSection({ schools, programsBySchool, provinceName }
                                 type="button"
                                 onClick={() => setChartType("PIE")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <Layers size={14} /> Pie
@@ -4546,8 +4600,8 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
                                         <div className="flex shrink-0 flex-col items-end gap-2">
                                             <span
                                                 className={`rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest ${row.progress === "SELESAI"
-                                                        ? "bg-emerald-50 text-emerald-600"
-                                                        : "bg-amber-50 text-amber-600"
+                                                    ? "bg-emerald-50 text-emerald-600"
+                                                    : "bg-amber-50 text-amber-600"
                                                     }`}
                                             >
                                                 {row.progress === "SELESAI"
@@ -4592,8 +4646,8 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
                                 type="button"
                                 onClick={() => setChartType("BAR")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "BAR"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <BarChart3 size={14} /> Batang
@@ -4602,8 +4656,8 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
                                 type="button"
                                 onClick={() => setChartType("PIE")}
                                 className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[9px] font-black uppercase tracking-wide transition ${chartType === "PIE"
-                                        ? "bg-[#0AC4E0] text-white"
-                                        : "text-slate-400 hover:bg-slate-50"
+                                    ? "bg-[#0AC4E0] text-white"
+                                    : "text-slate-400 hover:bg-slate-50"
                                     }`}
                             >
                                 <Layers size={14} /> Pie
@@ -4622,6 +4676,318 @@ function KadinProgramOnlySection({ programs, schools, provinceName }) {
     );
 }
 
+
+const KADIN_STAGE_META = [
+    { key: "APPROVAL", label: "Approval", color: "#F59E0B" },
+    { key: "SOSIALISASI", label: "Sosialisasi", color: "#38BDF8" },
+    { key: "IMPLEMENTASI", label: "Implementasi", color: "#0AC4E0" },
+    { key: "EVALUASI", label: "Evaluasi", color: "#8B5CF6" },
+    { key: "SELESAI", label: "Selesai", color: "#10B981" },
+];
+
+const KADIN_JENJANG_META = [
+    { key: "SD", label: "SD", color: "#0AC4E0" },
+    { key: "SMP", label: "SMP", color: "#2563EB" },
+    { key: "SMK", label: "SMK", color: "#8B5CF6" },
+    { key: "LAINNYA", label: "Lainnya", color: "#94A3B8" },
+];
+
+const KADIN_VIEW_OPTIONS = [
+    {
+        key: "TAHAPAN",
+        label: "Tahapan",
+        description: "Posisi seluruh program",
+        icon: <Layers size={15} />,
+    },
+    {
+        key: "PILAR",
+        label: "Pilar",
+        description: "Komposisi empat pilar",
+        icon: <Target size={15} />,
+    },
+    {
+        key: "JENJANG",
+        label: "Jenjang",
+        description: "Sekolah SD, SMP, dan SMK",
+        icon: <GraduationCap size={15} />,
+    },
+    {
+        key: "KABUPATEN",
+        label: "Kabupaten/Kota",
+        description: "Sebaran sekolah per wilayah",
+        icon: <MapPinned size={15} />,
+    },
+    {
+        key: "TAHUN",
+        label: "Tahun",
+        description: "Sebaran program per tahun",
+        icon: <CalendarDays size={15} />,
+    },
+];
+
+function normalizeKadinStage(program) {
+    const progressBucket = getKadinProgressBucket(program, "PROGRAM");
+    const raw = String(getProgramRawStatus(program) || "")
+        .trim()
+        .toUpperCase()
+        .replaceAll("-", "_")
+        .replaceAll(" ", "_");
+
+    if (progressBucket === "SELESAI" || raw.includes("SELESAI") || raw.includes("COMPLETED")) {
+        return "SELESAI";
+    }
+    if (raw.includes("EVALUASI") || raw.includes("EVALUATION")) return "EVALUASI";
+    if (raw.includes("IMPLEMENTASI") || raw.includes("IMPLEMENTATION")) return "IMPLEMENTASI";
+    if (raw.includes("SOSIALISASI") || raw.includes("SOCIALIZATION")) return "SOSIALISASI";
+    if (raw.includes("APPROVAL") || raw.includes("PERSETUJUAN")) return "APPROVAL";
+
+    return "IMPLEMENTASI";
+}
+
+function KadinSummaryItem({ icon, label, value, description, color }) {
+    return (
+        <article className="relative min-w-0 overflow-hidden px-5 py-4 sm:px-6">
+            <span className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: color }} />
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                        {label}
+                    </p>
+                    <p className="mt-2 text-2xl font-black tracking-[-0.04em] text-slate-900">
+                        {value}
+                    </p>
+                    <p className="mt-1 text-[10px] font-semibold leading-5 text-slate-400">
+                        {description}
+                    </p>
+                </div>
+                <span
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: `${color}14`, color }}
+                >
+                    {icon}
+                </span>
+            </div>
+        </article>
+    );
+}
+
+function KadinSolidPieCard({
+    eyebrow,
+    title,
+    description,
+    rows,
+    totalLabel = "Total Data",
+    activeViewLabel = "Tahapan",
+    contextLabel = "Wilayah penugasan",
+}) {
+    const visibleRows = rows.filter((row) => Number(row.value) > 0);
+    const total = rows.reduce((sum, row) => sum + Number(row.value || 0), 0);
+    const dominantRow = visibleRows.reduce(
+        (current, row) => (!current || Number(row.value) > Number(current.value) ? row : current),
+        null,
+    );
+    const dominantPercentage =
+        total > 0 && dominantRow
+            ? Math.round((Number(dominantRow.value || 0) / total) * 100)
+            : 0;
+
+    return (
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.8rem] border border-slate-200 bg-white shadow-sm">
+            <div className="flex shrink-0 flex-col gap-3 border-b border-slate-100 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-500">
+                            {eyebrow}
+                        </p>
+                        <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-cyan-600">
+                            {activeViewLabel}
+                        </span>
+                    </div>
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.04em] text-slate-900">
+                        {title}
+                    </h2>
+                    <p className="mt-1 max-w-3xl text-[10px] font-semibold leading-5 text-slate-400">
+                        {description}
+                    </p>
+                </div>
+
+                <div className="inline-flex shrink-0 items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-cyan-500 shadow-sm">
+                        <BarChart3 size={15} />
+                    </span>
+                    <div>
+                        <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            {totalLabel}
+                        </p>
+                        <strong className="text-xl font-black leading-none text-slate-900">{total}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid min-h-0 flex-1 min-w-0 gap-4 p-4 lg:grid-cols-[minmax(320px,0.95fr)_minmax(280px,0.72fr)] xl:grid-cols-[minmax(360px,0.95fr)_minmax(300px,0.72fr)_minmax(250px,0.55fr)] xl:items-stretch xl:px-6">
+                <div className="relative flex min-h-[300px] min-w-0 items-center justify-center overflow-hidden rounded-[1.55rem] border border-cyan-100 bg-gradient-to-br from-cyan-50/80 via-white to-blue-50/70">
+                    <div className="pointer-events-none absolute -left-16 -top-16 h-44 w-44 rounded-full bg-cyan-200/25 blur-3xl" />
+                    <div className="pointer-events-none absolute -bottom-20 -right-12 h-52 w-52 rounded-full bg-blue-200/20 blur-3xl" />
+                    {visibleRows.length > 0 ? (
+                        <ResponsiveContainer
+                            width="100%"
+                            height={310}
+                            minHeight={310}
+                            minWidth={300}
+                        >
+                            <PieChart>
+                                <Pie
+                                    data={visibleRows}
+                                    dataKey="value"
+                                    nameKey="label"
+                                    cx="50%"
+                                    cy="51%"
+                                    innerRadius={0}
+                                    outerRadius={124}
+                                    paddingAngle={visibleRows.length > 1 ? 2 : 0}
+                                    stroke="#FFFFFF"
+                                    strokeWidth={4}
+                                    isAnimationActive
+                                >
+                                    {visibleRows.map((entry) => (
+                                        <Cell key={entry.key} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const row = payload[0]?.payload || {};
+                                        return (
+                                            <div className="max-w-[300px] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                                                <p className="text-[10px] font-black text-slate-900">
+                                                    {row.label}
+                                                </p>
+                                                <p className="mt-1 text-[9px] font-bold text-cyan-600">
+                                                    {row.value} {totalLabel.toLowerCase()}
+                                                </p>
+                                                {Array.isArray(row.schoolNames) && row.schoolNames.length > 0 && (
+                                                    <p className="mt-2 break-words text-[9px] font-semibold leading-4 text-slate-500">
+                                                        {row.schoolNames.join(", ")}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="flex h-[310px] w-full items-center justify-center text-[10px] font-black uppercase tracking-widest text-slate-300">
+                            Belum ada data
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid min-h-0 min-w-0 content-center gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                    {rows.map((row) => {
+                        const percentage = total > 0 ? Math.round((row.value / total) * 100) : 0;
+                        return (
+                            <div
+                                key={row.key}
+                                className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3.5 py-2.5"
+                            >
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span
+                                        className="h-3 w-3 shrink-0 rounded-full ring-4 ring-white"
+                                        style={{ backgroundColor: row.color }}
+                                    />
+                                    <span className="min-w-0">
+                                        <span className="block break-words text-[10px] font-black leading-4 text-slate-600">
+                                            {row.label}
+                                        </span>
+                                        {Array.isArray(row.schoolNames) && row.schoolNames.length > 0 && (
+                                            <span
+                                                className="mt-0.5 block max-w-[250px] break-words text-[8px] font-semibold leading-3.5 text-slate-400"
+                                                title={row.schoolNames.join(", ")}
+                                            >
+                                                {row.schoolNames.slice(0, 3).join(", ")}
+                                                {row.schoolNames.length > 3
+                                                    ? ` +${row.schoolNames.length - 3} sekolah`
+                                                    : ""}
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                    <p className="text-sm font-black text-slate-900">{row.value}</p>
+                                    <p className="text-[8px] font-black uppercase tracking-wider text-slate-300">
+                                        {percentage}%
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <aside className="hidden min-h-0 flex-col gap-3 rounded-[1.55rem] border border-slate-200 bg-slate-950 p-4 text-white xl:flex">
+                    <div>
+                        <p className="text-[8px] font-black uppercase tracking-[0.22em] text-cyan-300">
+                            Baca Cepat
+                        </p>
+                        <h3 className="mt-1 text-base font-black tracking-[-0.03em]">
+                            Ringkasan {activeViewLabel}
+                        </h3>
+                        <p className="mt-1 text-[9px] font-semibold leading-4 text-slate-400">
+                            Data agregat dari {contextLabel} tanpa membuka daftar rinci.
+                        </p>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-400/15 text-cyan-300">
+                                    <Award size={15} />
+                                </span>
+                                <strong className="text-lg font-black">{dominantPercentage}%</strong>
+                            </div>
+                            <p className="mt-2 text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                Porsi Terbesar
+                            </p>
+                            <p className="mt-1 break-words text-[10px] font-black leading-4 text-white">
+                                {dominantRow?.label || "Belum ada data"}
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                                <Layers size={14} className="text-violet-300" />
+                                <p className="mt-3 text-lg font-black">{visibleRows.length}</p>
+                                <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                    Kategori Aktif
+                                </p>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                                <Globe size={14} className="text-emerald-300" />
+                                <p className="mt-3 text-lg font-black">{total}</p>
+                                <p className="text-[8px] font-black uppercase tracking-wider text-slate-500">
+                                    Data Terbaca
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-auto rounded-2xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 p-3">
+                        <div className="flex items-center gap-2 text-cyan-200">
+                            <TrendingUp size={14} />
+                            <span className="text-[8px] font-black uppercase tracking-wider">
+                                Insight
+                            </span>
+                        </div>
+                        <p className="mt-2 text-[9px] font-semibold leading-4 text-slate-300">
+                            Gunakan kendali di bawah untuk membandingkan tahapan, pilar, jenjang, wilayah, dan tahun pada diagram yang sama.
+                        </p>
+                    </div>
+                </aside>
+            </div>
+        </section>
+    );
+}
+
 export default function DashboardKepalaDinas() {
     const [currentUser, setCurrentUser] = useState(null);
     const [wilayah, setWilayah] = useState(null);
@@ -4631,11 +4997,7 @@ export default function DashboardKepalaDinas() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [loadError, setLoadError] = useState("");
-    const [mapScope, setMapScope] = useState(null);
-
-    const handleMapScopeChange = useCallback((scope) => {
-        setMapScope(scope);
-    }, []);
+    const [viewMode, setViewMode] = useState("TAHAPAN");
 
     const fetchProgramDetail = async (program, headers) => {
         const id = getProgramId(program);
@@ -4680,16 +5042,15 @@ export default function DashboardKepalaDinas() {
         setLoadError("");
 
         try {
-            const token = localStorage.getItem("token");
+            const token = localStorage.getItem("token") || sessionStorage.getItem("sme_tab_token");
             const tokenPayload = getTokenPayload() || {};
             const currentUserId = getCurrentUserIdFromToken();
 
             if (!token || !currentUserId) {
-                throw new Error("Token atau ID user tidak ditemukan. Silakan login ulang.");
+                throw new Error("Sesi login tidak ditemukan. Silakan login ulang.");
             }
 
             const headers = { Authorization: `Bearer ${token}` };
-
             const [
                 userPayload,
                 usersPayload,
@@ -4699,10 +5060,7 @@ export default function DashboardKepalaDinas() {
                 sekolahPayload,
                 programPayload,
             ] = await Promise.all([
-                fetchSafe(
-                    [`/users/${currentUserId}`, "/users/me", "/auth/profile"],
-                    headers,
-                ),
+                fetchSafe([`/users/${currentUserId}`, "/users/me", "/auth/profile"], headers),
                 fetchSafe(["/users"], headers),
                 fetchSafe(["/wilayah/tree"], headers),
                 fetchSafe(["/wilayah"], headers),
@@ -4714,28 +5072,20 @@ export default function DashboardKepalaDinas() {
             const userDetail = Array.isArray(userPayload)
                 ? {}
                 : unwrapPayload(userPayload) || {};
-
             const userFromList =
                 normalizeArray(usersPayload).find(
                     (item) =>
-                        String(
-                            item?.id_user ||
-                            item?.id ||
-                            item?.user_id ||
-                            "",
-                        ) === String(currentUserId),
+                        String(item?.id_user || item?.id || item?.user_id || "") ===
+                        String(currentUserId),
                 ) || {};
-
-            const storedUser = getStoredUserProfile();
-
             const user = mergeUserSources(
-                storedUser,
+                getStoredUserProfile(),
                 tokenPayload,
                 userFromList,
                 userDetail,
             );
 
-            const wilayahList = mergeRecordsByIdentity(
+            const allWilayah = mergeRecordsByIdentity(
                 mergeRecordsByIdentity(
                     flattenWilayahTree(wilayahTreePayload),
                     flattenWilayahTree(wilayahFlatPayload),
@@ -4745,31 +5095,16 @@ export default function DashboardKepalaDinas() {
                 getWilayahId,
             );
 
-            const currentWilayah = resolveKepalaDinasWilayah(
-                user,
-                wilayahList,
-                tokenPayload,
-            );
-
+            const currentWilayah = resolveKepalaDinasWilayah(user, allWilayah, tokenPayload);
             if (!currentWilayah) {
-                console.error("KADIN WILAYAH RESOLUTION FAILED:", {
-                    currentUserId,
-                    tokenPayload,
-                    storedUser,
-                    userFromList,
-                    userDetail,
-                    mergedUser: user,
-                    wilayahCount: wilayahList.length,
-                });
-
                 throw new Error(
-                    `Provinsi akun Kepala Dinas belum terbaca untuk user ID ${currentUserId}. Edit akun pada Master Kepala Dinas, pilih provinsi, simpan, lalu login ulang.`,
+                    "Provinsi akun Kepala Dinas belum terbaca. Periksa kembali wilayah pada Master Kepala Dinas.",
                 );
             }
 
             const masterSchools = normalizeArray(sekolahPayload)
                 .filter((school) => getSchoolId(school))
-                .map((school) => enrichSchoolWilayah(school, wilayahList));
+                .map((school) => enrichSchoolWilayah(school, allWilayah));
 
             const scopedSchoolSummaries = masterSchools.filter((school) =>
                 schoolBelongsToWilayah(school, currentWilayah),
@@ -4782,19 +5117,15 @@ export default function DashboardKepalaDinas() {
             );
 
             const visibleSchools = detailedSchools
-                .map((school) => enrichSchoolWilayah(school, wilayahList))
+                .map((school) => enrichSchoolWilayah(school, allWilayah))
                 .filter(
                     (school) =>
-                        getSchoolId(school) &&
-                        schoolBelongsToWilayah(school, currentWilayah),
+                        getSchoolId(school) && schoolBelongsToWilayah(school, currentWilayah),
                 )
                 .sort((a, b) => getSchoolName(a).localeCompare(getSchoolName(b)));
 
             const visibleSchoolIdSet = new Set(
-                visibleSchools
-                    .map((school) => getSchoolId(school))
-                    .filter(Boolean)
-                    .map(String),
+                visibleSchools.map(getSchoolId).filter(Boolean).map(String),
             );
 
             const programGroupsBySchool = await mapWithConcurrency(
@@ -4816,10 +5147,7 @@ export default function DashboardKepalaDinas() {
                         ...program,
                         __school_ids: [
                             ...new Set(
-                                [
-                                    ...collectSchoolIdsFromProgram(program),
-                                    String(schoolId),
-                                ]
+                                [...collectSchoolIdsFromProgram(program), String(schoolId)]
                                     .map(String)
                                     .filter(Boolean),
                             ),
@@ -4828,11 +5156,9 @@ export default function DashboardKepalaDinas() {
                 },
             );
 
-            const programsFromSchools = programGroupsBySchool.flat();
-            const masterPrograms = normalizeArray(programPayload);
             const combinedPrograms = mergeRecordsByIdentity(
-                masterPrograms,
-                programsFromSchools,
+                normalizeArray(programPayload),
+                programGroupsBySchool.flat(),
                 getProgramId,
             )
                 .filter((program) => getProgramId(program))
@@ -4846,20 +5172,18 @@ export default function DashboardKepalaDinas() {
 
             const visiblePrograms = detailedPrograms
                 .map((program) => enrichProgramSchoolLinks(program, visibleSchools))
-                .filter((program) => {
-                    const linkedSchoolIds = collectSchoolIdsFromProgram(program);
-                    return linkedSchoolIds.some((schoolId) =>
+                .filter((program) =>
+                    collectSchoolIdsFromProgram(program).some((schoolId) =>
                         visibleSchoolIdSet.has(String(schoolId)),
-                    );
-                })
+                    ),
+                )
                 .sort((a, b) => getProgramTime(b) - getProgramTime(a));
 
             setCurrentUser(user);
             setWilayah(currentWilayah);
-            setWilayahList(wilayahList);
+            setWilayahList(allWilayah);
             setSchools(visibleSchools);
             setPrograms(visiblePrograms);
-            setMapScope(null);
         } catch (error) {
             console.error("Dashboard Kepala Dinas Error:", error);
             setLoadError(error?.message || "Gagal memuat Dashboard Kepala Dinas.");
@@ -4868,7 +5192,6 @@ export default function DashboardKepalaDinas() {
             setWilayahList([]);
             setSchools([]);
             setPrograms([]);
-            setMapScope(null);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -4879,85 +5202,190 @@ export default function DashboardKepalaDinas() {
         fetchDashboard();
     }, []);
 
-    const scopedSchools = useMemo(() => {
-        if (!mapScope) return schools;
+    const relatedSchoolIds = useMemo(() => {
+        const ids = new Set();
+        programs.forEach((program) => {
+            collectSchoolIdsFromProgram(program).forEach((id) => ids.add(String(id)));
+        });
+        return ids;
+    }, [programs]);
 
-        const scopeName = cleanText(mapScope.name);
-        return schools.filter(
-            (school) => cleanText(getSchoolWilayahName(school)) === scopeName,
-        );
-    }, [schools, mapScope]);
-
-    const scopedSchoolIds = useMemo(
-        () =>
-            new Set(
-                scopedSchools
-                    .map((school) => getSchoolId(school))
-                    .filter(Boolean)
-                    .map(String),
-            ),
-        [scopedSchools],
+    const relatedSchools = useMemo(
+        () => schools.filter((school) => relatedSchoolIds.has(String(getSchoolId(school)))),
+        [relatedSchoolIds, schools],
     );
 
-    const scopedPrograms = useMemo(() => {
-        if (!mapScope) return programs;
+    const stageRows = useMemo(
+        () =>
+            KADIN_STAGE_META.map((meta) => ({
+                ...meta,
+                value: programs.filter(
+                    (program) => normalizeKadinStage(program) === meta.key,
+                ).length,
+            })),
+        [programs],
+    );
 
-        return programs.filter((program) =>
-            collectSchoolIdsFromProgram(program).some((schoolId) =>
-                scopedSchoolIds.has(String(schoolId)),
-            ),
-        );
-    }, [programs, mapScope, scopedSchoolIds]);
-
-    const programsBySchool = useMemo(() => {
-        const map = new Map();
-
-        scopedSchools.forEach((school) => {
-            const schoolId = getSchoolId(school);
-            if (schoolId) map.set(String(schoolId), []);
-        });
-
-        scopedPrograms.forEach((program) => {
-            collectSchoolIdsFromProgram(program).forEach((schoolId) => {
-                const key = String(schoolId);
-                if (map.has(key)) map.get(key).push(program);
-            });
-        });
-
-        map.forEach((value, key) => {
-            map.set(
+    const pillarRows = useMemo(
+        () =>
+            Object.entries(KADIN_PILLAR_META).map(([key, meta]) => ({
                 key,
-                [...value].sort((a, b) => getProgramTime(b) - getProgramTime(a)),
-            );
+                label: meta.label,
+                color: meta.color,
+                value: programs.filter((program) => getKadinPillarKey(program) === key).length,
+            })),
+        [programs],
+    );
+
+    const jenjangRows = useMemo(
+        () =>
+            KADIN_JENJANG_META.map((meta) => ({
+                ...meta,
+                value: schools.filter(
+                    (school) => normalizeKadinJenjang(school) === meta.key,
+                ).length,
+            })),
+        [schools],
+    );
+
+    const districtRows = useMemo(() => {
+        const grouped = new Map();
+
+        schools.forEach((school) => {
+            const districtName = getKadinDistrictName(school) || "Belum Diisi";
+            const schoolName = getSchoolName(school);
+            const current = grouped.get(districtName) || {
+                label: districtName,
+                schoolNames: [],
+            };
+
+            if (schoolName && !current.schoolNames.includes(schoolName)) {
+                current.schoolNames.push(schoolName);
+            }
+            grouped.set(districtName, current);
         });
 
-        return map;
-    }, [scopedSchools, scopedPrograms]);
+        const rows = [...grouped.values()]
+            .map((item, index) => ({
+                key: item.label,
+                label: item.label,
+                value: item.schoolNames.length,
+                schoolNames: item.schoolNames.sort((a, b) => a.localeCompare(b)),
+                details: item.schoolNames.length
+                    ? item.schoolNames.sort((a, b) => a.localeCompare(b)).join(", ")
+                    : "Belum ada nama sekolah",
+                color: CHART_PALETTE[index % CHART_PALETTE.length],
+            }))
+            .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label));
 
-    const runningPrograms = useMemo(
-        () =>
-            programs.filter(
-                (program) => getKadinProgressBucket(program, "PROGRAM") === "PROSES",
-            ).length,
-        [programs],
-    );
+        if (rows.length <= KADIN_CHART_GROUP_LIMIT) return rows;
 
-    const completedPrograms = useMemo(
-        () =>
-            programs.filter(
-                (program) => getKadinProgressBucket(program, "PROGRAM") === "SELESAI",
-            ).length,
-        [programs],
-    );
+        const visible = rows.slice(0, KADIN_CHART_GROUP_LIMIT - 1);
+        const rest = rows.slice(KADIN_CHART_GROUP_LIMIT - 1);
+        const otherSchoolNames = rest.flatMap((row) => row.schoolNames || []);
+        visible.push({
+            key: "LAINNYA",
+            label: "Kabupaten/Kota Lainnya",
+            value: otherSchoolNames.length,
+            schoolNames: otherSchoolNames,
+            details: otherSchoolNames.join(", "),
+            color: "#94A3B8",
+        });
+        return visible;
+    }, [schools]);
+
+    const yearRows = useMemo(() => {
+        const counts = new Map();
+        programs.forEach((program) => {
+            const year = String(getProgramYear(program) || "Belum Diisi");
+            counts.set(year, (counts.get(year) || 0) + 1);
+        });
+
+        return [...counts.entries()]
+            .map(([label, value], index) => ({
+                key: label,
+                label,
+                value,
+                color: CHART_PALETTE[index % CHART_PALETTE.length],
+            }))
+            .sort((a, b) => {
+                const aNumber = Number(a.label);
+                const bNumber = Number(b.label);
+                if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) return bNumber - aNumber;
+                return a.label.localeCompare(b.label);
+            });
+    }, [programs]);
+
+    const mainChart = useMemo(() => {
+        if (viewMode === "PILAR") {
+            return {
+                eyebrow: "Komposisi Program",
+                title: "4 Pilar Program",
+                description: "Sebaran seluruh program berdasarkan empat pilar pembinaan.",
+                rows: pillarRows,
+                totalLabel: "Program",
+            };
+        }
+
+        if (viewMode === "JENJANG") {
+            return {
+                eyebrow: "Cakupan Sekolah",
+                title: "Sekolah per Jenjang",
+                description: "Komposisi seluruh sekolah terdaftar berdasarkan SD, SMP, dan SMK.",
+                rows: jenjangRows,
+                totalLabel: "Sekolah",
+            };
+        }
+
+        if (viewMode === "KABUPATEN") {
+            return {
+                eyebrow: "Sebaran Wilayah",
+                title: "Sekolah per Kabupaten/Kota",
+                description: "Persebaran seluruh sekolah terdaftar per kabupaten/kota beserta nama sekolahnya.",
+                rows: districtRows,
+                totalLabel: "Sekolah",
+            };
+        }
+
+        if (viewMode === "TAHUN") {
+            return {
+                eyebrow: "Periode Program",
+                title: "Program per Tahun",
+                description: "Sebaran seluruh program berdasarkan tahun pelaksanaan.",
+                rows: yearRows,
+                totalLabel: "Program",
+            };
+        }
+
+        return {
+            eyebrow: "Perkembangan Program",
+            title: "Tahapan Program",
+            description: "Lima tahap program ditampilkan secara rinci untuk seluruh wilayah penugasan.",
+            rows: stageRows,
+            totalLabel: "Program",
+        };
+    }, [districtRows, jenjangRows, pillarRows, stageRows, viewMode, yearRows]);
+
+    const completedPrograms = stageRows.find((row) => row.key === "SELESAI")?.value || 0;
+    const runningPrograms = Math.max(0, programs.length - completedPrograms);
+    const provinceName = getWilayahName(wilayah);
+    const activeView = KADIN_VIEW_OPTIONS.find((option) => option.key === viewMode);
+    const controlCounts = {
+        TAHAPAN: stageRows.filter((row) => Number(row.value) > 0).length,
+        PILAR: pillarRows.filter((row) => Number(row.value) > 0).length,
+        JENJANG: jenjangRows.filter((row) => Number(row.value) > 0).length,
+        KABUPATEN: districtRows.filter((row) => Number(row.value) > 0).length,
+        TAHUN: yearRows.filter((row) => Number(row.value) > 0).length,
+    };
 
     if (loading) {
         return (
-            <PageWrapper className="flex h-screen w-full overflow-hidden bg-white !p-0">
+            <PageWrapper className="flex h-screen w-full overflow-hidden bg-slate-50 !p-0">
                 <Sidebar />
                 <main className="flex flex-1 items-center justify-center">
                     <div className="flex flex-col items-center gap-4">
                         <Loader2 className="h-11 w-11 animate-spin text-[#0AC4E0]" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.26em] text-cyan-500/70">
+                        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-500">
                             Memuat Dashboard Kepala Dinas...
                         </p>
                     </div>
@@ -4967,165 +5395,156 @@ export default function DashboardKepalaDinas() {
     }
 
     return (
-        <>
-            <style>{`
-                html, body {
-                    background-color: #F8FAFC;
-                    font-family: 'Poppins', sans-serif;
-                }
+        <PageWrapper className="flex h-screen w-full overflow-hidden bg-slate-50 !p-0">
+            <Sidebar />
 
-                .kadin-scroll::-webkit-scrollbar {
-                    width: 6px;
-                }
-
-                .kadin-scroll::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-
-                .kadin-scroll::-webkit-scrollbar-thumb {
-                    background: rgba(10, 196, 224, 0.35);
-                    border-radius: 999px;
-                }
-
-                .leaflet-container,
-                .leaflet-pane,
-                .leaflet-top,
-                .leaflet-bottom {
-                    z-index: 0 !important;
-                }
-            `}</style>
-
-            <PageWrapper className="flex min-h-screen w-full bg-slate-50 !p-0">
-                <Sidebar />
-
-                <main className="kadin-scroll h-screen flex-1 overflow-y-auto bg-slate-50">
-                    <header className="relative overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-500 px-8 py-9 text-white lg:px-10">
-                        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-                        <div className="relative w-full">
-                            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cyan-100">
-                                        Kepala Dinas Workspace
-                                    </p>
-                                    <h1 className="mt-2 text-3xl font-black tracking-[-0.05em] sm:text-4xl">
-                                        Monitoring Sekolah & Program Regional
-                                    </h1>
-                                    <p className="mt-3 max-w-3xl text-xs font-semibold leading-6 text-blue-100/80">
-                                        Data dibatasi otomatis berdasarkan provinsi penugasan akun Kepala Dinas. Assessment tidak ditampilkan pada halaman ini.
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={fetchDashboard}
-                                    disabled={refreshing}
-                                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur transition hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    <RefreshCcw
-                                        className={refreshing ? "animate-spin" : ""}
-                                        size={15}
-                                    />
-                                    {refreshing ? "Memuat..." : "Refresh Data"}
-                                </button>
-                            </div>
-
-                            <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                {[
-                                    {
-                                        label: "Provinsi",
-                                        value: getWilayahName(wilayah),
-                                        icon: <MapPin size={16} />,
-                                    },
-                                    {
-                                        label: "Sekolah",
-                                        value: compactNumber(schools.length),
-                                        icon: <School size={16} />,
-                                    },
-                                    {
-                                        label: "Sedang Berjalan",
-                                        value: compactNumber(runningPrograms),
-                                        icon: <Clock3 size={16} />,
-                                    },
-                                    {
-                                        label: "Selesai",
-                                        value: compactNumber(completedPrograms),
-                                        icon: <CheckCircle2 size={16} />,
-                                    },
-                                ].map((item) => (
-                                    <div
-                                        key={item.label}
-                                        className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur"
-                                    >
-                                        <div className="flex items-center gap-2 text-cyan-100">
-                                            {item.icon}
-                                            <span className="text-[9px] font-black uppercase tracking-widest">
-                                                {item.label}
-                                            </span>
-                                        </div>
-                                        <p className="mt-2 truncate text-xl font-black text-white">
-                                            {item.value}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-slate-50">
+                <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-blue-950 via-blue-900 to-cyan-500 px-6 py-5 text-white lg:px-8">
+                    <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+                    <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+                        <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-[0.24em] text-cyan-100">
+                                Dashboard Kepala Dinas
+                            </p>
+                            <h1 className="mt-2 break-words text-2xl font-black tracking-[-0.045em] sm:text-3xl">
+                                Monitoring Pendidikan {provinceName}
+                            </h1>
+                            <p className="mt-2 max-w-3xl text-[11px] font-semibold leading-6 text-blue-100/80">
+                                Ringkasan sekolah dan program hanya dari provinsi penugasan akun Kepala Dinas.
+                            </p>
                         </div>
-                    </header>
 
-                    <div className="w-full px-5 py-7 sm:px-6 lg:px-8">
-                        {loadError && (
-                            <div className="mb-8 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-5 text-red-600">
-                                <AlertTriangle className="mt-0.5 shrink-0" size={18} />
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-wider">
-                                        Data belum dapat ditampilkan
-                                    </p>
-                                    <p className="mt-1 text-xs font-semibold leading-6 text-red-500">
-                                        {loadError}
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        <KadinProvinceMap
-                            wilayah={wilayah}
-                            wilayahList={wilayahList}
-                            schools={schools}
-                            onScopeChange={handleMapScopeChange}
-                        />
-
-                        <KadinSchoolAnalyticsSection
-                            schools={scopedSchools}
-                            programsBySchool={programsBySchool}
-                            provinceName={mapScope?.name || getWilayahName(wilayah)}
-                        />
-
-                        <KadinProgramOnlySection
-                            programs={scopedPrograms}
-                            schools={scopedSchools}
-                            provinceName={mapScope?.name || getWilayahName(wilayah)}
-                        />
-
-                        <div className="rounded-3xl bg-slate-900 p-6 text-white">
-                            <div className="flex items-start gap-4">
-                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-cyan-400">
-                                    <ShieldCheck size={19} />
-                                </div>
-                                <div>
-                                    <h3 className="text-xs font-black uppercase tracking-wider">
-                                        Pembatasan Data Aktif
-                                    </h3>
-                                    <p className="mt-1 max-w-4xl text-[11px] font-semibold leading-6 text-slate-400">
-                                        Program hanya dimasukkan ketika memiliki relasi langsung dengan minimal satu sekolah yang berada di provinsi {getWilayahName(
-                                            wilayah,
-                                        )}. Data dari provinsi lain tidak ikut dihitung maupun ditampilkan.
-                                    </p>
-                                </div>
-                            </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => window.location.assign("/kepala-dinas/sekolah")}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-white hover:text-slate-900"
+                            >
+                                <School size={14} />
+                                Daftar Sekolah
+                            </button>
+                            <button
+                                type="button"
+                                onClick={fetchDashboard}
+                                disabled={refreshing}
+                                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-[9px] font-black uppercase tracking-widest text-blue-950 transition hover:bg-cyan-50 disabled:opacity-60"
+                            >
+                                <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
+                                Refresh
+                            </button>
                         </div>
                     </div>
-                </main>
-            </PageWrapper>
-        </>
+                </header>
+
+                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-5 py-4 lg:px-7">
+                    {loadError && (
+                        <div className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4 text-red-600">
+                            <AlertTriangle className="mt-0.5 shrink-0" size={17} />
+                            <p className="text-[11px] font-semibold leading-5">{loadError}</p>
+                        </div>
+                    )}
+
+                    <section className="grid shrink-0 overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-4 xl:divide-x xl:divide-slate-100">
+                        <KadinSummaryItem
+                            icon={<School size={18} />}
+                            label="Sekolah Terjangkau"
+                            value={schools.length}
+                            description={`Sekolah terdaftar di ${provinceName}`}
+                            color="#0AC4E0"
+                        />
+                        <KadinSummaryItem
+                            icon={<FolderKanban size={18} />}
+                            label="Total Program"
+                            value={programs.length}
+                            description="Seluruh program pada wilayah tugas"
+                            color="#2563EB"
+                        />
+                        <KadinSummaryItem
+                            icon={<Clock3 size={18} />}
+                            label="Dalam Proses"
+                            value={runningPrograms}
+                            description="Approval sampai Evaluasi"
+                            color="#F59E0B"
+                        />
+                        <KadinSummaryItem
+                            icon={<CheckCircle2 size={18} />}
+                            label="Program Selesai"
+                            value={completedPrograms}
+                            description="Program yang telah tuntas"
+                            color="#10B981"
+                        />
+                    </section>
+
+                    <KadinSolidPieCard
+                        eyebrow={mainChart.eyebrow}
+                        title={mainChart.title}
+                        description={mainChart.description}
+                        rows={mainChart.rows}
+                        totalLabel={mainChart.totalLabel}
+                        activeViewLabel={activeView?.label || "Tahapan"}
+                        contextLabel={provinceName}
+                    />
+
+                    <section className="shrink-0 overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-2.5">
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-500">
+                                    Kendali Tampilan
+                                </p>
+                                <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
+                                    Satu diagram, lima sudut pandang ringkasan wilayah.
+                                </p>
+                            </div>
+                            <div className="shrink-0 rounded-xl bg-slate-950 px-3 py-2 text-[8px] font-black uppercase tracking-wider text-white">
+                                {activeView?.label || "Tahapan"} · {controlCounts[viewMode] || 0} kategori
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-5 gap-2 p-2.5">
+                            {KADIN_VIEW_OPTIONS.map((option) => {
+                                const active = viewMode === option.key;
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        onClick={() => setViewMode(option.key)}
+                                        className={`group flex min-w-0 items-center justify-between gap-2 rounded-2xl border px-3 py-2.5 text-left transition ${active
+                                            ? "border-cyan-500 bg-cyan-500 text-white shadow-sm"
+                                            : "border-slate-200 bg-slate-50 text-slate-500 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-600"
+                                            }`}
+                                    >
+                                        <span className="flex min-w-0 items-center gap-2.5">
+                                            <span
+                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-white/15" : "bg-white shadow-sm"
+                                                    }`}
+                                            >
+                                                {option.icon}
+                                            </span>
+                                            <span className="min-w-0">
+                                                <span className="block truncate text-[9px] font-black uppercase tracking-wider">
+                                                    {option.label}
+                                                </span>
+                                                <span
+                                                    className={`mt-0.5 hidden truncate text-[8px] font-semibold xl:block ${active ? "text-cyan-50" : "text-slate-400"
+                                                        }`}
+                                                >
+                                                    {option.description}
+                                                </span>
+                                            </span>
+                                        </span>
+                                        <span
+                                            className={`flex h-6 min-w-6 shrink-0 items-center justify-center rounded-lg px-1.5 text-[8px] font-black ${active ? "bg-white/15 text-white" : "bg-white text-slate-400"
+                                                }`}
+                                        >
+                                            {controlCounts[option.key] || 0}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </section>
+                </div>
+            </main>
+        </PageWrapper>
     );
 }
-

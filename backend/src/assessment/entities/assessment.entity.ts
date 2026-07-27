@@ -33,6 +33,12 @@ export class Assessment {
   @Column({ type: 'timestamp', nullable: true })
   sent_at: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  paused_at: Date;
+
+  @Column({ type: 'integer', default: 0 })
+  total_paused_seconds: number;
+
   @Column({ nullable: true })
   tenggat: number;
 

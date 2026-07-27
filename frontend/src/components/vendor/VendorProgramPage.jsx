@@ -64,6 +64,65 @@ function VendorProgramPage({
         return [];
     };
 
+    const getProgramSchoolIds = (program) => {
+        const candidates = [
+            program?.sekolah_ids,
+            program?.target_sekolah_ids,
+            program?.id_sekolah,
+            program?.sekolah_id,
+        ];
+
+        const ids = candidates.flatMap((value) => {
+            if (Array.isArray(value)) return value;
+            if (value !== undefined && value !== null && value !== "") {
+                return [value];
+            }
+            return [];
+        });
+
+        const relationIds = Array.isArray(program?.sekolah)
+            ? program.sekolah.map(
+                (item) => item?.id_sekolah || item?.id || item?.sekolah_id,
+            )
+            : [
+                program?.sekolah?.id_sekolah ||
+                program?.sekolah?.id ||
+                program?.sekolah?.sekolah_id,
+            ];
+
+        return [
+            ...new Set(
+                [...ids, ...relationIds]
+                    .filter((value) => value !== undefined && value !== null && value !== "")
+                    .map(String),
+            ),
+        ];
+    };
+
+    const getProgramSchoolNames = (program) => {
+        const relationSchools = Array.isArray(program?.sekolah)
+            ? program.sekolah
+            : program?.sekolah
+                ? [program.sekolah]
+                : [];
+
+        const relationNames = relationSchools
+            .map((item) => item?.nama_sekolah || item?.nama)
+            .filter(Boolean);
+
+        const masterNames = getProgramSchoolIds(program)
+            .map((schoolId) =>
+                schools.find(
+                    (item) => String(item.id_sekolah || item.id) === String(schoolId),
+                ),
+            )
+            .map((item) => item?.nama_sekolah || item?.nama)
+            .filter(Boolean);
+
+        const names = [...new Set([...relationNames, ...masterNames])];
+        return names.length > 0 ? names : ["-"];
+    };
+
     const resolveCurrentVendor = (vendorList, userPayload) => {
         if (!userPayload) return null;
 
@@ -235,9 +294,7 @@ function VendorProgramPage({
         if (!keyword) return programs;
 
         return programs.filter((program) => {
-            const school = schools.find(
-                (item) => String(item.id_sekolah) === String(program.id_sekolah),
-            );
+            const schoolNames = getProgramSchoolNames(program);
 
             const hoId = getProgramHoId(program);
 
@@ -268,7 +325,7 @@ function VendorProgramPage({
                 program.kategori,
                 program.status_program,
                 program.tahun,
-                school?.nama_sekolah,
+                schoolNames.join(" "),
                 ho?.nama,
                 vendorNames,
             ]
@@ -299,11 +356,7 @@ function VendorProgramPage({
     }, [currentPage, totalPages]);
 
     const getSchoolName = (program) => {
-        const school = schools.find(
-            (item) => String(item.id_sekolah) === String(program.id_sekolah),
-        );
-
-        return program?.sekolah?.nama_sekolah || school?.nama_sekolah || "-";
+        return getProgramSchoolNames(program).join(", ");
     };
 
     const getHoName = (program) => {
@@ -384,22 +437,33 @@ function VendorProgramPage({
                     </div>
                 </header>
 
-                <section className="simple-scroll flex-1 space-y-5 overflow-y-auto px-7 py-6">
+                <section className="simple-scroll flex-1 space-y-4 overflow-y-auto px-7 py-5">
                     <VendorProgramStats programs={filteredPrograms} />
 
-                    <div className="rounded-[1.5rem] border border-slate-100 bg-white p-4 shadow-sm">
-                        <div className="relative">
-                            <Search
-                                size={17}
-                                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                            />
+                    <div className="rounded-[1.45rem] border border-slate-200 bg-white p-4 shadow-sm">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <div className="relative min-w-0 flex-1">
+                                <Search
+                                    size={17}
+                                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                />
 
-                            <Input
-                                value={searchKeyword}
-                                onChange={(event) => setSearchKeyword(event.target.value)}
-                                placeholder="Cari program, sekolah, HO, status, atau tahun..."
-                                className="!rounded-xl !border-none !bg-slate-50 !py-3 !pl-11 !text-sm !font-semibold"
-                            />
+                                <Input
+                                    value={searchKeyword}
+                                    onChange={(event) => setSearchKeyword(event.target.value)}
+                                    placeholder="Cari program, sekolah, HO, status, atau tahun..."
+                                    className="!rounded-xl !border-none !bg-slate-50 !py-3 !pl-11 !text-sm !font-semibold"
+                                />
+                            </div>
+
+                            <div className="shrink-0 rounded-xl bg-cyan-50 px-4 py-2.5 text-center">
+                                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-cyan-500">
+                                    Data Tampil
+                                </p>
+                                <p className="mt-0.5 text-sm font-black text-cyan-700">
+                                    {filteredPrograms.length} Program
+                                </p>
+                            </div>
                         </div>
                     </div>
 
