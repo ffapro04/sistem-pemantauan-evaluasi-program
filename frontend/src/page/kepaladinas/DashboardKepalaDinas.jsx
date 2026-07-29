@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     AlertTriangle,
     Award,
@@ -421,7 +421,8 @@ async function mapWithConcurrency(items = [], limit = 6, mapper) {
 
             try {
                 results[index] = await mapper(source[index], index);
-            } catch {
+            } catch (error) {
+                if (error?.name === "AbortError") throw error;
                 results[index] = source[index];
             }
         }
@@ -442,10 +443,10 @@ async function safeJson(response) {
     }
 }
 
-async function fetchSafe(endpointList, headers = {}) {
+async function fetchSafe(endpointList, headers = {}, signal) {
     for (const endpoint of endpointList) {
         try {
-            const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers });
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, { headers, signal });
             const payload = await safeJson(response);
 
             if (!response.ok) {
@@ -455,6 +456,7 @@ async function fetchSafe(endpointList, headers = {}) {
 
             return payload;
         } catch (error) {
+            if (error?.name === "AbortError") throw error;
             console.warn("Endpoint error:", endpoint, error);
         }
     }
@@ -4998,13 +5000,14 @@ export default function DashboardKepalaDinas() {
     const [refreshing, setRefreshing] = useState(false);
     const [loadError, setLoadError] = useState("");
     const [viewMode, setViewMode] = useState("TAHAPAN");
+    const requestControllerRef = useRef(null);
 
-    const fetchProgramDetail = async (program, headers) => {
+    const fetchProgramDetail = async (program, headers, signal) => {
         const id = getProgramId(program);
         if (!id) return program;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/program/${id}`, { headers });
+            const response = await fetch(`${API_BASE_URL}/program/${id}`, { headers, signal });
             const payload = await safeJson(response);
             if (!response.ok) return program;
 
@@ -5013,17 +5016,18 @@ export default function DashboardKepalaDinas() {
                 ...program,
                 ...(detail && typeof detail === "object" ? detail : {}),
             };
-        } catch {
+        } catch (error) {
+            if (error?.name === "AbortError") throw error;
             return program;
         }
     };
 
-    const fetchSchoolDetail = async (school, headers) => {
+    const fetchSchoolDetail = async (school, headers, signal) => {
         const id = getSchoolId(school);
         if (!id) return school;
 
         try {
-            const response = await fetch(`${API_BASE_URL}/sekolah/${id}`, { headers });
+            const response = await fetch(`${API_BASE_URL}/sekolah/${id}`, { headers, signal });
             const payload = await safeJson(response);
             if (!response.ok) return school;
 
@@ -5032,12 +5036,18 @@ export default function DashboardKepalaDinas() {
                 ...school,
                 ...(detail && typeof detail === "object" ? detail : {}),
             };
-        } catch {
+        } catch (error) {
+            if (error?.name === "AbortError") throw error;
             return school;
         }
     };
 
-    const fetchDashboard = async () => {
+    const fetchDashboard = useCallback(async () => {
+        requestControllerRef.current?.abort();
+        const controller = new AbortController();
+        requestControllerRef.current = controller;
+        const { signal } = controller;
+
         setRefreshing(true);
         setLoadError("");
 
@@ -5060,13 +5070,13 @@ export default function DashboardKepalaDinas() {
                 sekolahPayload,
                 programPayload,
             ] = await Promise.all([
-                fetchSafe([`/users/${currentUserId}`, "/users/me", "/auth/profile"], headers),
-                fetchSafe(["/users"], headers),
-                fetchSafe(["/wilayah/tree"], headers),
-                fetchSafe(["/wilayah"], headers),
-                fetchSafe(["/wilayah/provinsi", "/wilayah/reference/provinsi"], headers),
-                fetchSafe(["/sekolah"], headers),
-                fetchSafe(["/program"], headers),
+                fetchSafe([`/users/${currentUserId}`, "/users/me", "/auth/profile"], headers, signal),
+                fetchSafe(["/users"], headers, signal),
+                fetchSafe(["/wilayah/tree"], headers, signal),
+                fetchSafe(["/wilayah"], headers, signal),
+                fetchSafe(["/wilayah/provinsi", "/wilayah/reference/provinsi"], headers, signal),
+                fetchSafe(["/sekolah"], headers, signal),
+                fetchSafe(["/program"], headers, signal),
             ]);
 
             const userDetail = Array.isArray(userPayload)
@@ -5110,13 +5120,27 @@ export default function DashboardKepalaDinas() {
                 schoolBelongsToWilayah(school, currentWilayah),
             );
 
-            const detailedSchools = await mapWithConcurrency(
-                scopedSchoolSummaries,
-                6,
-                (school) => fetchSchoolDetail(school, headers),
+            const schoolSummariesNeedingDetail = scopedSchoolSummaries.filter(
+                (school) =>
+                    getSchoolName(school) === "Nama sekolah belum diisi" ||
+                    getSchoolJenjang(school) === "Belum Diisi" ||
+                    getSchoolAddress(school) === "Belum Diisi",
             );
 
-            const visibleSchools = detailedSchools
+            const detailedSchoolRows = await mapWithConcurrency(
+                schoolSummariesNeedingDetail,
+                6,
+                (school) => fetchSchoolDetail(school, headers, signal),
+            );
+            const detailedSchoolMap = new Map(
+                detailedSchoolRows.map((school) => [String(getSchoolId(school)), school]),
+            );
+
+            const visibleSchools = scopedSchoolSummaries
+                .map((school) => ({
+                    ...school,
+                    ...(detailedSchoolMap.get(String(getSchoolId(school))) || {}),
+                }))
                 .map((school) => enrichSchoolWilayah(school, allWilayah))
                 .filter(
                     (school) =>
@@ -5128,46 +5152,61 @@ export default function DashboardKepalaDinas() {
                 visibleSchools.map(getSchoolId).filter(Boolean).map(String),
             );
 
-            const programGroupsBySchool = await mapWithConcurrency(
-                visibleSchools,
-                5,
-                async (school) => {
-                    const schoolId = getSchoolId(school);
-                    if (!schoolId) return [];
-
-                    const payload = await fetchSafe(
-                        [
-                            `/program/sekolah/${schoolId}?id_user=${currentUserId}`,
-                            `/program/sekolah/${schoolId}`,
-                        ],
-                        headers,
-                    );
-
-                    return normalizeArray(payload).map((program) => ({
-                        ...program,
-                        __school_ids: [
-                            ...new Set(
-                                [...collectSchoolIdsFromProgram(program), String(schoolId)]
-                                    .map(String)
-                                    .filter(Boolean),
-                            ),
-                        ],
-                    }));
-                },
+            const globalPrograms = normalizeArray(programPayload)
+                .filter((program) => getProgramId(program));
+            const globalProgramsHaveSchoolLinks = globalPrograms.some(
+                (program) => collectSchoolIdsFromProgram(program).length > 0,
             );
 
+            const programGroupsBySchool = globalProgramsHaveSchoolLinks
+                ? []
+                : await mapWithConcurrency(
+                    visibleSchools,
+                    5,
+                    async (school) => {
+                        const schoolId = getSchoolId(school);
+                        if (!schoolId) return [];
+
+                        const payload = await fetchSafe(
+                            [
+                                `/program/sekolah/${schoolId}?id_user=${currentUserId}`,
+                                `/program/sekolah/${schoolId}`,
+                            ],
+                            headers,
+                            signal,
+                        );
+
+                        return normalizeArray(payload).map((program) => ({
+                            ...program,
+                            __school_ids: [
+                                ...new Set(
+                                    [...collectSchoolIdsFromProgram(program), String(schoolId)]
+                                        .map(String)
+                                        .filter(Boolean),
+                                ),
+                            ],
+                        }));
+                    },
+                );
+
             const combinedPrograms = mergeRecordsByIdentity(
-                normalizeArray(programPayload),
+                globalPrograms,
                 programGroupsBySchool.flat(),
                 getProgramId,
             )
                 .filter((program) => getProgramId(program))
                 .sort((a, b) => getProgramTime(b) - getProgramTime(a));
 
+            const scopedProgramSummaries = combinedPrograms.filter((program) =>
+                collectSchoolIdsFromProgram(program).some((schoolId) =>
+                    visibleSchoolIdSet.has(String(schoolId)),
+                ),
+            );
+
             const detailedPrograms = await mapWithConcurrency(
-                combinedPrograms,
+                scopedProgramSummaries,
                 6,
-                (program) => fetchProgramDetail(program, headers),
+                (program) => fetchProgramDetail(program, headers, signal),
             );
 
             const visiblePrograms = detailedPrograms
@@ -5185,6 +5224,7 @@ export default function DashboardKepalaDinas() {
             setSchools(visibleSchools);
             setPrograms(visiblePrograms);
         } catch (error) {
+            if (error?.name === "AbortError") return;
             console.error("Dashboard Kepala Dinas Error:", error);
             setLoadError(error?.message || "Gagal memuat Dashboard Kepala Dinas.");
             setCurrentUser(null);
@@ -5193,14 +5233,17 @@ export default function DashboardKepalaDinas() {
             setSchools([]);
             setPrograms([]);
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (!signal.aborted) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchDashboard();
-    }, []);
+        return () => requestControllerRef.current?.abort();
+    }, [fetchDashboard]);
 
     const relatedSchoolIds = useMemo(() => {
         const ids = new Set();

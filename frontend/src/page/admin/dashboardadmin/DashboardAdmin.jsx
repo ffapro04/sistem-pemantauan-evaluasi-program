@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -334,36 +334,43 @@ function withFreshParam(endpoint) {
 
 async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
   const controller = new AbortController();
+  const parentSignal = options.signal;
+  const abortFromParent = () => controller.abort();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  if (parentSignal) {
+    if (parentSignal.aborted) controller.abort();
+    else parentSignal.addEventListener("abort", abortFromParent, { once: true });
+  }
 
   try {
     return await fetch(url, {
       ...options,
-      cache: "no-store",
+      cache: options.cache || "no-cache",
       signal: controller.signal,
       headers: {
         ...(options.headers || {}),
-        "Cache-Control": "no-store",
-        Pragma: "no-cache",
       },
     });
   } finally {
     window.clearTimeout(timer);
+    parentSignal?.removeEventListener("abort", abortFromParent);
   }
 }
 
-async function ambilDataDenganFallback(endpointList, headers = {}) {
+async function ambilDataDenganFallback(endpointList, headers = {}, signal) {
   for (const endpoint of endpointList) {
     try {
       const response = await fetchWithTimeout(
-        `${API_BASE_URL}${withFreshParam(endpoint)}`,
-        { headers },
+        `${API_BASE_URL}${endpoint}`,
+        { headers, signal },
       );
       if (!response.ok) continue;
 
       const payload = await safeJson(response);
       return ambilArray(payload);
     } catch (error) {
+      if (error?.name === "AbortError") throw error;
       console.warn(`Endpoint dashboard admin gagal: ${endpoint}`, error);
       // lanjut endpoint berikutnya
     }
@@ -5191,6 +5198,8 @@ export default function DashboardAdmin() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const requestControllerRef = useRef(null);
   const [activeFilter, setActiveFilter] = useState("SEMUA");
   const [searchValue, setSearchValue] = useState("");
 
@@ -5214,20 +5223,17 @@ export default function DashboardAdmin() {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
   const fetchDashboardData = async () => {
+    requestControllerRef.current?.abort();
+    const controller = new AbortController();
+    requestControllerRef.current = controller;
+    const { signal } = controller;
+
     setRefreshing(true);
+    setLoadError("");
 
     try {
       const token = localStorage.getItem("token");
-      const headers = token
-        ? {
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-store",
-          Pragma: "no-cache",
-        }
-        : {
-          "Cache-Control": "no-store",
-          Pragma: "no-cache",
-        };
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [
         userData,
@@ -5235,58 +5241,101 @@ export default function DashboardAdmin() {
         wilayahData,
         schoolData,
         vendorData,
-        vendorAkademikData,
-        vendorNonAkademikData,
         programData,
-        programAkademikData,
-        programNonAkademikData,
         assessmentData,
-        assessmentAkademikData,
-        assessmentNonAkademikData,
         agendaData,
       ] = await Promise.all([
-        ambilDataDenganFallback(["/users"], headers),
-        ambilDataDenganFallback(["/users/ao"], headers),
-        ambilDataDenganFallback(["/wilayah"], headers),
-        ambilDataDenganFallback(["/sekolah"], headers),
-        ambilDataDenganFallback(["/vendor"], headers),
-        ambilDataDenganFallback([
-          "/vendor?kategori=AKADEMIK",
-          "/vendor?kategori=akademik",
-          "/vendor?jenis=AKADEMIK",
-        ], headers),
-        ambilDataDenganFallback([
-          "/vendor?kategori=NON_AKADEMIK",
-          "/vendor?kategori=non-akademik",
-          "/vendor?kategori=non akademik",
-        ], headers),
-        ambilDataDenganFallback(["/program"], headers),
-        ambilDataDenganFallback([
-          "/program?kategori=AKADEMIK",
-          "/program?kategori=akademik",
-        ], headers),
-        ambilDataDenganFallback([
-          "/program?kategori=NON_AKADEMIK",
-          "/program?kategori=non-akademik",
-          "/program?kategori=non akademik",
-        ], headers),
-        ambilDataDenganFallback(["/assessment"], headers),
-        ambilDataDenganFallback([
-          "/assessment?jenis=AKADEMIK",
-          "/assessment?jenis=akademik",
-          "/assessment?pilar=AKADEMIK",
-        ], headers),
-        ambilDataDenganFallback([
-          "/assessment?jenis=NON_AKADEMIK",
-          "/assessment?jenis=non-akademik",
-          "/assessment?pilar=NON_AKADEMIK",
-        ], headers),
-        ambilDataDenganFallback(["/admin-agenda"], headers),
+        ambilDataDenganFallback(["/users"], headers, signal),
+        ambilDataDenganFallback(["/users/ao"], headers, signal),
+        ambilDataDenganFallback(["/wilayah"], headers, signal),
+        ambilDataDenganFallback(["/sekolah"], headers, signal),
+        ambilDataDenganFallback(["/vendor"], headers, signal),
+        ambilDataDenganFallback(["/program"], headers, signal),
+        ambilDataDenganFallback(["/assessment"], headers, signal),
+        ambilDataDenganFallback(["/admin-agenda"], headers, signal),
       ]);
 
-      setUsers(
-        mergeUsersWithRoleData(userData, [{ roleId: 4, data: aoData }]),
-      );
+      const vendorNeedsHints =
+        vendorData.length === 0 ||
+        vendorData.some((vendor) => getVendorCategory(vendor) === "BELUM_DIISI");
+      const programNeedsHints =
+        programData.length === 0 ||
+        programData.some((program) => ambilKategoriProgram(program) === "BELUM_DIISI");
+      const assessmentNeedsHints =
+        assessmentData.length === 0 ||
+        assessmentData.some(
+          (assessment) => ambilKategoriAssessment(assessment) === "BELUM_DIISI",
+        );
+
+      const [
+        vendorAkademikData,
+        vendorNonAkademikData,
+        programAkademikData,
+        programNonAkademikData,
+        assessmentAkademikData,
+        assessmentNonAkademikData,
+      ] = await Promise.all([
+        vendorNeedsHints
+          ? ambilDataDenganFallback(
+            ["/vendor?kategori=AKADEMIK", "/vendor?kategori=akademik"],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+        vendorNeedsHints
+          ? ambilDataDenganFallback(
+            [
+              "/vendor?kategori=NON_AKADEMIK",
+              "/vendor?kategori=non-akademik",
+              "/vendor?kategori=non akademik",
+            ],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+        programNeedsHints
+          ? ambilDataDenganFallback(
+            ["/program?kategori=AKADEMIK", "/program?kategori=akademik"],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+        programNeedsHints
+          ? ambilDataDenganFallback(
+            [
+              "/program?kategori=NON_AKADEMIK",
+              "/program?kategori=non-akademik",
+              "/program?kategori=non akademik",
+            ],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+        assessmentNeedsHints
+          ? ambilDataDenganFallback(
+            [
+              "/assessment?jenis=AKADEMIK",
+              "/assessment?jenis=akademik",
+              "/assessment?pilar=AKADEMIK",
+            ],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+        assessmentNeedsHints
+          ? ambilDataDenganFallback(
+            [
+              "/assessment?jenis=NON_AKADEMIK",
+              "/assessment?jenis=non-akademik",
+              "/assessment?pilar=NON_AKADEMIK",
+            ],
+            headers,
+            signal,
+          )
+          : Promise.resolve([]),
+      ]);
+
+      setUsers(mergeUsersWithRoleData(userData, [{ roleId: 4, data: aoData }]));
       setWilayah(wilayahData);
       setSchools(schoolData);
       setVendors(
@@ -5312,22 +5361,20 @@ export default function DashboardAdmin() {
       );
       setAgendas(agendaData);
     } catch (error) {
+      if (error?.name === "AbortError") return;
       console.error("Dashboard Admin Error:", error);
-      setUsers([]);
-      setWilayah([]);
-      setSchools([]);
-      setVendors([]);
-      setPrograms([]);
-      setAssessments([]);
-      setAgendas([]);
+      setLoadError(error?.message || "Sebagian data Dashboard Admin gagal dimuat.");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!signal.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
+    return () => requestControllerRef.current?.abort();
   }, []);
 
   const keyword = normalisasiText(searchValue);
@@ -6180,6 +6227,22 @@ export default function DashboardAdmin() {
                   ))}
                 </div>
               </header>
+
+              {loadError && (
+                <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-6 py-3 text-amber-800">
+                  <span className="flex min-w-0 items-center gap-2 text-[10px] font-bold">
+                    <AlertTriangle size={15} className="shrink-0" />
+                    <span className="break-words">{loadError}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={fetchDashboardData}
+                    className="shrink-0 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-wider"
+                  >
+                    Coba Lagi
+                  </button>
+                </div>
+              )}
 
               <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 {[

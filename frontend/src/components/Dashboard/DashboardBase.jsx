@@ -2849,11 +2849,12 @@ function DashboardBase({
     ]);
 
     useEffect(() => {
-        if (!assessmentEnabled) return undefined;
+        if (!assessmentEnabled || activeView !== "ASSESSMENT") return undefined;
 
+        setAssessmentClock(Date.now());
         const timerId = window.setInterval(() => setAssessmentClock(Date.now()), 1000);
         return () => window.clearInterval(timerId);
-    }, [assessmentEnabled]);
+    }, [assessmentEnabled, activeView]);
 
     useEffect(() => {
         if (!assessmentEnabled && activeView !== "PROGRAM") {
@@ -4320,7 +4321,7 @@ function DashboardBase({
                                                 : "Status program"
                                         }
                                     />
-                                    </div>
+                                </div>
 
                                     <div className="min-h-[520px] xl:h-full">
                                         <VisualProcessPanel

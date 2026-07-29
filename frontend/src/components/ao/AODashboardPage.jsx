@@ -1,6 +1,6 @@
 ﻿/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { AnimatePresence, motion } from "framer-motion";
@@ -155,8 +155,8 @@ async function safeJson(response) {
     }
 }
 
-async function fetchJson(url, headers) {
-    const response = await fetch(url, { headers });
+async function fetchJson(url, headers, signal) {
+    const response = await fetch(url, { headers, signal });
     const payload = await safeJson(response);
 
     if (!response.ok) {
@@ -171,13 +171,14 @@ async function fetchJson(url, headers) {
     return payload;
 }
 
-async function fetchFirst(endpoints, headers) {
+async function fetchFirst(endpoints, headers, signal) {
     let lastError = null;
 
     for (const endpoint of endpoints) {
         try {
-            return await fetchJson(`${API_BASE_URL}${endpoint}`, headers);
+            return await fetchJson(`${API_BASE_URL}${endpoint}`, headers, signal);
         } catch (error) {
+            if (error?.name === "AbortError") throw error;
             lastError = error;
         }
     }
@@ -196,7 +197,8 @@ async function mapWithConcurrency(rows, limit, mapper) {
 
             try {
                 result[index] = await mapper(rows[index], index);
-            } catch {
+            } catch (error) {
+                if (error?.name === "AbortError") throw error;
                 result[index] = rows[index];
             }
         }
@@ -2767,8 +2769,14 @@ function AODashboardPage({
     const [selectedProgramId, setSelectedProgramId] = useState(null);
     const [activeListView, setActiveListView] = useState("PROGRAM");
     const [visualProgramQuery, setVisualProgramQuery] = useState("");
+    const requestControllerRef = useRef(null);
 
     const fetchAoData = async ({ silent = false } = {}) => {
+        requestControllerRef.current?.abort();
+        const controller = new AbortController();
+        requestControllerRef.current = controller;
+        const { signal } = controller;
+
         if (silent) setRefreshing(true);
         else setLoading(true);
 
@@ -2806,6 +2814,7 @@ function AODashboardPage({
                         `/users/ao/${aoUserId}`,
                     ],
                     headers,
+                    signal,
                 ),
                 fetchFirst(
                     [
@@ -2814,6 +2823,7 @@ function AODashboardPage({
                         "/wilayah/provinsi",
                     ],
                     headers,
+                    signal,
                 ),
                 fetchFirst(
                     [
@@ -2821,20 +2831,25 @@ function AODashboardPage({
                         "/wilayah",
                     ],
                     headers,
+                    signal,
                 ),
                 fetchFirst(
                     [
                         "/sekolah",
                     ],
                     headers,
+                    signal,
                 ),
                 fetchFirst(
                     [
                         "/program",
                     ],
                     headers,
+                    signal,
                 ),
             ]);
+
+            if (signal.aborted) return;
 
             const profilePayload =
                 profileResult.status === "fulfilled"
@@ -2900,12 +2915,26 @@ function AODashboardPage({
                     ? normalizeArray(programResult.value)
                     : [];
 
-            /*
-             * Detail dipanggil agar relasi AO, sekolah, fase, termin,
-             * kegiatan, dan persyaratan tidak tertinggal dari dashboard.
-             */
+            const summariesHaveScopeHints = programList.some(
+                (program) =>
+                    getProgramAoIds(program).length > 0 ||
+                    getProgramSchoolIds(program).length > 0,
+            );
+            const detailCandidates = summariesHaveScopeHints
+                ? programList.filter((program) =>
+                    isProgramVisibleToAo(
+                        program,
+                        aoUserId,
+                        scopedSchoolIds,
+                        scopedSchoolMap,
+                        wilayahMap,
+                    ),
+                )
+                : programList;
+
+            /* Detail hanya dimuat untuk Program kandidat AO. */
             const detailedPrograms = await mapWithConcurrency(
-                programList,
+                detailCandidates,
                 6,
                 async (program) => {
                     const id = getProgramId(program);
@@ -2915,6 +2944,7 @@ function AODashboardPage({
                         const detailPayload = await fetchJson(
                             `${API_BASE_URL}/program/${id}`,
                             headers,
+                            signal,
                         );
 
                         const detail =
@@ -2926,11 +2956,14 @@ function AODashboardPage({
                             ...program,
                             ...(detail || {}),
                         };
-                    } catch {
+                    } catch (error) {
+                        if (error?.name === "AbortError") throw error;
                         return program;
                     }
                 },
             );
+
+            if (signal.aborted) return;
 
             const visiblePrograms = detailedPrograms.filter((program) =>
                 isProgramVisibleToAo(
@@ -2951,21 +2984,23 @@ function AODashboardPage({
             setSchools(scopedSchools);
             setPrograms(visiblePrograms);
 
-            setSchoolDistrictFilter("ALL");
-            setSchoolSearch("");
-            setSchoolPage(1);
+            if (!silent) {
+                setSchoolDistrictFilter("ALL");
+                setSchoolSearch("");
+                setSchoolPage(1);
 
-            setProgramDistrictFilter("ALL");
-            setProgramSchoolFilter("ALL");
-            setProgramCategoryFilter("ALL");
-            setProgramPillarFilter("ALL");
-            setProgramStatusFilter("ALL");
-            setReviewStatusFilter("WAITING_AO");
-            setProgramSearch("");
-            setProgramPage(1);
-            setSelectedProgramId(null);
-            setActiveListView("PROGRAM");
-            setVisualProgramQuery("");
+                setProgramDistrictFilter("ALL");
+                setProgramSchoolFilter("ALL");
+                setProgramCategoryFilter("ALL");
+                setProgramPillarFilter("ALL");
+                setProgramStatusFilter("ALL");
+                setReviewStatusFilter("WAITING_AO");
+                setProgramSearch("");
+                setProgramPage(1);
+                setSelectedProgramId(null);
+                setActiveListView("PROGRAM");
+                setVisualProgramQuery("");
+            }
 
             if (!nextAoScope.hasScope) {
                 setErrorMessage(
@@ -2980,6 +3015,7 @@ function AODashboardPage({
                 );
             }
         } catch (error) {
+            if (error?.name === "AbortError") return;
             console.error("AODashboardPage Error:", error);
             setErrorMessage(
                 error?.message ||
@@ -2990,13 +3026,16 @@ function AODashboardPage({
                 "Gagal memuat dashboard Area Officer",
             );
         } finally {
-            setLoading(false);
-            setRefreshing(false);
+            if (!signal.aborted) {
+                setLoading(false);
+                setRefreshing(false);
+            }
         }
     };
 
     useEffect(() => {
         fetchAoData();
+        return () => requestControllerRef.current?.abort();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

@@ -1,9 +1,10 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import {
+    AlertTriangle,
     BadgeCheck,
     CheckCircle2,
     FolderOpen,
@@ -23,7 +24,7 @@ import { Sidebar, PageWrapper, Button } from "../common";
 import Dropdown from "../Dropdown";
 import SafeResponsiveContainer from "../charts/SafeResponsiveContainer";
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 const COLORS = ["#0AC4E0", "#2563EB", "#7C3AED", "#F97316", "#10B981", "#64748B", "#EC4899", "#F59E0B"];
 
 function normalizeArray(payload) {
@@ -34,6 +35,49 @@ function normalizeArray(payload) {
 
 function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
+}
+
+async function safeJson(response) {
+    try {
+        return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+async function fetchJson(url, { headers, signal } = {}) {
+    const response = await fetch(url, { headers, signal });
+    const payload = await safeJson(response);
+
+    if (!response.ok) {
+        const message = payload?.message || payload?.error || `Request gagal (${response.status})`;
+        throw new Error(Array.isArray(message) ? message.join(", ") : message);
+    }
+
+    return payload;
+}
+
+async function mapWithConcurrency(rows, limit, mapper) {
+    const result = new Array(rows.length);
+    let cursor = 0;
+
+    async function worker() {
+        while (cursor < rows.length) {
+            const index = cursor;
+            cursor += 1;
+            try {
+                result[index] = await mapper(rows[index], index);
+            } catch (error) {
+                if (error?.name === "AbortError") throw error;
+                result[index] = rows[index];
+            }
+        }
+    }
+
+    await Promise.all(
+        Array.from({ length: Math.min(Math.max(1, limit), Math.max(1, rows.length)) }, () => worker()),
+    );
+    return result;
 }
 
 function getProgramVendorIds(program) {
@@ -366,6 +410,9 @@ export default function DashboardVendorPage({
     const [schools, setSchools] = useState([]);
     const [currentVendor, setCurrentVendor] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState("");
+    const requestControllerRef = useRef(null);
     const [pillarFilter, setPillarFilter] = useState("ALL");
     const [gradeFilter, setGradeFilter] = useState("ALL");
     const [yearFilter, setYearFilter] = useState("ALL");
@@ -387,41 +434,79 @@ export default function DashboardVendorPage({
             || null;
     };
 
-    const fetchDashboardData = async () => {
-        setLoading(true);
+    const fetchDashboardData = async ({ silent = false } = {}) => {
+        requestControllerRef.current?.abort();
+        const controller = new AbortController();
+        requestControllerRef.current = controller;
+        const { signal } = controller;
+
+        if (silent) setRefreshing(true);
+        else setLoading(true);
+        setLoadError("");
+
         try {
             const token = localStorage.getItem("token");
+            if (!token) throw new Error("Sesi login Vendor tidak ditemukan.");
+
             const headers = { Authorization: `Bearer ${token}` };
             const payload = getTokenPayload();
-            const [programResponse, schoolResponse, vendorResponse] = await Promise.all([
-                fetch(`${API_BASE_URL}/program`, { headers }),
-                fetch(`${API_BASE_URL}/sekolah`, { headers }),
-                fetch(`${API_BASE_URL}/vendor`, { headers }),
+            const [programPayload, schoolPayload, vendorPayload] = await Promise.all([
+                fetchJson(`${API_BASE_URL}/program`, { headers, signal }),
+                fetchJson(`${API_BASE_URL}/sekolah`, { headers, signal }),
+                fetchJson(`${API_BASE_URL}/vendor`, { headers, signal }),
             ]);
-            const programList = normalizeArray(await programResponse.json());
-            const schoolList = normalizeArray(await schoolResponse.json());
-            const vendorList = normalizeArray(await vendorResponse.json());
+
+            const programList = normalizeArray(programPayload);
+            const schoolList = normalizeArray(schoolPayload);
+            const vendorList = normalizeArray(vendorPayload);
             const vendor = resolveCurrentVendor(vendorList, payload);
-            const vendorPrograms = vendor
-                ? programList.filter((program) => getProgramVendorIds(program).includes(String(vendor.id_vendor)))
-                : [];
-            const detailedPrograms = await Promise.all(vendorPrograms.map(async (program) => {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/program/${program.id_program}`, { headers });
-                    const result = await response.json();
-                    return result?.data || result || program;
-                } catch { return program; }
-            }));
+            if (!vendor) throw new Error("Data Vendor untuk akun ini belum terhubung.");
+
+            const vendorId = String(vendor.id_vendor || vendor.id || "");
+            const vendorPrograms = programList.filter((program) =>
+                getProgramVendorIds(program).includes(vendorId),
+            );
+            const detailedPrograms = await mapWithConcurrency(
+                vendorPrograms,
+                5,
+                async (program) => {
+                    const programId = program?.id_program || program?.id;
+                    if (!programId) return program;
+
+                    try {
+                        const result = await fetchJson(`${API_BASE_URL}/program/${programId}`, {
+                            headers,
+                            signal,
+                        });
+                        return { ...program, ...(result?.data || result?.program || result || {}) };
+                    } catch (error) {
+                        if (error?.name === "AbortError") throw error;
+                        return program;
+                    }
+                },
+            );
+
             setPrograms(detailedPrograms);
             setSchools(schoolList);
             setCurrentVendor(vendor);
         } catch (error) {
+            if (error?.name === "AbortError") return;
             console.error("Gagal mengambil dashboard vendor:", error);
-            toast.error("Gagal mengambil dashboard vendor");
-        } finally { setLoading(false); }
+            const message = error?.message || "Gagal mengambil dashboard Vendor";
+            setLoadError(message);
+            toast.error(message);
+        } finally {
+            if (!signal.aborted) {
+                setLoading(false);
+                setRefreshing(false);
+            }
+        }
     };
 
-    useEffect(() => { fetchDashboardData(); }, []);
+    useEffect(() => {
+        fetchDashboardData();
+        return () => requestControllerRef.current?.abort();
+    }, []);
 
     const vendorPillarControls = useMemo(
         () => getVendorPillarOptions(currentVendor, programs),
@@ -541,12 +626,27 @@ export default function DashboardVendorPage({
                                 width="w-[170px]"
                             />
                             <Button text="Program" icon={<FolderOpen size={14} />} onClick={() => navigate(listPath)} className="!rounded-xl !border !border-cyan-100 !bg-white !px-4 !py-2.5 !text-[9px] !font-black !uppercase !tracking-wider !text-[#0AC4E0] !shadow-sm" />
-                            <Button text="Refresh" icon={<RefreshCcw size={14} />} onClick={fetchDashboardData} className="!rounded-xl !bg-[#0AC4E0] !px-4 !py-2.5 !text-[9px] !font-black !uppercase !tracking-wider !text-white" />
+                            <Button text="Refresh" icon={<RefreshCcw size={14} />} onClick={() => fetchDashboardData({ silent: true })} className="!rounded-xl !bg-[#0AC4E0] !px-4 !py-2.5 !text-[9px] !font-black !uppercase !tracking-wider !text-white" />
                         </div>
                     </div>
                 </header>
 
                 <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden px-6 py-4">
+                    {loadError && (
+                        <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                            <span className="flex min-w-0 items-center gap-2 text-[10px] font-bold">
+                                <AlertTriangle size={15} className="shrink-0" />
+                                <span className="break-words">{loadError}</span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => fetchDashboardData({ silent: true })}
+                                className="shrink-0 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-wider"
+                            >
+                                Coba Lagi
+                            </button>
+                        </div>
+                    )}
                     <section className="shrink-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">
                         <div className="grid sm:grid-cols-2 xl:grid-cols-4">
                             <SummaryCard label="Program Vendor" value={filteredPrograms.length} helper="Sesuai filter aktif" icon={<Layers3 size={19} />} />
