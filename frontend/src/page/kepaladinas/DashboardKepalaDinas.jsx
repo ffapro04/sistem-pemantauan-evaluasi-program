@@ -4926,7 +4926,7 @@ function KadinSolidPieCard({
                     })}
                 </div>
 
-                <aside className="hidden min-h-0 flex-col gap-3 rounded-[1.55rem] border border-slate-200 bg-slate-950 p-4 text-white xl:flex">
+                <aside className="hidden min-h-0 flex-col gap-3 rounded-[1.55rem] border border-slate-200 p-4 text-white xl:flex">
                     <div>
                         <p className="text-[8px] font-black uppercase tracking-[0.22em] text-cyan-300">
                             Baca Cepat
@@ -4973,17 +4973,6 @@ function KadinSolidPieCard({
                         </div>
                     </div>
 
-                    <div className="mt-auto rounded-2xl bg-gradient-to-r from-cyan-500/20 to-blue-500/20 p-3">
-                        <div className="flex items-center gap-2 text-cyan-200">
-                            <TrendingUp size={14} />
-                            <span className="text-[8px] font-black uppercase tracking-wider">
-                                Insight
-                            </span>
-                        </div>
-                        <p className="mt-2 text-[9px] font-semibold leading-4 text-slate-300">
-                            Gunakan kendali di bawah untuk membandingkan tahapan, pilar, jenjang, wilayah, dan tahun pada diagram yang sama.
-                        </p>
-                    </div>
                 </aside>
             </div>
         </section>

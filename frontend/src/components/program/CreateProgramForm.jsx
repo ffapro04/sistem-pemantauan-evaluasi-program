@@ -1692,7 +1692,7 @@ function CreateProgramForm({
                                 />
                             ) : (
                                 <button type="button" onClick={goNext}
-                                    className="inline-flex items-center gap-2 rounded-2xl bg-[#2563EB] px-5 py-3 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]">
+                                        className="inline-flex items-center gap-2 rounded-2xl bg-[#0AC4E0] px-5 py-3 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]">
                                     Lanjut <ChevronRight size={16} />
                                 </button>
                             )}
