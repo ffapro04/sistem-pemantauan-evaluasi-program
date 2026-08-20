@@ -57,29 +57,6 @@ async function fetchJson(url, { headers, signal } = {}) {
     return payload;
 }
 
-async function mapWithConcurrency(rows, limit, mapper) {
-    const result = new Array(rows.length);
-    let cursor = 0;
-
-    async function worker() {
-        while (cursor < rows.length) {
-            const index = cursor;
-            cursor += 1;
-            try {
-                result[index] = await mapper(rows[index], index);
-            } catch (error) {
-                if (error?.name === "AbortError") throw error;
-                result[index] = rows[index];
-            }
-        }
-    }
-
-    await Promise.all(
-        Array.from({ length: Math.min(Math.max(1, limit), Math.max(1, rows.length)) }, () => worker()),
-    );
-    return result;
-}
-
 function getProgramVendorIds(program) {
     if (Array.isArray(program?.vendor_ids)) return program.vendor_ids.map(String);
     if (Array.isArray(program?.id_vendor)) return program.id_vendor.map(String);
@@ -451,7 +428,7 @@ export default function DashboardVendorPage({
             const headers = { Authorization: `Bearer ${token}` };
             const payload = getTokenPayload();
             const [programPayload, schoolPayload, vendorPayload] = await Promise.all([
-                fetchJson(`${API_BASE_URL}/program`, { headers, signal }),
+                fetchJson(`${API_BASE_URL}/program?include=fases`, { headers, signal }),
                 fetchJson(`${API_BASE_URL}/sekolah`, { headers, signal }),
                 fetchJson(`${API_BASE_URL}/vendor`, { headers, signal }),
             ]);
@@ -466,27 +443,8 @@ export default function DashboardVendorPage({
             const vendorPrograms = programList.filter((program) =>
                 getProgramVendorIds(program).includes(vendorId),
             );
-            const detailedPrograms = await mapWithConcurrency(
-                vendorPrograms,
-                5,
-                async (program) => {
-                    const programId = program?.id_program || program?.id;
-                    if (!programId) return program;
 
-                    try {
-                        const result = await fetchJson(`${API_BASE_URL}/program/${programId}`, {
-                            headers,
-                            signal,
-                        });
-                        return { ...program, ...(result?.data || result?.program || result || {}) };
-                    } catch (error) {
-                        if (error?.name === "AbortError") throw error;
-                        return program;
-                    }
-                },
-            );
-
-            setPrograms(detailedPrograms);
+            setPrograms(vendorPrograms);
             setSchools(schoolList);
             setCurrentVendor(vendor);
         } catch (error) {

@@ -13,6 +13,7 @@ import { User } from './user.entity';
 import { Wilayah } from '../wilayah/entities/wilayah.entity';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
+import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -477,19 +478,78 @@ export class UsersService {
     return user;
   }
 
-  async findAll() {
-    const users = await this.userRepo.find({
+  async findAll(page?: string, limit?: string) {
+    const pagination = parsePagination(page, limit);
+
+    if (!pagination) {
+      const users = await this.userRepo.find({
+        relations: ['role', 'sekolah', 'wilayah'],
+        order: {
+          id_user: 'DESC',
+        },
+      });
+
+      return this.hydrateKepalaDinasWilayahBatch(users);
+    }
+
+    const [users, total] = await this.userRepo.findAndCount({
       relations: ['role', 'sekolah', 'wilayah'],
       order: {
         id_user: 'DESC',
       },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
     });
 
-    const hydratedUsers = await Promise.all(
-      users.map((user) => this.hydrateKepalaDinasWilayah(user)),
-    );
+    const hydrated = await this.hydrateKepalaDinasWilayahBatch(users);
+    return toPaginatedResult(hydrated, total, pagination);
+  }
 
-    return hydratedUsers;
+  private async hydrateKepalaDinasWilayahBatch(
+    users: User[],
+  ): Promise<User[]> {
+    const wilayahIdsByUser = new Map<User, number[]>();
+    const allWilayahIds = new Set<number>();
+
+    for (const user of users) {
+      const roleId = Number(user.role?.id_role || user.id_role || 0);
+      if (roleId !== this.ROLE_KEPALA_DINAS_ID) continue;
+
+      const tugas = Array.isArray(user.kabupaten_tugas)
+        ? user.kabupaten_tugas
+        : [];
+      const wilayahIds = [
+        ...new Set(
+          tugas
+            .map((item: any) => item?.id_provinsi || item?.id_wilayah || null)
+            .map((id: any) => Number(id))
+            .filter((id: number) => Number.isFinite(id) && id > 0),
+        ),
+      ];
+
+      wilayahIdsByUser.set(user, wilayahIds);
+      wilayahIds.forEach((id) => allWilayahIds.add(id));
+    }
+
+    if (wilayahIdsByUser.size === 0) {
+      return users;
+    }
+
+    const allWilayah =
+      allWilayahIds.size > 0
+        ? await this.wilayahRepo.find({
+            where: { id_wilayah: In([...allWilayahIds]) },
+          })
+        : [];
+    const wilayahById = new Map(allWilayah.map((w) => [w.id_wilayah, w]));
+
+    for (const [user, wilayahIds] of wilayahIdsByUser) {
+      user.wilayah = wilayahIds
+        .map((id) => wilayahById.get(id))
+        .filter((w): w is (typeof allWilayah)[number] => Boolean(w));
+    }
+
+    return users;
   }
 
   async findOne(id: number) {

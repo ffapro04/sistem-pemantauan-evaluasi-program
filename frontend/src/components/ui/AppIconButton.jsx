@@ -4,7 +4,7 @@ import { cn } from "../../design/tokens";
 
 const variantClass = {
   primary:
-    "border-blue-100 bg-blue-50 text-[#1E5AA5] hover:bg-[#1E5AA5] hover:text-white",
+    "border-[#0AC4E0]/20 bg-[#0AC4E0]/5 text-[#0AC4E0] hover:bg-[#0AC4E0] hover:text-white",
   success:
     "border-emerald-100 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white",
   danger:
@@ -16,9 +16,13 @@ const variantClass = {
   plainDanger:
     "border-transparent bg-transparent text-red-500 hover:bg-gray-100 hover:text-red-700",
   plainPrimary:
-    "border-transparent bg-transparent text-[#2E5AA7] hover:bg-gray-100 hover:text-[#244a8a]",
+    "border-transparent bg-transparent text-[#0AC4E0] hover:bg-gray-100 hover:text-[#0899B0]",
   plainSuccess:
     "border-transparent bg-transparent text-green-500 hover:bg-gray-100 hover:text-green-700",
+  // Subtle chrome for icon-only nav controls (e.g. pagination arrows) sitting
+  // directly on a page/panel background rather than inside a filled surface.
+  nav:
+    "border-transparent bg-transparent text-gray-400 hover:bg-[#0AC4E0]/10 hover:text-[#0AC4E0]",
 };
 
 const sizeClass = {

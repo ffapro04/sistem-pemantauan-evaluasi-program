@@ -155,13 +155,13 @@ function DropdownItem({ label, active, onClick }) {
       className={`
         group relative w-full text-left px-4 py-2.5 rounded-xl mb-0.5 last:mb-0
         transition-all duration-200 flex items-center
-        ${active ? "bg-[#2E5AA7]/5 text-[#2E5AA7]" : "text-gray-500 hover:bg-gray-50"}
+        ${active ? "bg-[#0AC4E0]/5 text-[#0AC4E0]" : "text-gray-500 hover:bg-gray-50"}
       `}
     >
-      {/* Indikator Garis Aktif warna #2E5AA7 */}
+      {/* Indikator garis aktif — samakan dengan warna trigger (#0AC4E0) */}
       <span
-        className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 rounded-full transition-all duration-300 
-        ${active ? "h-4 bg-[#2E5AA7] opacity-100" : "h-0 bg-gray-300 opacity-0 group-hover:h-2 group-hover:opacity-100"}`}
+        className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 rounded-full transition-all duration-300
+        ${active ? "h-4 bg-[#0AC4E0] opacity-100" : "h-0 bg-gray-300 opacity-0 group-hover:h-2 group-hover:opacity-100"}`}
       />
 
       <span

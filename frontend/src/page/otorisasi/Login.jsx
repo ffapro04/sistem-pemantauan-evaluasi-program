@@ -30,6 +30,7 @@ import PageWrapper from "../../components/PageWrapper";
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import Label from "../../components/Label";
+import AppIconButton from "../../components/ui/AppIconButton";
 import { setAuthSession } from "../../utils/authSession";
 
 const API_BASE_URL =
@@ -798,13 +799,15 @@ const Login = () => {
           onBlur={() => setFocused(null)}
           className="!h-12 !rounded-2xl !border !border-slate-200 !bg-white !px-4 !pr-12 !text-[14px] !font-bold !text-slate-800 !shadow-sm !outline-none transition focus:!border-[#0AC4E0] focus:!ring-4 focus:!ring-[#0AC4E0]/10"
         />
-        <button
-          type="button"
+        <AppIconButton
+          icon={showPassword ? EyeOff : Eye}
+          iconSize={18}
+          variant="nav"
+          size="sm"
+          ariaLabel={showPassword ? "Sembunyikan password" : "Tampilkan password"}
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-cyan-50 hover:text-[#0AC4E0]"
-        >
-          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
+          className="absolute right-3 top-1/2 !h-8 !w-8 -translate-y-1/2 !rounded-lg"
+        />
       </div>
     </div>
   );
@@ -1055,14 +1058,14 @@ const Login = () => {
                       className="!h-14 !w-full !rounded-[1rem] !bg-[#0AC4E0] !text-[12px] !font-black !uppercase !tracking-[0.18em] !text-white !shadow-[0_16px_34px_rgba(10,196,224,0.25)] transition hover:!bg-[#08AFC8] active:scale-[0.99] disabled:!opacity-40"
                     />
 
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      icon={<ArrowLeft size={16} />}
                       onClick={() => navigate("/")}
-                      className="mx-auto flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-[12px] font-black text-slate-500 transition hover:bg-white/60 hover:text-[#0AC4E0]"
+                      className="!mx-auto !text-slate-500 hover:!text-[#0AC4E0]"
                     >
-                      <ArrowLeft size={16} />
                       Kembali
-                    </button>
+                    </Button>
                   </form>
                 </div>
               </section>
@@ -1116,14 +1119,16 @@ const Login = () => {
                   </h2>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowResetPassword(false)}
+                <AppIconButton
+                  icon={X}
+                  iconSize={16}
+                  variant="plainDanger"
+                  size="md"
+                  ariaLabel="Tutup"
                   disabled={resetLoading}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-50"
-                >
-                  <X size={16} />
-                </button>
+                  onClick={() => setShowResetPassword(false)}
+                  className="!rounded-xl !bg-slate-50"
+                />
               </div>
 
               <form
@@ -1155,19 +1160,16 @@ const Login = () => {
                       placeholder="nama@ypamdr.or.id"
                       className="!h-12 !rounded-2xl !border-slate-200 !bg-white !text-sm !font-bold !shadow-sm"
                     />
-                    <button
-                      type="button"
-                      onClick={requestResetOtp}
+                    <Button
+                      variant="secondary"
+                      loading={resetLoading && !resetOtpSent}
                       disabled={resetLoading}
-                      className="inline-flex h-12 shrink-0 items-center gap-2 rounded-2xl border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 px-4 text-[10px] font-black uppercase tracking-widest text-[#078EA3] transition hover:bg-[#0AC4E0]/15 disabled:opacity-60"
+                      icon={!resetLoading && <Mail size={14} />}
+                      onClick={requestResetOtp}
+                      className="!h-12 !shrink-0 !rounded-2xl !border-[#0AC4E0]/20 !bg-[#0AC4E0]/10 !px-4 !text-[10px] !text-[#0899B0] hover:!bg-[#0AC4E0]/15"
                     >
-                      {resetLoading && !resetOtpSent ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Mail size={14} />
-                      )}
                       {resetOtpSent ? "Kirim Ulang" : "Kirim OTP"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -1249,27 +1251,25 @@ const Login = () => {
                 )}
 
                 <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowResetPassword(false)}
+                  <Button
+                    variant="secondary"
                     disabled={resetLoading}
-                    className="h-11 rounded-xl border border-slate-100 bg-white px-5 text-[11px] font-black uppercase tracking-widest text-slate-500 transition hover:bg-slate-50 disabled:opacity-50"
+                    onClick={() => setShowResetPassword(false)}
+                    className="!h-11 !rounded-xl !px-5 !text-[11px]"
                   >
                     Batal
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
                     type="submit"
+                    variant="primary"
+                    loading={resetLoading}
                     disabled={resetLoading || !resetOtpSent}
-                    className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-[#08AFC8] disabled:opacity-60"
+                    icon={!resetLoading && <KeyRound size={14} />}
+                    className="!h-11 !rounded-xl !px-5 !text-[11px]"
                   >
-                    {resetLoading ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <KeyRound size={14} />
-                    )}
                     {resetLoading ? "Menyimpan" : "Reset Password"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </motion.div>

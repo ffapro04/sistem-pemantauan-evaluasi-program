@@ -4,10 +4,34 @@ export const appTheme = {
     surface: "bg-white",
     primary: "bg-[#0AC4E0]",
     primaryText: "text-[#0AC4E0]",
+    primaryBorder: "border-[#0AC4E0]",
+    // Focus/active accent for form controls and selected states — replaces
+    // the stray #1E5AA5 / #2E5AA7 blues that used to compete with the brand
+    // cyan used everywhere else in the app.
+    primaryRing: "ring-[#0AC4E0]",
+    primaryFocusBorder: "focus:border-[#0AC4E0]",
+    primaryFocusRing: "focus:ring-[#0AC4E0]/10",
     ink: "text-slate-950",
     body: "text-slate-600",
     muted: "text-slate-400",
     border: "border-slate-100",
+  },
+  // Bare hex values, for consumers that can't use a Tailwind class string
+  // (inline `style={{}}`, gradient stop chains, SVG fills, chart color maps).
+  raw: {
+    primary: "#0AC4E0",
+    primaryMid: "#08B5D0",
+    primaryDark: "#0899B0",
+    primaryDeep: "#067E95",
+  },
+  // Semantic states — reuses the exact shades already established by
+  // AppIconButton's success/danger/warning variants and AppSwitch's tones,
+  // rather than inventing a new scale.
+  state: {
+    success: { text: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100", solid: "bg-emerald-600" },
+    warning: { text: "text-orange-500", bg: "bg-orange-50", border: "border-orange-100", solid: "bg-orange-500" },
+    danger: { text: "text-red-500", bg: "bg-red-50", border: "border-red-100", solid: "bg-red-500" },
+    info: { text: "text-[#0AC4E0]", bg: "bg-[#0AC4E0]/5", border: "border-[#0AC4E0]/20", solid: "bg-[#0AC4E0]" },
   },
   radius: {
     sm: "rounded-xl",

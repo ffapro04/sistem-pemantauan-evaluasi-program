@@ -1,4 +1,5 @@
 /* eslint-disable no-unused-vars */
+/* eslint-disable react/prop-types */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -42,6 +43,9 @@ import {
 
 import Sidebar from "../../../components/Sidebar";
 import PageWrapper from "../../../components/PageWrapper";
+import Button from "../../../components/Button";
+import Table from "../../../components/Table";
+import Pagination from "../../../components/Pagination";
 import ResponsiveContainer from "../../../components/charts/SafeResponsiveContainer";
 import {
   CHART_PALETTE,
@@ -3099,29 +3103,29 @@ function VisualItemChooser({ modeLabel, options = [], value, onChange }) {
 
       {filteredOptions.length > VISUAL_ITEM_PAGE_SIZE && (
         <div className="mt-3 flex items-center justify-between gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
             disabled={page <= 1}
-            className="h-9 rounded-md border border-slate-100 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-35"
+            className="!h-9 !rounded-md !text-[9px]"
           >
             Prev
-          </button>
+          </Button>
 
           <span className="rounded-full bg-slate-50 px-4 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500">
             {page} / {totalPages}
           </span>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() =>
               setPage((currentPage) => Math.min(totalPages, currentPage + 1))
             }
             disabled={page >= totalPages}
-            className="h-9 rounded-md border border-slate-100 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-35"
+            className="!h-9 !rounded-md !text-[9px]"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -3359,9 +3363,6 @@ function TableMini({
     startIndex + itemsPerPage,
   );
 
-  const startNumber = filteredData.length === 0 ? 0 : startIndex + 1;
-  const endNumber = Math.min(startIndex + itemsPerPage, filteredData.length);
-
   return (
     <div className="flex min-h-[330px] flex-col">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3398,74 +3399,25 @@ function TableMini({
       ) : (
         <>
           <div className={`min-h-0 flex-1 ${maxHeight} overflow-auto`}>
-            <table className="w-full min-w-max border-collapse">
-              <thead className="sticky top-0 z-10">
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  {columns.map((column) => (
-                    <th
-                      key={column.key}
-                      className="min-w-[140px] whitespace-nowrap px-4 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-400"
-                    >
-                      {column.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {paginatedData.map((item, index) => (
-                  <tr
-                    key={
-                      item?.id ||
-                      item?.id_user ||
-                      item?.id_vendor ||
-                      item?.id_sekolah ||
-                      item?.email ||
-                      startIndex + index
-                    }
-                    className="border-b border-slate-100 last:border-b-0 hover:bg-cyan-50/40"
-                  >
-                    {columns.map((column) => (
-                      <td key={column.key} className="min-w-[140px] whitespace-nowrap px-4 py-3 align-top">
-                        {column.render(item, startIndex + index)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table
+              columns={columns.map((column) => ({
+                header: column.label,
+                align: "text-left",
+                render: (item, index) => column.render(item, startIndex + index),
+              }))}
+              data={paginatedData}
+              cellClassName="!whitespace-nowrap"
+            />
           </div>
 
-          <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-              Menampilkan {startNumber}-{endNumber} dari {filteredData.length}
-            </p>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setTablePage((page) => Math.max(1, page - 1))}
-                disabled={tablePage <= 1}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Prev
-              </button>
-
-              <span className="min-w-[82px] text-center text-[9px] font-black uppercase tracking-widest text-slate-500">
-                {tablePage} / {totalPages}
-              </span>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setTablePage((page) => Math.min(totalPages, page + 1))
-                }
-                disabled={tablePage >= totalPages}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2">
+            <Pagination
+              currentPage={tablePage}
+              totalPages={totalPages}
+              totalItems={filteredData.length}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setTablePage}
+            />
           </div>
         </>
       )}
@@ -4532,13 +4484,13 @@ function CompactSchoolLeafletMap({
           </p>
 
           {mapSearch && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => setMapSearch("")}
-              className="text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]"
+              className="!h-auto !p-0 !text-[10px] !text-[#0AC4E0] hover:!bg-transparent hover:!text-[#0899B0]"
             >
               Reset Pencarian
-            </button>
+            </Button>
           )}
         </div>
 
@@ -4701,15 +4653,13 @@ function CompactSchoolLeafletMap({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onSelectProvinsi(province)
-                          }
-                          className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
+                        <Button
+                          variant="primary"
+                          onClick={() => onSelectProvinsi(province)}
+                          className="admin-map-action-pulse !mt-3 !h-9 !w-full !rounded-lg !bg-[#0AC4E0] !px-3 !text-[9px] hover:!bg-[#0899B0]"
                         >
                           Pilih Wilayah
-                        </button>
+                        </Button>
                       </div>
                     </Popup>
                   </Marker>
@@ -4857,13 +4807,13 @@ function CompactSchoolLeafletMap({
                           </p>
                         )}
 
-                        <button
-                          type="button"
+                        <Button
+                          variant="primary"
                           onClick={() => pilihKabupaten(kabupaten)}
-                          className="admin-map-action-pulse mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg bg-[#0AC4E0] px-3 text-[9px] font-black uppercase tracking-widest text-white"
+                          className="admin-map-action-pulse !mt-3 !h-9 !w-full !rounded-lg !bg-[#0AC4E0] !px-3 !text-[9px] hover:!bg-[#0899B0]"
                         >
                           Pilih Wilayah
-                        </button>
+                        </Button>
 
                         {kabupaten.coordinateSource !==
                           "database" && (
@@ -4896,13 +4846,13 @@ function CompactSchoolLeafletMap({
         </div>
 
         {selectedProvinceData && (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onResetFilter}
-            className="absolute right-4 top-4 z-[500] inline-flex h-9 items-center justify-center rounded-xl border border-white/70 bg-white/90 px-4 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0] shadow-sm backdrop-blur transition hover:bg-cyan-50"
+            className="!absolute !right-4 !top-4 !z-[500] !h-9 !rounded-xl !border-white/70 !bg-white/90 !px-4 !text-[9px] !text-[#0AC4E0] !shadow-sm backdrop-blur hover:!bg-cyan-50"
           >
             Seluruh Indonesia
-          </button>
+          </Button>
         )}
 
         {!selectedProvinceData &&
@@ -6191,23 +6141,24 @@ export default function DashboardAdmin() {
                         className="h-11 w-full rounded-xl border border-slate-200 bg-white/90 pl-10 pr-4 text-[11px] font-bold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#0AC4E0] focus:ring-2 focus:ring-cyan-100"
                       />
                     </div>
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      icon={<SlidersHorizontal size={14} />}
                       onClick={resetDashboard}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0]"
+                      className="!h-11 !rounded-xl !text-[9px]"
                     >
-                      <SlidersHorizontal size={14} />
                       Reset
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="primary"
+                      icon={!refreshing && <RefreshCcw size={14} />}
+                      loading={refreshing}
                       onClick={fetchDashboardData}
                       disabled={refreshing}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-60"
+                      className="!h-11 !rounded-xl !bg-[#0AC4E0] !px-5 !text-[9px] hover:!bg-[#0899B0]"
                     >
-                      <RefreshCcw size={14} className={refreshing ? "animate-spin" : ""} />
                       {refreshing ? "Memuat" : "Refresh"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -6234,13 +6185,13 @@ export default function DashboardAdmin() {
                     <AlertTriangle size={15} className="shrink-0" />
                     <span className="break-words">{loadError}</span>
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={fetchDashboardData}
-                    className="shrink-0 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-wider"
+                    className="!shrink-0 !rounded-xl !border-amber-200 !px-3 !py-2 !text-[9px]"
                   >
                     Coba Lagi
-                  </button>
+                  </Button>
                 </div>
               )}
 

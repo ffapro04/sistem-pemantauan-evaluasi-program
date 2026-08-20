@@ -14,6 +14,7 @@ import { Sekolah } from './entities/sekolah.entity';
 import { Wilayah } from '../wilayah/entities/wilayah.entity';
 import INDONESIA from '../data/indonesiaProvinces'; // Kamus script data lu jirr
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
+import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 @Injectable()
 export class SekolahService {
@@ -394,13 +395,26 @@ export class SekolahService {
   // =========================================================
   // 🚨 PERBAIKAN: FIND ALL (Suntik objek wilayah & Terjemahkan ID Kabupaten)
   // =========================================================
-  async findAll() {
-    const dataSekolah = await this.sekolahRepo.find({
+  async findAll(page?: string, limit?: string) {
+    const pagination = parsePagination(page, limit);
+
+    if (!pagination) {
+      const dataSekolah = await this.sekolahRepo.find({
+        relations: ['wilayah', 'wilayah.parent'],
+        order: { nama_sekolah: 'ASC' },
+      });
+
+      return dataSekolah;
+    }
+
+    const [dataSekolah, total] = await this.sekolahRepo.findAndCount({
       relations: ['wilayah', 'wilayah.parent'],
       order: { nama_sekolah: 'ASC' },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
     });
 
-    return dataSekolah;
+    return toPaginatedResult(dataSekolah, total, pagination);
   }
 
   // =========================================================

@@ -41,6 +41,8 @@ export class AssessmentController {
     @Query('jenis') jenis?: string,
     @Query('id_ho') id_ho?: string,
     @Query('pilar') pilar?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const currentUser = req?.user?.user ?? req?.user;
 
@@ -49,6 +51,8 @@ export class AssessmentController {
       id_ho ? +id_ho : undefined,
       pilar,
       currentUser,
+      page,
+      limit,
     );
   }
 

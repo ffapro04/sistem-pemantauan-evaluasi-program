@@ -100,8 +100,17 @@ export class ProgramController {
   findAll(
     @Query('kategori') kategori?: string,
     @Query('jenis_program') jenis_program?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('include') include?: string,
   ) {
-    return this.programService.findAll(kategori, jenis_program);
+    return this.programService.findAll(
+      kategori,
+      jenis_program,
+      page,
+      limit,
+      include,
+    );
   }
 
   @Get('sekolah/:id_sekolah')

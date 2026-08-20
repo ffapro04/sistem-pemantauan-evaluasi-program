@@ -22,7 +22,7 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
       {/* 2. Window Kecil (Size HP) */}
       <div className="relative w-85 h-screen bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden">
         {/* HEADER: Profile Ringkas & Hak Akses */}
-        <div className="p-8 bg-[#1E5AA5] text-white shrink-0 relative">
+        <div className="p-8 bg-[#0AC4E0] text-white shrink-0 relative">
           <button
             onClick={onClose}
             className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all active:scale-90"
@@ -31,7 +31,7 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
           </button>
 
           <div className="flex flex-col items-center mt-4">
-            <div className="w-20 h-20 rounded-[2rem] bg-white flex items-center justify-center font-black text-[#1E5AA5] text-2xl border-4 border-white/20 shadow-2xl mb-4 uppercase">
+            <div className="w-20 h-20 rounded-[2rem] bg-white flex items-center justify-center font-black text-[#0AC4E0] text-2xl border-4 border-white/20 shadow-2xl mb-4 uppercase">
               {user.nama?.charAt(0)}
             </div>
             <h2 className="text-lg font-black uppercase tracking-tight leading-none text-center px-4">
@@ -72,7 +72,7 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
         <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-3 shrink-0">
           <button
             onClick={onClose}
-            className="w-full py-4 bg-[#1E5AA5] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-900/10 hover:bg-[#154380] active:scale-95 transition-all"
+            className="w-full py-4 bg-[#0AC4E0] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-900/10 hover:bg-[#0899B0] active:scale-95 transition-all"
           >
             Simpan Perubahan
           </button>

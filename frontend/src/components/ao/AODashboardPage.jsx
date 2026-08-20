@@ -186,34 +186,6 @@ async function fetchFirst(endpoints, headers, signal) {
     throw lastError || new Error("Endpoint tidak tersedia");
 }
 
-async function mapWithConcurrency(rows, limit, mapper) {
-    const result = new Array(rows.length);
-    let cursor = 0;
-
-    async function worker() {
-        while (cursor < rows.length) {
-            const index = cursor;
-            cursor += 1;
-
-            try {
-                result[index] = await mapper(rows[index], index);
-            } catch (error) {
-                if (error?.name === "AbortError") throw error;
-                result[index] = rows[index];
-            }
-        }
-    }
-
-    await Promise.all(
-        Array.from(
-            { length: Math.min(Math.max(1, limit), Math.max(1, rows.length)) },
-            () => worker(),
-        ),
-    );
-
-    return result;
-}
-
 function normalizeText(value) {
     return String(value || "")
         .trim()
@@ -2842,7 +2814,7 @@ function AODashboardPage({
                 ),
                 fetchFirst(
                     [
-                        "/program",
+                        "/program?include=fases",
                     ],
                     headers,
                     signal,
@@ -2932,40 +2904,9 @@ function AODashboardPage({
                 )
                 : programList;
 
-            /* Detail hanya dimuat untuk Program kandidat AO. */
-            const detailedPrograms = await mapWithConcurrency(
-                detailCandidates,
-                6,
-                async (program) => {
-                    const id = getProgramId(program);
-                    if (!id) return program;
-
-                    try {
-                        const detailPayload = await fetchJson(
-                            `${API_BASE_URL}/program/${id}`,
-                            headers,
-                            signal,
-                        );
-
-                        const detail =
-                            detailPayload?.data ||
-                            detailPayload?.program ||
-                            detailPayload;
-
-                        return {
-                            ...program,
-                            ...(detail || {}),
-                        };
-                    } catch (error) {
-                        if (error?.name === "AbortError") throw error;
-                        return program;
-                    }
-                },
-            );
-
             if (signal.aborted) return;
 
-            const visiblePrograms = detailedPrograms.filter((program) =>
+            const visiblePrograms = detailCandidates.filter((program) =>
                 isProgramVisibleToAo(
                     program,
                     aoUserId,

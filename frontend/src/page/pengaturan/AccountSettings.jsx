@@ -509,13 +509,13 @@ function HeroDecor() {
 function Field({ label, value, type = "text", disabled = false }) {
     return (
         <div className="min-w-0">
-            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-[#7FA4AB]">
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-[#94A3B8]">
                 {label}
             </label>
             <div
                 className={`flex h-11 min-w-0 items-center rounded-[1.05rem] border px-4 text-[13px] font-bold ${disabled
-                    ? "border-[#DFF8FC] bg-[#F7FDFF] text-[#7FA4AB]"
-                    : "border-[#DFF8FC] bg-white text-[#103F49]"
+                    ? "border-[#0AC4E0]/15 bg-[#0AC4E0]/5 text-[#94A3B8]"
+                    : "border-[#0AC4E0]/15 bg-white text-[#020617]"
                     }`}
             >
                 <span className="min-w-0 truncate">
@@ -537,7 +537,7 @@ function InputField({
 }) {
     return (
         <div className="min-w-0">
-            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-[#7FA4AB]">
+            <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.14em] text-[#94A3B8]">
                 {label}
             </label>
             <input
@@ -548,8 +548,8 @@ function InputField({
                 placeholder={placeholder}
                 autoComplete={autoComplete}
                 className={`h-11 w-full rounded-[1.05rem] border px-4 text-[13px] font-bold outline-none transition ${disabled
-                    ? "cursor-not-allowed border-[#DFF8FC] bg-[#F7FDFF] text-[#7FA4AB]"
-                    : "border-[#DFF8FC] bg-white text-[#103F49] focus:border-[#0AC4E0] focus:ring-4 focus:ring-[#0AC4E0]/10"
+                    ? "cursor-not-allowed border-[#0AC4E0]/15 bg-[#0AC4E0]/5 text-[#94A3B8]"
+                    : "border-[#0AC4E0]/15 bg-white text-[#020617] focus:border-[#0AC4E0] focus:ring-4 focus:ring-[#0AC4E0]/10"
                     }`}
             />
         </div>
@@ -559,11 +559,11 @@ function InputField({
 function SectionTitle({ children, desc }) {
     return (
         <div className="mb-4">
-            <h2 className="text-[23px] font-black leading-tight tracking-[-0.055em] text-[#103F49]">
+            <h2 className="text-[23px] font-black leading-tight tracking-[-0.055em] text-[#020617]">
                 {children}
             </h2>
             {desc && (
-                <p className="mt-1 max-w-2xl text-[13px] font-semibold leading-6 text-[#5F7E86]">
+                <p className="mt-1 max-w-2xl text-[13px] font-semibold leading-6 text-[#64748B]">
                     {desc}
                 </p>
             )}
@@ -582,7 +582,7 @@ function Avatar({ user, name, size = "md", rounded = "rounded-full" }) {
 
     return (
         <div
-            className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden ${rounded} bg-[#E9FBFF] font-black text-[#078EA3]`}
+            className={`relative flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden ${rounded} bg-[#0AC4E0]/10 font-black text-[#0899B0]`}
         >
             {avatarUrl && !imageError ? (
                 <img
@@ -606,28 +606,28 @@ function TeamMemberRow({ member, current = false, relation = "" }) {
     const subJenis = getSubJenisLabel(member);
 
     return (
-        <div className="flex items-center gap-3 rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-3.5 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#F7FDFF]">
+        <div className="flex items-center gap-3 rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-3.5 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#0AC4E0]/5">
             <Avatar user={member} name={name} />
 
             <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                    <p className="truncate text-[13px] font-black text-[#103F49]">{name}</p>
+                    <p className="truncate text-[13px] font-black text-[#020617]">{name}</p>
                     {current && (
                         <span className="shrink-0 rounded-full bg-[#0AC4E0] px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
                             Anda
                         </span>
                     )}
                 </div>
-                <p className="mt-0.5 truncate text-[11px] font-bold text-[#5F7E86]">
+                <p className="mt-0.5 truncate text-[11px] font-bold text-[#64748B]">
                     {jabatan}
                 </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-[#7FA4AB]">
+                <p className="mt-0.5 truncate text-[10px] font-semibold text-[#94A3B8]">
                     {jenis} · {subJenis} · {email}
                 </p>
             </div>
 
             {relation && (
-                <span className="shrink-0 rounded-full border border-[#0AC4E0]/18 bg-[#F6FDFF] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#078EA3]">
+                <span className="shrink-0 rounded-full border border-[#0AC4E0]/18 bg-[#0AC4E0]/5 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#0899B0]">
                     {relation}
                 </span>
             )}
@@ -1133,13 +1133,13 @@ function AccountSettings() {
     const hiddenTeamCount = Math.max(teamMembers.length - visibleTeamMembers.length, 0);
 
     return (
-        <div className="flex h-screen overflow-hidden bg-[#F7FDFF] font-sans text-[#103F49] selection:bg-cyan-400 selection:text-white">
+        <div className="flex h-screen overflow-hidden bg-[#EEF5FF] font-sans text-[#020617] selection:bg-cyan-400 selection:text-white">
             <Sidebar />
 
             <main className="h-screen min-w-0 flex-1 overflow-hidden px-8 py-7">
                 <div className="grid h-full grid-cols-[1.55fr_0.72fr] gap-7">
                     <div className="min-h-0">
-                        <div className="relative h-full overflow-hidden rounded-[2rem] border border-[#DFF8FC] bg-white shadow-[0_30px_90px_rgba(10,196,224,0.14)]">
+                        <div className="relative h-full overflow-hidden rounded-[2rem] border border-[#0AC4E0]/15 bg-white shadow-[0_30px_90px_rgba(10,196,224,0.14)]">
                             <div className="relative h-[128px] overflow-hidden bg-[#0AC4E0]">
                                 <HeroDecor />
                                 <CyanWave />
@@ -1149,7 +1149,7 @@ function AccountSettings() {
                                 <div className="-mt-[46px] flex items-start justify-between gap-6">
                                     <div className="flex min-w-0 items-start gap-6">
                                         <div className="relative shrink-0">
-                                            <div className="flex h-[128px] w-[128px] items-center justify-center overflow-hidden rounded-[2rem] border-[7px] border-white bg-[#E9FBFF] text-[50px] font-black text-[#078EA3] shadow-[0_22px_60px_rgba(10,196,224,0.20)]">
+                                            <div className="flex h-[128px] w-[128px] items-center justify-center overflow-hidden rounded-[2rem] border-[7px] border-white bg-[#0AC4E0]/10 text-[50px] font-black text-[#0899B0] shadow-[0_22px_60px_rgba(10,196,224,0.20)]">
                                                 {loadingProfile ? (
                                                     <Loader2 size={32} className="animate-spin text-[#0AC4E0]" />
                                                 ) : (
@@ -1174,7 +1174,7 @@ function AccountSettings() {
                                                 type="button"
                                                 onClick={handlePhotoButtonClick}
                                                 disabled={uploadingPhoto || loadingProfile}
-                                                className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-[0.9rem] border-4 border-white bg-[#103F49] text-white shadow-lg transition hover:bg-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-70"
+                                                className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-[0.9rem] border-4 border-white bg-[#0AC4E0] text-white shadow-lg transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-70"
                                                 title="Ganti foto profil"
                                             >
                                                 {uploadingPhoto ? (
@@ -1187,23 +1187,23 @@ function AccountSettings() {
 
                                         <div className="min-w-0 pt-[62px]">
                                             <div className="flex flex-wrap items-center gap-3">
-                                                <h2 className="truncate text-[40px] font-black leading-none tracking-[-0.07em] text-[#103F49]">
+                                                <h2 className="truncate text-[40px] font-black leading-none tracking-[-0.07em] text-[#020617]">
                                                     {displayName}
                                                 </h2>
 
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#E9FBFF] px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#078EA3]">
+                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#0899B0]">
                                                     {roleLabel}
                                                 </span>
                                             </div>
 
                                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full border border-[#DFF8FC] bg-white px-4 py-2 text-[12px] font-black text-[#5F7E86] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
+                                                <span className="rounded-full border border-[#0AC4E0]/15 bg-white px-4 py-2 text-[12px] font-black text-[#64748B] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
                                                     {displayEmail}
                                                 </span>
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#F6FDFF] px-4 py-2 text-[12px] font-black text-[#078EA3] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
+                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#0AC4E0]/5 px-4 py-2 text-[12px] font-black text-[#0899B0] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
                                                     {jabatan}
                                                 </span>
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-white px-4 py-2 text-[12px] font-black text-[#078EA3] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
+                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-white px-4 py-2 text-[12px] font-black text-[#0899B0] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
                                                     {jenisLabel} · {subJenisLabel}
                                                 </span>
                                             </div>
@@ -1226,8 +1226,8 @@ function AccountSettings() {
                                 </div>
 
                                 <div className={`mt-6 grid gap-7 ${showRelationPanel ? "grid-cols-[1fr_0.92fr]" : "grid-cols-1"}`}>
-                                    <div className="rounded-[1.7rem] border border-[#DFF8FC] bg-white shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
-                                        <div className="border-b border-[#DFF8FC] px-6 py-4">
+                                    <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-white shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
+                                        <div className="border-b border-[#0AC4E0]/15 px-6 py-4">
                                             <SectionTitle desc="Nama, email, dan password login sistem dikelola dari panel ini.">
                                                 Informasi Login
                                             </SectionTitle>
@@ -1275,7 +1275,7 @@ function AccountSettings() {
                                                 />
                                             </div>
 
-                                            <div className="rounded-[1.15rem] border border-[#0AC4E0]/16 bg-[#F6FDFF] px-4 py-3 text-[13px] font-semibold leading-6 text-[#5F7E86]">
+                                            <div className="rounded-[1.15rem] border border-[#0AC4E0]/16 bg-[#0AC4E0]/5 px-4 py-3 text-[13px] font-semibold leading-6 text-[#64748B]">
                                                 User dapat mengubah nama, email, password, dan foto profil secara mandiri. Admin hanya menerima notifikasi perubahan, bukan isi password.
                                             </div>
 
@@ -1295,7 +1295,7 @@ function AccountSettings() {
                                                     type="button"
                                                     onClick={handleSaveProfile}
                                                     disabled={!isEditingProfile || savingProfile || loadingProfile}
-                                                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[#103F49] px-5 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-60"
+                                                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
                                                     {savingProfile ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                                                     {savingProfile ? "Menyimpan" : "Simpan Perubahan"}
@@ -1305,14 +1305,14 @@ function AccountSettings() {
                                     </div>
 
                                     {showRelationPanel && (
-                                        <div className="rounded-[1.7rem] border border-[#DFF8FC] bg-[#F7FDFF] shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
-                                            <div className="border-b border-[#DFF8FC] px-6 py-4">
+                                        <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
+                                            <div className="border-b border-[#0AC4E0]/15 px-6 py-4">
                                                 <div className="flex items-start justify-between gap-4">
                                                     <SectionTitle desc={relationPanelMeta.desc}>
                                                         {relationPanelMeta.title}
                                                     </SectionTitle>
 
-                                                    <span className="mt-1 shrink-0 rounded-full border border-[#0AC4E0]/18 bg-white px-3 py-1.5 text-[10px] font-black text-[#078EA3]">
+                                                    <span className="mt-1 shrink-0 rounded-full border border-[#0AC4E0]/18 bg-white px-3 py-1.5 text-[10px] font-black text-[#0899B0]">
                                                         {relationPanelType === "wilayah"
                                                             ? `${aoWilayahItems.length} ${relationPanelMeta.countLabel}`
                                                             : `${loadingTeam ? "..." : teamMembers.length} ${relationPanelMeta.countLabel}`}
@@ -1326,29 +1326,29 @@ function AccountSettings() {
                                                         aoWilayahItems.map((item) => (
                                                             <div
                                                                 key={`${item.name}-${item.detail}`}
-                                                                className="rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-4 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#F7FDFF]"
+                                                                className="rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-4 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#0AC4E0]/5"
                                                             >
-                                                                <p className="text-[13px] font-black text-[#103F49]">
+                                                                <p className="text-[13px] font-black text-[#020617]">
                                                                     {item.name}
                                                                 </p>
-                                                                <p className="mt-1 text-[11px] font-semibold leading-5 text-[#6D98A1]">
+                                                                <p className="mt-1 text-[11px] font-semibold leading-5 text-[#94A3B8]">
                                                                     {item.detail}
                                                                 </p>
                                                             </div>
                                                         ))
                                                     ) : (
-                                                        <div className="rounded-[1.25rem] border border-[#DFF8FC] bg-white px-5 py-6 text-center">
-                                                            <p className="text-sm font-black text-[#103F49]">
+                                                        <div className="rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white px-5 py-6 text-center">
+                                                            <p className="text-sm font-black text-[#020617]">
                                                                 {relationPanelMeta.emptyTitle}
                                                             </p>
-                                                            <p className="mt-2 text-xs font-semibold leading-5 text-[#6D98A1]">
+                                                            <p className="mt-2 text-xs font-semibold leading-5 text-[#94A3B8]">
                                                                 {relationPanelMeta.emptyDesc}
                                                             </p>
                                                         </div>
                                                     )
                                                 ) : loadingTeam ? (
-                                                    <div className="flex h-[198px] items-center justify-center rounded-[1.25rem] border border-[#DFF8FC] bg-white">
-                                                        <div className="flex items-center gap-3 text-sm font-black text-[#6D98A1]">
+                                                    <div className="flex h-[198px] items-center justify-center rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white">
+                                                        <div className="flex items-center gap-3 text-sm font-black text-[#94A3B8]">
                                                             <Loader2 size={18} className="animate-spin text-[#0AC4E0]" />
                                                             {relationPanelMeta.loadingLabel}
                                                         </div>
@@ -1368,17 +1368,17 @@ function AccountSettings() {
                                                         ))}
 
                                                         {hiddenTeamCount > 0 && (
-                                                            <div className="rounded-[1.15rem] border border-[#DFF8FC] bg-white px-4 py-3 text-center text-[12px] font-black text-[#6D98A1]">
+                                                            <div className="rounded-[1.15rem] border border-[#0AC4E0]/15 bg-white px-4 py-3 text-center text-[12px] font-black text-[#94A3B8]">
                                                                 +{hiddenTeamCount} user lain dengan relasi team yang sama
                                                             </div>
                                                         )}
                                                     </>
                                                 ) : (
-                                                    <div className="rounded-[1.25rem] border border-[#DFF8FC] bg-white px-5 py-6 text-center">
-                                                        <p className="text-sm font-black text-[#103F49]">
+                                                    <div className="rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white px-5 py-6 text-center">
+                                                        <p className="text-sm font-black text-[#020617]">
                                                             {relationPanelMeta.emptyTitle}
                                                         </p>
-                                                        <p className="mt-2 text-xs font-semibold leading-5 text-[#6D98A1]">
+                                                        <p className="mt-2 text-xs font-semibold leading-5 text-[#94A3B8]">
                                                             {relationPanelMeta.emptyDesc}
                                                         </p>
                                                     </div>
@@ -1392,18 +1392,18 @@ function AccountSettings() {
                     </div>
 
                     <aside className="grid min-h-0 grid-rows-[0.9fr_1.1fr] gap-7">
-                        <div className="rounded-[2rem] border border-[#DFF8FC] bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
+                        <div className="rounded-[2rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex min-w-0 items-start gap-3">
-                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-[#DFF8FC] bg-white shadow-[0_12px_30px_rgba(10,196,224,0.10)]">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-[#0AC4E0]/15 bg-white shadow-[0_12px_30px_rgba(10,196,224,0.10)]">
                                         <GoogleDriveLogo size={28} />
                                     </div>
 
                                     <div className="min-w-0">
-                                        <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#103F49]">
+                                        <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#020617]">
                                             Penyimpanan Dokumen
                                         </h2>
-                                        <p className="mt-2 text-[13px] font-semibold leading-6 text-[#5F7E86]">
+                                        <p className="mt-2 text-[13px] font-semibold leading-6 text-[#64748B]">
                                             Dipakai ketika user mengunggah MOU, bukti termin, dan bukti kegiatan.
                                         </p>
                                     </div>
@@ -1411,7 +1411,7 @@ function AccountSettings() {
 
                                 <span
                                     className={`shrink-0 rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-[0.12em] ${connected
-                                        ? "border border-[#0AC4E0]/20 bg-[#E9FBFF] text-[#078EA3]"
+                                        ? "border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 text-[#0899B0]"
                                         : "border border-amber-200 bg-amber-50 text-amber-700"
                                         }`}
                                 >
@@ -1431,7 +1431,7 @@ function AccountSettings() {
                                     type="button"
                                     onClick={() => fetchDriveStatus()}
                                     disabled={loadingDrive}
-                                    className="h-11 flex-1 rounded-[1.05rem] border border-[#0AC4E0]/18 bg-white text-[11px] font-black uppercase tracking-[0.14em] text-[#078EA3] transition hover:bg-[#F6FDFF] disabled:opacity-60"
+                                    className="h-11 flex-1 rounded-[1.05rem] border border-[#0AC4E0]/18 bg-white text-[11px] font-black uppercase tracking-[0.14em] text-[#0899B0] transition hover:bg-[#0AC4E0]/5 disabled:opacity-60"
                                 >
                                     {loadingDrive ? "Memuat" : "Refresh"}
                                 </button>
@@ -1458,8 +1458,8 @@ function AccountSettings() {
                             </div>
                         </div>
 
-                        <div className="rounded-[2rem] border border-[#DFF8FC] bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
-                            <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#103F49]">
+                        <div className="rounded-[2rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
+                            <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#020617]">
                                 Cara Kerja Upload
                             </h2>
 
@@ -1480,15 +1480,15 @@ function AccountSettings() {
                                 ].map((item, index) => (
                                     <div
                                         key={item.title}
-                                        className="rounded-[1.35rem] border border-[#0AC4E0]/12 bg-[#F7FDFF] px-4 py-3"
+                                        className="rounded-[1.35rem] border border-[#0AC4E0]/12 bg-[#0AC4E0]/5 px-4 py-3"
                                     >
                                         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">
                                             Step 0{index + 1}
                                         </p>
-                                        <p className="mt-1 text-[14px] font-black text-[#103F49]">
+                                        <p className="mt-1 text-[14px] font-black text-[#020617]">
                                             {item.title}
                                         </p>
-                                        <p className="mt-1 text-[12px] font-semibold leading-5 text-[#5F7E86]">
+                                        <p className="mt-1 text-[12px] font-semibold leading-5 text-[#64748B]">
                                             {item.desc}
                                         </p>
                                     </div>

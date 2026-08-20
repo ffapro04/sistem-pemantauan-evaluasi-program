@@ -22,7 +22,7 @@ const Textarea = ({
         onChange={onChange}
         placeholder={placeholder}
         rows={rows}
-        className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs font-medium outline-none focus:ring-2 focus:ring-[#1E5AA5]/20 focus:border-[#1E5AA5] transition-all resize-none placeholder:text-gray-400"
+        className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-xs font-medium outline-none focus:ring-2 focus:ring-[#0AC4E0]/20 focus:border-[#0AC4E0] transition-all resize-none placeholder:text-gray-400"
       />
     </div>
   );

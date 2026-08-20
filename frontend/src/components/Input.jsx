@@ -26,9 +26,9 @@ export default function Input({
         outline-none
         transition-all duration-200
         focus:bg-white
-        focus:border-[#1E5AA5]
+        focus:border-[#0AC4E0]
         focus:ring-[3px]
-        focus:ring-[#1E5AA5]/10
+        focus:ring-[#0AC4E0]/10
         disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200 disabled:shadow-none disabled:cursor-not-allowed
         read-only:bg-gray-50 read-only:text-gray-500 read-only:focus:ring-0 read-only:focus:border-gray-200
         ${className}

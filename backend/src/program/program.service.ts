@@ -25,11 +25,26 @@ import { KegiatanRating } from './entities/kegiatan-rating.entity';
 import { CreateProgramDto } from './dto/create-program.dto';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
+import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 @Injectable()
 export class ProgramService implements OnModuleInit, OnModuleDestroy {
   private reminderTimer: NodeJS.Timeout | null = null;
   private lastReminderRunDate: string | null = null;
+
+  private readonly PROGRAM_FASES_RELATIONS = [
+    'fases',
+    'fases.termin',
+    'fases.termin.persyaratan',
+    'fases.termin.chats',
+    'fases.kegiatans',
+    'fases.kegiatans.pertemuan',
+    'fases.kegiatans.persyaratan',
+    'fases.kegiatans.comments',
+    'fases.kegiatans.ratings',
+    'fases.kegiatans.termin',
+    'fases.kegiatans.termin.chats',
+  ];
 
   constructor(
     @InjectRepository(Program)
@@ -732,7 +747,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     return isArrayPayload ? programs : programs[0];
   }
 
-  private async getProgramNotificationAudience(program: Program | any) {
+  private async getProgramNotificationAudience(
+    program: Program | any,
+    preloadedHoRows?: any[],
+  ) {
     const hoUserIds = new Set<number>();
     const aoUserIds = new Set<number>();
     const vendorUserIds = new Set<number>();
@@ -779,14 +797,16 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const hoRows = await this.programRepo.manager.query(
-      `
-        SELECT id_user, jenis, sub_jenis, jabatan
-        FROM m_users
-        WHERE id_role = 3
-          AND status = true
-      `,
-    );
+    const hoRows =
+      preloadedHoRows ||
+      (await this.programRepo.manager.query(
+        `
+          SELECT id_user, jenis, sub_jenis, jabatan
+          FROM m_users
+          WHERE id_role = 3
+            AND status = true
+        `,
+      ));
 
     const programCategory = this.normalizeProgramCategory(program?.kategori);
     const programPilar = String(program?.pilar_program || '')
@@ -1292,8 +1312,32 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     const rows: any[] = [];
 
-    for (const item of activityRows) {
-      const audience = await this.getProgramNotificationAudience(item);
+    const hoRows = await this.programRepo.manager.query(
+      `
+        SELECT id_user, jenis, sub_jenis, jabatan
+        FROM m_users
+        WHERE id_role = 3
+          AND status = true
+      `,
+    );
+
+    const audienceCache = new Map<
+      number,
+      ReturnType<ProgramService['getProgramNotificationAudience']>
+    >();
+    const getAudienceCached = (item: any) => {
+      const key = Number(item.id_program);
+      let cached = audienceCache.get(key);
+      if (!cached) {
+        cached = this.getProgramNotificationAudience(item, hoRows);
+        audienceCache.set(key, cached);
+      }
+      return cached;
+    };
+
+    await Promise.all(
+      activityRows.map(async (item) => {
+      const audience = await getAudienceCached(item);
       const pushUserRows = (
         ids: number[],
         scope: string,
@@ -1347,10 +1391,12 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
           dedupeKey: `program-deadline:activity-guru:${item.id_kegiatans}:${idGuru}:${date}`,
         });
       });
-    }
+      }),
+    );
 
-    for (const item of openingRows) {
-      const audience = await this.getProgramNotificationAudience(item);
+    await Promise.all(
+      openingRows.map(async (item) => {
+      const audience = await getAudienceCached(item);
       const pushUserRows = (
         ids: number[],
         scope: string,
@@ -1404,7 +1450,8 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
           dedupeKey: `program-deadline:opening-guru:${item.id_fase}:${idGuru}:${date}`,
         });
       });
-    }
+      }),
+    );
 
     const created = await this.notifikasiService.dispatchMany(rows);
 
@@ -1594,6 +1641,10 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         await queryRunner.manager.save(DokumenProgram, dokumen);
       }
 
+      const pendingPersyaratanTermin: PersyaratanTermin[] = [];
+      const pendingKegiatanPertemuan: KegiatanPertemuan[] = [];
+      const pendingPersyaratanKegiatan: PersyaratanKegiatan[] = [];
+
       for (let faseIndex = 0; faseIndex < fases.length; faseIndex++) {
         const fData = fases[faseIndex];
         if (!fData?.nama_fase?.trim()) continue;
@@ -1640,8 +1691,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             const req = persyaratanTermin[syaratIndex];
             if (!req?.nama?.trim()) continue;
 
-            await queryRunner.manager.save(
-              PersyaratanTermin,
+            pendingPersyaratanTermin.push(
               this.persyaratanTerminRepo.create({
                 id_termin: savedTermin.id_termin,
                 nama: req.nama.trim(),
@@ -1697,8 +1747,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             const pertemuanData = pertemuanList[pertemuanIndex];
             if (!pertemuanData?.nama_pertemuan?.trim()) continue;
 
-            await queryRunner.manager.save(
-              KegiatanPertemuan,
+            pendingKegiatanPertemuan.push(
               this.kegiatanPertemuanRepo.create({
                 id_kegiatans: savedKegiatan.id_kegiatans,
                 nama_pertemuan: pertemuanData.nama_pertemuan.trim(),
@@ -1727,8 +1776,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             const req = persyaratanKegiatan[syaratIndex];
             if (!req?.nama?.trim()) continue;
 
-            await queryRunner.manager.save(
-              PersyaratanKegiatan,
+            pendingPersyaratanKegiatan.push(
               this.persyaratanKegiatanRepo.create({
                 id_kegiatans: savedKegiatan.id_kegiatans,
                 nama: req.nama.trim(),
@@ -1740,6 +1788,25 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             );
           }
         }
+      }
+
+      if (pendingPersyaratanTermin.length > 0) {
+        await queryRunner.manager.save(
+          PersyaratanTermin,
+          pendingPersyaratanTermin,
+        );
+      }
+      if (pendingKegiatanPertemuan.length > 0) {
+        await queryRunner.manager.save(
+          KegiatanPertemuan,
+          pendingKegiatanPertemuan,
+        );
+      }
+      if (pendingPersyaratanKegiatan.length > 0) {
+        await queryRunner.manager.save(
+          PersyaratanKegiatan,
+          pendingPersyaratanKegiatan,
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -1762,17 +1829,45 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async findAll(kategori?: string, jenis_program?: string) {
+  async findAll(
+    kategori?: string,
+    jenis_program?: string,
+    page?: string,
+    limit?: string,
+    include?: string,
+  ) {
     const where: any = {};
     if (kategori) where.kategori = kategori;
     if (jenis_program) where.jenis_program = jenis_program;
 
-    const programs = await this.programRepo.find({
+    const includeFases = String(include || '')
+      .split(',')
+      .map((s) => s.trim())
+      .includes('fases');
+    const relations = includeFases ? this.PROGRAM_FASES_RELATIONS : undefined;
+
+    const pagination = parsePagination(page, limit);
+
+    if (!pagination) {
+      const programs = await this.programRepo.find({
+        where,
+        relations,
+        order: { created_at: 'DESC' },
+      });
+
+      return this.hydrateProgramPersonas(programs);
+    }
+
+    const [programs, total] = await this.programRepo.findAndCount({
       where,
+      relations,
       order: { created_at: 'DESC' },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
     });
 
-    return this.hydrateProgramPersonas(programs);
+    const hydrated = await this.hydrateProgramPersonas(programs);
+    return toPaginatedResult(hydrated as any[], total, pagination);
   }
 
   async findBySekolah(id_sekolah: number) {
@@ -1794,19 +1889,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
   async findOne(id: number) {
     const program = await this.programRepo.findOne({
       where: { id_program: id },
-      relations: [
-        'fases',
-        'fases.termin',
-        'fases.termin.persyaratan',
-        'fases.termin.chats',
-        'fases.kegiatans',
-        'fases.kegiatans.pertemuan',
-        'fases.kegiatans.persyaratan',
-        'fases.kegiatans.comments',
-        'fases.kegiatans.ratings',
-        'fases.kegiatans.termin',
-        'fases.kegiatans.termin.chats',
-      ],
+      relations: this.PROGRAM_FASES_RELATIONS,
       order: {
         fases: {
           urutan: 'ASC',

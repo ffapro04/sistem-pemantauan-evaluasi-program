@@ -9,7 +9,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import * as jwt from 'jsonwebtoken';
 
 import { Assessment } from './entities/assessment.entity';
@@ -21,6 +21,7 @@ import { AssessmentGuru } from '../assessment-guru/entities/assessment-guru.enti
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
+import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 function normalizeAssessmentPilar(value?: string, jenis?: string) {
   const raw = String(value || '')
@@ -493,6 +494,8 @@ export class AssessmentService {
     id_ho?: number,
     pilar?: string,
     currentUser?: any,
+    page?: string,
+    limit?: string,
   ) {
     const roleId = Number(
       currentUser?.id_role ??
@@ -621,6 +624,14 @@ export class AssessmentService {
       });
     }
 
+    const pagination = parsePagination(page, limit);
+    const total = pagination ? await query.getCount() : undefined;
+
+    if (pagination) {
+      query.offset((pagination.page - 1) * pagination.limit);
+      query.limit(pagination.limit);
+    }
+
     const rows = await query.getRawMany();
 
     const mappedRows = rows.map((row) => {
@@ -646,7 +657,13 @@ export class AssessmentService {
       };
     });
 
-    return this.hydrateAssessmentPersonas(mappedRows);
+    const hydrated = await this.hydrateAssessmentPersonas(mappedRows);
+
+    if (pagination) {
+      return toPaginatedResult(hydrated as any[], total as number, pagination);
+    }
+
+    return hydrated;
   }
 
   async findOne(id: number) {
@@ -1384,22 +1401,48 @@ export class AssessmentService {
         a.is_expired = isExpired;
         a.is_paused = Boolean(a.sent_at && a.aktif === false);
         a.status_display = isExpired ? 'Selesai' : a.status;
+      }
 
-        const pertanyaan = await this.pertanyaanRepo.find({
-          where: { id_assessment: a.id_assessment },
+      const assessmentIds = assessments.map((a) => a.id_assessment);
+      const hasValidUser = !isNaN(cleanIdUser) && cleanIdUser > 0;
+
+      if (assessmentIds.length > 0 && hasValidUser) {
+        const allPertanyaan = await this.pertanyaanRepo.find({
+          where: { id_assessment: In(assessmentIds) },
         });
 
-        if (!isNaN(cleanIdUser) && cleanIdUser > 0 && pertanyaan.length > 0) {
-          const ids = pertanyaan.map((p) => p.id_pertanyaan);
+        const pertanyaanIdsByAssessment = new Map<number, number[]>();
+        for (const p of allPertanyaan) {
+          const list = pertanyaanIdsByAssessment.get(p.id_assessment) || [];
+          list.push(p.id_pertanyaan);
+          pertanyaanIdsByAssessment.set(p.id_assessment, list);
+        }
 
-          const jumlah = await this.jawabanRepo
+        const allPertanyaanIds = allPertanyaan.map((p) => p.id_pertanyaan);
+        const filledPertanyaanIds = new Set<number>();
+
+        if (allPertanyaanIds.length > 0) {
+          const jawabanCounts = await this.jawabanRepo
             .createQueryBuilder('aj')
-            .where('aj.id_pertanyaan IN (:...ids)', { ids })
+            .select('aj.id_pertanyaan', 'id_pertanyaan')
+            .where('aj.id_pertanyaan IN (:...ids)', { ids: allPertanyaanIds })
             .andWhere('aj.id_user = :id_user', { id_user: cleanIdUser })
-            .getCount();
+            .groupBy('aj.id_pertanyaan')
+            .getRawMany();
 
-          a.sudah_diisi = jumlah > 0;
-        } else {
+          for (const row of jawabanCounts) {
+            filledPertanyaanIds.add(Number(row.id_pertanyaan));
+          }
+        }
+
+        for (const a of assessments) {
+          const pertanyaanIds = pertanyaanIdsByAssessment.get(a.id_assessment) || [];
+          a.sudah_diisi =
+            pertanyaanIds.length > 0 &&
+            pertanyaanIds.some((id) => filledPertanyaanIds.has(id));
+        }
+      } else {
+        for (const a of assessments) {
           a.sudah_diisi = false;
         }
       }

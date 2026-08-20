@@ -1919,3 +1919,15 @@ body[data-app-route*="/dashboard"] main .border-blue-100 {
     padding: 0.85rem !important;
   }
 }
+
+/* Generic scrollbar-hiding utility — previously re-injected locally by
+   several components (MasterPageShell, NoScrollbarStyle, etc). Defined once
+   globally so any element can opt in with className="no-scrollbar". */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

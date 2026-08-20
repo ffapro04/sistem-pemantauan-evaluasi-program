@@ -7,13 +7,13 @@ const Checkbox = ({ label, checked, onChange, value }) => {
     <label
       className={`group flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
         checked
-          ? "bg-blue-50 border-[#1E5AA5] shadow-sm"
+          ? "bg-blue-50 border-[#0AC4E0] shadow-sm"
           : "bg-gray-50 border-transparent hover:bg-gray-100"
       }`}
     >
       <span
         className={`text-[11px] font-black uppercase tracking-tight transition-colors ${
-          checked ? "text-[#1E5AA5]" : "text-gray-600"
+          checked ? "text-[#0AC4E0]" : "text-gray-600"
         }`}
       >
         {label}
@@ -22,7 +22,7 @@ const Checkbox = ({ label, checked, onChange, value }) => {
       <div className="relative flex items-center justify-center">
         <input
           type="checkbox"
-          className="peer appearance-none w-6 h-6 border-2 border-gray-200 rounded-lg checked:bg-[#1E5AA5] checked:border-[#1E5AA5] transition-all duration-300 cursor-pointer"
+          className="peer appearance-none w-6 h-6 border-2 border-gray-200 rounded-lg checked:bg-[#0AC4E0] checked:border-[#0AC4E0] transition-all duration-300 cursor-pointer"
           checked={checked}
           onChange={() => onChange(value)}
         />

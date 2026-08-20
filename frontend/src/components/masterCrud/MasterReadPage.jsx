@@ -322,6 +322,7 @@ export default function MasterReadPage({ config }) {
     const [rows, setRows] = useState([]);
     const [auxData, setAuxData] = useState({});
     const [loading, setLoading] = useState(true);
+    const [serverTotal, setServerTotal] = useState(0);
 
     const [searchTerm, setSearchTerm] = useState(
         localStorage.getItem(`${storageKey}_search`) || "",
@@ -335,6 +336,22 @@ export default function MasterReadPage({ config }) {
     const [currentPage, setCurrentPage] = useState(
         Number(localStorage.getItem(`${storageKey}_page`)) || 1,
     );
+
+    // Server-side pagination is only safe when nothing on this page needs the
+    // full dataset in memory: a `summary` widget always counts across every
+    // row, so entities that use one intentionally never qualify here, even if
+    // `serverPaginated` is set on their config.
+    const supportsServerPage = Boolean(config.serverPaginated) && !config.summary;
+
+    const filtersAreDefault = (config.filters || []).every((filter) => {
+        const value = filters[filter.name] || filter.defaultValue || "all";
+        return value === (filter.defaultValue || "all");
+    });
+
+    const canUseServerPage =
+        supportsServerPage && !searchTerm.trim() && filtersAreDefault;
+
+    const serverPageDep = canUseServerPage ? currentPage : 0;
 
     const fetchData = useCallback(async () => {
         try {
@@ -378,12 +395,23 @@ export default function MasterReadPage({ config }) {
             ].filter(Boolean);
 
             let rawRows = [];
+            let nextServerTotal = 0;
+            const useServerPage = canUseServerPage;
 
             for (const endpoint of endpoints) {
                 try {
-                    const response = await axios.get(buildFreshApiUrl(endpoint), {
+                    const requestUrl = useServerPage
+                        ? `${endpoint}${endpoint.includes("?") ? "&" : "?"}page=${currentPage}&limit=${itemsPerPage}`
+                        : endpoint;
+
+                    const response = await axios.get(buildFreshApiUrl(requestUrl), {
                         headers: getTokenHeader(),
                     });
+
+                    if (useServerPage && Array.isArray(response.data?.data)) {
+                        nextServerTotal =
+                            Number(response.data.total) || response.data.data.length;
+                    }
 
                     const normalizedPayload =
                         typeof config.getListPayload === "function"
@@ -446,6 +474,7 @@ export default function MasterReadPage({ config }) {
 
             setRows(normalizedRows);
             setAuxData(nextAuxData);
+            setServerTotal(useServerPage ? nextServerTotal : 0);
         } catch (error) {
             console.error("MasterReadPage Fetch Error:", error);
 
@@ -456,7 +485,10 @@ export default function MasterReadPage({ config }) {
         } finally {
             setLoading(false);
         }
-    }, [config, navigate]);
+        // Only re-run on page changes while server-paginated mode is active —
+        // otherwise page changes are pure client-side slicing of `rows` and
+        // must not trigger a network refetch.
+    }, [config, navigate, canUseServerPage, serverPageDep]);
 
     useEffect(() => {
         fetchData();
@@ -727,7 +759,7 @@ export default function MasterReadPage({ config }) {
         return result;
     }, [rows, searchTerm, filters, config, auxData]);
 
-    const totalItems = filteredData.length;
+    const totalItems = canUseServerPage ? serverTotal : filteredData.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
     useEffect(() => {
@@ -736,10 +768,15 @@ export default function MasterReadPage({ config }) {
         }
     }, [currentPage, totalPages]);
 
-    const currentData = filteredData.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage,
-    );
+    // In server-paginated mode `rows` already holds exactly one page fetched
+    // from the API (see fetchData), so `filteredData` here is just that page
+    // re-sorted via config.sortRows — nothing is sliced again client-side.
+    const currentData = canUseServerPage
+        ? filteredData
+        : filteredData.slice(
+            (currentPage - 1) * itemsPerPage,
+            currentPage * itemsPerPage,
+        );
 
     const summaryItems = useMemo(() => {
         if (typeof config.summary === "function") {
@@ -956,6 +993,9 @@ export default function MasterReadPage({ config }) {
                         columns={tableColumns}
                         data={currentData}
                         className="min-w-full border-separate border-spacing-0"
+                        headerClassName="!min-w-[108px] !whitespace-nowrap !py-[0.8rem] !text-[8.5px] !tracking-[0.13em] !text-center"
+                        rowClassName="!h-[62px] !bg-white"
+                        cellClassName="!h-[62px] !whitespace-nowrap !py-[0.55rem]"
                     />
 
                     {!loading && currentData.length === 0 && (
@@ -984,74 +1024,8 @@ export default function MasterReadPage({ config }) {
             <style
                 dangerouslySetInnerHTML={{
                     __html: `
-      .master-read-table {
-        background: #ffffff;
-      }
-
       .master-read-table table {
-        border-collapse: separate;
-        border-spacing: 0;
-        width: 100%;
         min-width: max(980px, 100%);
-        table-layout: auto;
-      }
-
-      .master-read-table thead th {
-        background-color: #0AC4E0 !important;
-        color: white !important;
-        height: 48px !important;
-        padding: 0.8rem 1rem !important;
-        border: none !important;
-        text-align: center !important;
-        vertical-align: middle !important;
-
-        font-size: 8.5px !important;
-        font-weight: 900 !important;
-        line-height: 1.1 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.13em !important;
-
-        position: sticky;
-        top: 0;
-        z-index: 10;
-        min-width: 108px !important;
-        white-space: nowrap !important;
-        word-break: keep-all !important;
-        overflow-wrap: normal !important;
-        hyphens: none !important;
-      }
-
-      .master-read-table thead th:first-child {
-        border-top-left-radius: 1.35rem !important;
-      }
-
-      .master-read-table thead th:last-child {
-        border-top-right-radius: 1.35rem !important;
-      }
-
-      .master-read-table tbody tr {
-        height: 62px !important;
-        transition: all 0.2s ease;
-      }
-
-      .master-read-table tbody td {
-        height: 62px !important;
-        padding: 0.55rem 1rem !important;
-        border-bottom: 1px solid #F1F5F9 !important;
-        vertical-align: middle !important;
-        background: #ffffff !important;
-        white-space: nowrap !important;
-        word-break: keep-all !important;
-        overflow-wrap: normal !important;
-        hyphens: none !important;
-      }
-
-      .master-read-table tbody tr:last-child td {
-        border-bottom: none !important;
-      }
-
-      .master-read-table tbody tr:hover td {
-        background-color: rgba(10, 196, 224, 0.04) !important;
       }
 
       .master-read-table tbody td > div {

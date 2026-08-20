@@ -170,6 +170,11 @@ export const vendorConfig = {
         update: (id) => `/vendor/${id}`,
     },
 
+    // Vendor has no `summary` widget, so it's safe to let MasterReadPage
+    // fetch one page at a time from the backend instead of the whole table
+    // whenever no search/filter is active.
+    serverPaginated: true,
+
     messages: {
         fetchError: "Gagal memuat data Vendor",
         detailError: "Gagal mengambil data Vendor",

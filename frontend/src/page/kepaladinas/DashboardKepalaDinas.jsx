@@ -4991,46 +4991,6 @@ export default function DashboardKepalaDinas() {
     const [viewMode, setViewMode] = useState("TAHAPAN");
     const requestControllerRef = useRef(null);
 
-    const fetchProgramDetail = async (program, headers, signal) => {
-        const id = getProgramId(program);
-        if (!id) return program;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/program/${id}`, { headers, signal });
-            const payload = await safeJson(response);
-            if (!response.ok) return program;
-
-            const detail = payload?.data || payload?.result || payload || {};
-            return {
-                ...program,
-                ...(detail && typeof detail === "object" ? detail : {}),
-            };
-        } catch (error) {
-            if (error?.name === "AbortError") throw error;
-            return program;
-        }
-    };
-
-    const fetchSchoolDetail = async (school, headers, signal) => {
-        const id = getSchoolId(school);
-        if (!id) return school;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/sekolah/${id}`, { headers, signal });
-            const payload = await safeJson(response);
-            if (!response.ok) return school;
-
-            const detail = payload?.data || payload?.result || payload || {};
-            return {
-                ...school,
-                ...(detail && typeof detail === "object" ? detail : {}),
-            };
-        } catch (error) {
-            if (error?.name === "AbortError") throw error;
-            return school;
-        }
-    };
-
     const fetchDashboard = useCallback(async () => {
         requestControllerRef.current?.abort();
         const controller = new AbortController();
@@ -5065,7 +5025,7 @@ export default function DashboardKepalaDinas() {
                 fetchSafe(["/wilayah"], headers, signal),
                 fetchSafe(["/wilayah/provinsi", "/wilayah/reference/provinsi"], headers, signal),
                 fetchSafe(["/sekolah"], headers, signal),
-                fetchSafe(["/program"], headers, signal),
+                fetchSafe(["/program?include=fases"], headers, signal),
             ]);
 
             const userDetail = Array.isArray(userPayload)
@@ -5109,27 +5069,7 @@ export default function DashboardKepalaDinas() {
                 schoolBelongsToWilayah(school, currentWilayah),
             );
 
-            const schoolSummariesNeedingDetail = scopedSchoolSummaries.filter(
-                (school) =>
-                    getSchoolName(school) === "Nama sekolah belum diisi" ||
-                    getSchoolJenjang(school) === "Belum Diisi" ||
-                    getSchoolAddress(school) === "Belum Diisi",
-            );
-
-            const detailedSchoolRows = await mapWithConcurrency(
-                schoolSummariesNeedingDetail,
-                6,
-                (school) => fetchSchoolDetail(school, headers, signal),
-            );
-            const detailedSchoolMap = new Map(
-                detailedSchoolRows.map((school) => [String(getSchoolId(school)), school]),
-            );
-
             const visibleSchools = scopedSchoolSummaries
-                .map((school) => ({
-                    ...school,
-                    ...(detailedSchoolMap.get(String(getSchoolId(school))) || {}),
-                }))
                 .map((school) => enrichSchoolWilayah(school, allWilayah))
                 .filter(
                     (school) =>
@@ -5192,13 +5132,7 @@ export default function DashboardKepalaDinas() {
                 ),
             );
 
-            const detailedPrograms = await mapWithConcurrency(
-                scopedProgramSummaries,
-                6,
-                (program) => fetchProgramDetail(program, headers, signal),
-            );
-
-            const visiblePrograms = detailedPrograms
+            const visiblePrograms = scopedProgramSummaries
                 .map((program) => enrichProgramSchoolLinks(program, visibleSchools))
                 .filter((program) =>
                     collectSchoolIdsFromProgram(program).some((schoolId) =>

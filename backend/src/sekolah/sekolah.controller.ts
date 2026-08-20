@@ -6,6 +6,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   Delete,
   UploadedFile,
   UseInterceptors,
@@ -96,8 +97,8 @@ export class SekolahController {
   }
 
   @Get()
-  findAll() {
-    return this.sekolahService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.sekolahService.findAll(page, limit);
   }
 
   @Get(':id(\\d+)')

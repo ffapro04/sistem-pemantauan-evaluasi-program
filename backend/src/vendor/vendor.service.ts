@@ -15,6 +15,7 @@ import { Vendor } from './entities/vendor.entity';
 import { UsersService } from '../users/users.service';
 import type { VendorDocumentFiles } from './vendor.controller';
 import { GoogleDriveService } from '../google-drive/google-drive.service';
+import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 type CurrentUploadUser = {
   id_user: number | null;
@@ -209,13 +210,28 @@ export class VendorService {
     }
   }
 
-  async findAll() {
-    return await this.vendorRepo.find({
+  async findAll(page?: string, limit?: string) {
+    const pagination = parsePagination(page, limit);
+
+    if (!pagination) {
+      return await this.vendorRepo.find({
+        relations: ['user'],
+        order: {
+          nama_vendor: 'ASC',
+        },
+      });
+    }
+
+    const [vendors, total] = await this.vendorRepo.findAndCount({
       relations: ['user'],
       order: {
         nama_vendor: 'ASC',
       },
+      skip: (pagination.page - 1) * pagination.limit,
+      take: pagination.limit,
     });
+
+    return toPaginatedResult(vendors, total, pagination);
   }
 
   async findOne(id: number) {

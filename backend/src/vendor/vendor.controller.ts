@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseInterceptors,
   UnauthorizedException,
@@ -130,8 +131,8 @@ export class VendorController {
   }
 
   @Get()
-  findAll() {
-    return this.vendorService.findAll();
+  findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.vendorService.findAll(page, limit);
   }
 
   @Get('management/summary')

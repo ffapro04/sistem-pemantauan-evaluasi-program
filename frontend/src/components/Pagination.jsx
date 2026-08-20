@@ -1,6 +1,7 @@
-﻿/* eslint-disable react/prop-types */
+/* eslint-disable react/prop-types */
 import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import AppIconButton from "./ui/AppIconButton";
 
 const CYAN = "#0AC4E0";
 const CYAN_DARK = "#0891a8";
@@ -29,11 +30,6 @@ const Pagination = ({
   const pages = getPageNumbers(currentPage, totalPages);
 
   if (totalItems === 0 && !loading) return null;
-
-  const arrowBase =
-    "w-[34px] h-[34px] flex items-center justify-center rounded-[9px] border-none bg-transparent cursor-pointer transition-all duration-150";
-  const arrowActive = `text-gray-400 hover:bg-[${CYAN_DIM}] hover:text-[${CYAN}] active:scale-90`;
-  const arrowDisabled = "text-gray-300 opacity-25 cursor-not-allowed";
 
   return (
     <div className="flex items-center justify-between mt-auto pt-5 px-1 shrink-0"
@@ -64,15 +60,17 @@ const Pagination = ({
 
       {/* Navigation */}
       <div className="flex items-center gap-0.5">
-        <button
-          type="button"
+        <AppIconButton
+          icon={ChevronLeft}
+          iconSize={15}
+          strokeWidth={2.3}
+          variant="nav"
+          size="md"
+          ariaLabel="Previous page"
           disabled={currentPage === 1 || loading}
           onClick={() => onPageChange(currentPage - 1)}
-          aria-label="Previous page"
-          className={`${arrowBase} ${currentPage === 1 || loading ? arrowDisabled : arrowActive}`}
-        >
-          <ChevronLeft size={15} strokeWidth={2.3} />
-        </button>
+          className="!rounded-[9px] active:scale-90"
+        />
 
         <div className="flex items-center gap-0.5 px-1.5">
           {pages.map((page, i) =>
@@ -87,23 +85,11 @@ const Pagination = ({
                 type="button"
                 onClick={() => onPageChange(page)}
                 disabled={loading}
-                className="w-8 h-8 flex items-center justify-center rounded-[8px] text-[13px] font-medium border-none transition-all duration-150 active:scale-90"
-                style={currentPage === page
-                  ? { background: CYAN, color: "#fff", fontWeight: 600 }
-                  : { background: "transparent", color: "inherit" }
-                }
-                onMouseEnter={e => {
-                  if (currentPage !== page) {
-                    e.currentTarget.style.background = CYAN_DIM;
-                    e.currentTarget.style.color = CYAN_DARK;
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (currentPage !== page) {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "inherit";
-                  }
-                }}
+                className={`w-8 h-8 flex items-center justify-center rounded-[8px] text-[13px] font-medium border-none transition-all duration-150 active:scale-90 ${
+                  currentPage === page
+                    ? "bg-[#0AC4E0] text-white font-semibold"
+                    : "bg-transparent text-inherit hover:bg-[#0AC4E0]/10 hover:text-[#0891a8]"
+                }`}
               >
                 {page}
               </button>
@@ -111,15 +97,17 @@ const Pagination = ({
           )}
         </div>
 
-        <button
-          type="button"
+        <AppIconButton
+          icon={ChevronRight}
+          iconSize={15}
+          strokeWidth={2.3}
+          variant="nav"
+          size="md"
+          ariaLabel="Next page"
           disabled={currentPage >= totalPages || totalPages === 0 || loading}
           onClick={() => onPageChange(currentPage + 1)}
-          aria-label="Next page"
-          className={`${arrowBase} ${currentPage >= totalPages || loading ? arrowDisabled : arrowActive}`}
-        >
-          <ChevronRight size={15} strokeWidth={2.3} />
-        </button>
+          className="!rounded-[9px] active:scale-90"
+        />
       </div>
     </div>
   );
