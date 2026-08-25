@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { cn } from "../../design/tokens";
 
 const sizeClass = {
@@ -80,3 +80,14 @@ export default function AppSwitch({
     </button>
   );
 }
+
+AppSwitch.propTypes = {
+  checked: PropTypes.bool,
+  onClick: PropTypes.func,
+  activeText: PropTypes.node,
+  inactiveText: PropTypes.node,
+  showText: PropTypes.bool,
+  size: PropTypes.oneOf(["sm", "md"]),
+  tone: PropTypes.oneOf(["cyan", "green"]),
+  className: PropTypes.string,
+};

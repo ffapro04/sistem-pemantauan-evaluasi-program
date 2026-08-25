@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { Loader2 } from "lucide-react";
 import { cn } from "../../design/tokens";
 
@@ -56,4 +56,25 @@ export default function AppButton({
     </button>
   );
 }
+
+AppButton.propTypes = {
+  children: PropTypes.node,
+  text: PropTypes.node,
+  type: PropTypes.oneOf(["button", "submit", "reset"]),
+  icon: PropTypes.node,
+  loading: PropTypes.bool,
+  disabled: PropTypes.bool,
+  variant: PropTypes.oneOf([
+    "primary",
+    "secondary",
+    "accent",
+    "ghost",
+    "danger",
+    "subtle",
+  ]),
+  size: PropTypes.oneOf(["xs", "sm", "md", "lg", "icon"]),
+  className: PropTypes.string,
+  onClick: PropTypes.func,
+  title: PropTypes.string,
+};
 

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Zap } from "lucide-react";
 import Card from "./Card";
 
@@ -82,5 +82,16 @@ function ProgressCard({
         </Card>
     );
 }
+
+ProgressCard.propTypes = {
+    label: PropTypes.string,
+    rate: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    current: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    total: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    desc: PropTypes.node,
+    color: PropTypes.string,
+    icon: PropTypes.node,
+    className: PropTypes.string,
+};
 
 export default ProgressCard;

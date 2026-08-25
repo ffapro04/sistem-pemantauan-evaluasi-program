@@ -1,5 +1,4 @@
-﻿/* eslint-disable react/prop-types */
-import React from "react";
+﻿import PropTypes from "prop-types";
 
 const Textarea = ({
   label,
@@ -26,6 +25,16 @@ const Textarea = ({
       />
     </div>
   );
+};
+
+Textarea.propTypes = {
+  label: PropTypes.node,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  placeholder: PropTypes.string,
+  required: PropTypes.bool,
+  rows: PropTypes.number,
+  className: PropTypes.string,
 };
 
 export default Textarea;

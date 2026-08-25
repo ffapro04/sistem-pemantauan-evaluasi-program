@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
 import React from "react";
+import PropTypes from "prop-types";
 import { cn } from "../../design/tokens";
 
 const variantClass = {
@@ -70,3 +70,28 @@ export default function AppIconButton({
     </button>
   );
 }
+
+AppIconButton.propTypes = {
+  icon: PropTypes.oneOfType([PropTypes.element, PropTypes.elementType]),
+  children: PropTypes.node,
+  onClick: PropTypes.func,
+  type: PropTypes.string,
+  title: PropTypes.string,
+  ariaLabel: PropTypes.string,
+  variant: PropTypes.oneOf([
+    "primary",
+    "success",
+    "danger",
+    "warning",
+    "gray",
+    "plainDanger",
+    "plainPrimary",
+    "plainSuccess",
+    "nav",
+  ]),
+  size: PropTypes.oneOf(["auto", "sm", "md", "lg"]),
+  iconSize: PropTypes.number,
+  strokeWidth: PropTypes.number,
+  disabled: PropTypes.bool,
+  className: PropTypes.string,
+};

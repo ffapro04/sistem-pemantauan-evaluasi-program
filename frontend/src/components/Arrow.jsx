@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function Arrow({ direction = "right" }) {
   // RIGHT & LEFT
   if (direction === "right" || direction === "left") {
@@ -14,7 +15,7 @@ export default function Arrow({ direction = "right" }) {
         >
           <path
             d="M0 6H18M18 6L14 2M18 6L14 10"
-            stroke="#0a5ea8"
+            stroke="#0AC4E0"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -37,13 +38,13 @@ export default function Arrow({ direction = "right" }) {
         >
           <path
             d="M6 0V34"
-            stroke="#0a5ea8"
+            stroke="#0AC4E0"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
           <path
             d="M6 34L2 30M6 34L10 30"
-            stroke="#0a5ea8"
+            stroke="#0AC4E0"
             strokeWidth="1.5"
             strokeLinecap="round"
           />
@@ -54,4 +55,8 @@ export default function Arrow({ direction = "right" }) {
 
   return null;
 }
+
+Arrow.propTypes = {
+  direction: PropTypes.oneOf(["right", "left", "down"]),
+};
 

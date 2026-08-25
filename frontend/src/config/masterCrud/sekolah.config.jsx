@@ -1,6 +1,5 @@
 // src/config/masterCrud/sekolah.config.jsx
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React from "react";
 import {
     Award,
@@ -27,8 +26,7 @@ import {
 } from "../../components/masterCrud";
 import { validateEmailField, validatePasswordField } from "./validation";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../apiBase.js";
 
 const AKREDITASI_INTERNAL_OPTIONS = [
     { value: "Unggul", label: "Unggul" },

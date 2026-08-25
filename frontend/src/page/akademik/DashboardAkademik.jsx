@@ -3,10 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { DashboardBase } from "../../components/Dashboard";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
+import { getAuthToken } from "../../utils/authSession";
 
 function getHoPayloadFromToken() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
 
   if (!token) return null;
 

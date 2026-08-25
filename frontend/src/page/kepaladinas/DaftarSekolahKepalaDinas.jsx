@@ -13,9 +13,10 @@ import {
 import { useNavigate } from "react-router-dom";
 
 import Sidebar from "../../components/Sidebar";
+import { getAuthToken } from "../../utils/authSession";
+import AppButton from "../../components/ui/AppButton";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 function getTokenPayload(token) {
     try {
@@ -211,7 +212,7 @@ export default function DaftarSekolahKepalaDinas() {
         setErrorMessage("");
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 setWilayah([]);
@@ -382,18 +383,22 @@ export default function DaftarSekolahKepalaDinas() {
                                 </div>
                             </div>
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={fetchSchools}
                                 disabled={refreshing}
-                                className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-widest text-white transition hover:bg-cyan-500 disabled:opacity-60"
+                                icon={
+                                    <RefreshCcw
+                                        size={15}
+                                        className={refreshing ? "animate-spin" : ""}
+                                    />
+                                }
+                                variant="accent"
+                                size="lg"
+                                className="!rounded-2xl hover:!bg-cyan-500"
                             >
-                                <RefreshCcw
-                                    size={15}
-                                    className={refreshing ? "animate-spin" : ""}
-                                />
                                 Refresh
-                            </button>
+                            </AppButton>
                         </div>
 
                         <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-center">

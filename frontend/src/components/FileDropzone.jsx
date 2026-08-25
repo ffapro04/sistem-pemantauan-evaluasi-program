@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { FileUp, FileBox, Loader2 } from "lucide-react";
 
 function FileDropzone({
@@ -42,5 +42,14 @@ function FileDropzone({
         </label>
     );
 }
+
+FileDropzone.propTypes = {
+    label: PropTypes.node,
+    fileName: PropTypes.string,
+    accept: PropTypes.string,
+    onChange: PropTypes.func,
+    variant: PropTypes.oneOf(["default", "convert"]),
+    loading: PropTypes.bool,
+};
 
 export default FileDropzone;

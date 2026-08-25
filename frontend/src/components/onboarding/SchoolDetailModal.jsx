@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { AnimatePresence, motion } from "framer-motion";
 import {
     Building2,
@@ -65,6 +65,12 @@ function InfoItem({ icon: Icon, label, value }) {
     );
 }
 
+InfoItem.propTypes = {
+    icon: PropTypes.elementType,
+    label: PropTypes.node,
+    value: PropTypes.node,
+};
+
 function ModalHeader({ school, provinceName, countyName, onClose }) {
     return (
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white p-5 sm:p-7">
@@ -91,6 +97,13 @@ function ModalHeader({ school, provinceName, countyName, onClose }) {
         </div>
     );
 }
+
+ModalHeader.propTypes = {
+    school: PropTypes.object,
+    provinceName: PropTypes.node,
+    countyName: PropTypes.node,
+    onClose: PropTypes.func,
+};
 
 function ModalContent({ school, provinceName, countyName }) {
     const status =
@@ -222,6 +235,12 @@ function ModalContent({ school, provinceName, countyName }) {
     );
 }
 
+ModalContent.propTypes = {
+    school: PropTypes.object,
+    provinceName: PropTypes.node,
+    countyName: PropTypes.node,
+};
+
 function ModalFooter({ currentIndex, totalSchools, onPrevious, onNext }) {
     return (
         <div className="flex shrink-0 items-center justify-between gap-4 border-t border-slate-200 bg-white px-5 py-5 sm:px-8">
@@ -253,6 +272,13 @@ function ModalFooter({ currentIndex, totalSchools, onPrevious, onNext }) {
         </div>
     );
 }
+
+ModalFooter.propTypes = {
+    currentIndex: PropTypes.number.isRequired,
+    totalSchools: PropTypes.number.isRequired,
+    onPrevious: PropTypes.func,
+    onNext: PropTypes.func,
+};
 
 function SchoolDetailModal({
     isOpen,
@@ -379,6 +405,14 @@ function SchoolDetailModal({
         </AnimatePresence>
     );
 }
+
+SchoolDetailModal.propTypes = {
+    isOpen: PropTypes.bool,
+    onClose: PropTypes.func,
+    initialSchool: PropTypes.object,
+    allSchools: PropTypes.arrayOf(PropTypes.object),
+    wilayahList: PropTypes.arrayOf(PropTypes.object),
+};
 
 export default SchoolDetailModal;
 

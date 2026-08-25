@@ -1,6 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-// components/InformationCard.jsx
-import React from "react";
+﻿// components/InformationCard.jsx
+import PropTypes from "prop-types";
 import Button from "./Button";
 
 const InformationCard = ({
@@ -38,7 +37,7 @@ const InformationCard = ({
   return (
     <div className={`relative group ${className}`}>
       {/* Glow Effect */}
-      <div className="absolute -inset-0.5 bg-gradient-to-br from-[#0a5ea8]/10 to-[#0d8aff]/10 rounded-2xl blur opacity-50 group-hover:opacity-70 transition duration-500"></div>
+      <div className="absolute -inset-0.5 bg-gradient-to-br from-[#0AC4E0]/10 to-[#0d8aff]/10 rounded-2xl blur opacity-50 group-hover:opacity-70 transition duration-500"></div>
 
       {/* Main Card */}
       <div className="relative bg-white p-4 sm:p-6 rounded-2xl border border-gray-200 shadow-lg">
@@ -89,7 +88,7 @@ const InformationCard = ({
                     />
                   </svg>
                 }
-                className="text-xs text-gray-500 hover:text-[#0a5ea8] px-2 py-1"
+                className="text-xs text-gray-500 hover:text-[#0899B0] px-2 py-1"
                 onClick={onShare}
               >
                 Share
@@ -116,7 +115,7 @@ const InformationCard = ({
                     />
                   </svg>
                 }
-                className="text-xs text-gray-500 hover:text-[#0a5ea8] px-2 py-1"
+                className="text-xs text-gray-500 hover:text-[#0899B0] px-2 py-1"
                 onClick={onRefresh}
                 disabled={isRefreshing}
               >
@@ -138,6 +137,24 @@ const InformationCard = ({
       </div>
     </div>
   );
+};
+
+InformationCard.propTypes = {
+  className: PropTypes.string,
+  title: PropTypes.node,
+  subtitle: PropTypes.node,
+  icon: PropTypes.node,
+  badge: PropTypes.shape({
+    show: PropTypes.bool,
+    color: PropTypes.string,
+    text: PropTypes.node,
+  }),
+  showRefresh: PropTypes.bool,
+  showShare: PropTypes.bool,
+  onRefresh: PropTypes.func,
+  onShare: PropTypes.func,
+  isRefreshing: PropTypes.bool,
+  children: PropTypes.node,
 };
 
 export default InformationCard;

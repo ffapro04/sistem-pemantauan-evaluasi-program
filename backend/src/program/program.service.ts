@@ -5,6 +5,7 @@ import {
   HttpException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
@@ -22,6 +23,7 @@ import { DokumenProgram } from './entities/dokumen-program.entity';
 import { KegiatanComment } from './entities/kegiatan-comment.entity';
 import { KegiatanPertemuan } from './entities/kegiatan-pertemuan.entity';
 import { KegiatanRating } from './entities/kegiatan-rating.entity';
+import { PersyaratanStatus } from './entities/persyaratan-termin.entity';
 import { CreateProgramDto } from './dto/create-program.dto';
 import { NotifikasiService } from '../notifikasi/notifikasi.service';
 import { NotificationRecipientType } from '../notifikasi/entities/notifikasi.entity';
@@ -29,6 +31,7 @@ import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 @Injectable()
 export class ProgramService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ProgramService.name);
   private reminderTimer: NodeJS.Timeout | null = null;
   private lastReminderRunDate: string | null = null;
 
@@ -90,7 +93,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
         this.lastReminderRunDate = today;
         this.createDeadlineReminders().catch((error) => {
-          console.error('PROGRAM_DEADLINE_REMINDER_ERROR:', error);
+          this.logger.error('PROGRAM_DEADLINE_REMINDER_ERROR:', error);
         });
       },
       60 * 60 * 1000,
@@ -453,19 +456,6 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       value === 'head office' ||
       value.includes('head office')
     );
-  }
-
-  private decodeUserFromToken(authHeader: string) {
-    try {
-      const token = authHeader?.split(' ')[1];
-      const payloadJson = Buffer.from(
-        token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
-        'base64',
-      ).toString('utf-8');
-      return JSON.parse(payloadJson);
-    } catch {
-      return null;
-    }
   }
 
   private async ensureGoogleDriveConnected(id_user: number, message: string) {
@@ -1276,7 +1266,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             SELECT 1
             FROM t_persyaratan_kegiatan pk
             WHERE pk.id_kegiatans = k.id_kegiatans
-              AND COALESCE(pk.status, 'WAITING_UPLOAD') <> 'APPROVED'
+              AND COALESCE(pk.status, '${PersyaratanStatus.WAITING_UPLOAD}') <> '${PersyaratanStatus.APPROVED}'
           )
       `,
       [date],
@@ -1304,7 +1294,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             FROM t_termin t
             JOIN t_persyaratan_termin pt ON pt.id_termin = t.id_termin
             WHERE t.id_fase = f.id_fase
-              AND COALESCE(pt.status, 'WAITING_UPLOAD') <> 'APPROVED'
+              AND COALESCE(pt.status, '${PersyaratanStatus.WAITING_UPLOAD}') <> '${PersyaratanStatus.APPROVED}'
           )
       `,
       [date],
@@ -1672,7 +1662,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
             nama_termin: tData.nama_termin.trim(),
             deskripsi: tData.deskripsi || null,
             jumlah_pembayaran: this.toNumber(tData.jumlah_pembayaran, 0),
-            status: 'WAITING_UPLOAD',
+            status: PersyaratanStatus.WAITING_UPLOAD,
             id_fase: savedFase.id_fase,
             id_kegiatans: null,
           });
@@ -1698,7 +1688,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
                 tipe: req.tipe || 'upload',
                 deskripsi: req.deskripsi || null,
                 urutan: this.toNumber(req.urutan, syaratIndex + 1),
-                status: 'WAITING_UPLOAD',
+                status: PersyaratanStatus.WAITING_UPLOAD,
               }),
             );
           }
@@ -1783,7 +1773,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
                 tipe: req.tipe || 'upload',
                 deskripsi: req.deskripsi || null,
                 urutan: this.toNumber(req.urutan, syaratIndex + 1),
-                status: 'WAITING_UPLOAD',
+                status: PersyaratanStatus.WAITING_UPLOAD,
               }),
             );
           }
@@ -1812,7 +1802,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       await queryRunner.commitTransaction();
       await this.notifyProgramCreated(savedProgram, id_user).catch((error) => {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`PROGRAM_CREATED_NOTIFICATION_ERROR: ${message}`);
+        this.logger.warn(`PROGRAM_CREATED_NOTIFICATION_ERROR: ${message}`);
       });
       return this.findOne(savedProgram.id_program);
     } catch (error) {
@@ -2057,13 +2047,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    if (persyaratan.status === 'APPROVED') {
+    if (persyaratan.status === PersyaratanStatus.APPROVED) {
       throw new BadRequestException(
         'Bukti sudah disetujui HO dan tidak bisa diupload ulang',
       );
     }
 
-    if (['WAITING_AO', 'WAITING_HO'].includes(persyaratan.status)) {
+    if ([PersyaratanStatus.WAITING_AO, PersyaratanStatus.WAITING_HO].includes(persyaratan.status)) {
       throw new BadRequestException(
         'Bukti sedang dalam proses review. Tunggu hasil review terlebih dahulu.',
       );
@@ -2092,7 +2082,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       persyaratan.nama_file = file.originalname;
     }
 
-    persyaratan.status = 'WAITING_AO';
+    persyaratan.status = PersyaratanStatus.WAITING_AO;
     persyaratan.uploaded_by = id_user;
     persyaratan.uploaded_at = new Date();
 
@@ -2144,13 +2134,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_AO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_AO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu review AO',
       );
     }
 
-    persyaratan.status = 'WAITING_HO';
+    persyaratan.status = PersyaratanStatus.WAITING_HO;
 
     persyaratan.rejected_by = null;
     persyaratan.rejected_at = null;
@@ -2197,13 +2187,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_AO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_AO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu review AO',
       );
     }
 
-    persyaratan.status = 'REJECTED_AO';
+    persyaratan.status = PersyaratanStatus.REJECTED_AO;
 
     // Penting: kosongkan file agar vendor wajib upload ulang
     persyaratan.file_path = null;
@@ -2263,13 +2253,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_HO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_HO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu validasi HO',
       );
     }
 
-    persyaratan.status = 'APPROVED';
+    persyaratan.status = PersyaratanStatus.APPROVED;
     persyaratan.approved_by = id_user;
     persyaratan.approved_at = new Date();
     persyaratan.updated_at = new Date();
@@ -2324,13 +2314,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan termin tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_HO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_HO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu validasi HO',
       );
     }
 
-    persyaratan.status = 'REJECTED_HO';
+    persyaratan.status = PersyaratanStatus.REJECTED_HO;
 
     // Penting: kosongkan file agar vendor wajib upload ulang
     persyaratan.file_path = null;
@@ -2392,13 +2382,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    if (persyaratan.status === 'APPROVED') {
+    if (persyaratan.status === PersyaratanStatus.APPROVED) {
       throw new BadRequestException(
         'Bukti sudah disetujui HO dan tidak bisa diupload ulang',
       );
     }
 
-    if (['WAITING_AO', 'WAITING_HO'].includes(persyaratan.status)) {
+    if ([PersyaratanStatus.WAITING_AO, PersyaratanStatus.WAITING_HO].includes(persyaratan.status)) {
       throw new BadRequestException(
         'Bukti sedang dalam proses review. Tunggu hasil review terlebih dahulu.',
       );
@@ -2427,7 +2417,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       persyaratan.nama_file = file.originalname;
     }
 
-    persyaratan.status = 'WAITING_AO';
+    persyaratan.status = PersyaratanStatus.WAITING_AO;
     persyaratan.uploaded_by = id_user;
     persyaratan.uploaded_at = new Date();
 
@@ -2482,13 +2472,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_AO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_AO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu review AO',
       );
     }
 
-    persyaratan.status = 'WAITING_HO';
+    persyaratan.status = PersyaratanStatus.WAITING_HO;
     persyaratan.ao_reviewed_by = id_user;
     persyaratan.ao_reviewed_at = new Date();
 
@@ -2537,13 +2527,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_AO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_AO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu review AO',
       );
     }
 
-    persyaratan.status = 'REJECTED_AO';
+    persyaratan.status = PersyaratanStatus.REJECTED_AO;
 
     // Penting: kosongkan file agar vendor wajib upload ulang
     persyaratan.file_path = null;
@@ -2606,13 +2596,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_HO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_HO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu validasi HO',
       );
     }
 
-    persyaratan.status = 'APPROVED';
+    persyaratan.status = PersyaratanStatus.APPROVED;
     persyaratan.approved_by = id_user;
     persyaratan.approved_at = new Date();
     persyaratan.updated_at = new Date();
@@ -2666,13 +2656,13 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException('Persyaratan kegiatan tidak ditemukan');
     }
 
-    if (persyaratan.status !== 'WAITING_HO') {
+    if (persyaratan.status !== PersyaratanStatus.WAITING_HO) {
       throw new BadRequestException(
         'Persyaratan belum dalam status menunggu validasi HO',
       );
     }
 
-    persyaratan.status = 'REJECTED_HO';
+    persyaratan.status = PersyaratanStatus.REJECTED_HO;
 
     // Penting: kosongkan file agar vendor wajib upload ulang
     persyaratan.file_path = null;
@@ -2734,7 +2724,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       const allApproved = terminPembukaPeriode.every(
         (item) =>
           item.persyaratan.length > 0 &&
-          item.persyaratan.every((p) => p.status === 'APPROVED'),
+          item.persyaratan.every((p) => p.status === PersyaratanStatus.APPROVED),
       );
 
       if (!allApproved) return;
@@ -2752,7 +2742,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         await this.kegiatansRepo.save(first);
       }
     } catch (error) {
-      console.error('checkAndUnlockKegiatanAfterTerminApproval error:', error);
+      this.logger.error('checkAndUnlockKegiatanAfterTerminApproval error:', error);
     }
   }
 
@@ -2770,7 +2760,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
       const allApproved =
         kegiatan.persyaratan.length > 0 &&
-        kegiatan.persyaratan.every((p) => p.status === 'APPROVED');
+        kegiatan.persyaratan.every((p) => p.status === PersyaratanStatus.APPROVED);
 
       if (!allApproved) return;
 
@@ -2794,7 +2784,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         await this.kegiatansRepo.save(nextKegiatan);
       }
     } catch (error) {
-      console.error('checkAndFinalizeKegiatan error:', error);
+      this.logger.error('checkAndFinalizeKegiatan error:', error);
     }
   }
 
@@ -2833,23 +2823,23 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       terminList.some((termin) =>
         (termin.persyaratan || []).some((item) =>
           [
-            'WAITING_AO',
-            'WAITING_HO',
-            'APPROVED',
-            'REJECTED_AO',
-            'REJECTED_HO',
-          ].includes(String(item.status || '')),
+            PersyaratanStatus.WAITING_AO,
+            PersyaratanStatus.WAITING_HO,
+            PersyaratanStatus.APPROVED,
+            PersyaratanStatus.REJECTED_AO,
+            PersyaratanStatus.REJECTED_HO,
+          ].includes(item.status),
         ),
       ) ||
       kegiatanList.some((kegiatan) =>
         (kegiatan.persyaratan || []).some((item) =>
           [
-            'WAITING_AO',
-            'WAITING_HO',
-            'APPROVED',
-            'REJECTED_AO',
-            'REJECTED_HO',
-          ].includes(String(item.status || '')),
+            PersyaratanStatus.WAITING_AO,
+            PersyaratanStatus.WAITING_HO,
+            PersyaratanStatus.APPROVED,
+            PersyaratanStatus.REJECTED_AO,
+            PersyaratanStatus.REJECTED_HO,
+          ].includes(item.status),
         ),
       );
 
@@ -2858,7 +2848,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
       terminList.every(
         (termin) =>
           (termin.persyaratan || []).length > 0 &&
-          termin.persyaratan.every((item) => item.status === 'APPROVED'),
+          termin.persyaratan.every((item) => item.status === PersyaratanStatus.APPROVED),
       );
 
     const allKegiatanApproved =
@@ -2869,7 +2859,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
         return (
           kegiatan.status_kegiatan === 'APPROVED' &&
           persyaratan.length > 0 &&
-          persyaratan.every((item) => item.status === 'APPROVED')
+          persyaratan.every((item) => item.status === PersyaratanStatus.APPROVED)
         );
       });
 
@@ -2989,7 +2979,7 @@ export class ProgramService implements OnModuleInit, OnModuleDestroy {
 
     const statusKegiatan = String(kegiatan.status_kegiatan || '').toUpperCase();
     const hasUnapprovedRequirement = (kegiatan.persyaratan || []).some(
-      (item) => String(item.status || '').toUpperCase() !== 'APPROVED',
+      (item) => String(item.status || '').toUpperCase() !== PersyaratanStatus.APPROVED,
     );
 
     if (statusKegiatan !== 'APPROVED' || hasUnapprovedRequirement) {

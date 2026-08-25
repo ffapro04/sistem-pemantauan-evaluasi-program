@@ -15,7 +15,7 @@ import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
 import { getAuthToken, getAuthUser } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as BASE_URL } from "../../config/apiBase.js";
 const ROWS_PER_PAGE = 8;
 
 const STATUS_MAP = {
@@ -418,7 +418,7 @@ export default function AssessmentSekolah() {
             title="Assessment"
             highlight="Sekolah"
             subtitle="Sistem Monitoring dan Evaluasi Program"
-            contentClassName="bg-[#F8FBFF]"
+            contentClassName="bg-[#EEF5FF]"
             action={
                 <button
                     type="button"

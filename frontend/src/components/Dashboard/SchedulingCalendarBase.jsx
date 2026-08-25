@@ -1,6 +1,6 @@
 ﻿// src/components/scheduling/SchedulingCalendarBase.jsx
 
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Sidebar from "../Sidebar";
@@ -320,5 +320,23 @@ function SchedulingCalendarBase({
         </PageWrapper>
     );
 }
+
+SchedulingCalendarBase.propTypes = {
+    title: PropTypes.node,
+    titleHighlight: PropTypes.node,
+    subtitle: PropTypes.node,
+    schedules: PropTypes.arrayOf(
+        PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            date: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+            startTime: PropTypes.string,
+            endTime: PropTypes.string,
+            title: PropTypes.node,
+            phase: PropTypes.node,
+            description: PropTypes.node,
+        }),
+    ),
+    onScheduleClick: PropTypes.func,
+};
 
 export default SchedulingCalendarBase;

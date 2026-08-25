@@ -1,5 +1,4 @@
-/* eslint-disable react/prop-types */
-import React from "react";
+import PropTypes from "prop-types";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AppIconButton from "./ui/AppIconButton";
 
@@ -111,6 +110,16 @@ const Pagination = ({
       </div>
     </div>
   );
+};
+
+Pagination.propTypes = {
+  currentPage: PropTypes.number.isRequired,
+  totalPages: PropTypes.number.isRequired,
+  onPageChange: PropTypes.func.isRequired,
+  totalItems: PropTypes.number.isRequired,
+  itemsPerPage: PropTypes.number.isRequired,
+  loading: PropTypes.bool,
+  showLiveTag: PropTypes.bool,
 };
 
 export default Pagination;

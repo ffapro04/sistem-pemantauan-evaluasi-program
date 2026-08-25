@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
 import { Fragment, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
   Building2,
   MapPin,
@@ -16,6 +16,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
+import AppButton from "../ui/AppButton";
 
 const INDONESIA_CENTER = [-2.5, 118];
 const DEFAULT_ZOOM = 5;
@@ -523,6 +524,12 @@ function MapViewport({ selectedProvince, provinceMarkers, countyMarkers }) {
   return null;
 }
 
+MapViewport.propTypes = {
+  selectedProvince: PropTypes.object,
+  provinceMarkers: PropTypes.array.isRequired,
+  countyMarkers: PropTypes.array.isRequired,
+};
+
 export default function AdminSchoolBinaanMap({
   wilayahList = [],
   schools = [],
@@ -612,7 +619,7 @@ export default function AdminSchoolBinaanMap({
         .admin-kabupaten-marker { position: relative; display: flex; width: 168px; min-height: 46px; align-items: center; justify-content: center; transform-origin: 50% 70%; transition: transform 180ms ease; }
         .admin-kabupaten-marker:hover, .admin-kabupaten-marker.is-active { z-index: 4; transform: scale(1.08); }
         .admin-kabupaten-marker__dot { position: absolute; left: 50%; top: 0; display: flex; width: 31px; height: 31px; align-items: center; justify-content: center; border: 3px solid #fff; border-radius: 999px; background: #0ac4e0; color: #fff; box-shadow: 0 7px 18px rgba(10,196,224,.36); transform: translateX(-50%); }
-        .admin-kabupaten-marker.is-active .admin-kabupaten-marker__dot { background: #0891b2; box-shadow: 0 9px 22px rgba(8,145,178,.42); }
+        .admin-kabupaten-marker.is-active .admin-kabupaten-marker__dot { background: #0899B0; box-shadow: 0 9px 22px rgba(8,153,176,.42); }
         .admin-kabupaten-marker__dot span { font-size: 9px; font-weight: 900; line-height: 1; }
         .admin-kabupaten-marker__label { position: absolute; left: 50%; top: 29px; max-width: 158px; overflow: hidden; border: 1px solid rgba(226,232,240,.95); border-radius: 999px; background: rgba(255,255,255,.96); padding: 4px 9px; font-size: 8px; font-weight: 900; color: #475569; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; box-shadow: 0 6px 16px rgba(15,23,42,.12); transform: translateX(-50%); }
         .admin-kabupaten-marker.is-active .admin-kabupaten-marker__label { border-color: rgba(10,196,224,.4); background: #083344; color: #fff; }
@@ -705,7 +712,7 @@ export default function AdminSchoolBinaanMap({
                     center={position}
                     radius={active ? 18 : 11}
                     pathOptions={{
-                      color: active ? "#0891B2" : "#0AC4E0",
+                      color: active ? "#0899B0" : "#0AC4E0",
                       fillColor: "#0AC4E0",
                       fillOpacity: active ? 0.24 : 0.1,
                       weight: active ? 3 : 2,
@@ -775,16 +782,25 @@ export default function AdminSchoolBinaanMap({
         </div>
 
         {selectedProvince && (
-          <button
-            type="button"
+          <AppButton
+            text="Seluruh Indonesia"
             onClick={onResetFilter}
-            className="absolute right-4 top-4 z-[500] inline-flex h-9 items-center justify-center rounded-xl border border-white/70 bg-white/90 px-4 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0] shadow-sm backdrop-blur transition hover:bg-cyan-50"
-          >
-            Seluruh Indonesia
-          </button>
+            variant="secondary"
+            size="sm"
+            className="!absolute !right-4 !top-4 !z-[500] !h-9 !rounded-xl !border !border-white/70 !bg-white/90 !px-4 !text-[9px] !tracking-widest !text-[#0AC4E0] shadow-sm backdrop-blur hover:!bg-cyan-50"
+          />
         )}
 
       </div>
     </div>
   );
 }
+
+AdminSchoolBinaanMap.propTypes = {
+  wilayahList: PropTypes.array,
+  schools: PropTypes.array,
+  selectedWilayah: PropTypes.object,
+  onSelectWilayah: PropTypes.func,
+  onResetFilter: PropTypes.func,
+  onOpenSchool: PropTypes.func,
+};

@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
     GeoJSON,
     MapContainer,
@@ -24,6 +24,7 @@ import "leaflet/dist/leaflet.css";
 
 import OnboardingLeafletStyle from "./OnboardingLeafletStyle";
 import Dropdown from "../Dropdown";
+import AppButton from "../ui/AppButton";
 import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
 const INDONESIA_CENTER = [-2.5, 118];
@@ -507,6 +508,11 @@ function MapViewportController({ provinceGroup, countyGroup }) {
     return null;
 }
 
+MapViewportController.propTypes = {
+    provinceGroup: PropTypes.object,
+    countyGroup: PropTypes.object,
+};
+
 function CountyPopup({ countyGroup, onOpenSchool }) {
     const [keyword, setKeyword] = useState("");
 
@@ -584,6 +590,11 @@ function CountyPopup({ countyGroup, onOpenSchool }) {
     );
 }
 
+CountyPopup.propTypes = {
+    countyGroup: PropTypes.object.isRequired,
+    onOpenSchool: PropTypes.func,
+};
+
 function SchoolMap({
     provinceGroups,
     activeProvince,
@@ -658,13 +669,15 @@ function SchoolMap({
                                         </div>
                                     </div>
 
-                                    <button
+                                    <AppButton
                                         type="button"
                                         onClick={() => onSelectProvince(group)}
-                                        className="mt-4 w-full rounded-xl bg-slate-950 py-3 text-[10px] font-black uppercase tracking-widest text-white"
+                                        variant="primary"
+                                        size="md"
+                                        className="mt-4 w-full"
                                     >
                                         Fokuskan Provinsi
-                                    </button>
+                                    </AppButton>
                                 </div>
                             </Popup>
                         </Marker>
@@ -724,6 +737,17 @@ function SchoolMap({
         </div>
     );
 }
+
+SchoolMap.propTypes = {
+    provinceGroups: PropTypes.arrayOf(PropTypes.object),
+    activeProvince: PropTypes.object,
+    activeCounty: PropTypes.object,
+    visibleProvinceGroups: PropTypes.arrayOf(PropTypes.object).isRequired,
+    visibleCountyGroups: PropTypes.arrayOf(PropTypes.object).isRequired,
+    onSelectProvince: PropTypes.func,
+    onSelectCounty: PropTypes.func,
+    onOpenSchool: PropTypes.func,
+};
 
 function SchoolRegistry({
     schools,
@@ -817,6 +841,15 @@ function SchoolRegistry({
         </div>
     );
 }
+
+SchoolRegistry.propTypes = {
+    schools: PropTypes.arrayOf(PropTypes.object).isRequired,
+    currentPage: PropTypes.number.isRequired,
+    totalPages: PropTypes.number.isRequired,
+    totalFiltered: PropTypes.number,
+    onPageChange: PropTypes.func,
+    onOpenSchool: PropTypes.func,
+};
 
 function SchoolMapPanel({
     wilayahList = [],
@@ -1023,14 +1056,16 @@ function SchoolMapPanel({
                     />
                 </div>
 
-                <button
+                <AppButton
                     type="button"
                     onClick={resetMap}
-                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 text-[10px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-slate-800"
+                    icon={activeProvince ? <ArrowLeft size={15} /> : <RotateCcw size={15} />}
+                    variant="primary"
+                    size="lg"
+                    className="hover:!bg-slate-800"
                 >
-                    {activeProvince ? <ArrowLeft size={15} /> : <RotateCcw size={15} />}
                     {activeProvince ? "Kembali ke Indonesia" : "Reset"}
-                </button>
+                </AppButton>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.42fr_0.58fr]">
@@ -1057,6 +1092,16 @@ function SchoolMapPanel({
         </section>
     );
 }
+
+SchoolMapPanel.propTypes = {
+    wilayahList: PropTypes.arrayOf(PropTypes.object),
+    selectedWilayah: PropTypes.object,
+    schools: PropTypes.arrayOf(PropTypes.object),
+    totalSchools: PropTypes.number,
+    onSelectWilayah: PropTypes.func,
+    onResetFilter: PropTypes.func,
+    onOpenSchool: PropTypes.func,
+};
 
 export default SchoolMapPanel;
 

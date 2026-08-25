@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import { forwardRef } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";

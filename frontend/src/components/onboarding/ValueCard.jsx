@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React from "react";
+import PropTypes from "prop-types";
 
 function ValueCard({ icon: Icon, title, desc }) {
     return (
@@ -23,5 +23,11 @@ function ValueCard({ icon: Icon, title, desc }) {
         </div>
     );
 }
+
+ValueCard.propTypes = {
+    icon: PropTypes.elementType.isRequired,
+    title: PropTypes.node,
+    desc: PropTypes.node,
+};
 
 export default ValueCard;

@@ -2,6 +2,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -522,6 +523,39 @@ export class GoogleDriveService {
     });
 
     return uploaded;
+  }
+
+  // Streams a previously-uploaded file back to any logged-in viewer (AO/HO
+  // reviewing a vendor's proof document, for example) without ever sharing
+  // the file itself on Google Drive: the request is authenticated using the
+  // ORIGINAL UPLOADER's stored OAuth token, server-side, so the file stays
+  // private on Drive while still being viewable through the app.
+  async streamFileForViewer(driveFileId: string) {
+    const fileRecord = await this.fileRepo.findOne({
+      where: { drive_file_id: driveFileId },
+    });
+
+    if (!fileRecord) {
+      throw new NotFoundException('File tidak ditemukan.');
+    }
+
+    const auth = await this.getActiveOAuthClientByUser(
+      fileRecord.id_user,
+      'Pemilik file belum menghubungkan Google Drive, file tidak bisa dibuka.',
+    );
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    const response = await drive.files.get(
+      { fileId: driveFileId, alt: 'media' },
+      { responseType: 'stream' },
+    );
+
+    return {
+      stream: response.data as Readable,
+      mimeType: fileRecord.mime_type || 'application/octet-stream',
+      fileName: fileRecord.original_name || 'dokumen',
+    };
   }
 
 }

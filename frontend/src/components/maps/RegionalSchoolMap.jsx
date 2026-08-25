@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import { useEffect, useMemo } from "react";
+﻿import { useEffect, useMemo } from "react";
+import PropTypes from "prop-types";
 import {
     GeoJSON,
     MapContainer,
@@ -153,6 +153,12 @@ function MapAutoFocus({ schools, wilayah, mode }) {
     return null;
 }
 
+MapAutoFocus.propTypes = {
+    schools: PropTypes.array.isRequired,
+    wilayah: PropTypes.object,
+    mode: PropTypes.string,
+};
+
 function MapResizeGuard({ refreshKey }) {
     const map = useMap();
 
@@ -175,6 +181,10 @@ function MapResizeGuard({ refreshKey }) {
 
     return null;
 }
+
+MapResizeGuard.propTypes = {
+    refreshKey: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
 
 export default function RegionalSchoolMap({
     schools = [],
@@ -301,3 +311,11 @@ export default function RegionalSchoolMap({
         </section>
     );
 }
+
+RegionalSchoolMap.propTypes = {
+    schools: PropTypes.array,
+    wilayah: PropTypes.object,
+    mode: PropTypes.string,
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+};

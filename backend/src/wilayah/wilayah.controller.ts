@@ -9,12 +9,15 @@ import {
   Patch,
   Query,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { WilayahService } from './wilayah.service';
 import { CreateWilayahDto, UpdateWilayahDto } from './dto/wilayah.dto';
 
 @Controller('wilayah')
 export class WilayahController {
+  private readonly logger = new Logger(WilayahController.name);
+
   constructor(private readonly wilayahService: WilayahService) {}
 
   // =========================
@@ -44,7 +47,7 @@ export class WilayahController {
 
       return { isDuplicate };
     } catch (error) {
-      console.error('Error di check-name:', error);
+      this.logger.error('Error di check-name:', error);
       throw new InternalServerErrorException('Gagal mengecek nama wilayah');
     }
   }

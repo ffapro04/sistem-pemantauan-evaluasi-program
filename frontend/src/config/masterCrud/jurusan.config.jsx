@@ -15,7 +15,8 @@ import {
 
 import { isActiveValue } from "../../components/masterCrud";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../apiBase.js";
+import { getAuthToken } from "../../utils/authSession";
 
 const getJurusanImageUrl = (imagePath) => {
     if (!imagePath) return "";
@@ -39,7 +40,7 @@ const getCurrentUser = () => {
     }
 
     try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return {};
         const payload = JSON.parse(atob(token.split(".")[1]));
         return payload || {};

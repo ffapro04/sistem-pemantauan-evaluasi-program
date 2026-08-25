@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -33,8 +33,8 @@ import Label from "../../components/Label";
 import AppIconButton from "../../components/ui/AppIconButton";
 import { setAuthSession } from "../../utils/authSession";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
+import { ROLE_ADMIN, ROLE_PENGURUS, ROLE_VENDOR, ROLE_SEKOLAH } from "../../constants/roles.js";
 
 // =========================================================================
 // DAFTAR JENIS LOGIN
@@ -106,9 +106,9 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
   const { idRole, role, jabatan } = getDecodedRoleInfo(decoded);
   switch (selectedRole) {
     case "Admin":
-      return idRole === 1 || role === "admin";
+      return idRole === 1 || role === ROLE_ADMIN;
     case "Pengurus":
-      return idRole === 2 || role === "pengurus";
+      return idRole === 2 || role === ROLE_PENGURUS;
     case "Head Office":
       return idRole === 3 || role.includes("head office");
     case "Area Officer":
@@ -126,7 +126,7 @@ const isRoleMatch = (selectedRole, decoded = {}) => {
         jabatan.includes("kepala sekolah")
       );
     case "Vendor":
-      return idRole === 6 || role === "vendor";
+      return idRole === 6 || role === ROLE_VENDOR;
     case "Kepala Dinas":
       return idRole === 7 || role.includes("kepala dinas");
     case "Guru Assessment":
@@ -162,12 +162,12 @@ const getRedirectPath = (decoded) => {
     .toLowerCase();
 
   // Admin
-  if (idRole === 1 || role === "admin") {
+  if (idRole === 1 || role === ROLE_ADMIN) {
     return "/admin/dashboard";
   }
 
   // Pengurus
-  if (idRole === 2 || role === "pengurus") {
+  if (idRole === 2 || role === ROLE_PENGURUS) {
     return "/pengurus/dashboard";
   }
 
@@ -204,12 +204,12 @@ const getRedirectPath = (decoded) => {
   }
 
   // Sekolah
-  if (idRole === 5 || role === "sekolah") {
+  if (idRole === 5 || role === ROLE_SEKOLAH) {
     return "/sekolah/dashboard";
   }
 
   // Vendor / Narasumber
-  if (idRole === 6 || role === "vendor" || role.includes("narasumber")) {
+  if (idRole === 6 || role === ROLE_VENDOR || role.includes("narasumber")) {
     return "/vendor/dashboard";
   }
 
@@ -297,6 +297,11 @@ const RoleDropdown = ({ selectedRole, onSelect }) => {
   );
 };
 
+RoleDropdown.propTypes = {
+  selectedRole: PropTypes.string,
+  onSelect: PropTypes.func,
+};
+
 const RoleSuggestion = ({ selectedRole, onSelect }) => (
   <div className="grid grid-cols-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5">
     {ROLE_OPTIONS.map((role) => {
@@ -322,6 +327,11 @@ const RoleSuggestion = ({ selectedRole, onSelect }) => (
     })}
   </div>
 );
+
+RoleSuggestion.propTypes = {
+  selectedRole: PropTypes.string,
+  onSelect: PropTypes.func,
+};
 
 // =========================================================================
 // KOMPONEN DROPDOWN SEKOLAH UNTUK LOGIN GURU
@@ -449,6 +459,13 @@ const SekolahDropdown = ({
       </AnimatePresence>
     </div>
   );
+};
+
+SekolahDropdown.propTypes = {
+  sekolahList: PropTypes.arrayOf(PropTypes.object),
+  selectedId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onSelect: PropTypes.func,
+  loading: PropTypes.bool,
 };
 
 // =========================================================================
@@ -937,7 +954,7 @@ const Login = () => {
           <button
             type="button"
             onClick={openResetPassword}
-            className="text-[11px] font-black text-[#0AC4E0] transition hover:text-[#078EA3]"
+            className="text-[11px] font-black text-[#0AC4E0] transition hover:text-[#0899B0]"
           >
             Lupa password?
           </button>

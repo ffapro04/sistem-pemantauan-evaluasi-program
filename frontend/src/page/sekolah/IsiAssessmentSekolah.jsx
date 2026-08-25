@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import AppButton from "../../components/ui/AppButton";
 import { getAuthToken } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as BASE_URL } from "../../config/apiBase.js";
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 const getAssessmentDeadlineDate = (assessment = {}) => {
@@ -186,12 +187,14 @@ export default function IsiAssessmentSekolah() {
                         <h3 className="text-lg font-black text-slate-800">Assessment Terkirim!</h3>
                         <p className="mt-1 text-xs font-medium text-slate-400">Jawaban Anda telah berhasil disimpan.</p>
                     </div>
-                    <button
+                    <AppButton
+                        type="button"
                         onClick={() => navigate("/sekolah/assessment")}
-                        className="mt-2 rounded-full bg-[#0AC4E0] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm shadow-cyan-100 transition-all hover:bg-cyan-500 active:scale-95"
+                        variant="accent"
+                        className="mt-2 !rounded-full shadow-sm shadow-cyan-100 hover:!bg-cyan-500"
                     >
                         Kembali ke Daftar
-                    </button>
+                    </AppButton>
                 </div>
             </MasterPageShell>
         );
@@ -261,30 +264,40 @@ export default function IsiAssessmentSekolah() {
 
                         {/* Navigation */}
                         <div className="flex items-center justify-between">
-                            <button
+                            <AppButton
+                                type="button"
                                 onClick={() => setCurrent((p) => Math.max(0, p - 1))}
                                 disabled={current === 0}
-                                className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase text-slate-400 shadow-sm transition-all hover:text-slate-700 active:scale-95 disabled:opacity-30"
+                                icon={<ChevronLeft size={12} />}
+                                variant="secondary"
+                                size="sm"
+                                className="!rounded-full !border-slate-100 !text-slate-400 hover:!text-slate-700"
                             >
-                                <ChevronLeft size={12} /> Sebelumnya
-                            </button>
+                                Sebelumnya
+                            </AppButton>
 
                             {current < totalQ - 1 ? (
-                                <button
+                                <AppButton
+                                    type="button"
                                     onClick={() => setCurrent((p) => p + 1)}
-                                    className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-2.5 text-[9px] font-black uppercase text-white shadow-sm shadow-cyan-100 transition-all hover:bg-cyan-500 active:scale-95"
+                                    variant="accent"
+                                    size="sm"
+                                    className="!rounded-full shadow-sm shadow-cyan-100 hover:!bg-cyan-500"
                                 >
-                                    Selanjutnya <ChevronRight size={12} />
-                                </button>
+                                    Selanjutnya <ChevronRight size={12} className="ml-2" />
+                                </AppButton>
                             ) : (
-                                <button
-                                        onClick={handleSubmit}
-                                        disabled={submitting}
-                                        className="flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-2.5 text-[9px] font-black uppercase text-white shadow-sm shadow-emerald-100 transition-all hover:bg-emerald-600 active:scale-95 disabled:opacity-60"
-                                    >
-                                        {submitting ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
-                                        Kirim Jawaban
-                                    </button>
+                                <AppButton
+                                    type="button"
+                                    onClick={handleSubmit}
+                                    disabled={submitting}
+                                    icon={submitting ? <RefreshCw size={11} className="animate-spin" /> : <Send size={11} />}
+                                    variant="primary"
+                                    size="sm"
+                                    className="!rounded-full !bg-emerald-500 shadow-sm shadow-emerald-100 hover:!bg-emerald-600"
+                                >
+                                    Kirim Jawaban
+                                </AppButton>
                             )}
                         </div>
                     </div>

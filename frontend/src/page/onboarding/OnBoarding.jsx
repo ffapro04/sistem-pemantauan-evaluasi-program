@@ -1,7 +1,7 @@
-﻿/* eslint-disable react/prop-types */
-/* eslint-disable react-hooks/exhaustive-deps */
+﻿/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable no-unused-vars */
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import axios from "axios";
 import {
   ArrowRight,
@@ -35,11 +35,7 @@ import AdminSchoolBinaanMap from "../../components/maps/AdminSchoolBinaanMap";
 
 import picturependidikan from "../../assets/img/pichture_pendidikan 1.png";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const VISION_MISSION_ITEMS = [
   {
@@ -444,7 +440,7 @@ function SectionHeader({ label, title, desc, center = true, light = false }) {
       </div>
 
       <h2
-        className={`mt-6 text-3xl font-black leading-tight tracking-[-0.06em] md:text-5xl ${light ? "text-white" : "text-[#103F49]"
+        className={`mt-6 text-3xl font-black leading-tight tracking-[-0.06em] md:text-5xl ${light ? "text-white" : "text-[#020617]"
           }`}
       >
         {title}
@@ -452,7 +448,7 @@ function SectionHeader({ label, title, desc, center = true, light = false }) {
 
       {desc && (
         <p
-          className={`mt-5 text-sm font-semibold leading-7 md:text-base ${light ? "text-white/85" : "text-[#5F7E86]"
+          className={`mt-5 text-sm font-semibold leading-7 md:text-base ${light ? "text-white/85" : "text-[#64748B]"
             }`}
         >
           {desc}
@@ -461,6 +457,14 @@ function SectionHeader({ label, title, desc, center = true, light = false }) {
     </div>
   );
 }
+
+SectionHeader.propTypes = {
+  label: PropTypes.node,
+  title: PropTypes.node,
+  desc: PropTypes.node,
+  center: PropTypes.bool,
+  light: PropTypes.bool,
+};
 
 function CyanToWhiteWave({ position = "bottom" }) {
   const isBottom = position === "bottom";
@@ -495,6 +499,10 @@ function CyanToWhiteWave({ position = "bottom" }) {
   );
 }
 
+CyanToWhiteWave.propTypes = {
+  position: PropTypes.oneOf(["top", "bottom"]),
+};
+
 function SoftHeroDecor() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -520,6 +528,11 @@ function HeroMetric({ label, value }) {
   );
 }
 
+HeroMetric.propTypes = {
+  label: PropTypes.node,
+  value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+};
+
 function HeroSection({ image, stats }) {
   return (
     <section id="top" className="relative isolate overflow-hidden bg-[#0AC4E0] px-4 pb-[170px] pt-20 text-white sm:px-6 lg:px-8 lg:pb-[210px] lg:pt-28">
@@ -544,7 +557,7 @@ function HeroSection({ image, stats }) {
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <a
               href="#peta"
-              className="inline-flex items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#0AC4E0] shadow-[0_18px_55px_rgba(255,255,255,0.22)] transition hover:-translate-y-0.5 hover:bg-[#F6FDFF]"
+              className="inline-flex items-center justify-center gap-3 rounded-full bg-white px-7 py-4 text-[11px] font-black uppercase tracking-[0.18em] text-[#0AC4E0] shadow-[0_18px_55px_rgba(255,255,255,0.22)] transition hover:-translate-y-0.5 hover:bg-[#EEF5FF]"
             >
               Jelajahi Sekolah
               <ArrowRight size={16} />
@@ -586,6 +599,16 @@ function HeroSection({ image, stats }) {
   );
 }
 
+HeroSection.propTypes = {
+  image: PropTypes.string,
+  stats: PropTypes.shape({
+    totalWilayah: PropTypes.number,
+    totalSekolah: PropTypes.number,
+    totalGuru: PropTypes.number,
+    totalSiswa: PropTypes.number,
+  }).isRequired,
+};
+
 function VisionMissionSection() {
   const [vision, ...remainingItems] = VISION_MISSION_ITEMS;
   const VisionIcon = vision.icon;
@@ -602,7 +625,7 @@ function VisionMissionSection() {
         <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div
             id={vision.anchor}
-            className="relative scroll-mt-28 overflow-hidden rounded-[2.3rem] border border-[#0AC4E0]/16 bg-gradient-to-br from-[#E9FBFF] via-white to-white p-8 shadow-[0_26px_80px_rgba(10,196,224,0.12)] sm:p-10 lg:p-12"
+            className="relative scroll-mt-28 overflow-hidden rounded-[2.3rem] border border-[#0AC4E0]/16 bg-gradient-to-br from-[#EEF5FF] via-white to-white p-8 shadow-[0_26px_80px_rgba(10,196,224,0.12)] sm:p-10 lg:p-12"
           >
             <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#0AC4E0]/15 blur-[80px]" />
 
@@ -615,11 +638,11 @@ function VisionMissionSection() {
                 {vision.eyebrow}
               </p>
 
-              <h3 className="mt-3 text-5xl font-black uppercase tracking-[-0.08em] text-[#103F49] sm:text-6xl">
+              <h3 className="mt-3 text-5xl font-black uppercase tracking-[-0.08em] text-[#020617] sm:text-6xl">
                 {vision.title}
               </h3>
 
-              <p className="mt-8 max-w-2xl text-base font-semibold leading-8 text-[#5F7E86]">
+              <p className="mt-8 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">
                 {vision.desc}
               </p>
 
@@ -644,23 +667,23 @@ function VisionMissionSection() {
                   className="group scroll-mt-28 rounded-[2rem] border border-[#0AC4E0]/12 bg-white p-6 shadow-[0_18px_55px_rgba(10,196,224,0.08)] transition hover:-translate-y-1 hover:border-[#0AC4E0]/25 hover:shadow-[0_24px_70px_rgba(10,196,224,0.14)] sm:p-8"
                 >
                   <div className="grid gap-5 sm:grid-cols-[64px_1fr_auto] sm:items-start">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[#E9FBFF] text-[#0AC4E0]">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-[#EEF5FF] text-[#0AC4E0]">
                       <Icon size={24} />
                     </div>
 
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#7FA4AB]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#94A3B8]">
                         {item.eyebrow}
                       </p>
-                      <h3 className="mt-2 text-3xl font-black uppercase tracking-[-0.06em] text-[#103F49]">
+                      <h3 className="mt-2 text-3xl font-black uppercase tracking-[-0.06em] text-[#020617]">
                         {item.title}
                       </h3>
-                      <p className="mt-4 text-sm font-semibold leading-7 text-[#5F7E86]">
+                      <p className="mt-4 text-sm font-semibold leading-7 text-[#64748B]">
                         {item.desc}
                       </p>
                     </div>
 
-                    <span className="hidden text-4xl font-black leading-none text-[#DFF8FC] sm:block">
+                    <span className="hidden text-4xl font-black leading-none text-[#EEF5FF] sm:block">
                       0{index + 2}
                     </span>
                   </div>
@@ -722,7 +745,7 @@ function PillarsSection() {
                   type="button"
                   onClick={() => setActiveIndex(index)}
                   className={`group scroll-mt-28 rounded-[1.6rem] border px-5 py-5 text-left transition ${active
-                    ? "border-[#0AC4E0]/30 bg-[#E9FBFF] shadow-[0_18px_45px_rgba(10,196,224,0.12)]"
+                    ? "border-[#0AC4E0]/30 bg-[#EEF5FF] shadow-[0_18px_45px_rgba(10,196,224,0.12)]"
                     : "border-transparent bg-white hover:border-[#0AC4E0]/15 hover:bg-[#F7FDFF]"
                     }`}
                 >
@@ -730,7 +753,7 @@ function PillarsSection() {
                     <span
                       className={`flex h-12 w-12 items-center justify-center rounded-2xl transition ${active
                         ? "bg-[#0AC4E0] text-white"
-                        : "bg-[#E9FBFF] text-[#0AC4E0]"
+                        : "bg-[#EEF5FF] text-[#0AC4E0]"
                         }`}
                     >
                       <Icon size={22} />
@@ -741,10 +764,10 @@ function PillarsSection() {
                     />
                   </div>
 
-                  <p className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#7FA4AB]">
+                  <p className="mt-5 text-[9px] font-black uppercase tracking-[0.22em] text-[#94A3B8]">
                     Pilar 0{index + 1}
                   </p>
-                  <p className="mt-1 text-lg font-black text-[#103F49]">
+                  <p className="mt-1 text-lg font-black text-[#020617]">
                     {pillar.title}
                   </p>
                 </button>
@@ -752,7 +775,7 @@ function PillarsSection() {
             })}
           </div>
 
-          <div className="mt-5 rounded-[2rem] border border-[#0AC4E0]/14 bg-gradient-to-br from-white via-[#F7FDFF] to-[#E9FBFF] p-7 sm:p-9 lg:p-11">
+          <div className="mt-5 rounded-[2rem] border border-[#0AC4E0]/14 bg-gradient-to-br from-white via-[#F7FDFF] to-[#EEF5FF] p-7 sm:p-9 lg:p-11">
             <div className="grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
               <div>
                 <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-[#0AC4E0] text-white shadow-[0_18px_45px_rgba(10,196,224,0.24)]">
@@ -763,13 +786,13 @@ function PillarsSection() {
                   Fokus Pembinaan
                 </p>
 
-                <h3 className="mt-2 text-4xl font-black tracking-[-0.07em] text-[#103F49] sm:text-5xl">
+                <h3 className="mt-2 text-4xl font-black tracking-[-0.07em] text-[#020617] sm:text-5xl">
                   {activePillar.title}
                 </h3>
               </div>
 
               <div>
-                <p className="max-w-3xl text-base font-semibold leading-8 text-[#5F7E86]">
+                <p className="max-w-3xl text-base font-semibold leading-8 text-[#64748B]">
                   {activePillar.desc}
                 </p>
 
@@ -780,10 +803,10 @@ function PillarsSection() {
                       className="mt-0.5 shrink-0 text-[#0AC4E0]"
                     />
                     <div>
-                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#7FA4AB]">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#94A3B8]">
                         Dampak yang dituju
                       </p>
-                      <p className="mt-2 text-sm font-black leading-6 text-[#103F49]">
+                      <p className="mt-2 text-sm font-black leading-6 text-[#020617]">
                         {activePillar.outcome}
                       </p>
                     </div>
@@ -794,7 +817,7 @@ function PillarsSection() {
                   {PILLARS.map((pillar, index) => (
                     <div
                       key={pillar.title}
-                      className={`h-2 rounded-full transition ${index === activeIndex ? "bg-[#0AC4E0]" : "bg-[#DFF8FC]"
+                      className={`h-2 rounded-full transition ${index === activeIndex ? "bg-[#0AC4E0]" : "bg-[#EEF5FF]"
                         }`}
                     />
                   ))}
@@ -814,7 +837,7 @@ function WorkflowSection() {
       id="cara-kerja"
       className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8"
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-[#DFF8FC]" />
+      <div className="absolute inset-x-0 top-0 h-px bg-[#EEF5FF]" />
 
       <div className="mx-auto max-w-7xl">
         <SectionHeader
@@ -835,19 +858,19 @@ function WorkflowSection() {
                   key={item.title}
                   className="relative rounded-[2rem] border border-[#0AC4E0]/12 bg-white p-7 shadow-[0_18px_55px_rgba(10,196,224,0.08)] transition hover:-translate-y-1 hover:border-[#0AC4E0]/25 hover:shadow-[0_24px_70px_rgba(10,196,224,0.14)]"
                 >
-                  <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-[1.3rem] bg-[#E9FBFF] text-[#0AC4E0]">
+                  <div className="relative z-10 flex h-14 w-14 items-center justify-center rounded-[1.3rem] bg-[#EEF5FF] text-[#0AC4E0]">
                     <Icon size={24} />
                   </div>
 
-                  <p className="mt-8 text-[10px] font-black uppercase tracking-[0.22em] text-[#7FA4AB]">
+                  <p className="mt-8 text-[10px] font-black uppercase tracking-[0.22em] text-[#94A3B8]">
                     Step 0{index + 1}
                   </p>
 
-                  <h3 className="mt-2 text-xl font-black leading-tight tracking-[-0.04em] text-[#103F49]">
+                  <h3 className="mt-2 text-xl font-black leading-tight tracking-[-0.04em] text-[#020617]">
                     {item.title}
                   </h3>
 
-                  <p className="mt-4 text-sm font-semibold leading-7 text-[#5F7E86]">
+                  <p className="mt-4 text-sm font-semibold leading-7 text-[#64748B]">
                     {item.desc}
                   </p>
                 </article>
@@ -856,17 +879,17 @@ function WorkflowSection() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col gap-5 rounded-[2rem] border border-[#0AC4E0]/14 bg-[#F6FDFF] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+        <div className="mt-8 flex flex-col gap-5 rounded-[2rem] border border-[#0AC4E0]/14 bg-[#EEF5FF] px-6 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#0AC4E0] text-white">
               <CheckCircle2 size={23} />
             </div>
 
             <div>
-              <p className="text-sm font-black text-[#103F49]">
+              <p className="text-sm font-black text-[#020617]">
                 Lebih mudah dipantau, lebih cepat ditindaklanjuti.
               </p>
-              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#5F7E86]">
+              <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[#64748B]">
                 Website ini membantu setiap proses pembinaan tetap tersambung,
                 terdokumentasi, dan mudah dibaca sehingga tim dapat fokus pada
                 keputusan yang benar-benar berdampak.
@@ -876,7 +899,7 @@ function WorkflowSection() {
 
           <a
             href="#peta"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-[#08B7D1]"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white transition hover:bg-[#0899B0]"
           >
             Jelajahi Sekolah
             <ArrowRight size={15} />
@@ -918,14 +941,14 @@ function MapSection({
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-[#0AC4E0]">
                   Interactive Map
                 </p>
-                <p className="mt-1 text-sm font-semibold text-[#5F7E86]">
+                <p className="mt-1 text-sm font-semibold text-[#64748B]">
                   Fokus saat ini: {getWilayahName(selectedWilayah)}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#0AC4E0]/14 bg-[#F6FDFF] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6D98A1]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#0AC4E0]/14 bg-[#EEF5FF] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6D98A1]">
                 <School size={14} />
                 {formatNumber(sekolahList.length)} Sekolah
               </div>
@@ -934,12 +957,12 @@ function MapSection({
                 <button
                   type="button"
                   onClick={onResetFilter}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_14px_40px_rgba(10,196,224,0.20)] transition hover:bg-[#08B7D1]"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_14px_40px_rgba(10,196,224,0.20)] transition hover:bg-[#0899B0]"
                 >
                   Reset Wilayah
                 </button>
               ) : (
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#0AC4E0]/14 bg-[#F6FDFF] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6D98A1]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#0AC4E0]/14 bg-[#EEF5FF] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#6D98A1]">
                   <MousePointerClick size={14} />
                   Pilih Marker
                 </div>
@@ -947,12 +970,12 @@ function MapSection({
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[2.8rem] border border-[#DFF8FC] bg-white p-4 shadow-[0_35px_100px_rgba(10,196,224,0.18)] sm:p-5 lg:p-6">
+          <div className="relative overflow-hidden rounded-[2.8rem] border border-[#EEF5FF] bg-white p-4 shadow-[0_35px_100px_rgba(10,196,224,0.18)] sm:p-5 lg:p-6">
             <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#0AC4E0]/35 to-transparent" />
             <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#0AC4E0]/10 blur-[55px]" />
             <div className="pointer-events-none absolute -left-20 bottom-0 h-56 w-56 rounded-full bg-[#0AC4E0]/10 blur-[55px]" />
 
-            <div className="relative overflow-hidden rounded-[2.25rem] border border-[#DFF8FC] bg-[#F8FEFF]">
+            <div className="relative overflow-hidden rounded-[2.25rem] border border-[#EEF5FF] bg-[#F8FEFF]">
               <div className="p-5 sm:p-6 lg:p-7">
                 <AdminSchoolBinaanMap
                 wilayahList={wilayahList}
@@ -982,6 +1005,14 @@ function MapSection({
   );
 }
 
+MapSection.propTypes = {
+  wilayahList: PropTypes.array,
+  sekolahList: PropTypes.array.isRequired,
+  selectedWilayah: PropTypes.object,
+  onSelectWilayah: PropTypes.func,
+  onResetFilter: PropTypes.func,
+  onOpenSchool: PropTypes.func,
+};
 
 function OnboardingSearchPanel({ query, results, onOpenResult, onClear }) {
   const keyword = String(query || "").trim();
@@ -995,12 +1026,12 @@ function OnboardingSearchPanel({ query, results, onOpenResult, onClear }) {
       <div className="mx-auto max-w-3xl overflow-hidden rounded-[1.6rem] border border-[#0AC4E0]/20 bg-white/95 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-xl">
         <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#E9FBFF] text-[#0AC4E0]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#EEF5FF] text-[#0AC4E0]">
               <SearchIcon size={18} />
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-black text-[#103F49]">
+              <p className="truncate text-[12px] font-black text-[#020617]">
                 Hasil pencarian untuk “{keyword}”
               </p>
               <p className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
@@ -1026,14 +1057,14 @@ function OnboardingSearchPanel({ query, results, onOpenResult, onClear }) {
                 key={`${item.kind}-${item.id}`}
                 type="button"
                 onClick={() => onOpenResult(item)}
-                className="group flex w-full items-start gap-4 px-5 py-4 text-left transition hover:bg-[#F6FDFF]"
+                className="group flex w-full items-start gap-4 px-5 py-4 text-left transition hover:bg-[#EEF5FF]"
               >
-                <span className="mt-0.5 rounded-full border border-[#0AC4E0]/18 bg-[#E9FBFF] px-3 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                <span className="mt-0.5 rounded-full border border-[#0AC4E0]/18 bg-[#EEF5FF] px-3 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0]">
                   {item.typeLabel}
                 </span>
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-black text-[#103F49] group-hover:text-[#0AC4E0]">
+                  <span className="block truncate text-[12px] font-black text-[#020617] group-hover:text-[#0AC4E0]">
                     {item.title}
                   </span>
                   <span className="mt-1 line-clamp-2 block text-[11px] font-semibold leading-5 text-slate-500">
@@ -1057,6 +1088,13 @@ function OnboardingSearchPanel({ query, results, onOpenResult, onClear }) {
     </div>
   );
 }
+
+OnboardingSearchPanel.propTypes = {
+  query: PropTypes.string,
+  results: PropTypes.array.isRequired,
+  onOpenResult: PropTypes.func,
+  onClear: PropTypes.func,
+};
 
 function OnBoarding() {
   const [wilayahList, setWilayahList] = useState([]);
@@ -1402,7 +1440,7 @@ function OnBoarding() {
   if (loading) return <LoadingScreen />;
 
   return (
-    <div id="onboarding-page" className="min-h-screen w-full overflow-hidden bg-white font-sans text-[#103F49] selection:bg-cyan-400 selection:text-white">
+    <div id="onboarding-page" className="min-h-screen w-full overflow-hidden bg-white font-sans text-[#020617] selection:bg-cyan-400 selection:text-white">
       <Navbar
         isDashboard
         searchValue={searchQuery}
@@ -1443,7 +1481,7 @@ function OnBoarding() {
               display: inline;
               border-radius: 0.45rem;
               background: linear-gradient(135deg, rgba(255, 235, 59, 0.95), rgba(255, 193, 7, 0.88));
-              color: #103F49;
+              color: #020617;
               box-shadow: 0 0 0 3px rgba(255, 235, 59, 0.34), 0 12px 30px rgba(15, 23, 42, 0.12);
               font-weight: 900;
               padding: 0.05rem 0.22rem;

@@ -12,12 +12,9 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../../utils/authSession";
 
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../../../config/apiBase.js";
 
 const scoreTone = (score) => {
   if (score >= 90) return "text-emerald-600 bg-emerald-50 border-emerald-100";
@@ -36,7 +33,7 @@ function MetricCard({ icon: Icon, label, value, helper }) {
           </p>
           {helper && <p className="mt-1 line-clamp-1 text-[10px] font-semibold text-slate-400">{helper}</p>}
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E9FBFF] text-[#0AC4E0]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF5FF] text-[#0AC4E0]">
           <Icon size={18} />
         </div>
       <style
@@ -126,7 +123,7 @@ export default function ManajemenVendor() {
   const [selectedId, setSelectedId] = useState(null);
 
   const fetchData = async () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/vendor/management/summary`, {
@@ -193,7 +190,7 @@ export default function ManajemenVendor() {
               <button
                 type="button"
                 onClick={fetchData}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-[#E9FBFF] px-4 text-[10px] font-black uppercase tracking-widest text-[#078EA3] shadow-[0_10px_22px_rgba(10,196,224,0.12)] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-60"
+                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-[#EEF5FF] px-4 text-[10px] font-black uppercase tracking-widest text-[#0899B0] shadow-[0_10px_22px_rgba(10,196,224,0.12)] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-60"
               >
                 <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                 Muat Ulang

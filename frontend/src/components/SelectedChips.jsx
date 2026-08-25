@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { X } from "lucide-react";
 
 function SelectedChips({ items = [], onRemove, variant = "default" }) {
@@ -26,5 +26,16 @@ function SelectedChips({ items = [], onRemove, variant = "default" }) {
         </div>
     );
 }
+
+SelectedChips.propTypes = {
+    items: PropTypes.arrayOf(
+        PropTypes.shape({
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.node,
+        }),
+    ),
+    onRemove: PropTypes.func,
+    variant: PropTypes.string,
+};
 
 export default SelectedChips;

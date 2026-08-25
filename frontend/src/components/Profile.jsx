@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { User, Mail, ShieldCheck } from "lucide-react";
 
 function Profile({ user }) {
@@ -39,6 +39,15 @@ function Profile({ user }) {
     );
 }
 
+Profile.propTypes = {
+    user: PropTypes.shape({
+        nama: PropTypes.string,
+        email: PropTypes.string,
+        role: PropTypes.string,
+        jenis: PropTypes.string,
+    }),
+};
+
 function InfoRow({ icon, label, value }) {
     return (
         <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-white px-4 py-3">
@@ -55,5 +64,11 @@ function InfoRow({ icon, label, value }) {
         </div>
     );
 }
+
+InfoRow.propTypes = {
+    icon: PropTypes.node,
+    label: PropTypes.node,
+    value: PropTypes.node,
+};
 
 export default Profile;

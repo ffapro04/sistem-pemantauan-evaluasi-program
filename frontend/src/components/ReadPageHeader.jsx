@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Plus } from "lucide-react";
 import Button from "./Button";
 
@@ -34,5 +34,13 @@ function ReadPageHeader({
         </header>
     );
 }
+
+ReadPageHeader.propTypes = {
+    subtitle: PropTypes.node,
+    title: PropTypes.node,
+    highlight: PropTypes.node,
+    buttonText: PropTypes.node,
+    onCreate: PropTypes.func,
+};
 
 export default ReadPageHeader;

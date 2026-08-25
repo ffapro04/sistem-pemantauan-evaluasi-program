@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function Alert({ message, type = "error" }) {
   if (!message) return null;
 
@@ -17,4 +18,9 @@ export default function Alert({ message, type = "error" }) {
     </div>
   );
 }
+
+Alert.propTypes = {
+  message: PropTypes.node,
+  type: PropTypes.oneOf(["error", "success", "warning", "info"]),
+};
 

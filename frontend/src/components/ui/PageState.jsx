@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { AlertTriangle, Loader2, RefreshCcw } from "lucide-react";
 import AppButton from "./AppButton";
 import AppPanel from "./AppPanel";
@@ -68,4 +68,26 @@ export default function PageState({
     </div>
   );
 }
+
+PageState.propTypes = {
+  title: PropTypes.node,
+  description: PropTypes.node,
+  eyebrow: PropTypes.node,
+  icon: PropTypes.elementType,
+  loading: PropTypes.bool,
+  tone: PropTypes.oneOf(["default", "error", "warning", "success"]),
+  primaryAction: PropTypes.shape({
+    icon: PropTypes.node,
+    onClick: PropTypes.func,
+    variant: PropTypes.string,
+    label: PropTypes.node,
+  }),
+  secondaryAction: PropTypes.shape({
+    icon: PropTypes.node,
+    onClick: PropTypes.func,
+    variant: PropTypes.string,
+    label: PropTypes.node,
+  }),
+  className: PropTypes.string,
+};
 

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import {
     CheckCircle2,
     FileClock,
@@ -128,6 +128,14 @@ function StatItem({ label, value, helper, icon, tone = "cyan" }) {
     );
 }
 
+StatItem.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+    helper: PropTypes.node,
+    icon: PropTypes.node,
+    tone: PropTypes.oneOf(["cyan", "blue", "amber", "emerald", "rose"]),
+};
+
 function VendorProgramStats({ programs }) {
     const totalProgram = programs.length;
     const allRequirements = programs.flatMap(getProgramRequirements);
@@ -213,5 +221,9 @@ function VendorProgramStats({ programs }) {
         </section>
     );
 }
+
+VendorProgramStats.propTypes = {
+    programs: PropTypes.arrayOf(PropTypes.object).isRequired,
+};
 
 export default VendorProgramStats;

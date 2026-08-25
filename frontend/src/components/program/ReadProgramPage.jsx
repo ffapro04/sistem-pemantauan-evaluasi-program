@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../utils/authSession";
 import {
     Plus,
     Filter,
@@ -27,14 +28,14 @@ import {
     Button,
     Search,
 } from "../common";
+import AppButton from "../ui/AppButton";
 
 import {
     filterSchoolsByHoAccess,
     canHoAccessProgram,
 } from "../../utils/hoAccess";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const getAssetUrl = (value) => {
     const raw = String(value || "").trim();
@@ -539,7 +540,7 @@ const getProgramTime = (program) => {
 };
 
 const getCurrentHoIdFromToken = () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -651,7 +652,7 @@ function ReadProgramPage({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -1191,27 +1192,31 @@ function ReadProgramPage({
                                     </p>
 
                                     <div className="flex items-center gap-2">
-                                        <button
+                                        <AppButton
                                             type="button"
                                             onClick={() => setPage((value) => Math.max(1, value - 1))}
                                             disabled={page <= 1}
-                                            className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="!border-slate-100 !text-slate-500 hover:!border-slate-100 hover:!text-[#0AC4E0]"
                                         >
                                             Prev
-                                        </button>
+                                        </AppButton>
 
                                         <span className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white">
                                             {page} / {totalPages}
                                         </span>
 
-                                        <button
+                                        <AppButton
                                             type="button"
                                             onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
                                             disabled={page >= totalPages}
-                                            className="rounded-xl border border-slate-100 bg-white px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="!border-slate-100 !text-slate-500 hover:!border-slate-100 hover:!text-[#0AC4E0]"
                                         >
                                             Next
-                                        </button>
+                                        </AppButton>
                                     </div>
                                 </div>
                             </>

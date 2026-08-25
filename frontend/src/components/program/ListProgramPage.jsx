@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../utils/authSession";
 import {
     Eye,
     Edit,
@@ -45,8 +46,7 @@ import {
     matchYearFilter,
 } from "../../utils/yearFilter";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const PROGRAM_STATUSES = [
     "Semua",
@@ -585,7 +585,7 @@ function getMasterName(master, ids, idKeys = [], nameKeys = []) {
 }
 
 function getCurrentHoIdFromToken() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -678,7 +678,7 @@ function SchoolHeaderLogo({ src, name }) {
     const showImage = Boolean(src) && !failed;
 
     return (
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-cyan-100 bg-[#E9FBFF] text-[#0AC4E0] shadow-[0_14px_28px_rgba(10,196,224,0.16)]">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-cyan-100 bg-[#EEF5FF] text-[#0AC4E0] shadow-[0_14px_28px_rgba(10,196,224,0.16)]">
             {showImage ? (
                 <img
                     src={src}
@@ -746,7 +746,7 @@ function ListProgramPage({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             if (!token) {
                 navigate("/login");
@@ -1093,7 +1093,7 @@ function ListProgramPage({
                 return (
                     <div className="min-w-0 py-1 text-left">
                         <div className="flex items-start gap-4">
-                            <div className="arcade-icon mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E9FBFF] text-[#0AC4E0] shadow-[0_12px_24px_rgba(10,196,224,0.16)]">
+                            <div className="arcade-icon mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF5FF] text-[#0AC4E0] shadow-[0_12px_24px_rgba(10,196,224,0.16)]">
                                 <Layers3 size={18} />
                             </div>
 
@@ -1146,7 +1146,7 @@ function ListProgramPage({
                                             <span className="line-clamp-1 text-[12px] font-black text-slate-800">
                                                 {activePhase.label}
                                             </span>
-                                            <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[10px] font-black uppercase tracking-widest text-[#078EA3] ring-1 ring-cyan-100">
+                                            <span className="shrink-0 rounded-lg bg-white px-2 py-1 text-[10px] font-black uppercase tracking-widest text-[#0899B0] ring-1 ring-cyan-100">
                                                 {progress.percentage}%
                                             </span>
                                         </div>

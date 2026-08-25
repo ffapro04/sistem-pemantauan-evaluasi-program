@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { Star } from "lucide-react";
 
 function toFiniteNumber(value, fallback = 0) {
@@ -100,3 +100,10 @@ export default function ProgramRatingStars({
         </div>
     );
 }
+
+ProgramRatingStars.propTypes = {
+    program: PropTypes.object,
+    size: PropTypes.number,
+    className: PropTypes.string,
+    compact: PropTypes.bool,
+};

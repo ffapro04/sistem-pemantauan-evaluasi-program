@@ -2,6 +2,7 @@
 /* eslint-disable prettier/prettier */
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   InternalServerErrorException,
@@ -18,6 +19,7 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   private readonly ROLE_KEPALA_DINAS_ID = 7;
   private readonly ROLE_KEPALA_SEKOLAH_ID = 10;
   constructor(
@@ -718,7 +720,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('CREATE USER ERROR:', error);
+      this.logger.error('CREATE USER ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail || error?.message || 'Gagal menyimpan user ke database.',
@@ -795,7 +797,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('UPDATE OWN PROFILE ERROR:', error);
+      this.logger.error('UPDATE OWN PROFILE ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail || error?.message || 'Gagal memperbarui profil akun.',
@@ -927,7 +929,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('UPDATE USER ERROR:', error);
+      this.logger.error('UPDATE USER ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail || error?.message || 'Gagal memperbarui data user.',
@@ -1044,7 +1046,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('CREATE KEPALA SEKOLAH ERROR:', error);
+      this.logger.error('CREATE KEPALA SEKOLAH ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail || error?.message || 'Gagal membuat akun Kepala Sekolah.',
@@ -1134,7 +1136,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('UPDATE KEPALA SEKOLAH ERROR:', error);
+      this.logger.error('UPDATE KEPALA SEKOLAH ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail ||
@@ -1233,7 +1235,7 @@ export class UsersService {
         throw error;
       }
 
-      console.error('REGISTER USER ERROR:', error);
+      this.logger.error('REGISTER USER ERROR:', error);
 
       throw new InternalServerErrorException(
         error?.detail || error?.message || 'Gagal registrasi user.',

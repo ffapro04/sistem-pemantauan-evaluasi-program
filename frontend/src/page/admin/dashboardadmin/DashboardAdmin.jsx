@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { getAuthToken } from "../../../utils/authSession";
 import {
   AlertTriangle,
   ArrowRight,
@@ -67,7 +68,7 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import indonesiaGeoJson from "../../../assets/maps/indonesia-province-simple.json";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../../config/apiBase.js";
 
 const INDONESIA_CENTER = [-2.5, 118];
 const DEFAULT_ZOOM = 5;
@@ -2765,7 +2766,7 @@ function EmptyChart({ icon, text }) {
 function StatusPill({ status }) {
   return (
     <span
-      className="inline-flex rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white"
+      className="inline-flex max-w-full truncate rounded-full px-3 py-1 text-[9px] font-black uppercase tracking-widest text-white"
       style={{ backgroundColor: warnaStatus(status) }}
     >
       {status || "Belum Diisi"}
@@ -3076,7 +3077,7 @@ function VisualItemChooser({ modeLabel, options = [], value, onChange }) {
                   }`}
               >
                 <div className="flex min-w-0 items-center justify-between gap-3">
-                  <p className="truncate text-[11px] font-black text-slate-800">
+                  <p className="min-w-0 flex-1 truncate text-[11px] font-black text-slate-800">
                     {item.title || item.label}
                   </p>
                   <span
@@ -4699,7 +4700,7 @@ function CompactSchoolLeafletMap({
                     radius={active ? 18 : 11}
                     pathOptions={{
                       color: active
-                        ? "#0891B2"
+                        ? "#0899B0"
                         : "#0AC4E0",
                       fillColor: "#0AC4E0",
                       fillOpacity: active ? 0.24 : 0.1,
@@ -5182,7 +5183,7 @@ export default function DashboardAdmin() {
     setLoadError("");
 
     try {
-      const token = localStorage.getItem("token");
+      const token = getAuthToken();
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       const [

@@ -1,6 +1,6 @@
 // src/components/masterCrud/MasterStatusSwitch.jsx
 
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import AppSwitch from "../ui/AppSwitch";
 import { isActiveValue } from "./masterCrudUtils";
 
@@ -25,3 +25,11 @@ export default function MasterStatusSwitch({
         />
     );
 }
+
+MasterStatusSwitch.propTypes = {
+    value: PropTypes.oneOfType([PropTypes.bool, PropTypes.string, PropTypes.number]),
+    active: PropTypes.bool,
+    activeText: PropTypes.node,
+    inactiveText: PropTypes.node,
+    onClick: PropTypes.func,
+};

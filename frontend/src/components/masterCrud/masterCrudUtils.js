@@ -2,8 +2,8 @@
 
 import { getAuthToken } from "../../utils/authSession";
 
-export const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
+export { API_BASE_URL };
 
 export const buildApiUrl = (endpoint) => {
     if (!endpoint) return API_BASE_URL;

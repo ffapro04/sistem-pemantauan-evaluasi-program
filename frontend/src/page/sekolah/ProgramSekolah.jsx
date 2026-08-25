@@ -1,6 +1,6 @@
-/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -23,9 +23,10 @@ import {
 } from "lucide-react";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import AppButton from "../../components/ui/AppButton";
 import { getAuthToken } from "../../utils/authSession";
 
-const BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as BASE_URL } from "../../config/apiBase.js";
 const PROGRAM_PAGE_SIZE = 6;
 
 const PROGRAM_STATUS_COLOR = {
@@ -407,6 +408,11 @@ function StatusBadge({ status, type = "requirement" }) {
     );
 }
 
+StatusBadge.propTypes = {
+    status: PropTypes.string,
+    type: PropTypes.oneOf(["requirement", "activity"]),
+};
+
 function JenisBadge({ jenis }) {
     if (!jenis) return null;
 
@@ -418,6 +424,10 @@ function JenisBadge({ jenis }) {
         </span>
     );
 }
+
+JenisBadge.propTypes = {
+    jenis: PropTypes.string,
+};
 
 function KategoriBadge({ kategori }) {
     if (!kategori) return null;
@@ -431,6 +441,10 @@ function KategoriBadge({ kategori }) {
         </span>
     );
 }
+
+KategoriBadge.propTypes = {
+    kategori: PropTypes.string,
+};
 
 function ProgramCard({ program, onClick }) {
     const progress = getProgramProgress(program);
@@ -505,6 +519,11 @@ function ProgramCard({ program, onClick }) {
     );
 }
 
+ProgramCard.propTypes = {
+    program: PropTypes.object.isRequired,
+    onClick: PropTypes.func,
+};
+
 function MiniStat({ label, value }) {
     return (
         <div className="rounded-xl bg-white px-2 py-2">
@@ -517,6 +536,11 @@ function MiniStat({ label, value }) {
         </div>
     );
 }
+
+MiniStat.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+};
 
 function DetailMetric({ label, value, helper, tone = "cyan" }) {
     const toneClass =
@@ -546,6 +570,13 @@ function DetailMetric({ label, value, helper, tone = "cyan" }) {
         </div>
     );
 }
+
+DetailMetric.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+    helper: PropTypes.node,
+    tone: PropTypes.oneOf(["cyan", "emerald", "amber", "sky", "red"]),
+};
 
 export default function ProgramSekolah() {
     const [user, setUser] = useState(null);
@@ -797,24 +828,28 @@ export default function ProgramSekolah() {
             action={(
                 <div className="flex items-center gap-2">
                     {selectedProgram && (
-                        <button
+                        <AppButton
                             type="button"
                             onClick={() => setSelectedProgram(null)}
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-500 shadow-sm transition hover:text-[#0AC4E0] active:scale-95"
+                            icon={<ChevronRight size={12} className="rotate-180" />}
+                            variant="secondary"
+                            size="sm"
+                            className="!rounded-full !border-slate-100 !text-slate-500 hover:!text-[#0AC4E0]"
                         >
-                            <ChevronRight size={12} className="rotate-180" />
                             Kembali
-                        </button>
+                        </AppButton>
                     )}
 
-                    <button
+                    <AppButton
                         type="button"
                         onClick={() => (selectedProgram ? fetchDetail(selectedProgram.id_program) : fetchList())}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-500 shadow-sm transition hover:text-[#0AC4E0] active:scale-95"
+                        icon={<RefreshCw size={12} className={loading || detailLoading ? "animate-spin" : ""} />}
+                        variant="secondary"
+                        size="sm"
+                        className="!rounded-full !border-slate-100 !text-slate-500 hover:!text-[#0AC4E0]"
                     >
-                        <RefreshCw size={12} className={loading || detailLoading ? "animate-spin" : ""} />
                         Refresh
-                    </button>
+                    </AppButton>
                 </div>
             )}
         >
@@ -932,34 +967,43 @@ function ProgramListView({ list, loading, onOpenDetail }) {
                 </p>
 
                 <div className="flex items-center gap-2">
-                    <button
+                    <AppButton
                         type="button"
                         disabled={safePage <= 1}
                         onClick={() => setPage((current) => Math.max(1, current - 1))}
-                        className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                        icon={<ChevronRight size={13} className="rotate-180" />}
+                        variant="secondary"
+                        size="sm"
+                        className="hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                     >
-                        <ChevronRight size={13} className="rotate-180" />
                         Prev
-                    </button>
+                    </AppButton>
 
                     <span className="inline-flex h-9 min-w-14 items-center justify-center rounded-xl bg-[#0AC4E0] px-3 text-[10px] font-black text-white">
                         {safePage} / {totalPages}
                     </span>
 
-                    <button
+                    <AppButton
                         type="button"
                         disabled={safePage >= totalPages}
                         onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                        className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                        variant="secondary"
+                        size="sm"
+                        className="hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                     >
-                        Next
-                        <ChevronRight size={13} />
-                    </button>
+                        Next <ChevronRight size={13} className="ml-2" />
+                    </AppButton>
                 </div>
             </div>
         </div>
     );
 }
+
+ProgramListView.propTypes = {
+    list: PropTypes.array.isRequired,
+    loading: PropTypes.bool,
+    onOpenDetail: PropTypes.func,
+};
 
 function ProgramDetailHeader({ program, progress }) {
     const derivedStatus = getDerivedProgramStatus(program);
@@ -1009,6 +1053,11 @@ function ProgramDetailHeader({ program, progress }) {
     );
 }
 
+ProgramDetailHeader.propTypes = {
+    program: PropTypes.object.isRequired,
+    progress: PropTypes.object.isRequired,
+};
+
 function InfoLine({ icon, label, value }) {
     return (
         <div className="flex items-center gap-3 rounded-[1.1rem] border border-slate-100 bg-slate-50 px-4 py-3">
@@ -1026,6 +1075,12 @@ function InfoLine({ icon, label, value }) {
         </div>
     );
 }
+
+InfoLine.propTypes = {
+    icon: PropTypes.node,
+    label: PropTypes.node,
+    value: PropTypes.node,
+};
 
 function getProgramFeedbackActivities(program = {}) {
     return getArray(program?.fases).flatMap((period, periodIndex) => {
@@ -1147,6 +1202,13 @@ function SimpleProgramFeedbackPanel({ program, canRate, user, openRating }) {
     );
 }
 
+SimpleProgramFeedbackPanel.propTypes = {
+    program: PropTypes.object,
+    canRate: PropTypes.bool,
+    user: PropTypes.object,
+    openRating: PropTypes.func,
+};
+
 function PeriodTabs({ periods, activePeriod, setActivePeriod }) {
     if (!periods.length) return null;
 
@@ -1193,6 +1255,12 @@ function PeriodTabs({ periods, activePeriod, setActivePeriod }) {
         </div>
     );
 }
+
+PeriodTabs.propTypes = {
+    periods: PropTypes.array.isRequired,
+    activePeriod: PropTypes.number,
+    setActivePeriod: PropTypes.func,
+};
 
 function PeriodContent({ period, periodIndex, isGuru, user, openComment, openRating }) {
     const openingList = getArray(period.termin, period.termins, period.t_termin);
@@ -1257,6 +1325,15 @@ function PeriodContent({ period, periodIndex, isGuru, user, openComment, openRat
     );
 }
 
+PeriodContent.propTypes = {
+    period: PropTypes.object.isRequired,
+    periodIndex: PropTypes.number,
+    isGuru: PropTypes.bool,
+    user: PropTypes.object,
+    openComment: PropTypes.func,
+    openRating: PropTypes.func,
+};
+
 function SectionCard({ title, subtitle, badge, badgeClassName, children }) {
     return (
         <div className="overflow-hidden rounded-[1.6rem] border border-slate-100 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
@@ -1281,6 +1358,14 @@ function SectionCard({ title, subtitle, badge, badgeClassName, children }) {
         </div>
     );
 }
+
+SectionCard.propTypes = {
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    badge: PropTypes.node,
+    badgeClassName: PropTypes.string,
+    children: PropTypes.node,
+};
 
 function OpeningCard({ termin, index }) {
     const requirements = getArray(
@@ -1344,6 +1429,11 @@ function OpeningCard({ termin, index }) {
         </div>
     );
 }
+
+OpeningCard.propTypes = {
+    termin: PropTypes.object.isRequired,
+    index: PropTypes.number,
+};
 
 function ActivityCard({ period, activity, index, isGuru, user, openComment, openRating }) {
     const activityStatus = getActivityStatus(activity);
@@ -1498,6 +1588,16 @@ function ActivityCard({ period, activity, index, isGuru, user, openComment, open
     );
 }
 
+ActivityCard.propTypes = {
+    period: PropTypes.object,
+    activity: PropTypes.object.isRequired,
+    index: PropTypes.number,
+    isGuru: PropTypes.bool,
+    user: PropTypes.object,
+    openComment: PropTypes.func,
+    openRating: PropTypes.func,
+};
+
 function LockedActivityNotice() {
     return (
         <div className="flex flex-col items-center justify-center rounded-[1.3rem] border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
@@ -1522,6 +1622,10 @@ function InlineEmpty({ text }) {
     );
 }
 
+InlineEmpty.propTypes = {
+    text: PropTypes.node,
+};
+
 function EmptyState({ icon, title, description }) {
     return (
         <div className="flex flex-col items-center justify-center rounded-[1.7rem] border border-dashed border-slate-200 bg-white px-8 py-16 text-center">
@@ -1536,6 +1640,12 @@ function EmptyState({ icon, title, description }) {
     );
 }
 
+EmptyState.propTypes = {
+    icon: PropTypes.node,
+    title: PropTypes.node,
+    description: PropTypes.node,
+};
+
 function LoadingState({ label }) {
     return (
         <div className="flex flex-col items-center justify-center py-24">
@@ -1548,6 +1658,10 @@ function LoadingState({ label }) {
         </div>
     );
 }
+
+LoadingState.propTypes = {
+    label: PropTypes.node,
+};
 
 function RatingModal({
     ratingModal,
@@ -1649,6 +1763,18 @@ function RatingModal({
         </div>
     );
 }
+
+RatingModal.propTypes = {
+    ratingModal: PropTypes.object,
+    isEdit: PropTypes.bool,
+    ratingValue: PropTypes.number,
+    ratingComment: PropTypes.string,
+    ratingLoading: PropTypes.bool,
+    setRatingValue: PropTypes.func,
+    setRatingComment: PropTypes.func,
+    onClose: PropTypes.func,
+    onSubmit: PropTypes.func,
+};
 
 function CommentDrawer({
     open,
@@ -1773,3 +1899,15 @@ function CommentDrawer({
         </div>
     );
 }
+
+CommentDrawer.propTypes = {
+    open: PropTypes.bool,
+    activity: PropTypes.object,
+    comments: PropTypes.array.isRequired,
+    isGuru: PropTypes.bool,
+    commentText: PropTypes.string,
+    commentLoading: PropTypes.bool,
+    setCommentText: PropTypes.func,
+    onClose: PropTypes.func,
+    onSubmit: PropTypes.func,
+};

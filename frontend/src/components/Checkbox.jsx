@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import React from "react";
 import { Check } from "lucide-react";
 
@@ -7,7 +7,7 @@ const Checkbox = ({ label, checked, onChange, value }) => {
     <label
       className={`group flex items-center justify-between p-4 rounded-2xl cursor-pointer transition-all duration-300 border-2 ${
         checked
-          ? "bg-blue-50 border-[#0AC4E0] shadow-sm"
+          ? "bg-[#0AC4E0]/5 border-[#0AC4E0] shadow-sm"
           : "bg-gray-50 border-transparent hover:bg-gray-100"
       }`}
     >
@@ -34,6 +34,13 @@ const Checkbox = ({ label, checked, onChange, value }) => {
       </div>
     </label>
   );
+};
+
+Checkbox.propTypes = {
+  label: PropTypes.node,
+  checked: PropTypes.bool,
+  onChange: PropTypes.func,
+  value: PropTypes.any,
 };
 
 export default Checkbox;

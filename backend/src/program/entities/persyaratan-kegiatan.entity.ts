@@ -7,6 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Kegiatans } from './kegiatans.entity';
+import { PersyaratanStatus } from './persyaratan-termin.entity';
 
 @Entity('t_persyaratan_kegiatan')
 export class PersyaratanKegiatan {
@@ -28,9 +29,8 @@ export class PersyaratanKegiatan {
   @Column({ default: 1 })
   urutan: number;
 
-  /** WAITING_UPLOAD | WAITING_HO | APPROVED | REJECTED */
-  @Column({ default: 'WAITING_UPLOAD' })
-  status: string;
+  @Column({ default: PersyaratanStatus.WAITING_UPLOAD })
+  status: PersyaratanStatus;
 
   @Column({ type: 'text', nullable: true })
   file_path: string;

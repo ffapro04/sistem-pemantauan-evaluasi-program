@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { isActiveValue } from "../../components/masterCrud";
+import { getAuthToken } from "../../utils/authSession";
 
 const getCurrentUser = () => {
     try {
@@ -22,7 +23,7 @@ const getCurrentUser = () => {
     }
 
     try {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return {};
         const payload = JSON.parse(atob(token.split(".")[1]));
         return payload || {};

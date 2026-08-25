@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { cn } from "../design/tokens";
 
 export default function Table({
@@ -94,3 +94,23 @@ export default function Table({
     </div>
   );
 }
+
+Table.propTypes = {
+  columns: PropTypes.arrayOf(
+    PropTypes.shape({
+      header: PropTypes.node,
+      accessor: PropTypes.string,
+      render: PropTypes.func,
+      align: PropTypes.string,
+      minWidth: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    }),
+  ),
+  data: PropTypes.array,
+  footer: PropTypes.node,
+  className: PropTypes.string,
+  headerClassName: PropTypes.string,
+  rowClassName: PropTypes.oneOfType([PropTypes.func, PropTypes.string]),
+  cellClassName: PropTypes.oneOfType([PropTypes.func, PropTypes.string]),
+  emptyMessage: PropTypes.node,
+};

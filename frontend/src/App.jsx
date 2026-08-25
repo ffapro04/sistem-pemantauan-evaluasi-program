@@ -4,6 +4,7 @@ import { jwtDecode } from "jwt-decode";
 import { ENABLE_UI_TRANSLATOR } from "./config/features";
 import { PageState } from "./components/common";
 import { clearAuthSession, getAuthToken, getAuthUser } from "./utils/authSession";
+import { ROLE_ADMIN, ROLE_PENGURUS } from "./constants/roles.js";
 
 const Onboarding = lazy(() => import("./page/onboarding/OnBoarding"));
 const Login = lazy(() => import("./page/otorisasi/Login"));
@@ -149,8 +150,8 @@ function getDefaultRoute(user = {}) {
   const jabatan = String(user.jabatan || "").toLowerCase();
   const jenis = String(user.jenis || "").toLowerCase();
 
-  if (roleId === 1 || role === "admin") return "/admin/dashboard";
-  if (roleId === 2 || role === "pengurus") return "/pengurus/dashboard";
+  if (roleId === 1 || role === ROLE_ADMIN) return "/admin/dashboard";
+  if (roleId === 2 || role === ROLE_PENGURUS) return "/pengurus/dashboard";
   if (roleId === 3 || role.includes("head office")) {
     return jenis.includes("non")
       ? "/ho/dashboard/non-akademik"
@@ -175,8 +176,8 @@ function getAllowedPrefixes(user = {}) {
   const jabatan = String(user.jabatan || "").toLowerCase();
   const common = ["/pengaturan-akun", "/integrasi/google-drive"];
 
-  if (roleId === 1 || role === "admin") return ["/admin", ...common];
-  if (roleId === 2 || role === "pengurus") return ["/pengurus", ...common];
+  if (roleId === 1 || role === ROLE_ADMIN) return ["/admin", ...common];
+  if (roleId === 2 || role === ROLE_PENGURUS) return ["/pengurus", ...common];
   if (roleId === 3 || role.includes("head office")) return ["/ho", ...common];
   if (roleId === 4 || role.includes("area officer")) return ["/ao", ...common];
   if (roleId === 6 || role.includes("vendor")) return ["/vendor", ...common];

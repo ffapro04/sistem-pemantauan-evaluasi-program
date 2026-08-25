@@ -1,7 +1,5 @@
 ﻿// src/config/masterCrud/user.config.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
 import {
     Briefcase,
     Database,
@@ -22,11 +20,7 @@ import { validateEmailField, validatePasswordField } from "./validation";
 
 const ROLE_KEPALA_DINAS_ID = 7;
 
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../apiBase.js";
 
 const getUserPhotoUrl = (fotoProfile) => {
     if (!fotoProfile) return "";

@@ -1269,10 +1269,7 @@ export class AssessmentService {
     // Verifikasi token jika tidak ada id_guru_assessment
     if (body.token && !id_guru_assessment) {
       try {
-        const decoded: any = jwt.verify(
-          body.token,
-          process.env.JWT_SECRET || 'secretkey',
-        );
+        const decoded: any = jwt.verify(body.token, process.env.JWT_SECRET);
 
         if (decoded.type !== 'guru-access') {
           throw new Error('Invalid token type');
@@ -1449,7 +1446,7 @@ export class AssessmentService {
 
       return assessments;
     } catch (error) {
-      console.error('ERROR findBySekolah:', error);
+      this.logger.error('ERROR findBySekolah:', error);
       return [];
     }
   }

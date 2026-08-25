@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import {
     Eye,
     School,
@@ -13,6 +13,7 @@ import {
     RotateCcw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import AppButton from "../ui/AppButton";
 
 function getArray(...values) {
     return values.find((value) => Array.isArray(value)) || [];
@@ -102,6 +103,10 @@ function StatusBadge({ status }) {
     );
 }
 
+StatusBadge.propTypes = {
+    status: PropTypes.node,
+};
+
 function SummaryChip({ icon, value, label, className }) {
     return (
         <span
@@ -113,6 +118,13 @@ function SummaryChip({ icon, value, label, className }) {
         </span>
     );
 }
+
+SummaryChip.propTypes = {
+    icon: PropTypes.node,
+    value: PropTypes.node,
+    label: PropTypes.node,
+    className: PropTypes.string,
+};
 
 function UploadSummary({ program }) {
     const requirements = getProgramRequirements(program);
@@ -189,6 +201,10 @@ function UploadSummary({ program }) {
     );
 }
 
+UploadSummary.propTypes = {
+    program: PropTypes.object.isRequired,
+};
+
 function MobileLabel({ children }) {
     return (
         <p className="mb-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-slate-400 xl:hidden">
@@ -196,6 +212,10 @@ function MobileLabel({ children }) {
         </p>
     );
 }
+
+MobileLabel.propTypes = {
+    children: PropTypes.node,
+};
 
 function VendorProgramTable({
     programs,
@@ -335,34 +355,51 @@ function VendorProgramTable({
 
                 {hasPagination && (
                     <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <button
+                        <AppButton
                             type="button"
                             onClick={onPrevPage}
                             disabled={page <= 1}
-                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                            icon={<ChevronLeft size={15} />}
+                            variant="secondary"
+                            size="sm"
+                            className="hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                         >
-                            <ChevronLeft size={15} />
                             Prev
-                        </button>
+                        </AppButton>
 
                         <span className="inline-flex h-10 min-w-[58px] items-center justify-center rounded-xl bg-[#0AC4E0] px-3 text-[11px] font-black text-white">
                             {page} / {totalPages}
                         </span>
 
-                        <button
+                        <AppButton
                             type="button"
                             onClick={onNextPage}
                             disabled={page >= totalPages}
-                            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                            variant="secondary"
+                            size="sm"
+                            className="hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                         >
                             Next
-                            <ChevronRight size={15} />
-                        </button>
+                            <ChevronRight size={15} className="ml-2" />
+                        </AppButton>
                     </div>
                 )}
             </footer>
         </section>
     );
 }
+
+VendorProgramTable.propTypes = {
+    programs: PropTypes.arrayOf(PropTypes.object).isRequired,
+    detailPathPrefix: PropTypes.string,
+    getSchoolName: PropTypes.func.isRequired,
+    getHoName: PropTypes.func.isRequired,
+    page: PropTypes.number,
+    totalPages: PropTypes.number,
+    startIndex: PropTypes.number,
+    totalItems: PropTypes.number,
+    onPrevPage: PropTypes.func,
+    onNextPage: PropTypes.func,
+};
 
 export default VendorProgramTable;

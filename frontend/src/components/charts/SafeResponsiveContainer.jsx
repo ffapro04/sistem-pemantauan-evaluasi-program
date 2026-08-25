@@ -1,5 +1,5 @@
-/* eslint-disable react/prop-types */
 import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import { ResponsiveContainer } from "recharts";
 
 function parseSize(value, fallback) {
@@ -95,3 +95,14 @@ export default function SafeResponsiveContainer({
     </div>
   );
 }
+
+SafeResponsiveContainer.propTypes = {
+  children: PropTypes.oneOfType([PropTypes.func, PropTypes.node]),
+  width: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  height: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  minWidth: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  minHeight: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  debounce: PropTypes.number,
+  className: PropTypes.string,
+  style: PropTypes.object,
+};

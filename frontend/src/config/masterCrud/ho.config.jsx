@@ -1,7 +1,5 @@
 ﻿// src/config/masterCrud/ho.config.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
 import {
     Briefcase,
     Building2,
@@ -16,13 +14,9 @@ import {
 import { isActiveValue } from "../../components/masterCrud";
 import { validateEmailField, validatePasswordField } from "./validation";
 
-const ROLE_HO = 3;
+import { API_BASE_URL } from "../apiBase.js";
 
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+const ROLE_HO = 3;
 
 const getUserPhotoUrl = (fotoProfile) => {
     if (!fotoProfile) return "";

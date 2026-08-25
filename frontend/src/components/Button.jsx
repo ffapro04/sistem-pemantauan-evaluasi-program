@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import AppButton from "./ui/AppButton";
 
 export default function Button({
@@ -36,4 +36,23 @@ export default function Button({
     </AppButton>
   );
 }
+
+Button.propTypes = {
+  text: PropTypes.node,
+  type: PropTypes.string,
+  loading: PropTypes.bool,
+  disabled: PropTypes.bool,
+  icon: PropTypes.node,
+  variant: PropTypes.oneOf([
+    "primary",
+    "ghost",
+    "icon",
+    "outline",
+    "secondary",
+    "danger",
+  ]),
+  className: PropTypes.string,
+  onClick: PropTypes.func,
+  children: PropTypes.node,
+};
 

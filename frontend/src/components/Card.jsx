@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import AppPanel from "./ui/AppPanel";
 
 export default function Card({ title, description, className = "", children }) {
@@ -23,4 +23,11 @@ export default function Card({ title, description, className = "", children }) {
     </AppPanel>
   );
 }
+
+Card.propTypes = {
+  title: PropTypes.node,
+  description: PropTypes.node,
+  className: PropTypes.string,
+  children: PropTypes.node,
+};
 

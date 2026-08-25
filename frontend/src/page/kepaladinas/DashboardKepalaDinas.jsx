@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getAuthToken } from "../../utils/authSession";
 import {
     AlertTriangle,
     Award,
@@ -58,6 +59,7 @@ import "leaflet/dist/leaflet.css";
 
 import Sidebar from "../../components/Sidebar";
 import PageWrapper from "../../components/PageWrapper";
+import AppButton from "../../components/ui/AppButton";
 import Input from "../../components/Input";
 import Button from "../../components/Button";
 import Dropdown from "../../components/Dropdown";
@@ -65,7 +67,7 @@ import ResponsiveContainer from "../../components/charts/SafeResponsiveContainer
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 import indonesiaGeoJson from "../../assets/maps/indonesia-province-simple.json";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const COLORS = {
     cyan: CHART_STATUS_COLORS.info,
@@ -465,7 +467,7 @@ async function fetchSafe(endpointList, headers = {}, signal) {
 }
 
 function getTokenPayload() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return null;
 
     try {
@@ -2911,13 +2913,15 @@ function KadinProvinceMap({ wilayah, wilayahList, schools, onScopeChange }) {
                 </div>
 
                 {focused && (
-                    <button
+                    <AppButton
                         type="button"
                         onClick={resetMap}
-                        className="inline-flex h-11 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50 px-5 text-[10px] font-black uppercase tracking-widest text-cyan-700 transition hover:bg-cyan-100"
+                        variant="secondary"
+                        size="lg"
+                        className="!rounded-2xl !border-cyan-200 !bg-cyan-50 !text-cyan-700 hover:!border-cyan-200 hover:!bg-cyan-100 hover:!text-cyan-700"
                     >
                         Kembali ke Marker Provinsi
-                    </button>
+                    </AppButton>
                 )}
             </div>
 
@@ -2951,7 +2955,7 @@ function KadinProvinceMap({ wilayah, wilayahList, schools, onScopeChange }) {
                 </div>
             </div>
 
-            <div className="relative h-[540px]">
+            <div className="relative h-[540px] overflow-hidden">
                 <MapContainer
                     center={KADIN_INDONESIA_CENTER}
                     zoom={KADIN_INDONESIA_ZOOM}
@@ -3005,13 +3009,15 @@ function KadinProvinceMap({ wilayah, wilayahList, schools, onScopeChange }) {
                                         </div>
                                     </div>
 
-                                    <button
+                                    <AppButton
                                         type="button"
                                         onClick={focusProvince}
-                                        className="kadin-map-action-pulse mt-3 h-10 w-full rounded-xl bg-[#0AC4E0] text-[10px] font-black uppercase tracking-wider text-white transition hover:bg-cyan-500"
+                                        variant="accent"
+                                        size="md"
+                                        className="kadin-map-action-pulse !h-10 w-full !rounded-xl hover:!bg-cyan-500"
                                     >
                                         Lihat Program Wilayah Ini
-                                    </button>
+                                    </AppButton>
                                 </div>
                             </Popup>
                         </Marker>
@@ -3037,11 +3043,11 @@ function KadinProvinceMap({ wilayah, wilayahList, schools, onScopeChange }) {
                         ))}
                 </MapContainer>
 
-                <div className="pointer-events-none absolute bottom-5 left-5 z-[500] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md">
+                <div className="pointer-events-none absolute bottom-5 left-5 right-5 z-[500] max-w-[calc(100%-2.5rem)] rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-md sm:right-auto sm:max-w-[280px]">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
                         Tampilan Aktif
                     </p>
-                    <p className="mt-1 text-[12px] font-black text-slate-800">
+                    <p className="mt-1 truncate text-[12px] font-black text-slate-800">
                         {focused
                             ? `${mapData.name} · ${filteredDistricts.length} kabupaten`
                             : `${mapData.name} · marker provinsi`}
@@ -3211,7 +3217,7 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                     ))}
                 </div>
 
-                <div className="relative h-[390px] min-h-[340px] min-w-0">
+                <div className="relative h-[390px] min-h-[340px] min-w-0 overflow-hidden">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
@@ -3219,8 +3225,8 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                                 dataKey="value"
                                 nameKey="name"
                                 cx="50%"
-                                cy="50%"
-                                outerRadius={138}
+                                cy="56%"
+                                outerRadius={118}
                                 paddingAngle={4}
                                 stroke="#FFFFFF"
                                 strokeWidth={4}
@@ -3232,7 +3238,7 @@ function KadinCoverageChart({ rows, visiblePillars, chartType }) {
                             <Tooltip content={<KadinAnalyticsTooltip />} />
                         </PieChart>
                     </ResponsiveContainer>
-                    <span className="absolute right-3 top-3 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
+                    <span className="absolute right-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0]">
                         Total {total}
                     </span>
                 </div>
@@ -3854,14 +3860,17 @@ function DashboardPagination({ page, totalPages, onChange }) {
 
     return (
         <div className="flex flex-wrap items-center gap-1.5">
-            <button
+            <AppButton
                 type="button"
                 disabled={page <= 1}
                 onClick={() => onChange(Math.max(1, page - 1))}
-                className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-500 transition hover:border-cyan-200 hover:text-cyan-600 disabled:cursor-not-allowed disabled:opacity-35"
+                icon={<ChevronLeft size={14} />}
+                variant="secondary"
+                size="sm"
+                className="hover:!border-cyan-200 hover:!text-cyan-600"
             >
-                <ChevronLeft size={14} /> Prev
-            </button>
+                Prev
+            </AppButton>
 
             {numbers.map((number) => (
                 <button
@@ -3877,14 +3886,16 @@ function DashboardPagination({ page, totalPages, onChange }) {
                 </button>
             ))}
 
-            <button
+            <AppButton
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => onChange(Math.min(totalPages, page + 1))}
-                className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-500 transition hover:border-cyan-200 hover:text-cyan-600 disabled:cursor-not-allowed disabled:opacity-35"
+                variant="secondary"
+                size="sm"
+                className="hover:!border-cyan-200 hover:!text-cyan-600"
             >
-                Next <ChevronRight size={14} />
-            </button>
+                Next <ChevronRight size={14} className="ml-1" />
+            </AppButton>
         </div>
     );
 }
@@ -5001,7 +5012,7 @@ export default function DashboardKepalaDinas() {
         setLoadError("");
 
         try {
-            const token = localStorage.getItem("token") || sessionStorage.getItem("sme_tab_token");
+            const token = getAuthToken();
             const tokenPayload = getTokenPayload() || {};
             const currentUserId = getCurrentUserIdFromToken();
 

@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function AuthSplit({ children, rightContent }) {
   return (
     <div className="min-h-screen flex">
@@ -16,4 +17,9 @@ export default function AuthSplit({ children, rightContent }) {
     </div>
   );
 }
+
+AuthSplit.propTypes = {
+  children: PropTypes.node,
+  rightContent: PropTypes.node,
+};
 

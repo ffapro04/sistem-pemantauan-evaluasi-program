@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
@@ -89,5 +89,16 @@ function FormDropdown({
         </div>
     );
 }
+
+FormDropdown.propTypes = {
+    label: PropTypes.node,
+    items: PropTypes.array,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onSelect: PropTypes.func,
+    placeholder: PropTypes.node,
+    icon: PropTypes.elementType,
+    getKey: PropTypes.func,
+    getLabel: PropTypes.func,
+};
 
 export default FormDropdown;

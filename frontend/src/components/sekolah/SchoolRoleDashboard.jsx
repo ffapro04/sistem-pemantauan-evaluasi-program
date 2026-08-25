@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
+import { getAuthToken } from "../../utils/authSession";
 import {
     AlertCircle,
     BarChart3,
@@ -29,8 +30,7 @@ import SafeResponsiveContainer from "../charts/SafeResponsiveContainer";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
 import { notify } from "../../utils/popup";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const PROGRAM_STAGES = [
     "Approval",
@@ -75,7 +75,7 @@ const normalizeText = (value) =>
         .replaceAll(" ", "_");
 
 const getTokenPayload = () => {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return null;
 
     try {
@@ -327,11 +327,11 @@ function SolidPieCard({ eyebrow, title, subtitle, rows, totalLabel = "Total Data
                             </PieChart>
                         </SafeResponsiveContainer>
 
-                        <div className="mx-auto -mt-1 flex max-w-[190px] items-center justify-between rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-2.5">
-                            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-[#0AC4E0]">
+                        <div className="mx-auto -mt-1 flex max-w-[190px] items-center justify-between gap-2 rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-2.5">
+                            <span className="min-w-0 flex-1 truncate text-[9px] font-black uppercase tracking-[0.14em] text-[#0AC4E0]">
                                 {totalLabel}
                             </span>
-                            <span className="text-lg font-black text-slate-950">{total}</span>
+                            <span className="shrink-0 text-lg font-black text-slate-950">{total}</span>
                         </div>
                     </div>
 
@@ -601,9 +601,9 @@ function HeadSchoolExecutiveView({
             title="Dashboard"
             highlight="Kepala Sekolah"
             subtitle="Ringkasan strategis program dan assessment sekolah."
-            contentClassName="bg-[#F8FBFF]"
+            contentClassName="bg-[#EEF5FF]"
         >
-            <div className="h-full overflow-y-auto bg-[#F8FBFF] p-3 text-slate-900 no-scrollbar lg:overflow-hidden md:p-4">
+            <div className="h-full overflow-y-auto bg-[#EEF5FF] p-3 text-slate-900 no-scrollbar lg:overflow-hidden md:p-4">
                 <div className="flex min-h-full flex-col gap-3 lg:h-full lg:min-h-0">
                     <section className="relative shrink-0 overflow-hidden rounded-[1.7rem] border border-slate-100 bg-white px-4 py-3.5 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
                         <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#0AC4E0]/12 blur-3xl" />
@@ -784,7 +784,7 @@ function HeadSchoolExecutiveView({
                                 </div>
                             </section>
 
-                            <section className="min-h-0 rounded-[1.55rem] border border-slate-100 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
+                            <section className="min-h-0 overflow-hidden rounded-[1.55rem] border border-slate-100 bg-white p-4 shadow-[0_14px_36px_rgba(15,23,42,0.04)]">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">
@@ -888,7 +888,7 @@ export default function SchoolRoleDashboard({ mode = "auto" }) {
             return;
         }
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         setLoading(true);
@@ -1181,7 +1181,7 @@ export default function SchoolRoleDashboard({ mode = "auto" }) {
                 { jumlah_siswa: value },
                 {
                     headers: {
-                        Authorization: `Bearer ${localStorage.getItem("token")}`,
+                        Authorization: `Bearer ${getAuthToken()}`,
                     },
                 },
             );
@@ -1222,9 +1222,9 @@ export default function SchoolRoleDashboard({ mode = "auto" }) {
             title="Dashboard"
             highlight={roleLabel}
             subtitle={roleSubtitle}
-            contentClassName="bg-[#F8FBFF]"
+            contentClassName="bg-[#EEF5FF]"
         >
-            <div className="h-full overflow-y-auto bg-[#F8FBFF] p-4 text-slate-900 no-scrollbar md:p-6">
+            <div className="h-full overflow-y-auto bg-[#EEF5FF] p-4 text-slate-900 no-scrollbar md:p-6">
                 <div className="space-y-4">
                     <section className="relative overflow-hidden rounded-[1.7rem] border border-slate-100 bg-white p-4 shadow-[0_18px_48px_rgba(15,23,42,0.05)]">
                         <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#0AC4E0]/10 blur-3xl" />

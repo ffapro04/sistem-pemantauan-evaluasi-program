@@ -1,7 +1,7 @@
 ﻿// src/components/masterCrud/MasterReadPage.jsx
 
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -282,6 +282,14 @@ const MasterRowActions = ({
             </div>
         </div>
     );
+};
+
+MasterRowActions.propTypes = {
+    row: PropTypes.object.isRequired,
+    config: PropTypes.object.isRequired,
+    navigate: PropTypes.func,
+    onDelete: PropTypes.func,
+    onToggleStatus: PropTypes.func,
 };
 
 export default function MasterReadPage({ config }) {
@@ -1096,3 +1104,7 @@ export default function MasterReadPage({ config }) {
         </MasterPageShell>
     );
 }
+
+MasterReadPage.propTypes = {
+    config: PropTypes.object.isRequired,
+};

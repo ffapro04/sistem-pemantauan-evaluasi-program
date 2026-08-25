@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import Card from "./Card";
 
 function FormSection({ icon, title, children, className = "" }) {
@@ -22,5 +22,12 @@ function FormSection({ icon, title, children, className = "" }) {
     </Card>
   );
 }
+
+FormSection.propTypes = {
+  icon: PropTypes.node,
+  title: PropTypes.node,
+  children: PropTypes.node,
+  className: PropTypes.string,
+};
 
 export default FormSection;

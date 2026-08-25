@@ -12,11 +12,8 @@ import { useUiAutoTranslate } from "../../i18n/localUiTranslator";
 import { showConfirmDialog } from "../../utils/popup";
 import { GoogleDriveLogo } from "../../components/ui";
 
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../../config/apiBase.js";
+import { getAuthToken } from "../../utils/authSession";
 
 const ROLE_LABELS = {
     1: "Admin",
@@ -44,13 +41,6 @@ const ROLE_IDS = {
     KEPALA_SEKOLAH: 10,
 };
 
-const PENGURUS_POSITION_ORDER = {
-    "ketua pengurus": 1,
-    sekretaris: 2,
-    bendahara: 3,
-    "anggota pengurus": 4,
-};
-
 function normalizeArray(payload) {
     if (Array.isArray(payload)) return payload;
 
@@ -73,7 +63,7 @@ function normalizeArray(payload) {
 }
 
 function getTokenPayload() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return null;
 
     try {
@@ -267,245 +257,6 @@ function formatDateTime(value) {
     }
 }
 
-function getRelationPanelType(user = {}) {
-    const roleId = getRoleId(user);
-
-    if (roleId === ROLE_IDS.PENGURUS || roleId === ROLE_IDS.HO) return "team";
-    if (roleId === ROLE_IDS.AO) return "wilayah";
-
-    return null;
-}
-
-function getPengurusPositionKey(user = {}) {
-    const key = getJabatanKey(user);
-
-    if (key.includes("ketua")) return "ketua pengurus";
-    if (key.includes("sekretaris")) return "sekretaris";
-    if (key.includes("bendahara")) return "bendahara";
-    if (key.includes("anggota")) return "anggota pengurus";
-
-    return "";
-}
-
-function getHoFocusKey(user = {}) {
-    const combined = normalKey(
-        [getJenis(user), getSubJenis(user), getJabatan(user), user?.bidang, user?.kategori]
-            .filter(Boolean)
-            .join(" "),
-    );
-
-    if (!combined) return "";
-
-    if (combined.includes("non akademik")) {
-        if (combined.includes("seni")) return "non-akademik-seni-budaya";
-        if (combined.includes("kecakapan")) return "non-akademik-kecakapan-hidup";
-        return "non-akademik";
-    }
-
-    if (combined.includes("smk")) return "akademik-smk";
-    if (combined.includes("sd") || combined.includes("smp")) return "akademik-sd-smp";
-    if (combined.includes("akademik")) return "akademik";
-
-    return getSubJenisKey(user) || getJenisKey(user) || getJabatanKey(user);
-}
-
-function getHoFocusLabel(user = {}) {
-    const focusKey = getHoFocusKey(user);
-
-    const labels = {
-        "akademik-smk": "HO Akademik SMK",
-        "akademik-sd-smp": "HO Akademik SD/SMP",
-        akademik: "HO Akademik",
-        "non-akademik-seni-budaya": "HO Seni Budaya",
-        "non-akademik-kecakapan-hidup": "HO Kecakapan Hidup",
-        "non-akademik": "HO Non Akademik",
-    };
-
-    return labels[focusKey] || "Fokus HO";
-}
-
-function getTeamRelation(currentUser = {}, targetUser = {}) {
-    const currentRole = getRoleId(currentUser);
-    const targetRole = getRoleId(targetUser);
-
-    if (!currentRole || !targetRole || currentRole !== targetRole) return null;
-
-    if (currentRole === ROLE_IDS.PENGURUS) {
-        const positionKey = getPengurusPositionKey(targetUser);
-        return positionKey ? titleCase(positionKey) : null;
-    }
-
-    if (currentRole === ROLE_IDS.HO) {
-        const currentFocus = getHoFocusKey(currentUser);
-        const targetFocus = getHoFocusKey(targetUser);
-
-        if (!currentFocus || !targetFocus || currentFocus !== targetFocus) return null;
-        return getHoFocusLabel(targetUser);
-    }
-
-    return null;
-}
-
-function sortTeamMembers(currentId = "") {
-    return (a, b) => {
-        const aCurrent = String(getUserId(a.user) || "") === currentId ? -1 : 0;
-        const bCurrent = String(getUserId(b.user) || "") === currentId ? -1 : 0;
-        if (aCurrent !== bCurrent) return aCurrent - bCurrent;
-
-        const aRole = getRoleId(a.user);
-        const bRole = getRoleId(b.user);
-
-        if (aRole === ROLE_IDS.PENGURUS || bRole === ROLE_IDS.PENGURUS) {
-            const aPriority = PENGURUS_POSITION_ORDER[getPengurusPositionKey(a.user)] || 99;
-            const bPriority = PENGURUS_POSITION_ORDER[getPengurusPositionKey(b.user)] || 99;
-            if (aPriority !== bPriority) return aPriority - bPriority;
-        }
-
-        return getUserName(a.user).localeCompare(getUserName(b.user));
-    };
-}
-
-function normalizeWilayahItem(value = {}) {
-    if (!value) return null;
-
-    if (typeof value === "string") {
-        const name = value.trim();
-        return name ? { name, detail: "Wilayah terhubung" } : null;
-    }
-
-    const name =
-        value?.nama_wilayah ||
-        value?.namaWilayah ||
-        value?.wilayah ||
-        value?.nama_provinsi ||
-        value?.provinsi ||
-        value?.nama_kabupaten ||
-        value?.kabupaten ||
-        value?.name ||
-        "";
-
-    const detail = [
-        value?.kode_wilayah || value?.kodeWilayah,
-        value?.nama_provinsi || value?.provinsi,
-        value?.nama_kabupaten || value?.kabupaten,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-
-    if (!String(name).trim()) return null;
-
-    return {
-        name: String(name).trim(),
-        detail: detail || "Wilayah terhubung",
-    };
-}
-
-function getAoWilayahItems(user = {}) {
-    const rawCollections = [
-        user?.wilayahs,
-        user?.wilayah_list,
-        user?.wilayahList,
-        user?.areas,
-        user?.area_list,
-        user?.areaList,
-    ];
-
-    const fromCollections = rawCollections
-        .flatMap((item) => (Array.isArray(item) ? item : []))
-        .map(normalizeWilayahItem)
-        .filter(Boolean);
-
-    const directItems = [
-        user?.wilayah,
-        user?.area,
-        user?.region,
-        {
-            nama_wilayah: user?.nama_wilayah,
-            kode_wilayah: user?.kode_wilayah,
-            nama_provinsi: user?.nama_provinsi,
-            nama_kabupaten: user?.nama_kabupaten,
-        },
-    ]
-        .map(normalizeWilayahItem)
-        .filter(Boolean);
-
-    const seen = new Set();
-
-    return [...fromCollections, ...directItems].filter((item) => {
-        const key = normalKey(`${item.name} ${item.detail}`);
-        if (!key || seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
-}
-
-function getRelationPanelMeta(user = {}) {
-    const panelType = getRelationPanelType(user);
-
-    if (panelType === "wilayah") {
-        return {
-            title: "Wilayah",
-            desc: "Wilayah binaan yang sudah diatur untuk akun Area Officer ini.",
-            countLabel: "Wilayah",
-            loadingLabel: "Memuat wilayah terkait",
-            emptyTitle: "Belum ada wilayah terkait.",
-            emptyDesc: "Pastikan data wilayah Area Officer sudah diatur dari master user.",
-        };
-    }
-
-    return {
-        title: "Teams",
-        desc: getRoleId(user) === ROLE_IDS.PENGURUS
-            ? "Menampilkan struktur pengurus: ketua, sekretaris, bendahara, dan anggota pengurus."
-            : "Menampilkan Head Office dengan fokus bidang yang sama.",
-        countLabel: "User",
-        loadingLabel: "Memuat team terkait",
-        emptyTitle: "Belum ada user terkait.",
-        emptyDesc: getRoleId(user) === ROLE_IDS.PENGURUS
-            ? "Pastikan jabatan pengurus sudah diisi sebagai ketua, sekretaris, bendahara, atau anggota pengurus."
-            : "Pastikan jenis dan sub jenis Head Office sudah terisi konsisten.",
-    };
-}
-
-function CyanWave() {
-    return (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[-1px]">
-            <svg
-                viewBox="0 0 1440 145"
-                xmlns="http://www.w3.org/2000/svg"
-                className="block h-[76px] w-full"
-                preserveAspectRatio="none"
-            >
-                <path
-                    d="M0 52C160 97 300 105 470 72C655 36 812 20 1000 55C1175 88 1297 103 1440 70V145H0V52Z"
-                    fill="#ffffff"
-                    opacity="0.32"
-                />
-                <path
-                    d="M0 77C170 116 330 111 505 88C710 60 865 62 1042 88C1210 112 1325 114 1440 92V145H0V77Z"
-                    fill="#ffffff"
-                    opacity="0.62"
-                />
-                <path
-                    d="M0 104C185 133 342 129 526 109C730 88 902 91 1090 110C1250 126 1354 122 1440 107V145H0V104Z"
-                    fill="#ffffff"
-                />
-            </svg>
-        </div>
-    );
-}
-
-function HeroDecor() {
-    return (
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-            <div className="absolute -left-44 -top-44 h-[390px] w-[390px] rounded-full bg-white/12" />
-            <div className="absolute right-[-160px] top-[-220px] h-[540px] w-[540px] rounded-full bg-white/10" />
-            <div className="absolute bottom-[72px] left-[-10%] h-[2px] w-[120%] rotate-[3deg] bg-white/24" />
-            <div className="absolute bottom-[104px] left-0 h-[2px] w-[120%] -rotate-[2deg] bg-white/32" />
-        </div>
-    );
-}
-
 function Field({ label, value, type = "text", disabled = false }) {
     return (
         <div className="min-w-0">
@@ -556,28 +307,13 @@ function InputField({
     );
 }
 
-function SectionTitle({ children, desc }) {
-    return (
-        <div className="mb-4">
-            <h2 className="text-[23px] font-black leading-tight tracking-[-0.055em] text-[#020617]">
-                {children}
-            </h2>
-            {desc && (
-                <p className="mt-1 max-w-2xl text-[13px] font-semibold leading-6 text-[#64748B]">
-                    {desc}
-                </p>
-            )}
-        </div>
-    );
-}
-
 function Avatar({ user, name, size = "md", rounded = "rounded-full" }) {
     const [imageError, setImageError] = useState(false);
     const avatarUrl = getAvatarUrl(user);
 
     const sizeClass =
         size === "lg"
-            ? "h-[128px] w-[128px] text-[50px]"
+            ? "h-[72px] w-[72px] text-[26px]"
             : "h-10 w-10 text-sm";
 
     return (
@@ -598,43 +334,6 @@ function Avatar({ user, name, size = "md", rounded = "rounded-full" }) {
     );
 }
 
-function TeamMemberRow({ member, current = false, relation = "" }) {
-    const name = getUserName(member);
-    const jabatan = getJabatan(member);
-    const email = getUserEmail(member);
-    const jenis = getJenisLabel(member);
-    const subJenis = getSubJenisLabel(member);
-
-    return (
-        <div className="flex items-center gap-3 rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-3.5 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#0AC4E0]/5">
-            <Avatar user={member} name={name} />
-
-            <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                    <p className="truncate text-[13px] font-black text-[#020617]">{name}</p>
-                    {current && (
-                        <span className="shrink-0 rounded-full bg-[#0AC4E0] px-2 py-0.5 text-[8px] font-black uppercase tracking-wider text-white">
-                            Anda
-                        </span>
-                    )}
-                </div>
-                <p className="mt-0.5 truncate text-[11px] font-bold text-[#64748B]">
-                    {jabatan}
-                </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-[#94A3B8]">
-                    {jenis} · {subJenis} · {email}
-                </p>
-            </div>
-
-            {relation && (
-                <span className="shrink-0 rounded-full border border-[#0AC4E0]/18 bg-[#0AC4E0]/5 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#0899B0]">
-                    {relation}
-                </span>
-            )}
-        </div>
-    );
-}
-
 function AccountSettings() {
     useUiAutoTranslate();
 
@@ -643,7 +342,6 @@ function AccountSettings() {
 
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [loadingDrive, setLoadingDrive] = useState(true);
-    const [loadingTeam, setLoadingTeam] = useState(true);
     const [connecting, setConnecting] = useState(false);
     const [disconnecting, setDisconnecting] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -659,10 +357,9 @@ function AccountSettings() {
     });
     const photoInputRef = useRef(null);
 
-    const token = useMemo(() => localStorage.getItem("token"), []);
+    const token = useMemo(() => getAuthToken(), []);
     const tokenUser = useMemo(() => getTokenPayload() || {}, []);
     const [profile, setProfile] = useState(tokenUser);
-    const [teamMembers, setTeamMembers] = useState([]);
 
     const [driveStatus, setDriveStatus] = useState({
         connected: false,
@@ -724,82 +421,16 @@ function AccountSettings() {
         };
     }, [photoPreviewUrl]);
 
-    const loadTeamMembers = useCallback(
-        async (effectiveProfile) => {
-            if (!checkAuth()) return;
-
-            const relationPanelType = getRelationPanelType(effectiveProfile);
-
-            if (relationPanelType !== "team") {
-                setTeamMembers([]);
-                setLoadingTeam(false);
-                return;
-            }
-
-            setLoadingTeam(true);
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/users`, {
-                    method: "GET",
-                    headers: authHeaders,
-                });
-
-                const payload = await response.json().catch(() => ({}));
-                const users = normalizeArray(payload);
-
-                if (!response.ok || users.length === 0) {
-                    setTeamMembers([]);
-                    return;
-                }
-
-                const currentId = String(getUserId(effectiveProfile) || "");
-                const currentFromUsers =
-                    users.find((user) => String(getUserId(user) || "") === currentId) || null;
-
-                const finalProfile = {
-                    ...effectiveProfile,
-                    ...(currentFromUsers || {}),
-                };
-
-                if (currentFromUsers) {
-                    setProfile((previous) => ({
-                        ...previous,
-                        ...currentFromUsers,
-                    }));
-                }
-
-                const relatedUsers = users
-                    .filter((user) => isActiveUser(user))
-                    .map((user) => ({
-                        user,
-                        relation: getTeamRelation(finalProfile, user),
-                    }))
-                    .filter((item) => item.relation)
-                    .sort(sortTeamMembers(currentId));
-
-                setTeamMembers(relatedUsers);
-            } catch {
-                setTeamMembers([]);
-            } finally {
-                setLoadingTeam(false);
-            }
-        },
-        [authHeaders, checkAuth],
-    );
-
     const fetchProfile = useCallback(async () => {
         if (!checkAuth()) return;
 
         const idUser = getUserId(tokenUser);
         if (!idUser) {
             setLoadingProfile(false);
-            await loadTeamMembers(tokenUser);
             return;
         }
 
         setLoadingProfile(true);
-
-        let effectiveProfile = tokenUser;
 
         try {
             const response = await fetch(`${API_BASE_URL}/users/${idUser}`, {
@@ -810,21 +441,19 @@ function AccountSettings() {
             const payload = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                effectiveProfile = {
+                setProfile({
                     ...tokenUser,
                     ...(payload?.data || payload || {}),
-                };
+                });
+            } else {
+                setProfile(tokenUser);
             }
-
-            setProfile(effectiveProfile);
         } catch {
             setProfile(tokenUser);
-            effectiveProfile = tokenUser;
         } finally {
             setLoadingProfile(false);
-            await loadTeamMembers(effectiveProfile);
         }
-    }, [authHeaders, checkAuth, loadTeamMembers, tokenUser]);
+    }, [authHeaders, checkAuth, tokenUser]);
 
     const fetchDriveStatus = useCallback(
         async ({ silent = false } = {}) => {
@@ -1101,11 +730,6 @@ function AccountSettings() {
             clearPhotoPreview();
             setProfileForm(buildProfileForm(updatedUser));
 
-            await loadTeamMembers({
-                ...profile,
-                ...updatedUser,
-            });
-
             window.dispatchEvent(new Event("user-profile-updated"));
             window.dispatchEvent(new Event("agenda-notification-refresh"));
 
@@ -1125,274 +749,193 @@ function AccountSettings() {
     const subJenisLabel = getSubJenisLabel(profile);
     const connected = Boolean(driveStatus.connected);
     const connectedAtLabel = formatDateTime(driveStatus?.connected_at);
-    const relationPanelType = getRelationPanelType(profile);
-    const relationPanelMeta = getRelationPanelMeta(profile);
-    const showRelationPanel = Boolean(relationPanelType);
-    const aoWilayahItems = getAoWilayahItems(profile);
-    const visibleTeamMembers = teamMembers.slice(0, 4);
-    const hiddenTeamCount = Math.max(teamMembers.length - visibleTeamMembers.length, 0);
 
     return (
         <div className="flex h-screen overflow-hidden bg-[#EEF5FF] font-sans text-[#020617] selection:bg-cyan-400 selection:text-white">
             <Sidebar />
 
-            <main className="h-screen min-w-0 flex-1 overflow-hidden px-8 py-7">
-                <div className="grid h-full grid-cols-[1.55fr_0.72fr] gap-7">
-                    <div className="min-h-0">
-                        <div className="relative h-full overflow-hidden rounded-[2rem] border border-[#0AC4E0]/15 bg-white shadow-[0_30px_90px_rgba(10,196,224,0.14)]">
-                            <div className="relative h-[128px] overflow-hidden bg-[#0AC4E0]">
-                                <HeroDecor />
-                                <CyanWave />
+            <main className="h-screen min-w-0 flex-1 overflow-y-auto px-8 py-7">
+                <div className="mx-auto flex max-w-[920px] flex-col">
+                    <div className="flex items-start justify-between gap-4 pb-7">
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#0AC4E0]">
+                                Akun Saya
+                            </p>
+                            <h1 className="mt-1.5 text-[26px] font-black tracking-[-0.03em] text-[#020617]">
+                                Pengaturan Akun
+                            </h1>
+                        </div>
+                        <LanguageSwitcher compact />
+                    </div>
+
+                    {/* Profil */}
+                    <div className="grid grid-cols-[220px_1fr] gap-10 border-t border-[#0AC4E0]/15 py-7">
+                        <div>
+                            <p className="text-[14px] font-black text-[#020617]">Profil</p>
+                            <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-[#94A3B8]">
+                                Foto dan identitas yang tampil di seluruh sistem.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-5 rounded-[1.7rem] border border-[#0AC4E0]/15 bg-white px-6 py-5 shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
+                            <div className="flex min-w-0 items-center gap-4">
+                                <div className="relative shrink-0">
+                                    <div className="flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-[1.3rem] bg-[#0AC4E0]/10 text-[26px] font-black text-[#0899B0]">
+                                        {loadingProfile ? (
+                                            <Loader2 size={22} className="animate-spin text-[#0AC4E0]" />
+                                        ) : (
+                                            <Avatar
+                                                user={photoPreviewUrl ? { ...profile, foto_profile: photoPreviewUrl } : profile}
+                                                name={displayName}
+                                                size="lg"
+                                                rounded="rounded-[1.3rem]"
+                                            />
+                                        )}
+                                    </div>
+
+                                    <input
+                                        ref={photoInputRef}
+                                        type="file"
+                                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                                        className="hidden"
+                                        onChange={handlePhotoChange}
+                                    />
+
+                                    <button
+                                        type="button"
+                                        onClick={handlePhotoButtonClick}
+                                        disabled={uploadingPhoto || loadingProfile}
+                                        className="absolute -bottom-1.5 -right-1.5 flex h-7 w-7 items-center justify-center rounded-[0.6rem] border-[3px] border-white bg-[#0AC4E0] text-white shadow-lg transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-70"
+                                        title="Ganti foto profil"
+                                    >
+                                        {uploadingPhoto ? (
+                                            <Loader2 size={11} className="animate-spin" />
+                                        ) : (
+                                            <Camera size={11} />
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                        <p className="truncate text-[17px] font-black tracking-[-0.02em] text-[#020617]">
+                                            {displayName}
+                                        </p>
+                                        <span className="shrink-0 rounded-full border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.1em] text-[#0899B0]">
+                                            {roleLabel}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 truncate text-[12px] font-semibold text-[#64748B]">
+                                        {jabatan} · {jenisLabel} · {subJenisLabel}
+                                    </p>
+                                </div>
                             </div>
 
-                            <div className="px-8 pb-7">
-                                <div className="-mt-[46px] flex items-start justify-between gap-6">
-                                    <div className="flex min-w-0 items-start gap-6">
-                                        <div className="relative shrink-0">
-                                            <div className="flex h-[128px] w-[128px] items-center justify-center overflow-hidden rounded-[2rem] border-[7px] border-white bg-[#0AC4E0]/10 text-[50px] font-black text-[#0899B0] shadow-[0_22px_60px_rgba(10,196,224,0.20)]">
-                                                {loadingProfile ? (
-                                                    <Loader2 size={32} className="animate-spin text-[#0AC4E0]" />
-                                                ) : (
-                                                    <Avatar
-                                                        user={photoPreviewUrl ? { ...profile, foto_profile: photoPreviewUrl } : profile}
-                                                        name={displayName}
-                                                        size="lg"
-                                                        rounded="rounded-[1.55rem]"
-                                                    />
-                                                )}
-                                            </div>
+                            <button
+                                type="button"
+                                onClick={isEditingProfile ? handleCancelProfile : handleEditProfile}
+                                disabled={savingProfile || loadingProfile}
+                                className={`inline-flex h-9 shrink-0 items-center gap-2 rounded-full px-4 text-[11px] font-black uppercase tracking-[0.08em] transition disabled:cursor-not-allowed disabled:opacity-70 ${isEditingProfile
+                                    ? "border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                                    : "border border-[#0AC4E0]/20 bg-white text-[#0899B0] hover:bg-[#0AC4E0]/5"
+                                    }`}
+                            >
+                                {isEditingProfile ? <X size={12} /> : <Pencil size={12} />}
+                                {isEditingProfile ? "Batal" : "Edit Profil"}
+                            </button>
+                        </div>
+                    </div>
 
-                                            <input
-                                                ref={photoInputRef}
-                                                type="file"
-                                                accept="image/jpeg,image/jpg,image/png,image/webp"
-                                                className="hidden"
-                                                onChange={handlePhotoChange}
-                                            />
+                    {/* Informasi Login */}
+                    <div className="grid grid-cols-[220px_1fr] gap-10 border-t border-[#0AC4E0]/15 py-7">
+                        <div>
+                            <p className="text-[14px] font-black text-[#020617]">Informasi Login</p>
+                            <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-[#94A3B8]">
+                                Nama, email, dan password dikelola secara mandiri.
+                            </p>
+                        </div>
 
-                                            <button
-                                                type="button"
-                                                onClick={handlePhotoButtonClick}
-                                                disabled={uploadingPhoto || loadingProfile}
-                                                className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-[0.9rem] border-4 border-white bg-[#0AC4E0] text-white shadow-lg transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-70"
-                                                title="Ganti foto profil"
-                                            >
-                                                {uploadingPhoto ? (
-                                                    <Loader2 size={14} className="animate-spin" />
-                                                ) : (
-                                                    <Camera size={14} />
-                                                )}
-                                            </button>
-                                        </div>
+                        <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
+                            <div className="grid grid-cols-2 gap-4">
+                                <InputField
+                                    label="Nama"
+                                    value={profileForm.nama}
+                                    onChange={handleProfileInputChange("nama")}
+                                    disabled={!isEditingProfile || savingProfile}
+                                    placeholder="Masukkan nama"
+                                    autoComplete="name"
+                                />
+                                <InputField
+                                    label="Email"
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={handleProfileInputChange("email")}
+                                    disabled={!isEditingProfile || savingProfile}
+                                    placeholder="nama@gmail.com"
+                                    autoComplete="email"
+                                />
+                            </div>
 
-                                        <div className="min-w-0 pt-[62px]">
-                                            <div className="flex flex-wrap items-center gap-3">
-                                                <h2 className="truncate text-[40px] font-black leading-none tracking-[-0.07em] text-[#020617]">
-                                                    {displayName}
-                                                </h2>
+                            <div className="mt-4 grid grid-cols-2 gap-4">
+                                <InputField
+                                    label="Password Baru"
+                                    type="password"
+                                    value={profileForm.password}
+                                    onChange={handleProfileInputChange("password")}
+                                    disabled={!isEditingProfile || savingProfile}
+                                    placeholder="Kosongkan jika tidak diganti"
+                                    autoComplete="new-password"
+                                />
+                                <InputField
+                                    label="Konfirmasi Password"
+                                    type="password"
+                                    value={profileForm.password_confirmation}
+                                    onChange={handleProfileInputChange("password_confirmation")}
+                                    disabled={!isEditingProfile || savingProfile}
+                                    placeholder="Ulangi password baru"
+                                    autoComplete="new-password"
+                                />
+                            </div>
 
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#0AC4E0]/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-[#0899B0]">
-                                                    {roleLabel}
-                                                </span>
-                                            </div>
+                            <div className="mt-4 rounded-[1.15rem] border border-[#0AC4E0]/16 bg-[#0AC4E0]/5 px-4 py-3 text-[13px] font-semibold leading-6 text-[#64748B]">
+                                Admin hanya menerima notifikasi perubahan, bukan isi password.
+                            </div>
 
-                                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                <span className="rounded-full border border-[#0AC4E0]/15 bg-white px-4 py-2 text-[12px] font-black text-[#64748B] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
-                                                    {displayEmail}
-                                                </span>
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-[#0AC4E0]/5 px-4 py-2 text-[12px] font-black text-[#0899B0] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
-                                                    {jabatan}
-                                                </span>
-                                                <span className="rounded-full border border-[#0AC4E0]/20 bg-white px-4 py-2 text-[12px] font-black text-[#0899B0] shadow-[0_10px_30px_rgba(10,196,224,0.06)]">
-                                                    {jenisLabel} · {subJenisLabel}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
+                            <div className="mt-5 flex justify-end gap-3">
+                                {isEditingProfile && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCancelProfile}
+                                        disabled={savingProfile}
+                                        className="h-10 rounded-full border border-slate-200 bg-white px-5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 transition hover:bg-slate-50 disabled:opacity-60"
+                                    >
+                                        Batal
+                                    </button>
+                                )}
 
-                                    <div className="mt-[74px] flex shrink-0 items-center gap-3">
-                                        <LanguageSwitcher compact />
-
-                                        <button
-                                            type="button"
-                                            onClick={isEditingProfile ? handleCancelProfile : handleEditProfile}
-                                            disabled={savingProfile || loadingProfile}
-                                            className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-7 text-[12px] font-black uppercase tracking-[0.16em] text-white shadow-[0_16px_45px_rgba(10,196,224,0.24)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70 ${isEditingProfile ? "bg-slate-500 hover:bg-slate-600" : "bg-[#0AC4E0] hover:bg-[#08B7D1]"}`}
-                                        >
-                                            {isEditingProfile ? <X size={14} /> : <Pencil size={14} />}
-                                            {isEditingProfile ? "Batal" : "Edit Profil"}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className={`mt-6 grid gap-7 ${showRelationPanel ? "grid-cols-[1fr_0.92fr]" : "grid-cols-1"}`}>
-                                    <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-white shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
-                                        <div className="border-b border-[#0AC4E0]/15 px-6 py-4">
-                                            <SectionTitle desc="Nama, email, dan password login sistem dikelola dari panel ini.">
-                                                Informasi Login
-                                            </SectionTitle>
-                                        </div>
-
-                                        <div className="space-y-4 px-6 py-5">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField
-                                                    label="Nama"
-                                                    value={profileForm.nama}
-                                                    onChange={handleProfileInputChange("nama")}
-                                                    disabled={!isEditingProfile || savingProfile}
-                                                    placeholder="Masukkan nama"
-                                                    autoComplete="name"
-                                                />
-                                                <InputField
-                                                    label="Email"
-                                                    type="email"
-                                                    value={profileForm.email}
-                                                    onChange={handleProfileInputChange("email")}
-                                                    disabled={!isEditingProfile || savingProfile}
-                                                    placeholder="nama@gmail.com"
-                                                    autoComplete="email"
-                                                />
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <InputField
-                                                    label="Password Baru"
-                                                    type="password"
-                                                    value={profileForm.password}
-                                                    onChange={handleProfileInputChange("password")}
-                                                    disabled={!isEditingProfile || savingProfile}
-                                                    placeholder="Kosongkan jika tidak diganti"
-                                                    autoComplete="new-password"
-                                                />
-                                                <InputField
-                                                    label="Konfirmasi Password"
-                                                    type="password"
-                                                    value={profileForm.password_confirmation}
-                                                    onChange={handleProfileInputChange("password_confirmation")}
-                                                    disabled={!isEditingProfile || savingProfile}
-                                                    placeholder="Ulangi password baru"
-                                                    autoComplete="new-password"
-                                                />
-                                            </div>
-
-                                            <div className="rounded-[1.15rem] border border-[#0AC4E0]/16 bg-[#0AC4E0]/5 px-4 py-3 text-[13px] font-semibold leading-6 text-[#64748B]">
-                                                User dapat mengubah nama, email, password, dan foto profil secara mandiri. Admin hanya menerima notifikasi perubahan, bukan isi password.
-                                            </div>
-
-                                            <div className="flex justify-end gap-3">
-                                                {isEditingProfile && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleCancelProfile}
-                                                        disabled={savingProfile}
-                                                        className="h-10 rounded-full border border-slate-200 bg-white px-5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500 transition hover:bg-slate-50 disabled:opacity-60"
-                                                    >
-                                                        Batal
-                                                    </button>
-                                                )}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={handleSaveProfile}
-                                                    disabled={!isEditingProfile || savingProfile || loadingProfile}
-                                                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-60"
-                                                >
-                                                    {savingProfile ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                                                    {savingProfile ? "Menyimpan" : "Simpan Perubahan"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {showRelationPanel && (
-                                        <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
-                                            <div className="border-b border-[#0AC4E0]/15 px-6 py-4">
-                                                <div className="flex items-start justify-between gap-4">
-                                                    <SectionTitle desc={relationPanelMeta.desc}>
-                                                        {relationPanelMeta.title}
-                                                    </SectionTitle>
-
-                                                    <span className="mt-1 shrink-0 rounded-full border border-[#0AC4E0]/18 bg-white px-3 py-1.5 text-[10px] font-black text-[#0899B0]">
-                                                        {relationPanelType === "wilayah"
-                                                            ? `${aoWilayahItems.length} ${relationPanelMeta.countLabel}`
-                                                            : `${loadingTeam ? "..." : teamMembers.length} ${relationPanelMeta.countLabel}`}
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-3 px-6 py-5">
-                                                {relationPanelType === "wilayah" ? (
-                                                    aoWilayahItems.length > 0 ? (
-                                                        aoWilayahItems.map((item) => (
-                                                            <div
-                                                                key={`${item.name}-${item.detail}`}
-                                                                className="rounded-[1.15rem] border border-[#0AC4E0]/12 bg-white px-4 py-3 transition hover:border-[#0AC4E0]/25 hover:bg-[#0AC4E0]/5"
-                                                            >
-                                                                <p className="text-[13px] font-black text-[#020617]">
-                                                                    {item.name}
-                                                                </p>
-                                                                <p className="mt-1 text-[11px] font-semibold leading-5 text-[#94A3B8]">
-                                                                    {item.detail}
-                                                                </p>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white px-5 py-6 text-center">
-                                                            <p className="text-sm font-black text-[#020617]">
-                                                                {relationPanelMeta.emptyTitle}
-                                                            </p>
-                                                            <p className="mt-2 text-xs font-semibold leading-5 text-[#94A3B8]">
-                                                                {relationPanelMeta.emptyDesc}
-                                                            </p>
-                                                        </div>
-                                                    )
-                                                ) : loadingTeam ? (
-                                                    <div className="flex h-[198px] items-center justify-center rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white">
-                                                        <div className="flex items-center gap-3 text-sm font-black text-[#94A3B8]">
-                                                            <Loader2 size={18} className="animate-spin text-[#0AC4E0]" />
-                                                            {relationPanelMeta.loadingLabel}
-                                                        </div>
-                                                    </div>
-                                                ) : visibleTeamMembers.length > 0 ? (
-                                                    <>
-                                                        {visibleTeamMembers.map((item) => (
-                                                            <TeamMemberRow
-                                                                key={getUserId(item.user) || getUserEmail(item.user)}
-                                                                member={item.user}
-                                                                relation={item.relation}
-                                                                current={
-                                                                    String(getUserId(item.user) || "") ===
-                                                                    String(getUserId(profile) || getUserId(tokenUser) || "")
-                                                                }
-                                                            />
-                                                        ))}
-
-                                                        {hiddenTeamCount > 0 && (
-                                                            <div className="rounded-[1.15rem] border border-[#0AC4E0]/15 bg-white px-4 py-3 text-center text-[12px] font-black text-[#94A3B8]">
-                                                                +{hiddenTeamCount} user lain dengan relasi team yang sama
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <div className="rounded-[1.25rem] border border-[#0AC4E0]/15 bg-white px-5 py-6 text-center">
-                                                        <p className="text-sm font-black text-[#020617]">
-                                                            {relationPanelMeta.emptyTitle}
-                                                        </p>
-                                                        <p className="mt-2 text-xs font-semibold leading-5 text-[#94A3B8]">
-                                                            {relationPanelMeta.emptyDesc}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleSaveProfile}
+                                    disabled={!isEditingProfile || savingProfile || loadingProfile}
+                                    className="inline-flex h-10 items-center gap-2 rounded-full bg-[#0AC4E0] px-5 text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {savingProfile ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                                    {savingProfile ? "Menyimpan" : "Simpan Perubahan"}
+                                </button>
                             </div>
                         </div>
                     </div>
 
-                    <aside className="grid min-h-0 grid-rows-[0.9fr_1.1fr] gap-7">
-                        <div className="rounded-[2rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
+                    {/* Penyimpanan Dokumen */}
+                    <div className="grid grid-cols-[220px_1fr] gap-10 border-t border-b border-[#0AC4E0]/15 py-7">
+                        <div>
+                            <p className="text-[14px] font-black text-[#020617]">Penyimpanan Dokumen</p>
+                            <p className="mt-1.5 text-[12px] font-medium leading-relaxed text-[#94A3B8]">
+                                Dipakai saat mengunggah MOU, bukti termin, dan bukti kegiatan.
+                            </p>
+                        </div>
+
+                        <div className="rounded-[1.7rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_18px_55px_rgba(10,196,224,0.07)]">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex min-w-0 items-start gap-3">
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[1rem] border border-[#0AC4E0]/15 bg-white shadow-[0_12px_30px_rgba(10,196,224,0.10)]">
@@ -1400,10 +943,8 @@ function AccountSettings() {
                                     </div>
 
                                     <div className="min-w-0">
-                                        <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#020617]">
-                                            Penyimpanan Dokumen
-                                        </h2>
-                                        <p className="mt-2 text-[13px] font-semibold leading-6 text-[#64748B]">
+                                        <p className="text-[15px] font-black text-[#020617]">Google Drive</p>
+                                        <p className="mt-1 text-[12px] font-semibold leading-5 text-[#64748B]">
                                             Dipakai ketika user mengunggah MOU, bukti termin, dan bukti kegiatan.
                                         </p>
                                     </div>
@@ -1419,10 +960,8 @@ function AccountSettings() {
                                 </span>
                             </div>
 
-                            <div className="mt-5 space-y-3">
-                                <Field label="Provider Penyimpanan" value="Google Drive" />
+                            <div className="mt-5 grid grid-cols-2 gap-3">
                                 <Field label="Email Penyimpanan" value={driveStatus.google_email} />
-                                <Field label="Nama Akun Penyimpanan" value={driveStatus.google_name} />
                                 <Field label="Waktu Tertaut" value={connectedAtLabel} />
                             </div>
 
@@ -1450,52 +989,14 @@ function AccountSettings() {
                                         type="button"
                                         onClick={handleConnectDrive}
                                         disabled={connecting}
-                                        className="h-11 flex-1 rounded-[1.05rem] bg-[#0AC4E0] text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#08B7D1] disabled:opacity-60"
+                                        className="h-11 flex-1 rounded-[1.05rem] bg-[#0AC4E0] text-[11px] font-black uppercase tracking-[0.14em] text-white transition hover:bg-[#0899B0] disabled:opacity-60"
                                     >
                                         {connecting ? "Menghubungkan" : "Tautkan Google Drive"}
                                     </button>
                                 )}
                             </div>
                         </div>
-
-                        <div className="rounded-[2rem] border border-[#0AC4E0]/15 bg-white p-6 shadow-[0_24px_70px_rgba(10,196,224,0.11)]">
-                            <h2 className="text-[23px] font-black tracking-[-0.055em] text-[#020617]">
-                                Cara Kerja Upload
-                            </h2>
-
-                            <div className="mt-5 space-y-3">
-                                {[
-                                    {
-                                        title: "Upload dari modul aktif",
-                                        desc: "User mengunggah file dari Program, Assessment, atau modul lain.",
-                                    },
-                                    {
-                                        title: "Sistem validasi tautan",
-                                        desc: "Jika belum tertaut, user diarahkan menautkan penyimpanan dokumen.",
-                                    },
-                                    {
-                                        title: "Riwayat tetap tercatat",
-                                        desc: "Metadata menyimpan user, role, modul, dan waktu upload.",
-                                    },
-                                ].map((item, index) => (
-                                    <div
-                                        key={item.title}
-                                        className="rounded-[1.35rem] border border-[#0AC4E0]/12 bg-[#0AC4E0]/5 px-4 py-3"
-                                    >
-                                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0AC4E0]">
-                                            Step 0{index + 1}
-                                        </p>
-                                        <p className="mt-1 text-[14px] font-black text-[#020617]">
-                                            {item.title}
-                                        </p>
-                                        <p className="mt-1 text-[12px] font-semibold leading-5 text-[#64748B]">
-                                            {item.desc}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </aside>
+                    </div>
                 </div>
             </main>
         </div>

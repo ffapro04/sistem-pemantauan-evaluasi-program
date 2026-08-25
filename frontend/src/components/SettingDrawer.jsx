@@ -1,12 +1,14 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React from "react";
+import PropTypes from "prop-types";
 import { X, ShieldCheck, ChevronRight } from "lucide-react";
 
 // Import komponen-komponen kecil yang sudah kamu buat
 import Profile from "./Profile";
 import Bahasa from "./Bahasa";
 import Notifikasi from "./Notifikasi";
+import AppButton from "./ui/AppButton";
+import AppIconButton from "./ui/AppIconButton";
 
 const SettingDrawer = ({ isOpen, onClose, user }) => {
   if (!isOpen) return null;
@@ -23,12 +25,15 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
       <div className="relative w-85 h-screen bg-white shadow-[-10px_0_30px_rgba(0,0,0,0.1)] flex flex-col animate-in slide-in-from-right duration-500 overflow-hidden">
         {/* HEADER: Profile Ringkas & Hak Akses */}
         <div className="p-8 bg-[#0AC4E0] text-white shrink-0 relative">
-          <button
+          <AppIconButton
+            icon={X}
+            iconSize={18}
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-all active:scale-90"
-          >
-            <X size={18} />
-          </button>
+            ariaLabel="Tutup"
+            size="auto"
+            variant="gray"
+            className="!absolute !top-6 !right-6 !rounded-xl !border-transparent !bg-white/10 !p-2 !text-white hover:!bg-white/20 hover:!text-white active:!scale-90"
+          />
 
           <div className="flex flex-col items-center mt-4">
             <div className="w-20 h-20 rounded-[2rem] bg-white flex items-center justify-center font-black text-[#0AC4E0] text-2xl border-4 border-white/20 shadow-2xl mb-4 uppercase">
@@ -70,12 +75,13 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
 
         {/* FOOTER: Simpan / Tutup */}
         <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-3 shrink-0">
-          <button
+          <AppButton
+            text="Simpan Perubahan"
             onClick={onClose}
-            className="w-full py-4 bg-[#0AC4E0] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-blue-900/10 hover:bg-[#0899B0] active:scale-95 transition-all"
-          >
-            Simpan Perubahan
-          </button>
+            variant="accent"
+            size="lg"
+            className="!w-full !py-4 !text-[10px] !tracking-[0.2em] !shadow-lg !shadow-blue-900/10 hover:!bg-[#0899B0]"
+          />
           <p className="text-center text-[8px] font-bold text-gray-300 uppercase tracking-[0.3em]">
             YPA-MDR System v2.0.4
           </p>
@@ -83,6 +89,15 @@ const SettingDrawer = ({ isOpen, onClose, user }) => {
       </div>
     </div>
   );
+};
+
+SettingDrawer.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  user: PropTypes.shape({
+    nama: PropTypes.string,
+    role: PropTypes.string,
+  }).isRequired,
 };
 
 export default SettingDrawer;

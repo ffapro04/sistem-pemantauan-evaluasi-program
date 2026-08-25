@@ -1,6 +1,6 @@
-/* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -27,10 +27,9 @@ import {
     Button,
 } from "../common";
 import { getAuthToken } from "../../utils/authSession";
-import { buildFileUrl } from "../../utils/fileUrl";
+import { buildFileUrl, resolveViewableFileUrl } from "../../utils/fileUrl";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const STATUS_STYLE = {
     APPROVED: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -162,6 +161,10 @@ function StatusBadge({ status }) {
     );
 }
 
+StatusBadge.propTypes = {
+    status: PropTypes.string,
+};
+
 function AOMetric({ label, value, tone = "cyan" }) {
     const toneClass =
         tone === "sky"
@@ -186,6 +189,12 @@ function AOMetric({ label, value, tone = "cyan" }) {
         </div>
     );
 }
+
+AOMetric.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    tone: PropTypes.oneOf(["cyan", "sky", "amber", "emerald", "red"]),
+};
 
 function AOProgramDetailPage({
     backPath = "/ao/program",
@@ -366,7 +375,7 @@ function AOProgramDetailPage({
         };
     }, [allRequirements]);
 
-    const openFile = (file) => {
+    const openFile = async (file) => {
         const url = getFileUrl(file);
 
         if (!url) {
@@ -374,7 +383,19 @@ function AOProgramDetailPage({
             return;
         }
 
-        window.open(url, "_blank", "noopener,noreferrer");
+        // Open the tab synchronously (within the click handler) so browsers
+        // don't treat it as a blocked popup, then fill it in once the file
+        // is resolved — documents proxied through our backend need an auth
+        // header a plain window.open() target URL could never carry.
+        const newTab = window.open("", "_blank", "noopener,noreferrer");
+
+        try {
+            const viewableUrl = await resolveViewableFileUrl(url);
+            if (newTab) newTab.location.href = viewableUrl;
+        } catch {
+            newTab?.close();
+            toast.error("Gagal membuka dokumen.");
+        }
     };
 
     const sendAoComment = async ({ row, requirement, action, reason }) => {
@@ -791,7 +812,7 @@ function AOProgramDetailPage({
                                                                         action: "approve",
                                                                     })
                                                                 }
-                                                                className="inline-flex items-center gap-2 rounded-xl bg-[#0AC4E0] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8] disabled:cursor-not-allowed disabled:opacity-40"
+                                                                className="inline-flex items-center gap-2 rounded-xl bg-[#0AC4E0] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-40"
                                                             >
                                                                 <CheckCircle2 size={13} />
                                                                 Setujui ke HO
@@ -836,6 +857,10 @@ function AOProgramDetailPage({
         </PageWrapper>
     );
 }
+
+AOProgramDetailPage.propTypes = {
+    backPath: PropTypes.string,
+};
 
 function AOCommentModal({
     commentModal,
@@ -892,7 +917,7 @@ function AOCommentModal({
                         type="button"
                         onClick={onSubmit}
                         disabled={commentLoading}
-                        className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8] disabled:opacity-50"
+                        className="rounded-xl bg-[#0AC4E0] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0899B0] disabled:opacity-50"
                     >
                         {commentLoading ? "Menyimpan..." : "Simpan Komentar"}
                     </button>
@@ -901,5 +926,17 @@ function AOCommentModal({
         </div>
     );
 }
+
+AOCommentModal.propTypes = {
+    commentModal: PropTypes.shape({
+        row: PropTypes.object,
+        requirement: PropTypes.object,
+    }),
+    aoCommentText: PropTypes.string,
+    setAoCommentText: PropTypes.func,
+    commentLoading: PropTypes.bool,
+    onClose: PropTypes.func,
+    onSubmit: PropTypes.func,
+};
 
 export default AOProgramDetailPage;

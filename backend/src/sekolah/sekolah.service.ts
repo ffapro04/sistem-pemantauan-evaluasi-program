@@ -5,6 +5,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,6 +19,7 @@ import { parsePagination, toPaginatedResult } from '../common/pagination.util';
 
 @Injectable()
 export class SekolahService {
+  private readonly logger = new Logger(SekolahService.name);
   private readonly ROLE_SEKOLAH_ID = 5;
 
   constructor(
@@ -378,7 +380,7 @@ export class SekolahService {
       return sekolahSaved;
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      console.error('Create Sekolah Error:', error);
+      this.logger.error('Create Sekolah Error:', error);
 
       if (error instanceof ConflictException || error instanceof BadRequestException) {
         throw error;
@@ -761,7 +763,7 @@ export class SekolahService {
       return { message: `Sekolah #${id} dan akun aksesnya berhasil dihapus` };
     } catch (error) {
       await queryRunner.rollbackTransaction();
-      console.error('Remove Sekolah Error:', error);
+      this.logger.error('Remove Sekolah Error:', error);
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException(
         error?.message || 'Gagal menghapus data sekolah.',

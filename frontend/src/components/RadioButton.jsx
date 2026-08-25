@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function RadioButton({
   name,
   value,
@@ -31,7 +32,7 @@ export default function RadioButton({
         disabled={disabled}
         className="
           w-4 h-4
-          accent-[#2E5AA7]
+          accent-[#0AC4E0]
           cursor-pointer
         "
       />
@@ -40,4 +41,14 @@ export default function RadioButton({
     </label>
   );
 }
+
+RadioButton.propTypes = {
+  name: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  checked: PropTypes.bool,
+  onChange: PropTypes.func,
+  label: PropTypes.node,
+  disabled: PropTypes.bool,
+  className: PropTypes.string,
+};
 

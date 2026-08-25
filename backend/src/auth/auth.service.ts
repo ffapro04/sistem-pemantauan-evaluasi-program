@@ -147,7 +147,7 @@ export class AuthService {
   }
 
   private hashOtp(email: string, otp: string) {
-    const secret = process.env.PASSWORD_RESET_SECRET || process.env.JWT_SECRET || 'SECRET_KEY';
+    const secret = process.env.PASSWORD_RESET_SECRET || process.env.JWT_SECRET;
     return createHash('sha256')
       .update(`${email}:${otp}:${secret}`)
       .digest('hex');

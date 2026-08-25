@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -30,8 +30,7 @@ import Dropdown from "../Dropdown";
 import { filterSchoolsByHoAccess } from "../../utils/hoAccess";
 import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as API_BASE } from "../../config/apiBase.js";
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -1118,5 +1117,12 @@ function CreateAssessmentForm({
         </PageWrapper>
     );
 }
+
+CreateAssessmentForm.propTypes = {
+    jenisAssessment: PropTypes.string,
+    labelAssessment: PropTypes.string,
+    basePath: PropTypes.string,
+    title: PropTypes.node,
+};
 
 export default CreateAssessmentForm;

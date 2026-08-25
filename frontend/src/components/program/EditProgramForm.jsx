@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -36,8 +36,7 @@ import {
 import { getAuthToken } from "../../utils/authSession";
 
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const PROGRAM_STATUSES = [
     "Approval",
@@ -1447,6 +1446,17 @@ function EditProgramForm({
         </PageWrapper>
     );
 }
+
+EditProgramForm.propTypes = {
+    kategori: PropTypes.string,
+    title: PropTypes.string,
+    titleHighlight: PropTypes.string,
+    vendorEndpoint: PropTypes.string,
+    backPath: PropTypes.string,
+    detailPathPrefix: PropTypes.string,
+    programPlaceholder: PropTypes.string,
+    successMessage: PropTypes.string,
+};
 
 export default EditProgramForm;
 

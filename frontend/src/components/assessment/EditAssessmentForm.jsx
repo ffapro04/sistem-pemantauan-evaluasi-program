@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { ClipboardList } from "lucide-react";
@@ -19,8 +19,7 @@ import Dropdown from "../Dropdown";
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { getAuthToken } from "../../utils/authSession";
 
-const DEFAULT_API_BASE =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as DEFAULT_API_BASE } from "../../config/apiBase.js";
 
 const ASSESSMENT_PILAR_OPTIONS = {
     akademik: [
@@ -522,5 +521,13 @@ function AssessmentEditBase({
         </PageWrapper>
     );
 }
+
+AssessmentEditBase.propTypes = {
+    basePath: PropTypes.string,
+    highlight: PropTypes.node,
+    questionPlaceholder: PropTypes.string,
+    successMessage: PropTypes.string,
+    apiBase: PropTypes.string,
+};
 
 export default AssessmentEditBase;

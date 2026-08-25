@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -147,6 +147,22 @@ export default function Dropdown({
   );
 }
 
+Dropdown.propTypes = {
+  label: PropTypes.node,
+  placeholder: PropTypes.node,
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      label: PropTypes.node,
+    }),
+  ),
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  disabled: PropTypes.bool,
+  width: PropTypes.string,
+  usePortal: PropTypes.bool,
+};
+
 function DropdownItem({ label, active, onClick }) {
   return (
     <button
@@ -173,4 +189,10 @@ function DropdownItem({ label, active, onClick }) {
     </button>
   );
 }
+
+DropdownItem.propTypes = {
+  label: PropTypes.node,
+  active: PropTypes.bool,
+  onClick: PropTypes.func,
+};
 

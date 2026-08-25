@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -47,14 +47,15 @@ import {
     EmptyState,
     DetailModal,
 } from "../common";
+import AppButton from "../ui/AppButton";
+import AppIconButton from "../ui/AppIconButton";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { CHART_STATUS_COLORS } from "../../utils/chartPalette";
 import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
 import { getAuthToken } from "../../utils/authSession";
 
-const DEFAULT_API_BASE =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as DEFAULT_API_BASE } from "../../config/apiBase.js";
 const loadXlsx = async () => import("xlsx");
 const ANSWER_CHART_COLORS = ["#FF0052", "#FFD400", "#00C68D", "#0055DA"];
 
@@ -697,14 +698,14 @@ function AssessmentDetailBase({
                         </div>
 
                         <div className="flex items-center gap-4">
-                            <button
-                                type="button"
+                            <AppButton
+                                text="Download Hasil"
+                                icon={<Download size={14} />}
                                 onClick={handleExport}
-                                className="hidden items-center gap-2 rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-[#0AC4E0] transition-all hover:bg-[#0AC4E0] hover:text-white md:flex"
-                            >
-                                <Download size={14} />
-                                Download Hasil
-                            </button>
+                                variant="subtle"
+                                size="sm"
+                                className="!hidden !gap-2 !rounded-xl !border !border-cyan-100 !bg-cyan-50 !px-4 !py-2.5 !text-[10px] !tracking-widest !text-[#0AC4E0] hover:!bg-[#0AC4E0] hover:!text-white md:!flex"
+                            />
 
                             <div className="hidden text-right lg:block">
                                 <p className="mb-1 text-[9px] font-semibold uppercase tracking-widest text-slate-400">
@@ -812,28 +813,32 @@ function AssessmentDetailBase({
                                         </div>
 
                                         <div className="flex shrink-0 gap-2">
-                                            <button
-                                                type="button"
+                                            <AppIconButton
+                                                icon={ChevronLeft}
+                                                iconSize={18}
                                                 onClick={handlePrevQuestion}
                                                 disabled={
                                                     activeQuestionIndex === 0 || questions.length === 0
                                                 }
-                                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all hover:border-[#0AC4E0] hover:bg-[#0AC4E0]/5 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-25"
-                                            >
-                                                <ChevronLeft size={18} />
-                                            </button>
+                                                ariaLabel="Pertanyaan sebelumnya"
+                                                variant="primary"
+                                                size="lg"
+                                                className="!rounded-xl !border !border-slate-200 !bg-white hover:!border-[#0AC4E0] hover:!bg-[#0AC4E0]/5 hover:!text-[#0AC4E0] disabled:!opacity-25"
+                                            />
 
-                                            <button
-                                                type="button"
+                                            <AppIconButton
+                                                icon={ChevronRight}
+                                                iconSize={18}
                                                 onClick={handleNextQuestion}
                                                 disabled={
                                                     questions.length === 0 ||
                                                     activeQuestionIndex === questions.length - 1
                                                 }
-                                                className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white transition-all hover:border-[#0AC4E0] hover:bg-[#0AC4E0]/5 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-25"
-                                            >
-                                                <ChevronRight size={18} />
-                                            </button>
+                                                ariaLabel="Pertanyaan berikutnya"
+                                                variant="primary"
+                                                size="lg"
+                                                className="!rounded-xl !border !border-slate-200 !bg-white hover:!border-[#0AC4E0] hover:!bg-[#0AC4E0]/5 hover:!text-[#0AC4E0] disabled:!opacity-25"
+                                            />
                                         </div>
                                     </div>
 
@@ -1057,6 +1062,16 @@ function AssessmentDetailBase({
     );
 }
 
+AssessmentDetailBase.propTypes = {
+    type: PropTypes.string,
+    jenisAssessment: PropTypes.string,
+    label: PropTypes.string,
+    basePath: PropTypes.string,
+    headerEyebrow: PropTypes.node,
+    title: PropTypes.node,
+    apiBase: PropTypes.string,
+};
+
 function AnswerDetailContent({ pengisi, pertanyaan }) {
     const safeJawaban = Array.isArray(pengisi?.jawaban) ? pengisi.jawaban : [];
 
@@ -1119,6 +1134,11 @@ function AnswerDetailContent({ pengisi, pertanyaan }) {
         </div>
     );
 }
+
+AnswerDetailContent.propTypes = {
+    pengisi: PropTypes.object,
+    pertanyaan: PropTypes.array.isRequired,
+};
 
 function AssessmentDetailStyle() {
     return (

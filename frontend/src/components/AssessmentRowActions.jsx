@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import Toggle from "./Toggle";
 import {
     DetailButton,
@@ -33,5 +33,19 @@ function AssessmentRowActions({
         </div>
     );
 }
+
+AssessmentRowActions.propTypes = {
+    row: PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        sent: PropTypes.bool,
+        aktif: PropTypes.bool,
+    }).isRequired,
+    detailPath: PropTypes.func.isRequired,
+    editPath: PropTypes.func.isRequired,
+    onNavigate: PropTypes.func.isRequired,
+    onSend: PropTypes.func.isRequired,
+    onToggle: PropTypes.func.isRequired,
+    toggling: PropTypes.object,
+};
 
 export default AssessmentRowActions;

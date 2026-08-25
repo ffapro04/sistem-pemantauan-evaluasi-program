@@ -1,7 +1,7 @@
 ﻿// src/components/masterCrud/MasterField.jsx
 
-/* eslint-disable react/prop-types */
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import Input from "../Input";
 import Label from "../Label";
 import Dropdown from "../Dropdown";
@@ -225,6 +225,14 @@ const MultiSelectCards = ({ field, value, options, onChange }) => {
         </div>
     );
 };
+
+MultiSelectCards.propTypes = {
+    field: PropTypes.object.isRequired,
+    value: PropTypes.any,
+    options: PropTypes.array,
+    onChange: PropTypes.func.isRequired,
+};
+
 export default function MasterField({
     field,
     value,
@@ -418,3 +426,14 @@ export default function MasterField({
         </div>
     );
 }
+
+MasterField.propTypes = {
+    field: PropTypes.object.isRequired,
+    value: PropTypes.any,
+    formData: PropTypes.object,
+    auxData: PropTypes.any,
+    mode: PropTypes.string,
+    onChange: PropTypes.func.isRequired,
+    showPassword: PropTypes.bool,
+    setShowPassword: PropTypes.func,
+};

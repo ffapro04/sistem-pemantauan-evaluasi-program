@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { ArrowLeft } from "lucide-react";
 import Button from "./Button";
 
@@ -48,5 +48,15 @@ function FormPageHeader({
         </header>
     );
 }
+
+FormPageHeader.propTypes = {
+    title: PropTypes.node,
+    highlight: PropTypes.node,
+    subtitle: PropTypes.node,
+    backText: PropTypes.node,
+    icon: PropTypes.node,
+    onBack: PropTypes.func,
+    className: PropTypes.string,
+};
 
 export default FormPageHeader;

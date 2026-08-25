@@ -1,9 +1,10 @@
-﻿/* eslint-disable react/prop-types */
-/* eslint-disable no-unused-vars */
+﻿/* eslint-disable no-unused-vars */
+import PropTypes from "prop-types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { AnimatePresence, motion } from "framer-motion";
+import { getAuthToken } from "../../utils/authSession";
 import {
     AlertTriangle,
     BarChart3,
@@ -41,12 +42,7 @@ import ResponsiveContainer from "../charts/SafeResponsiveContainer";
 import ProgramRatingStars from "../program/ProgramRatingStars";
 import Dropdown from "../Dropdown";
 import { CHART_PALETTE, CHART_STATUS_COLORS } from "../../utils/chartPalette";
-
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const PAGE_SIZE = 10;
 const PROGRAM_LIST_PAGE_SIZE = 5;
@@ -209,7 +205,7 @@ function uniqueStrings(values = []) {
 }
 
 function getTokenPayload() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -962,7 +958,7 @@ function getProgramStatusColor(status) {
     return {
         background: "#ECFEFF",
         border: "#A5F3FC",
-        color: "#0891B2",
+        color: "#0AC4E0",
     };
 }
 
@@ -1116,6 +1112,14 @@ function MetricCard({ label, value, helper, icon, color }) {
     );
 }
 
+MetricCard.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+    helper: PropTypes.node,
+    icon: PropTypes.node,
+    color: PropTypes.string,
+};
+
 function PanelHeader({ eyebrow, title, subtitle, icon, right }) {
     return (
         <header className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
@@ -1144,6 +1148,14 @@ function PanelHeader({ eyebrow, title, subtitle, icon, right }) {
     );
 }
 
+PanelHeader.propTypes = {
+    eyebrow: PropTypes.node,
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    icon: PropTypes.node,
+    right: PropTypes.node,
+};
+
 function EmptyState({ title, description, icon }) {
     return (
         <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center">
@@ -1158,6 +1170,12 @@ function EmptyState({ title, description, icon }) {
         </div>
     );
 }
+
+EmptyState.propTypes = {
+    title: PropTypes.node,
+    description: PropTypes.node,
+    icon: PropTypes.node,
+};
 
 function Pagination({
     page,
@@ -1207,6 +1225,14 @@ function Pagination({
     );
 }
 
+Pagination.propTypes = {
+    page: PropTypes.number.isRequired,
+    totalPages: PropTypes.number.isRequired,
+    totalRows: PropTypes.number,
+    pageSize: PropTypes.number,
+    onChange: PropTypes.func,
+};
+
 function FilterSelect({ label, value, onChange, options }) {
     return (
         <div className="min-w-0 [&_button>span]:whitespace-nowrap" title={label}>
@@ -1221,6 +1247,18 @@ function FilterSelect({ label, value, onChange, options }) {
         </div>
     );
 }
+
+FilterSelect.propTypes = {
+    label: PropTypes.string,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func,
+    options: PropTypes.arrayOf(
+        PropTypes.shape({
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.node,
+        }),
+    ).isRequired,
+};
 
 function DistrictDropdown({ label, value, onChange, options = [] }) {
     const selectedOption =
@@ -1241,6 +1279,18 @@ function DistrictDropdown({ label, value, onChange, options = [] }) {
     );
 }
 
+DistrictDropdown.propTypes = {
+    label: PropTypes.string,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func,
+    options: PropTypes.arrayOf(
+        PropTypes.shape({
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.node,
+        }),
+    ),
+};
+
 function SearchInput({ value, onChange, placeholder }) {
     return (
         <label className="relative block min-w-[220px] flex-1">
@@ -1258,6 +1308,12 @@ function SearchInput({ value, onChange, placeholder }) {
     );
 }
 
+SearchInput.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    placeholder: PropTypes.string,
+};
+
 function DistrictPieTooltip({ active, payload }) {
     if (!active || !payload?.length) return null;
 
@@ -1273,6 +1329,18 @@ function DistrictPieTooltip({ active, payload }) {
     );
 }
 
+DistrictPieTooltip.propTypes = {
+    active: PropTypes.bool,
+    payload: PropTypes.arrayOf(
+        PropTypes.shape({
+            payload: PropTypes.shape({
+                name: PropTypes.string,
+                total: PropTypes.number,
+            }),
+        }),
+    ),
+};
+
 function SchoolDistributionChart({ rows, totalSchools }) {
     if (!rows.length) {
         return (
@@ -1286,7 +1354,7 @@ function SchoolDistributionChart({ rows, totalSchools }) {
 
     return (
         <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-            <div className="relative h-[300px] rounded-2xl border border-slate-100 bg-slate-50/50 p-3">
+            <div className="relative h-[300px] overflow-hidden rounded-2xl border border-slate-100 bg-slate-50/50 p-3">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <Pie
@@ -1352,6 +1420,18 @@ function SchoolDistributionChart({ rows, totalSchools }) {
         </div>
     );
 }
+
+SchoolDistributionChart.propTypes = {
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            name: PropTypes.string,
+            total: PropTypes.number,
+            color: PropTypes.string,
+        }),
+    ).isRequired,
+    totalSchools: PropTypes.number,
+};
 
 function SchoolTable({
     rows,
@@ -1459,6 +1539,24 @@ function SchoolTable({
 }
 
 
+SchoolTable.propTypes = {
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            name: PropTypes.string,
+            npsn: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            level: PropTypes.string,
+            districtName: PropTypes.string,
+            accreditation: PropTypes.string,
+            status: PropTypes.string,
+        }),
+    ),
+    totalRows: PropTypes.number,
+    page: PropTypes.number,
+    totalPages: PropTypes.number,
+    onPageChange: PropTypes.func,
+};
+
 function getStableChartColor(value) {
     const source = String(value || "sekolah");
     let hash = 0;
@@ -1523,6 +1621,14 @@ function SchoolAxisTick({ x, y, payload }) {
     );
 }
 
+SchoolAxisTick.propTypes = {
+    x: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    y: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    payload: PropTypes.shape({
+        value: PropTypes.string,
+    }),
+};
+
 function ProgramChartTooltip({ active, payload }) {
     if (!active || !payload?.length) return null;
 
@@ -1562,6 +1668,20 @@ function ProgramChartTooltip({ active, payload }) {
         </div>
     );
 }
+
+ProgramChartTooltip.propTypes = {
+    active: PropTypes.bool,
+    payload: PropTypes.arrayOf(
+        PropTypes.shape({
+            payload: PropTypes.shape({
+                fullName: PropTypes.string,
+                districtName: PropTypes.string,
+                total: PropTypes.number,
+                programNames: PropTypes.arrayOf(PropTypes.string),
+            }),
+        }),
+    ),
+};
 
 function SchoolProgramBarChart({ rows }) {
     if (!rows.length) {
@@ -1652,6 +1772,19 @@ function SchoolProgramBarChart({ rows }) {
         </div>
     );
 }
+
+SchoolProgramBarChart.propTypes = {
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            fullName: PropTypes.string,
+            districtName: PropTypes.string,
+            total: PropTypes.number,
+            color: PropTypes.string,
+            programNames: PropTypes.arrayOf(PropTypes.string),
+        }),
+    ).isRequired,
+};
 
 function ProgramTable({
     rows,
@@ -1837,6 +1970,18 @@ function ProgramTable({
     );
 }
 
+ProgramTable.propTypes = {
+    rows: PropTypes.arrayOf(PropTypes.object),
+    totalRows: PropTypes.number,
+    page: PropTypes.number,
+    totalPages: PropTypes.number,
+    onPageChange: PropTypes.func,
+    navigate: PropTypes.func,
+    detailPathPrefix: PropTypes.string,
+    schoolMap: PropTypes.object,
+    wilayahMap: PropTypes.object,
+};
+
 function getReviewStatusCount(progress, status) {
     if (status === "WAITING_AO") return progress.waitingAo;
     if (status === "WAITING_UPLOAD") return progress.waitingUpload;
@@ -1979,7 +2124,7 @@ function ReviewUploadTable({
                                             onClick={() =>
                                                 navigate(`${detailPathPrefix}/${getProgramId(program)}`)
                                             }
-                                            className="inline-flex items-center gap-2 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8]"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0899B0]"
                                         >
                                             <Eye size={14} />
                                             Review
@@ -2003,6 +2148,18 @@ function ReviewUploadTable({
 }
 
 
+ReviewUploadTable.propTypes = {
+    rows: PropTypes.arrayOf(PropTypes.object),
+    totalRows: PropTypes.number,
+    page: PropTypes.number,
+    totalPages: PropTypes.number,
+    onPageChange: PropTypes.func,
+    navigate: PropTypes.func,
+    detailPathPrefix: PropTypes.string,
+    schoolMap: PropTypes.object,
+    wilayahMap: PropTypes.object,
+};
+
 function AODashboardPanel({ children, className = "" }) {
     return (
         <section
@@ -2012,6 +2169,11 @@ function AODashboardPanel({ children, className = "" }) {
         </section>
     );
 }
+
+AODashboardPanel.propTypes = {
+    children: PropTypes.node,
+    className: PropTypes.string,
+};
 
 function AOStatusPieCard({
     title,
@@ -2142,6 +2304,21 @@ function AOStatusPieCard({
     );
 }
 
+AOStatusPieCard.propTypes = {
+    title: PropTypes.node,
+    helper: PropTypes.node,
+    total: PropTypes.number,
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            name: PropTypes.string,
+            value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            color: PropTypes.string,
+        }),
+    ),
+    icon: PropTypes.node,
+};
+
 function AOVisualProgramPanel({
     program,
     processSteps = [],
@@ -2238,7 +2415,7 @@ function AOVisualProgramPanel({
                             onClick={() =>
                                 navigate(`${detailPathPrefix}/${getProgramId(program)}`)
                             }
-                            className="inline-flex h-8 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-3 text-[8px] font-black uppercase tracking-widest text-white transition hover:bg-[#09AFC8]"
+                            className="inline-flex h-8 items-center justify-center gap-2 rounded-xl bg-[#0AC4E0] px-3 text-[8px] font-black uppercase tracking-widest text-white transition hover:bg-[#0899B0]"
                         >
                             <Eye size={12} />
                             Detail
@@ -2356,6 +2533,31 @@ function AOVisualProgramPanel({
         </AODashboardPanel>
     );
 }
+
+AOVisualProgramPanel.propTypes = {
+    program: PropTypes.object,
+    processSteps: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.string,
+            stateLabel: PropTypes.string,
+            color: PropTypes.string,
+            background: PropTypes.string,
+            border: PropTypes.string,
+        }),
+    ),
+    schoolRows: PropTypes.arrayOf(
+        PropTypes.shape({
+            name: PropTypes.string,
+            districtName: PropTypes.string,
+        }),
+    ),
+    progress: PropTypes.object,
+    query: PropTypes.string,
+    setQuery: PropTypes.func,
+    navigate: PropTypes.func,
+    detailPathPrefix: PropTypes.string,
+};
 
 function AOTerritoryCard({
     rows = [],
@@ -2477,6 +2679,19 @@ function AOTerritoryCard({
         </AODashboardPanel>
     );
 }
+
+AOTerritoryCard.propTypes = {
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            name: PropTypes.string,
+            value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            color: PropTypes.string,
+        }),
+    ),
+    totalSchools: PropTypes.number,
+    provinceLabel: PropTypes.string,
+};
 
 function AOFlipMonitoringList({
     activeView,
@@ -2690,6 +2905,24 @@ function AOFlipMonitoringList({
     );
 }
 
+AOFlipMonitoringList.propTypes = {
+    activeView: PropTypes.oneOf(["PROGRAM", "SCHOOL"]),
+    onFlip: PropTypes.func,
+    programRows: PropTypes.arrayOf(PropTypes.object),
+    programTotalRows: PropTypes.number,
+    programPage: PropTypes.number,
+    programTotalPages: PropTypes.number,
+    onProgramPageChange: PropTypes.func,
+    schoolRows: PropTypes.arrayOf(PropTypes.object),
+    schoolTotalRows: PropTypes.number,
+    schoolPage: PropTypes.number,
+    schoolTotalPages: PropTypes.number,
+    onSchoolPageChange: PropTypes.func,
+    selectedProgramId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onSelectProgram: PropTypes.func,
+    programSchoolRowsMap: PropTypes.instanceOf(Map),
+};
+
 function LoadingView() {
     return (
         <PageWrapper className="flex min-h-screen items-center justify-center bg-slate-100 !p-0">
@@ -2755,7 +2988,7 @@ function AODashboardPage({
         setErrorMessage("");
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const tokenPayload = getTokenPayload();
 
             if (!token || !tokenPayload) {
@@ -4345,5 +4578,11 @@ function AODashboardPage({
         </PageWrapper>
     );
 }
+
+AODashboardPage.propTypes = {
+    title: PropTypes.string,
+    detailPathPrefix: PropTypes.string,
+    mode: PropTypes.oneOf(["dashboard", "review"]),
+};
 
 export default AODashboardPage;

@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
+import PropTypes from "prop-types";
 import { ChevronLeft, ChevronRight, Eye, Filter, RefreshCcw, Search } from "lucide-react";
 
 import { Dropdown } from "../common";
@@ -47,6 +47,10 @@ function RegistryHeader({ onResetFilter }) {
     );
 }
 
+RegistryHeader.propTypes = {
+    onResetFilter: PropTypes.func,
+};
+
 function RegistryFilters({
     wilayahList,
     selectedWilayah,
@@ -85,6 +89,14 @@ function RegistryFilters({
         </div>
     );
 }
+
+RegistryFilters.propTypes = {
+    wilayahList: PropTypes.arrayOf(PropTypes.object).isRequired,
+    selectedWilayah: PropTypes.object,
+    selectedJenis: PropTypes.string,
+    onChangeWilayah: PropTypes.func,
+    onChangeJenis: PropTypes.func,
+};
 
 function SchoolRow({ school, onOpenSchool }) {
     return (
@@ -129,6 +141,11 @@ function SchoolRow({ school, onOpenSchool }) {
     );
 }
 
+SchoolRow.propTypes = {
+    school: PropTypes.object.isRequired,
+    onOpenSchool: PropTypes.func,
+};
+
 function RegistryTable({ schools, onOpenSchool }) {
     if (schools.length === 0) return <EmptySchoolState />;
 
@@ -159,6 +176,11 @@ function RegistryTable({ schools, onOpenSchool }) {
         </div>
     );
 }
+
+RegistryTable.propTypes = {
+    schools: PropTypes.arrayOf(PropTypes.object).isRequired,
+    onOpenSchool: PropTypes.func,
+};
 
 function RegistryPagination({
     currentPage,
@@ -203,6 +225,14 @@ function RegistryPagination({
         </div>
     );
 }
+
+RegistryPagination.propTypes = {
+    currentPage: PropTypes.number,
+    totalPages: PropTypes.number,
+    totalSchools: PropTypes.number,
+    onPreviousPage: PropTypes.func,
+    onNextPage: PropTypes.func,
+};
 
 function RegistryPanel({
     wilayahList,
@@ -277,5 +307,21 @@ function RegistryPanel({
         </aside>
     );
 }
+
+RegistryPanel.propTypes = {
+    wilayahList: PropTypes.arrayOf(PropTypes.object).isRequired,
+    selectedWilayah: PropTypes.object,
+    selectedJenis: PropTypes.string,
+    schools: PropTypes.arrayOf(PropTypes.object).isRequired,
+    totalSchools: PropTypes.number,
+    currentPage: PropTypes.number,
+    totalPages: PropTypes.number,
+    onSelectWilayah: PropTypes.func,
+    onResetFilter: PropTypes.func,
+    onChangeJenis: PropTypes.func,
+    onOpenSchool: PropTypes.func,
+    onPreviousPage: PropTypes.func,
+    onNextPage: PropTypes.func,
+};
 
 export default RegistryPanel;

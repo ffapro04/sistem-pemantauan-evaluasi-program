@@ -1,5 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useMemo, useState } from "react";
+import { getAuthToken } from "../../utils/authSession";
 import {
     ArrowLeft,
     Building2,
@@ -17,9 +18,9 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 
 import Sidebar from "../../components/Sidebar";
+import AppButton from "../../components/ui/AppButton";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 function normalizeArray(payload) {
     if (Array.isArray(payload)) return payload;
@@ -275,7 +276,7 @@ export default function DetailSekolahKepalaDinas() {
         setRefreshing(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
 
             const headers = token
                 ? {
@@ -428,27 +429,33 @@ export default function DetailSekolahKepalaDinas() {
                 <main className="kadin-scroll h-screen flex-1 overflow-y-auto p-6">
                     <header className="mb-6 overflow-hidden rounded-[1.9rem] border border-cyan-100 bg-white p-6 shadow-[0_24px_80px_rgba(10,196,224,0.10)]">
                         <div className="mb-5 flex items-center justify-between gap-4">
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={() => navigate("/kepaladinas/sekolah")}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-[#0AC4E0]"
+                                icon={<ArrowLeft size={15} />}
+                                variant="secondary"
+                                size="sm"
+                                className="!rounded-2xl !border-slate-100 !bg-slate-50 !text-slate-500 hover:!text-[#0AC4E0]"
                             >
-                                <ArrowLeft size={15} />
                                 Kembali
-                            </button>
+                            </AppButton>
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={fetchDetail}
                                 disabled={refreshing}
-                                className="inline-flex h-10 items-center gap-2 rounded-2xl bg-[#0AC4E0] px-4 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-cyan-500 disabled:opacity-60"
+                                icon={
+                                    <RefreshCcw
+                                        size={14}
+                                        className={refreshing ? "animate-spin" : ""}
+                                    />
+                                }
+                                variant="accent"
+                                size="sm"
+                                className="!rounded-2xl hover:!bg-cyan-500"
                             >
-                                <RefreshCcw
-                                    size={14}
-                                    className={refreshing ? "animate-spin" : ""}
-                                />
                                 Refresh
-                            </button>
+                            </AppButton>
                         </div>
 
                         <div className="flex items-start gap-5">

@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { jwtDecode } from "jwt-decode";
@@ -29,7 +29,6 @@ import {
   Clock3,
   ShieldCheck,
   ChevronRight,
-  Database,
   BookOpenCheck,
   UserCog,
   Newspaper,
@@ -39,12 +38,7 @@ import {
 
 import { getHoAllowedJenjang, normalizeValue } from "../utils/hoAccess";
 import { clearAuthSession, getAuthToken } from "../utils/authSession";
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../config/apiBase.js";
 
 const roleNameMap = {
   1: "Admin",
@@ -106,15 +100,6 @@ const getSekolahIdFromToken = (decoded) => {
     decoded?.school?.id ||
     null
   );
-};
-
-const formatDate = (date) => {
-  return date.toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
 };
 
 const isOperatorSekolahUser = (user = {}) => {
@@ -506,6 +491,42 @@ const getNotificationIcon = (type) => {
   return Bell;
 };
 
+// Notifikasi backend disimpan sebagai enum mentah (mis. PROGRAM_ACTIVITY_DEADLINE);
+// map ini menerjemahkannya jadi label yang enak dibaca di UI notifikasi.
+const NOTIFICATION_TYPE_LABELS = {
+  PROGRAM_ACTIVITY_DEADLINE: "Tenggat Aktivitas",
+  PROGRAM_OPENING_DEADLINE: "Tenggat Pembukaan",
+  PROGRAM_CREATED: "Program Baru",
+  PROGRAM_RATING: "Penilaian Program",
+  PROGRAM_EVIDENCE_UPLOADED: "Bukti Diupload",
+  PROGRAM_EVIDENCE_AO_APPROVED: "Bukti Disetujui AO",
+  PROGRAM_EVIDENCE_AO_REJECTED: "Bukti Ditolak AO",
+  PROGRAM_EVIDENCE_HO_APPROVED: "Bukti Disetujui HO",
+  PROGRAM_EVIDENCE_HO_REJECTED: "Bukti Ditolak HO",
+  ASSESSMENT_SENT: "Assessment Baru",
+  GURU: "Data Guru",
+  JURUSAN: "Data Jurusan",
+  KELAS: "Data Kelas",
+  SEKOLAH: "Data Sekolah",
+  AGENDA: "Agenda",
+  AGENDA_STATUS: "Status Agenda",
+  PROFILE_UPDATE: "Profil Diperbarui",
+  PASSWORD_RESET: "Reset Kata Sandi",
+};
+
+const humanizeNotificationTipe = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "Sistem";
+  if (NOTIFICATION_TYPE_LABELS[raw]) return NOTIFICATION_TYPE_LABELS[raw];
+
+  return raw
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+};
+
 const formatNotificationTime = (value) => {
   if (!value) return "Baru saja";
   const date = new Date(value);
@@ -533,7 +554,7 @@ const normalizeNotification = (item = {}) => ({
   id: item.id_notifikasi || item.id,
   title: item.judul || item.title || "Notifikasi",
   description: item.pesan || item.description || "",
-  category: item.tipe || item.category || "Sistem",
+  category: humanizeNotificationTipe(item.tipe || item.category),
   time: formatNotificationTime(item.created_at || item.createdAt),
   unread: !(item.is_read ?? item.read ?? false),
   icon: getNotificationIcon(item.tipe || item.category),
@@ -545,7 +566,7 @@ const MarqueeText = ({ text }) => {
   const value = text || "User Account";
   const truncated = value.length > 20 ? value.substring(0, 18) + "..." : value;
   return (
-    <div className="sidebar-marquee-wrap max-w-[130px]">
+    <div className="sidebar-marquee-wrap max-w-[150px]">
       <div className="sidebar-marquee-track">
         <span>{truncated}</span>
         <span aria-hidden="true">{truncated}</span>
@@ -554,99 +575,109 @@ const MarqueeText = ({ text }) => {
   );
 };
 
-const UserProfileCard = ({
+MarqueeText.propTypes = {
+  text: PropTypes.string,
+};
+
+// Kartu akun tunggal di footer sidebar: strip status/jam, identitas (avatar +
+// nama + role), lalu aksi notifikasi/pengaturan — menggantikan ClockBox dan
+// UserProfileCard yang sebelumnya tampil sebagai beberapa kotak terpisah.
+const AccountCard = ({
   user,
   label,
   unreadCount,
+  now,
   onProfileClick,
   onNotificationClick,
   onSettingsClick,
-  compact = false,
 }) => {
   const avatarUrl = getUserAvatarUrl(user);
 
   return (
-    <div
-      className={`group relative flex items-center gap-2 ${compact ? "w-auto" : "w-full"}`}
-    >
+    <div className="overflow-hidden rounded-[1.4rem] border border-slate-100 bg-white shadow-[0_16px_38px_rgba(15,23,42,0.07)]">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-3.5 py-2">
+        <div className="flex items-center gap-1.5">
+          <span className="h-[6px] w-[6px] rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.16)]" />
+          <span className="text-[7px] font-black uppercase tracking-[0.16em] text-slate-400">Tersambung</span>
+        </div>
+        <span className="text-[10px] font-black tabular-nums text-slate-500">
+          {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+
       <button
         type="button"
         onClick={onProfileClick}
-        className={`relative min-w-0 flex-1 text-left transition-all active:scale-[0.98] ${compact ? "w-auto" : "w-full"}`}
+        className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left transition-colors active:scale-[0.99] hover:bg-[#0AC4E0]/5"
         title="Lihat profil"
       >
-        <div
-          className={`relative overflow-hidden border border-slate-100 bg-white shadow-[0_16px_38px_rgba(15,23,42,0.07)] ${compact ? "rounded-full p-1.5" : "rounded-[1.4rem] p-2.5"}`}
-        >
-          <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-[#0AC4E0]/10 blur-2xl transition-all group-hover:bg-[#0AC4E0]/15" />
-          <div
-            className={`relative flex min-w-0 items-center ${compact ? "gap-1.5" : "gap-2.5"}`}
-          >
-            <div className="relative shrink-0">
-              <div
-                className={`relative flex items-center justify-center overflow-hidden bg-[#0AC4E0] text-white shadow-[0_10px_24px_rgba(10,196,224,0.25)] ${compact ? "h-7 w-7 rounded-full" : "h-9 w-9 rounded-xl"}`}
-              >
-                <span
-                  className={`font-black uppercase ${compact ? "text-[10px]" : "text-sm"}`}
-                >
-                  {getInitial(user?.nama)}
-                </span>
+        <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#0AC4E0] to-[#0899B0] shadow-[0_10px_22px_rgba(10,196,224,0.28)]">
+          <div className="flex h-full w-full items-center justify-center text-[15px] font-black uppercase text-white">
+            {getInitial(user?.nama)}
+          </div>
+          {avatarUrl && (
+            <img
+              src={avatarUrl}
+              alt={user?.nama || "Profile"}
+              className="absolute inset-0 h-full w-full object-cover"
+              onError={(event) => {
+                event.currentTarget.remove();
+              }}
+            />
+          )}
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-[17px] w-[17px] items-center justify-center rounded-full border-[2.5px] border-white bg-emerald-500 text-white">
+            <CheckCircle2 size={9} />
+          </span>
+        </div>
 
-                {avatarUrl && (
-                  <img
-                    src={avatarUrl}
-                    alt={user?.nama || "Profile"}
-                    className="absolute inset-0 h-full w-full object-cover"
-                    onError={(event) => {
-                      event.currentTarget.remove();
-                    }}
-                  />
-                )}
-              </div>
-              <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full border-[2px] border-white bg-[#0AC4E0]" />
-            </div>
-
-            {!compact && (
-              <div className="min-w-0 flex-1">
-                <MarqueeText text={user?.nama || "User Account"} />
-                <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full border border-[#0AC4E0]/10 bg-[#0AC4E0]/5 px-2 py-0.5 text-[7px] font-black uppercase leading-none tracking-widest text-[#0AC4E0]">
-                  <ShieldCheck size={8} />
-                  <span className="truncate">{label}</span>
-                </div>
-              </div>
-            )}
+        <div className="min-w-0 flex-1">
+          <MarqueeText text={user?.nama || "User Account"} />
+          <div className="mt-1.5 inline-flex max-w-full items-center gap-1 rounded-full bg-[#0AC4E0]/8 px-2 py-0.5 text-[7px] font-black uppercase leading-none tracking-widest text-[#0899B0]">
+            <ShieldCheck size={8} />
+            <span className="truncate">{label}</span>
           </div>
         </div>
+
+        <ChevronRight size={15} className="shrink-0 text-slate-300" />
       </button>
 
-      {!compact && (
+      <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100">
         <button
           type="button"
           onClick={onNotificationClick}
-          className="relative flex h-[58px] w-12 shrink-0 items-center justify-center rounded-[1.2rem] border border-slate-100 bg-white text-slate-400 shadow-[0_14px_35px_rgba(15,23,42,0.05)] transition-all hover:border-cyan-100 hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+          className="relative flex items-center justify-center gap-1.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition-colors hover:bg-[#0AC4E0]/5 hover:text-[#0899B0]"
           title="Buka notifikasi"
         >
-          <Bell size={17} />
+          <Bell size={13} />
+          Notifikasi
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-[#0AC4E0] px-1 text-[8px] font-black text-white shadow-lg shadow-[#0AC4E0]/25">
+            <span className="absolute right-[24%] top-1.5 flex h-[15px] min-w-[15px] items-center justify-center rounded-full border-2 border-white bg-[#0AC4E0] px-1 text-[8px] font-black text-white shadow-[0_3px_8px_rgba(10,196,224,0.4)]">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
         </button>
-      )}
-
-      {!compact && (
         <button
           type="button"
           onClick={onSettingsClick}
-          className="flex h-[58px] w-12 shrink-0 items-center justify-center rounded-[1.2rem] border border-slate-100 bg-white text-slate-400 shadow-[0_14px_35px_rgba(15,23,42,0.05)] transition-all hover:border-cyan-100 hover:bg-cyan-50 hover:text-[#0AC4E0] active:scale-95"
+          className="flex items-center justify-center gap-1.5 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition-colors hover:bg-[#0AC4E0]/5 hover:text-[#0899B0]"
           title="Pengaturan akun"
         >
-          <Settings size={17} />
+          <Settings size={13} />
+          Pengaturan
         </button>
-      )}
+      </div>
     </div>
   );
+};
+
+AccountCard.propTypes = {
+  user: PropTypes.object,
+  label: PropTypes.string,
+  unreadCount: PropTypes.number,
+  now: PropTypes.instanceOf(Date).isRequired,
+  onProfileClick: PropTypes.func,
+  onNotificationClick: PropTypes.func,
+  onSettingsClick: PropTypes.func,
 };
 
 const UserMiniProfileModal = ({ open, onClose, user, label }) => {
@@ -909,6 +940,13 @@ const UserMiniProfileModal = ({ open, onClose, user, label }) => {
   );
 };
 
+UserMiniProfileModal.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  user: PropTypes.object,
+  label: PropTypes.string,
+};
+
 const UserNotificationModal = ({
   open,
   onClose,
@@ -931,25 +969,25 @@ const UserNotificationModal = ({
             animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
             exit={{ opacity: 0, x: -18, y: 14, scale: 0.96 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute bottom-8 left-1/2 w-[min(410px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.18)] xl:left-[300px] xl:translate-x-0"
+            className="absolute bottom-8 left-1/2 w-[min(440px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[2.1rem] border border-slate-100 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.18)] xl:left-[300px] xl:translate-x-0"
           >
-            <div className="border-b border-slate-100 px-6 py-5">
+            <div className="border-b border-slate-100 px-7 py-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.28em] text-[#0AC4E0]">User Hub</p>
-                  <h3 className="mt-1 text-lg font-black uppercase tracking-tight text-slate-900">Pesan & Notifikasi</h3>
-                  <p className="mt-1 max-w-[280px] truncate text-[10px] font-bold text-slate-400">{user?.nama || "User"} · {label || "Akun Sistem"}</p>
+                  <h3 className="mt-1.5 text-lg font-black uppercase tracking-tight text-slate-900">Pesan & Notifikasi</h3>
+                  <p className="mt-1.5 max-w-[280px] truncate text-[10px] font-bold text-slate-400">{user?.nama || "User"} · {label || "Akun Sistem"}</p>
                 </div>
-                <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 active:scale-95">
+                <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-500 active:scale-95">
                   <X size={17} />
                 </button>
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 rounded-full bg-[#0AC4E0]/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#0AC4E0]">
-                  <Bell size={12} />
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-[#0AC4E0]/15 bg-[#0AC4E0]/5 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-[#0899B0]">
+                  <span className="h-[6px] w-[6px] rounded-full bg-[#0AC4E0]" />
                   {unreadCount} Belum Dibaca
                 </div>
-                <div className="rounded-full bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
+                <div className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400">
                   {notifications.length} Total
                 </div>
                 {unreadCount > 0 && (
@@ -964,7 +1002,7 @@ const UserNotificationModal = ({
                 )}
               </div>
             </div>
-            <div className="max-h-[390px] overflow-y-auto px-4 py-4">
+            <div className="max-h-[420px] overflow-y-auto px-[18px] py-[18px]">
               <div className="space-y-3">
                 {loading && notifications.length === 0 && (
                   <div className="rounded-[1.5rem] border border-dashed border-cyan-100 bg-cyan-50/40 p-8 text-center">
@@ -979,21 +1017,19 @@ const UserNotificationModal = ({
                       type="button"
                       key={item.id}
                       onClick={() => onNotificationClick?.(item)}
-                      className={`relative w-full rounded-[1.5rem] border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${item.unread ? "border-[#0AC4E0]/15 bg-[#0AC4E0]/5" : "border-slate-100 bg-white"}`}
+                      className={`relative flex w-full items-start gap-3.5 rounded-[1.3rem] border border-slate-100 bg-white py-[17px] pr-[18px] text-left transition-all hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md ${item.unread ? "border-l-[3px] border-l-[#0AC4E0] pl-4" : "pl-[18px]"}`}
                     >
-                      {item.unread && <span className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-[#0AC4E0]" />}
-                      <div className="flex gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-[#0AC4E0] shadow-sm ring-1 ring-slate-100">
-                          <Icon size={18} />
+                      {item.unread && <span className="absolute right-4 top-[18px] h-[6px] w-[6px] rounded-full bg-[#0AC4E0]" />}
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] ${item.unread ? "bg-[#0AC4E0]/8 text-[#0899B0]" : "bg-slate-50 text-slate-400 ring-1 ring-inset ring-slate-100"}`}>
+                        <Icon size={17} />
+                      </div>
+                      <div className="min-w-0 flex-1 pr-1">
+                        <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                          <span className={`text-[9px] font-bold ${item.unread ? "text-[#0899B0]" : "text-slate-400"}`}>{item.category}</span>
+                          <span className="text-[9px] font-semibold text-slate-300">· {item.time}</span>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="mb-1 flex flex-wrap items-center gap-2 pr-4">
-                            <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase tracking-widest text-[#0AC4E0] ring-1 ring-[#0AC4E0]/10">{item.category}</span>
-                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-300">{item.time}</span>
-                          </div>
-                          <p className="text-[12px] font-black leading-snug text-slate-900">{item.title}</p>
-                          <p className="mt-1 text-[10px] font-bold leading-relaxed text-slate-400">{item.description}</p>
-                        </div>
+                        <p className="text-[12.5px] font-black leading-snug text-slate-900">{item.title}</p>
+                        <p className="mt-1.5 text-[10.5px] font-medium leading-relaxed text-slate-400">{item.description}</p>
                       </div>
                     </button>
                   );
@@ -1016,21 +1052,27 @@ const UserNotificationModal = ({
   );
 };
 
-const ClockBox = ({ now }) => (
-  <div className="rounded-[1.4rem] border border-slate-100 bg-white p-2.5 shadow-[0_14px_35px_rgba(15,23,42,0.05)]">
-    <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-[#0AC4E0] shadow-sm ring-1 ring-slate-100">
-        <Clock3 size={15} />
-      </div>
-      <div>
-        <p className="text-md font-black leading-none tracking-tight text-slate-900">
-          {now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-        </p>
-        <p className="mt-0.5 text-[7px] font-black uppercase tracking-widest text-slate-400">{formatDate(now)}</p>
-      </div>
-    </div>
-  </div>
-);
+UserNotificationModal.propTypes = {
+  open: PropTypes.bool,
+  onClose: PropTypes.func,
+  user: PropTypes.object,
+  label: PropTypes.string,
+  notifications: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      title: PropTypes.node,
+      description: PropTypes.node,
+      category: PropTypes.node,
+      time: PropTypes.node,
+      unread: PropTypes.bool,
+      icon: PropTypes.elementType,
+    }),
+  ),
+  loading: PropTypes.bool,
+  markingAll: PropTypes.bool,
+  onNotificationClick: PropTypes.func,
+  onMarkAllRead: PropTypes.func,
+};
 
 // ===== NOTCH NAVIGATION - MENEMPEL DI ATAS TENGAH =====
 const NotchNavigation = ({
@@ -1169,6 +1211,34 @@ const NotchNavigation = ({
       }} />
     </>
   );
+};
+
+const menuGroupsPropType = PropTypes.arrayOf(
+  PropTypes.shape({
+    label: PropTypes.string,
+    items: PropTypes.arrayOf(
+      PropTypes.shape({
+        label: PropTypes.string,
+        path: PropTypes.string,
+        icon: PropTypes.elementType,
+      }),
+    ),
+  }),
+);
+
+NotchNavigation.propTypes = {
+  menuGroups: menuGroupsPropType.isRequired,
+  location: PropTypes.object.isRequired,
+  onLogout: PropTypes.func,
+  user: PropTypes.object,
+  roleLabel: PropTypes.string,
+  unreadCount: PropTypes.number,
+  onProfileClick: PropTypes.func,
+  onNotificationClick: PropTypes.func,
+  onSettingsClick: PropTypes.func,
+  now: PropTypes.instanceOf(Date).isRequired,
+  brandTitle: PropTypes.string,
+  brandSubtitle: PropTypes.string,
 };
 
 const RightPoniNavigation = ({
@@ -1323,6 +1393,18 @@ const RightPoniNavigation = ({
   );
 };
 
+RightPoniNavigation.propTypes = {
+  menuGroups: menuGroupsPropType.isRequired,
+  location: PropTypes.object.isRequired,
+  onLogout: PropTypes.func,
+  user: PropTypes.object,
+  unreadCount: PropTypes.number,
+  onProfileClick: PropTypes.func,
+  onNotificationClick: PropTypes.func,
+  onSettingsClick: PropTypes.func,
+  brandTitle: PropTypes.string,
+  brandSubtitle: PropTypes.string,
+};
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -1624,7 +1706,7 @@ const Sidebar = () => {
         className={({ isActive: navActive }) => {
           const active = navActive || isActive;
           return `group relative flex min-h-12 w-full items-center gap-3 overflow-hidden rounded-[1.15rem] px-3.5 py-2.5 text-[13px] font-black leading-tight transition-[background-color,color,box-shadow,transform] duration-200 ease-out ${active
-            ? "bg-[#0AC4E0] text-white shadow-[0_14px_30px_rgba(10,196,224,0.24)]"
+            ? "bg-gradient-to-br from-[#0AC4E0] to-[#08B5D0] text-white shadow-[0_14px_30px_rgba(10,196,224,0.24)]"
             : "text-slate-500 hover:bg-[#0AC4E0]/5 hover:text-slate-900"
             }`;
         }}
@@ -1797,16 +1879,19 @@ const Sidebar = () => {
 
       <aside className={`app-sidebar-panel fixed inset-y-0 left-0 z-[220] flex shrink-0 flex-col overflow-hidden rounded-r-[1.55rem] border-r border-cyan-100/70 bg-white px-4 py-5 font-inter text-slate-800 shadow-[16px_0_48px_rgba(14,116,144,0.12)] transition-transform duration-300 ease-out lg:z-[80] lg:translate-x-0 lg:shadow-[14px_0_38px_rgba(14,116,144,0.08)] ${mobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
         <div className="shrink-0">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-slate-950">{menuTitle}</h1>
-              <div className="mt-2 h-1 w-10 rounded-full bg-[#0AC4E0]" />
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-[42px] w-[42px] shrink-0 items-center justify-center overflow-hidden rounded-[0.85rem] bg-gradient-to-br from-[#0AC4E0] via-[#08B5D0] to-[#0899B0] shadow-[0_10px_22px_rgba(10,196,224,0.32)]">
+              <LayoutDashboard size={19} className="text-white" />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Sistem Monitoring</p>
+              <h1 className="truncate text-[15px] font-black tracking-tight text-slate-950">{menuTitle}</h1>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-500 transition-all hover:bg-rose-500 hover:text-white active:scale-95"
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-500 transition-all hover:bg-rose-500 hover:text-white active:scale-95"
                 title="Keluar"
               >
                 <LogOut size={14} />
@@ -1815,7 +1900,7 @@ const Sidebar = () => {
               <button
                 type="button"
                 onClick={() => setMobileSidebarOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-900 hover:text-white active:scale-95 lg:hidden"
+                className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 text-slate-400 transition-all hover:bg-slate-900 hover:text-white active:scale-95 lg:hidden"
                 title="Tutup menu"
               >
                 <X size={14} />
@@ -1829,7 +1914,7 @@ const Sidebar = () => {
             {staticMenuGroups.map((group) => (
               <div key={group.label}>
                 <p className="mb-2 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
-                  <Database size={10} className="text-[#0AC4E0]" />
+                  <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-[#0AC4E0] shadow-[0_0_0_3px_rgba(10,196,224,0.14)]" />
                   {group.label}
                 </p>
                 <div className="space-y-1">
@@ -1842,7 +1927,7 @@ const Sidebar = () => {
           {managementMenuGroups.map((group) => (
             <div key={group.label} className="flex flex-1 flex-col min-h-0 border-t border-slate-100 pt-3">
               <p className="mb-2 flex shrink-0 items-center gap-2 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">
-                <Database size={10} className="text-[#0AC4E0]" />
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-[#0AC4E0] shadow-[0_0_0_3px_rgba(10,196,224,0.14)]" />
                 {group.label}
               </p>
               <div className="no-scrollbar flex-1 overflow-y-auto pr-1 min-h-0">
@@ -1856,11 +1941,11 @@ const Sidebar = () => {
 
         <div className="shrink-0 mt-auto pt-3 border-t border-slate-100">
           <div className="space-y-2">
-            <ClockBox now={now} />
-            <UserProfileCard
+            <AccountCard
               user={user}
               label={roleLabel}
               unreadCount={unreadNotificationCount}
+              now={now}
               onProfileClick={() => {
                 setShowNotificationHub(false);
                 setShowProfileHub(true);

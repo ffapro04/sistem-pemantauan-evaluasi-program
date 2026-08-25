@@ -2,6 +2,7 @@
 import {
   Controller,
   Get,
+  Param,
   Post,
   Query,
   Req,
@@ -17,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 
 import { GoogleDriveService } from './google-drive.service';
 import { JwtAuthGuard } from '../auth/jwt/jwt-auth-guard';
+import { UploadFileDto } from './dto/upload-file.dto';
 
 @Controller('google-drive')
 export class GoogleDriveController {
@@ -102,12 +104,11 @@ export class GoogleDriveController {
   async upload(
     @Req() req: any,
     @UploadedFile() file: Express.Multer.File,
-    @Body('moduleType') moduleType: string,
-    @Body('relatedTable') relatedTable?: string,
-    @Body('relatedId') relatedId?: string,
+    @Body() body: UploadFileDto,
   ) {
     const idUser = this.getCurrentUserId(req);
     const idRole = this.getCurrentUserRoleId(req);
+    const { moduleType, relatedTable, relatedId } = body;
 
     return this.googleDriveService.uploadFile({
       idUser,
@@ -117,5 +118,26 @@ export class GoogleDriveController {
       relatedTable: relatedTable || null,
       relatedId: relatedId ? Number(relatedId) : null,
     });
+  }
+
+  // Any logged-in user (AO, HO, vendor, ...) can open a document uploaded to
+  // this app through this route — the file itself stays private on Drive,
+  // this just proxies it through using the original uploader's credentials.
+  @UseGuards(JwtAuthGuard)
+  @Get('file/:driveFileId/stream')
+  async streamFile(
+    @Param('driveFileId') driveFileId: string,
+    @Res() res: Response,
+  ) {
+    const { stream, mimeType, fileName } =
+      await this.googleDriveService.streamFileForViewer(driveFileId);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(fileName)}"`,
+    );
+
+    stream.pipe(res);
   }
 }

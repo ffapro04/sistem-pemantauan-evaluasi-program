@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { cn } from "../../design/tokens";
 
 export default function AppPanel({
@@ -21,4 +21,12 @@ export default function AppPanel({
     </Component>
   );
 }
+
+AppPanel.propTypes = {
+  as: PropTypes.elementType,
+  children: PropTypes.node,
+  className: PropTypes.string,
+  padded: PropTypes.bool,
+  interactive: PropTypes.bool,
+};
 

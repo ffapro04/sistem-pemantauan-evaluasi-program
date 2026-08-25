@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../utils/authSession";
 import {
     AlertTriangle,
     BadgeCheck,
@@ -22,6 +23,7 @@ import {
 
 import { Sidebar, PageWrapper, Button } from "../common";
 import Dropdown from "../Dropdown";
+import AppButton from "../ui/AppButton";
 import SafeResponsiveContainer from "../charts/SafeResponsiveContainer";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -258,7 +260,7 @@ function ChartLegend({ data, total, valueSuffix = "program" }) {
 
 function DashboardPieCard({ eyebrow, title, description, data, total, centerLabel, emptyText, valueSuffix = "program" }) {
     return (
-        <section className="flex min-h-0 flex-col rounded-[1.55rem] border border-cyan-100 bg-white shadow-sm">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[1.55rem] border border-cyan-100 bg-white shadow-sm">
             <div className="shrink-0 border-b border-slate-100 px-4 py-3">
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0AC4E0]">{eyebrow}</p>
                 <h2 className="mt-1 text-[17px] font-black text-slate-950">{title}</h2>
@@ -268,7 +270,7 @@ function DashboardPieCard({ eyebrow, title, description, data, total, centerLabe
             {data.length ? (
                 <div className="grid min-h-0 flex-1 grid-cols-[minmax(250px,0.95fr)_minmax(260px,1.05fr)] items-center gap-4 p-4">
                     <div className="flex min-h-0 flex-col items-center justify-center">
-                        <div className="h-[290px] w-full min-w-0">
+                        <div className="h-[290px] w-full min-w-0 overflow-hidden">
                             <SafeResponsiveContainer
                                 width="100%"
                                 height="100%"
@@ -396,7 +398,7 @@ export default function DashboardVendorPage({
     const [viewMode, setViewMode] = useState("PILLAR");
 
     const getTokenPayload = () => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return null;
         try { return jwtDecode(token); } catch { return null; }
     };
@@ -422,7 +424,7 @@ export default function DashboardVendorPage({
         setLoadError("");
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             if (!token) throw new Error("Sesi login Vendor tidak ditemukan.");
 
             const headers = { Authorization: `Bearer ${token}` };
@@ -596,13 +598,15 @@ export default function DashboardVendorPage({
                                 <AlertTriangle size={15} className="shrink-0" />
                                 <span className="break-words">{loadError}</span>
                             </span>
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={() => fetchDashboardData({ silent: true })}
-                                className="shrink-0 rounded-xl border border-amber-200 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-wider"
+                                variant="secondary"
+                                size="xs"
+                                className="shrink-0 !border-amber-200 !text-amber-800 hover:!border-amber-200 hover:!text-amber-800"
                             >
                                 Coba Lagi
-                            </button>
+                            </AppButton>
                         </div>
                     )}
                     <section className="shrink-0 overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-sm">

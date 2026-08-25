@@ -19,12 +19,10 @@ import { showConfirmDialog } from "../../utils/popup";
 
 import Sidebar from "../../components/Sidebar";
 import { GoogleDriveLogo } from "../../components/ui";
+import AppButton from "../../components/ui/AppButton";
 
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../../config/apiBase.js";
+import { getAuthToken } from "../../utils/authSession";
 
 const GoogleDriveIntegration = () => {
     const navigate = useNavigate();
@@ -46,7 +44,7 @@ const GoogleDriveIntegration = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [uploadedFile, setUploadedFile] = useState(null);
 
-    const token = useMemo(() => localStorage.getItem("token"), []);
+    const token = useMemo(() => getAuthToken(), []);
 
     const authHeaders = useMemo(
         () => ({
@@ -284,19 +282,22 @@ const GoogleDriveIntegration = () => {
                                     </p>
                                 </div>
 
-                                <button
+                                <AppButton
                                     type="button"
                                     onClick={() => fetchStatus()}
                                     disabled={loading}
-                                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500 shadow-sm transition hover:border-cyan-100 hover:bg-cyan-50 hover:text-[#0AC4E0] disabled:opacity-60"
+                                    icon={
+                                        loading ? (
+                                            <Loader2 size={15} className="animate-spin" />
+                                        ) : (
+                                            <RefreshCw size={15} />
+                                        )
+                                    }
+                                    variant="secondary"
+                                    className="!rounded-2xl hover:!border-cyan-100 hover:!bg-cyan-50 hover:!text-[#0AC4E0]"
                                 >
-                                    {loading ? (
-                                        <Loader2 size={15} className="animate-spin" />
-                                    ) : (
-                                        <RefreshCw size={15} />
-                                    )}
                                     Refresh
-                                </button>
+                                </AppButton>
                             </div>
 
                             <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -367,33 +368,41 @@ const GoogleDriveIntegration = () => {
 
                             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                                 {!status.connected ? (
-                                    <button
+                                    <AppButton
                                         type="button"
                                         onClick={handleConnect}
                                         disabled={connecting}
-                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#0AC4E0] px-5 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-[0_18px_40px_rgba(10,196,224,0.28)] transition hover:bg-[#09b4ce] active:scale-[0.99] disabled:opacity-60"
+                                        icon={
+                                            connecting ? (
+                                                <Loader2 size={17} className="animate-spin" />
+                                            ) : (
+                                                <GoogleDriveLogo size={18} />
+                                            )
+                                        }
+                                        variant="accent"
+                                        size="lg"
+                                        className="flex-1 !rounded-2xl shadow-[0_18px_40px_rgba(10,196,224,0.28)] hover:!bg-[#09b4ce]"
                                     >
-                                        {connecting ? (
-                                            <Loader2 size={17} className="animate-spin" />
-                                        ) : (
-                                            <GoogleDriveLogo size={18} />
-                                        )}
                                         Hubungkan Google Drive
-                                    </button>
+                                    </AppButton>
                                 ) : (
-                                    <button
+                                    <AppButton
                                         type="button"
                                         onClick={handleDisconnect}
                                         disabled={disconnecting}
-                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-rose-500 px-5 py-3.5 text-sm font-black uppercase tracking-widest text-white shadow-[0_18px_40px_rgba(244,63,94,0.22)] transition hover:bg-rose-600 active:scale-[0.99] disabled:opacity-60"
+                                        icon={
+                                            disconnecting ? (
+                                                <Loader2 size={17} className="animate-spin" />
+                                            ) : (
+                                                <Unlink size={17} />
+                                            )
+                                        }
+                                        variant="danger"
+                                        size="lg"
+                                        className="flex-1 !rounded-2xl shadow-[0_18px_40px_rgba(244,63,94,0.22)]"
                                     >
-                                        {disconnecting ? (
-                                            <Loader2 size={17} className="animate-spin" />
-                                        ) : (
-                                            <Unlink size={17} />
-                                        )}
                                         Putuskan Koneksi
-                                    </button>
+                                    </AppButton>
                                 )}
                             </div>
                         </div>
@@ -438,19 +447,23 @@ const GoogleDriveIntegration = () => {
                                     </div>
                                 )}
 
-                                <button
+                                <AppButton
                                     type="button"
                                     onClick={handleUploadTest}
                                     disabled={uploading || !status.connected}
-                                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-black uppercase tracking-widest text-white transition hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
+                                    icon={
+                                        uploading ? (
+                                            <Loader2 size={17} className="animate-spin" />
+                                        ) : (
+                                            <UploadCloud size={17} />
+                                        )
+                                    }
+                                    variant="primary"
+                                    size="lg"
+                                    className="mt-5 w-full !rounded-2xl hover:!bg-slate-800"
                                 >
-                                    {uploading ? (
-                                        <Loader2 size={17} className="animate-spin" />
-                                    ) : (
-                                        <UploadCloud size={17} />
-                                    )}
                                     Upload Test
-                                </button>
+                                </AppButton>
                             </div>
 
                             {uploadedFile?.web_view_link && (

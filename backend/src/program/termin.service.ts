@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +16,8 @@ import { TerminChat } from './entities/termin-chat.entity';
 
 @Injectable()
 export class TerminService {
+  private readonly logger = new Logger(TerminService.name);
+
   constructor(
     @InjectRepository(Program)
     private readonly programRepo: Repository<Program>,
@@ -360,7 +363,7 @@ export class TerminService {
 
       return savedTermin;
     } catch (error) {
-      console.error('Error saat save termin:', error);
+      this.logger.error('Error saat save termin:', error);
 
       if (error instanceof BadRequestException) {
         throw error;
@@ -442,7 +445,7 @@ export class TerminService {
         throw error;
       }
 
-      console.error('Error saat save chat:', error);
+      this.logger.error('Error saat save chat:', error);
       throw new InternalServerErrorException('Gagal mengirim pesan!');
     }
   }

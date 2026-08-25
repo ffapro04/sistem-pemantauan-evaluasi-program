@@ -6,8 +6,8 @@ import {
   Body,
   Patch,
   Query,
-  Headers,
-  UnauthorizedException,
+  Req,
+  UseGuards,
   UseInterceptors,
   UploadedFile,
   Param,
@@ -16,6 +16,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ProgramService } from './program.service';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth-guard';
+import { CreateProgramDto } from './dto/create-program.dto';
+import { UpdateProgramDto } from './dto/update-program.dto';
 
 const FILE_LIMIT_10_MB = 10 * 1024 * 1024;
 
@@ -23,55 +26,29 @@ const FILE_LIMIT_10_MB = 10 * 1024 * 1024;
 export class ProgramController {
   constructor(private readonly programService: ProgramService) {}
 
-  private decodeToken(authHeader: string): {
+  // Sumber identitas user tunggal untuk seluruh controller ini: req.user
+  // sudah diverifikasi tanda tangannya oleh JwtStrategy (lewat JwtAuthGuard),
+  // jadi tidak ada lagi decode token manual tanpa verifikasi di sini.
+  private extractUser(req: any): {
     id_user: number;
     nama: string;
     role: string;
     id_role?: number;
   } {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token tidak ada');
-    }
+    const user = req?.user?.user ?? req?.user;
 
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Format token tidak valid');
-    }
-
-    try {
-      const payloadBase64Url = token.split('.')[1];
-
-      const payloadJson = Buffer.from(
-        payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/'),
-        'base64',
-      ).toString('utf-8');
-
-      const payload = JSON.parse(payloadJson);
-
-      return {
-        id_user: payload.sub || payload.id_user || payload.id,
-        nama:
-          payload.nama ||
-          payload.name ||
-          payload.username ||
-          payload.email ||
-          'User',
-        role:
-          payload.role ||
-          payload.nama_role ||
-          payload.jabatan ||
-          String(payload.id_role || ''),
-        id_role: payload.id_role ? Number(payload.id_role) : undefined,
-      };
-    } catch {
-      throw new UnauthorizedException('Token tidak valid');
-    }
+    return {
+      id_user: Number(user?.id_user || user?.sub || user?.id || 0),
+      nama: user?.nama || user?.name || user?.email || 'User',
+      role: user?.role || user?.nama_role || String(user?.id_role || ''),
+      id_role: user?.id_role ? Number(user.id_role) : undefined,
+    };
   }
 
   // ─── CREATE PROGRAM ──────────────────────────────────────────────────────────
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file_mou', {
       storage: memoryStorage(),
@@ -81,11 +58,11 @@ export class ProgramController {
     }),
   )
   create(
-    @Body() createProgramDto: any,
+    @Body() createProgramDto: CreateProgramDto,
     @UploadedFile() file: Express.Multer.File,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, id_role } = this.decodeToken(authHeader);
+    const { id_user, id_role } = this.extractUser(req);
 
     if (!createProgramDto.nama_program || !createProgramDto.id_sekolah) {
       throw new BadRequestException('Data wajib tidak lengkap');
@@ -137,6 +114,7 @@ export class ProgramController {
   // Vendor/Narasumber upload → Google Drive → WAITING_AO
 
   @Patch('persyaratan-termin/:id/upload')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -149,9 +127,9 @@ export class ProgramController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFile() file: Express.Multer.File,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role, id_role } = this.decodeToken(authHeader);
+    const { id_user, role, id_role } = this.extractUser(req);
 
     return this.programService.uploadPersyaratanTermin(
       +id,
@@ -167,12 +145,13 @@ export class ProgramController {
   // WAITING_AO → WAITING_HO / REJECTED_AO
 
   @Patch('persyaratan-termin/:id/ao-approve')
+  @UseGuards(JwtAuthGuard)
   aoApprovePersyaratanTermin(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.aoApprovePersyaratanTermin(
       +id,
@@ -183,12 +162,13 @@ export class ProgramController {
   }
 
   @Patch('persyaratan-termin/:id/ao-reject')
+  @UseGuards(JwtAuthGuard)
   aoRejectPersyaratanTermin(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.aoRejectPersyaratanTermin(
       +id,
@@ -202,22 +182,24 @@ export class ProgramController {
   // WAITING_HO → APPROVED / REJECTED_HO
 
   @Patch('persyaratan-termin/:id/approve')
+  @UseGuards(JwtAuthGuard)
   approvePersyaratanTermin(
     @Param('id') id: string,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.approvePersyaratanTermin(+id, id_user, role);
   }
 
   @Patch('persyaratan-termin/:id/reject')
+  @UseGuards(JwtAuthGuard)
   rejectPersyaratanTermin(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.rejectPersyaratanTermin(+id, id_user, role, body);
   }
@@ -226,6 +208,7 @@ export class ProgramController {
   // Vendor/Narasumber upload → Google Drive → WAITING_AO
 
   @Patch('persyaratan-kegiatan/:id/upload')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -238,9 +221,9 @@ export class ProgramController {
     @Param('id') id: string,
     @Body() body: any,
     @UploadedFile() file: Express.Multer.File,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role, id_role } = this.decodeToken(authHeader);
+    const { id_user, role, id_role } = this.extractUser(req);
 
     return this.programService.uploadPersyaratanKegiatan(
       +id,
@@ -256,12 +239,13 @@ export class ProgramController {
   // WAITING_AO → WAITING_HO / REJECTED_AO
 
   @Patch('persyaratan-kegiatan/:id/ao-approve')
+  @UseGuards(JwtAuthGuard)
   aoApprovePersyaratanKegiatan(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.aoApprovePersyaratanKegiatan(
       +id,
@@ -272,12 +256,13 @@ export class ProgramController {
   }
 
   @Patch('persyaratan-kegiatan/:id/ao-reject')
+  @UseGuards(JwtAuthGuard)
   aoRejectPersyaratanKegiatan(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.aoRejectPersyaratanKegiatan(
       +id,
@@ -291,22 +276,24 @@ export class ProgramController {
   // WAITING_HO → APPROVED / REJECTED_HO
 
   @Patch('persyaratan-kegiatan/:id/approve')
+  @UseGuards(JwtAuthGuard)
   approvePersyaratanKegiatan(
     @Param('id') id: string,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.approvePersyaratanKegiatan(+id, id_user, role);
   }
 
   @Patch('persyaratan-kegiatan/:id/reject')
+  @UseGuards(JwtAuthGuard)
   rejectPersyaratanKegiatan(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, role } = this.decodeToken(authHeader);
+    const { id_user, role } = this.extractUser(req);
 
     return this.programService.rejectPersyaratanKegiatan(+id, id_user, role, body);
   }
@@ -314,12 +301,13 @@ export class ProgramController {
   // ─── COMMENT PER KEGIATAN ───────────────────────────────────────────────────
 
   @Post('kegiatan/:id/comment')
+  @UseGuards(JwtAuthGuard)
   addComment(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, nama, role } = this.decodeToken(authHeader);
+    const { id_user, nama, role } = this.extractUser(req);
 
     return this.programService.addComment(+id, body, id_user, nama, role);
   }
@@ -332,12 +320,13 @@ export class ProgramController {
   // ─── GURU RATING / KOMENTAR SEKOLAH ─────────────────────────────────────────
 
   @Post('kegiatan/:id/rating')
+  @UseGuards(JwtAuthGuard)
   submitRating(
     @Param('id') id: string,
     @Body() body: any,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, nama } = this.decodeToken(authHeader);
+    const { id_user, nama } = this.extractUser(req);
 
     return this.programService.submitGuruRating(+id, body, id_user, nama);
   }
@@ -345,6 +334,7 @@ export class ProgramController {
   // ─── UPDATE PROGRAM ─────────────────────────────────────────────────────────
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('file_mou', {
       storage: memoryStorage(),
@@ -355,11 +345,11 @@ export class ProgramController {
   )
   update(
     @Param('id') id: string,
-    @Body() updateData: any,
+    @Body() updateData: UpdateProgramDto,
     @UploadedFile() file: Express.Multer.File,
-    @Headers('authorization') authHeader: string,
+    @Req() req: any,
   ) {
-    const { id_user, id_role } = this.decodeToken(authHeader);
+    const { id_user, id_role } = this.extractUser(req);
 
     return this.programService.update(+id, updateData, file, id_user, id_role);
   }

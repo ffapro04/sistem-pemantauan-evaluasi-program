@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React, { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
   ArrowLeft,
   LogOut,
@@ -7,7 +7,6 @@ import {
   Settings,
   User,
   X,
-  Search as SearchIcon,
   Home,
   Target,
   BookOpen,
@@ -37,6 +36,11 @@ const ChevronDown = ({ size = 16, className = "" }) => (
     <path d="m6 9 6 6 6-6" />
   </svg>
 );
+
+ChevronDown.propTypes = {
+  size: PropTypes.number,
+  className: PropTypes.string,
+};
 
 const MOBILE_NAV_ITEMS = [
   {
@@ -159,6 +163,12 @@ function ProfileMenu({ profileOpen, setProfileOpen, navigate }) {
   );
 }
 
+ProfileMenu.propTypes = {
+  profileOpen: PropTypes.bool,
+  setProfileOpen: PropTypes.func.isRequired,
+  navigate: PropTypes.func.isRequired,
+};
+
 function BrandLogo({ navigate }) {
   return (
     <button
@@ -175,6 +185,10 @@ function BrandLogo({ navigate }) {
     </button>
   );
 }
+
+BrandLogo.propTypes = {
+  navigate: PropTypes.func.isRequired,
+};
 
 function MobileMenuItem({ item, onClick }) {
   const Icon = item.icon || Home;
@@ -200,6 +214,16 @@ function MobileMenuItem({ item, onClick }) {
     </button>
   );
 }
+
+MobileMenuItem.propTypes = {
+  item: PropTypes.shape({
+    label: PropTypes.string,
+    desc: PropTypes.string,
+    href: PropTypes.string,
+    icon: PropTypes.elementType,
+  }).isRequired,
+  onClick: PropTypes.func.isRequired,
+};
 
 function Navbar({
   extraMenu = null,
@@ -558,5 +582,16 @@ function Navbar({
     </>
   );
 }
+
+Navbar.propTypes = {
+  extraMenu: PropTypes.node,
+  showBack: PropTypes.bool,
+  showProfile: PropTypes.bool,
+  isDashboard: PropTypes.bool,
+  searchValue: PropTypes.string,
+  onSearchChange: PropTypes.func,
+  onSearchSubmit: PropTypes.func,
+  searchPlaceholder: PropTypes.string,
+};
 
 export default Navbar;

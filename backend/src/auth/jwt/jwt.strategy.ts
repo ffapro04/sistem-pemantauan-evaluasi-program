@@ -6,14 +6,19 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly configService: ConfigService) {
+  constructor(configService: ConfigService) {
+    const jwtSecret = configService.get<string>('JWT_SECRET');
+
+    if (!jwtSecret) {
+      throw new Error(
+        'JWT_SECRET tidak ditemukan di environment. Set JWT_SECRET sebelum menjalankan aplikasi.',
+      );
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') ||
-        process.env.JWT_SECRET ||
-        'SECRET_KEY',
+      secretOrKey: jwtSecret,
     });
   }
 

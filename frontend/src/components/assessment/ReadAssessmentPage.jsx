@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
@@ -30,12 +30,12 @@ import Card from "../Card";
 import Input from "../Input";
 import Button from "../Button";
 import Label from "../Label";
+import AppButton from "../ui/AppButton";
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { exportAssessmentResultWorkbook } from "../../utils/assessmentExcelExport";
 import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as API_BASE } from "../../config/apiBase.js";
 const loadXlsx = async () => import("xlsx");
 
 const ASSESSMENT_PILAR_OPTIONS = {
@@ -1019,15 +1019,17 @@ function ReadAssessmentPage({
                                 usePortal
                             />
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={resetFilter}
-                                className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[9px] font-black uppercase tracking-wide text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 xl:w-11 xl:px-0"
+                                icon={<RotateCcw size={16} />}
+                                variant="subtle"
+                                size="md"
                                 title="Reset seluruh filter"
+                                className="!h-10 !w-full !gap-2 !rounded-xl !border !border-slate-200 !bg-slate-50 !px-3 !text-[9px] !tracking-wide !text-slate-400 hover:!border-rose-200 hover:!bg-rose-50 hover:!text-rose-500 xl:!w-11 xl:!px-0"
                             >
-                                <RotateCcw size={16} />
                                 <span className="xl:hidden">Reset Filter</span>
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
 
@@ -1289,25 +1291,25 @@ function ReadAssessmentPage({
 
                         {totalPages > 1 && (
                             <div className="flex items-center justify-center gap-2">
-                                <button
-                                    type="button"
+                                <AppButton
+                                    text="Prev"
                                     onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
                                     disabled={page <= 1}
-                                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                    Prev
-                                </button>
+                                    variant="secondary"
+                                    size="sm"
+                                    className="!px-4 !py-2.5 !text-[9px] !tracking-wide !text-slate-500 hover:!border-cyan-200 hover:!text-[#0AC4E0]"
+                                />
                                 <span className="min-w-[72px] rounded-xl bg-slate-900 px-4 py-2.5 text-center text-[9px] font-black uppercase tracking-wide text-white">
                                     {page} / {totalPages}
                                 </span>
-                                <button
-                                    type="button"
+                                <AppButton
+                                    text="Next"
                                     onClick={() => setPage((prev) => Math.min(prev + 1, totalPages))}
                                     disabled={page >= totalPages}
-                                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[9px] font-black uppercase tracking-wide text-slate-500 transition hover:border-cyan-200 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
-                                >
-                                    Next
-                                </button>
+                                    variant="secondary"
+                                    size="sm"
+                                    className="!px-4 !py-2.5 !text-[9px] !tracking-wide !text-slate-500 hover:!border-cyan-200 hover:!text-[#0AC4E0]"
+                                />
                             </div>
                         )}
                     </div>
@@ -1316,5 +1318,12 @@ function ReadAssessmentPage({
         </PageWrapper>
     );
 }
+
+ReadAssessmentPage.propTypes = {
+    jenisAssessment: PropTypes.string,
+    labelAssessment: PropTypes.string,
+    basePath: PropTypes.string,
+    title: PropTypes.node,
+};
 
 export default ReadAssessmentPage;

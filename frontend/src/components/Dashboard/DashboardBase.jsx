@@ -1,7 +1,8 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../utils/authSession";
 import {
     Activity,
     AlertTriangle,
@@ -957,6 +958,14 @@ function DashboardPanel({ title, subtitle, right, children, className = "" }) {
     );
 }
 
+DashboardPanel.propTypes = {
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    right: PropTypes.node,
+    children: PropTypes.node,
+    className: PropTypes.string,
+};
+
 function MetricCard({ label, value, helper, icon, color }) {
     return (
         <div className="relative min-h-[102px] overflow-hidden border-r border-slate-100 bg-white px-5 py-4 last:border-r-0">
@@ -989,6 +998,14 @@ function MetricCard({ label, value, helper, icon, color }) {
         </div>
     );
 }
+
+MetricCard.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+    helper: PropTypes.node,
+    icon: PropTypes.node,
+    color: PropTypes.string,
+};
 
 function ExecutiveVisualControlPanel({
     modes = [],
@@ -1105,6 +1122,27 @@ function ExecutiveVisualControlPanel({
     );
 }
 
+ExecutiveVisualControlPanel.propTypes = {
+    modes: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.string,
+            label: PropTypes.string,
+            helper: PropTypes.string,
+            color: PropTypes.string,
+            icon: PropTypes.node,
+            count: PropTypes.number,
+        }),
+    ),
+    activeMode: PropTypes.string,
+    stageLabel: PropTypes.string,
+    pillarLabel: PropTypes.string,
+    countyLabel: PropTypes.string,
+    resultCount: PropTypes.number,
+    totalCount: PropTypes.number,
+    onSelectMode: PropTypes.func,
+    onResetSlices: PropTypes.func,
+};
+
 function SearchBox({ value, onChange, placeholder }) {
     return (
         <div className="relative min-w-[220px] flex-1">
@@ -1121,6 +1159,12 @@ function SearchBox({ value, onChange, placeholder }) {
         </div>
     );
 }
+
+SearchBox.propTypes = {
+    value: PropTypes.string,
+    onChange: PropTypes.func,
+    placeholder: PropTypes.string,
+};
 
 function DropdownFilter({
     value,
@@ -1144,6 +1188,20 @@ function DropdownFilter({
     );
 }
 
+DropdownFilter.propTypes = {
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func,
+    items: PropTypes.arrayOf(
+        PropTypes.shape({
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.node,
+        }),
+    ),
+    placeholder: PropTypes.string,
+    ariaLabel: PropTypes.string,
+    width: PropTypes.string,
+};
+
 function EmptyState({ title }) {
     return (
         <div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center">
@@ -1154,6 +1212,10 @@ function EmptyState({ title }) {
         </div>
     );
 }
+
+EmptyState.propTypes = {
+    title: PropTypes.node,
+};
 
 function PillarBadge({ pillarKey }) {
     const meta = PILLAR_META[pillarKey] || PILLAR_META.AKADEMIK;
@@ -1171,6 +1233,10 @@ function PillarBadge({ pillarKey }) {
         </span>
     );
 }
+
+PillarBadge.propTypes = {
+    pillarKey: PropTypes.string,
+};
 
 function StatusPieCard({
     title,
@@ -1214,18 +1280,16 @@ function StatusPieCard({
                 </div>
             </div>
 
-            <div className={`grid min-h-0 flex-1 gap-4 px-4 py-4 md:items-stretch ${emphasizeChart
+            <div className={`grid min-h-0 flex-1 gap-4 px-4 pb-12 pt-4 md:items-stretch ${emphasizeChart
                 ? "md:grid-cols-[minmax(250px,1fr)_minmax(250px,1fr)]"
                 : "md:grid-cols-[minmax(190px,0.92fr)_minmax(210px,1.08fr)]"
                 }`}>
                 <div
-                    className={`relative min-w-0 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-cyan-50/40 ${emphasizeChart ? "h-full min-h-[300px]" : "min-h-[210px]"
+                    className={`relative min-w-0 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 via-white to-cyan-50/40 ${emphasizeChart ? "h-full min-h-[300px]" : "min-h-[210px]"
                         }`}
                 >
                     {visibleRows.length ? (
-                        <div
-                            className={emphasizeChart ? "h-full translate-y-[58px]" : "h-full"}
-                        >
+                        <div className="h-full">
                             <ResponsiveContainer
                                 width="100%"
                                 height="100%"
@@ -1241,8 +1305,8 @@ function StatusPieCard({
                                             Math.min(126, Math.round(radiusBase * 0.43)),
                                         )
                                         : Math.max(
-                                            65,
-                                            Math.min(88, Math.round(radiusBase * 0.39)),
+                                            60,
+                                            Math.min(78, Math.round(radiusBase * 0.34)),
                                         );
 
                                     return (
@@ -1252,7 +1316,7 @@ function StatusPieCard({
                                                 dataKey="value"
                                                 nameKey="name"
                                                 cx="50%"
-                                                cy={emphasizeChart ? "56%" : "50%"}
+                                                cy={emphasizeChart ? "44%" : "40%"}
                                                 innerRadius={0}
                                                 outerRadius={outerRadius}
                                                 paddingAngle={2}
@@ -1310,22 +1374,26 @@ function StatusPieCard({
                         </div>
                     )}
 
+                    {/* Absolutely positioned so it costs no extra layout height
+                        (this card sits in a fixed-height dashboard grid row) —
+                        but bounded to the chart box's own width with truncation,
+                        and the pie above is shifted/shrunk to keep its lower arc
+                        clear of this zone, so the badge can no longer overlap the
+                        chart or spill past this card into whatever sits below,
+                        no matter how long the title text or how much pie data. */}
                     <div
-                        className={`pointer-events-none absolute left-1/2 -translate-x-1/2 ${emphasizeChart ? "bottom-7" : "bottom-3"
+                        className={`pointer-events-none absolute inset-x-2 flex justify-center ${emphasizeChart ? "bottom-7" : "bottom-4"
                             }`}
                     >
-                        <div className="inline-flex min-w-[154px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_16px_38px_rgba(15,23,42,0.16)]">
-                            <span className="flex h-10 min-w-[42px] shrink-0 items-center justify-center rounded-xl bg-slate-900 px-2 text-[20px] font-black leading-none text-white shadow-sm">
+                        <div className="inline-flex max-w-full items-center gap-2.5 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-[0_16px_38px_rgba(15,23,42,0.16)]">
+                            <span className="flex h-8 min-w-[36px] shrink-0 items-center justify-center rounded-lg bg-slate-900 px-2 text-[16px] font-black leading-none text-white shadow-sm">
                                 {total}
                             </span>
                             <span className="min-w-0 pr-1 text-left">
                                 <span className="block whitespace-nowrap text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
                                     Total Data
                                 </span>
-                                <span
-                                    className="mt-0.5 block whitespace-nowrap text-[10px] font-black leading-none text-slate-700"
-                                    style={{ wordBreak: "keep-all", overflowWrap: "normal" }}
-                                >
+                                <span className="mt-0.5 block truncate text-[10px] font-black leading-none text-slate-700">
                                     {title}
                                 </span>
                             </span>
@@ -1422,6 +1490,30 @@ function StatusPieCard({
         </DashboardPanel>
     );
 }
+
+StatusPieCard.propTypes = {
+    title: PropTypes.node,
+    total: PropTypes.number,
+    rows: PropTypes.arrayOf(
+        PropTypes.shape({
+            key: PropTypes.string,
+            name: PropTypes.string,
+            value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            color: PropTypes.string,
+            detail: PropTypes.string,
+        }),
+    ),
+    icon: PropTypes.node,
+    helper: PropTypes.node,
+    showProgress: PropTypes.bool,
+    description: PropTypes.string,
+    className: PropTypes.string,
+    interactive: PropTypes.bool,
+    selectedKey: PropTypes.string,
+    onSelect: PropTypes.func,
+    emphasizeChart: PropTypes.bool,
+    compactSummary: PropTypes.bool,
+};
 
 function VisualProcessPanel({
     mode = "PROGRAM",
@@ -1779,6 +1871,33 @@ function VisualProcessPanel({
     );
 }
 
+VisualProcessPanel.propTypes = {
+    mode: PropTypes.oneOf(["PROGRAM", "ASSESSMENT"]),
+    query: PropTypes.string,
+    setQuery: PropTypes.func,
+    item: PropTypes.object,
+    steps: PropTypes.arrayOf(
+        PropTypes.oneOfType([
+            PropTypes.string,
+            PropTypes.shape({
+                label: PropTypes.string,
+                status: PropTypes.string,
+            }),
+        ]),
+    ),
+    targets: PropTypes.arrayOf(
+        PropTypes.shape({
+            name: PropTypes.string,
+            county: PropTypes.string,
+            area: PropTypes.string,
+        }),
+    ),
+    getTitle: PropTypes.func,
+    getCode: PropTypes.func,
+    nowMs: PropTypes.number,
+    staggeredHeader: PropTypes.bool,
+};
+
 function CompactMonitoringList({
     mode = "PROGRAM",
     onFlip,
@@ -1990,6 +2109,20 @@ function CompactMonitoringList({
     );
 }
 
+CompactMonitoringList.propTypes = {
+    mode: PropTypes.oneOf(["PROGRAM", "ASSESSMENT"]),
+    onFlip: PropTypes.func,
+    rows: PropTypes.arrayOf(PropTypes.object),
+    totalCount: PropTypes.number,
+    page: PropTypes.number,
+    totalPages: PropTypes.number,
+    setPage: PropTypes.func,
+    getTitle: PropTypes.func,
+    getCode: PropTypes.func,
+    getYear: PropTypes.func,
+    onSelectVisual: PropTypes.func,
+};
+
 function CoverageTooltip({ active, payload, label }) {
     if (!active || !payload?.length) return null;
 
@@ -2020,6 +2153,19 @@ function CoverageTooltip({ active, payload, label }) {
         </div>
     );
 }
+
+CoverageTooltip.propTypes = {
+    active: PropTypes.bool,
+    payload: PropTypes.arrayOf(
+        PropTypes.shape({
+            dataKey: PropTypes.string,
+            name: PropTypes.string,
+            value: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            color: PropTypes.string,
+        }),
+    ),
+    label: PropTypes.node,
+};
 
 function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
     if (!rows.length) {
@@ -2265,6 +2411,12 @@ function CoverageChart({ rows, visiblePillars, chartType = "BAR" }) {
         </div>
     );
 }
+CoverageChart.propTypes = {
+    rows: PropTypes.arrayOf(PropTypes.object).isRequired,
+    visiblePillars: PropTypes.arrayOf(PropTypes.string).isRequired,
+    chartType: PropTypes.oneOf(["BAR", "PIE"]),
+};
+
 function DataList({
     rows,
     type,
@@ -2444,6 +2596,17 @@ function DataList({
         </div>
     );
 }
+
+DataList.propTypes = {
+    rows: PropTypes.arrayOf(PropTypes.object).isRequired,
+    type: PropTypes.oneOf(["PROGRAM", "ASSESSMENT"]),
+    getTitle: PropTypes.func.isRequired,
+    getCode: PropTypes.func.isRequired,
+    getStatus: PropTypes.func,
+    resolveTargets: PropTypes.func.isRequired,
+    onItemClick: PropTypes.func,
+    filterSignature: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+};
 
 function AnalyticsSection({
     type,
@@ -2679,6 +2842,38 @@ function AnalyticsSection({
     );
 }
 
+AnalyticsSection.propTypes = {
+    type: PropTypes.oneOf(["PROGRAM", "ASSESSMENT"]),
+    title: PropTypes.node,
+    rows: PropTypes.arrayOf(PropTypes.object),
+    chartRows: PropTypes.arrayOf(PropTypes.object),
+    visiblePillars: PropTypes.arrayOf(PropTypes.string),
+    groupFilter: PropTypes.string,
+    setGroupFilter: PropTypes.func,
+    pillarFilter: PropTypes.string,
+    setPillarFilter: PropTypes.func,
+    countyFilter: PropTypes.string,
+    setCountyFilter: PropTypes.func,
+    countyOptions: PropTypes.array,
+    yearFilter: PropTypes.string,
+    setYearFilter: PropTypes.func,
+    yearOptions: PropTypes.array,
+    groupBy: PropTypes.string,
+    setGroupBy: PropTypes.func,
+    typeFilter: PropTypes.string,
+    setTypeFilter: PropTypes.func,
+    progressFilter: PropTypes.string,
+    setProgressFilter: PropTypes.func,
+    search: PropTypes.string,
+    setSearch: PropTypes.func,
+    categoryFilter: PropTypes.string,
+    getTitle: PropTypes.func,
+    getCode: PropTypes.func,
+    getStatus: PropTypes.func,
+    resolveTargets: PropTypes.func,
+    onItemClick: PropTypes.func,
+};
+
 function DashboardBase({
     title = "Dashboard",
     titleHighlight = "",
@@ -2776,7 +2971,7 @@ function DashboardBase({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
             const [schoolRes, programRes, assessmentRes] = await Promise.all([
@@ -4049,7 +4244,7 @@ function DashboardBase({
 
                     {showMonitoringList ? (
                         <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.34fr)]">
-                            <div className="grid min-h-0 gap-3 xl:grid-rows-[auto_minmax(320px,1fr)]">
+                            <div className="grid min-h-0 gap-5 xl:grid-rows-[auto_minmax(320px,1fr)]">
                                 <div
                                     className={`grid min-h-0 gap-3 lg:items-start ${assessmentEnabled ? "lg:grid-cols-2" : "lg:grid-cols-1"
                                         }`}
@@ -4186,7 +4381,7 @@ function DashboardBase({
                         </section>
                     ) : showExecutiveSummary ? (
                         <section className="min-h-0 flex-1 overflow-hidden">
-                            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(280px,1fr)_auto] gap-3">
+                            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(400px,1fr)_auto] gap-3">
                                 <DashboardPanel className="shrink-0">
                                     <div className="grid sm:grid-cols-2 xl:grid-cols-4">
                                         {executiveMetricRows.map((metric) => (
@@ -4347,5 +4542,30 @@ function DashboardBase({
         </PageWrapper>
     );
 }
+
+DashboardBase.propTypes = {
+    title: PropTypes.string,
+    titleHighlight: PropTypes.string,
+    subtitle: PropTypes.string,
+    categoryLabel: PropTypes.string,
+    categoryFilter: PropTypes.string,
+    allowedJenjang: PropTypes.array,
+    scopeLabel: PropTypes.string,
+    primaryEndpoint: PropTypes.string,
+    programEndpoint: PropTypes.string,
+    assessmentEndpoint: PropTypes.string,
+    getItemRegion: PropTypes.func,
+    getProgramTitle: PropTypes.func,
+    getProgramStatus: PropTypes.func,
+    getProgramCode: PropTypes.func,
+    getAssessmentTitle: PropTypes.func,
+    getAssessmentStatus: PropTypes.func,
+    getAssessmentCode: PropTypes.func,
+    onProgramClick: PropTypes.func,
+    onAssessmentClick: PropTypes.func,
+    showAssessment: PropTypes.bool,
+    showMonitoringList: PropTypes.bool,
+    showExecutiveSummary: PropTypes.bool,
+};
 
 export default DashboardBase;

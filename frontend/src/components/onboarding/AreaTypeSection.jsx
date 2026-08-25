@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React from "react";
+﻿import React from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { CheckCircle2, Globe2, MapPinned, Layers } from "lucide-react";
 
@@ -93,6 +93,15 @@ function AreaTypeCard({ icon: Icon, title, desc, points, highlighted, index }) {
         </motion.div>
     );
 }
+
+AreaTypeCard.propTypes = {
+    icon: PropTypes.elementType.isRequired,
+    title: PropTypes.string.isRequired,
+    desc: PropTypes.string.isRequired,
+    points: PropTypes.arrayOf(PropTypes.string).isRequired,
+    highlighted: PropTypes.bool,
+    index: PropTypes.number,
+};
 
 function AreaTypeSection() {
     return (

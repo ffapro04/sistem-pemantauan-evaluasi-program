@@ -8,6 +8,15 @@ import {
 } from 'typeorm';
 import { Termin } from './termin.entity';
 
+export enum PersyaratanStatus {
+  WAITING_UPLOAD = 'WAITING_UPLOAD',
+  WAITING_AO = 'WAITING_AO',
+  WAITING_HO = 'WAITING_HO',
+  APPROVED = 'APPROVED',
+  REJECTED_AO = 'REJECTED_AO',
+  REJECTED_HO = 'REJECTED_HO',
+}
+
 @Entity('t_persyaratan_termin')
 export class PersyaratanTermin {
   @PrimaryGeneratedColumn()
@@ -28,9 +37,8 @@ export class PersyaratanTermin {
   @Column({ default: 1 })
   urutan: number;
 
-  /** WAITING_UPLOAD | WAITING_HO | APPROVED | REJECTED */
-  @Column({ default: 'WAITING_UPLOAD' })
-  status: string;
+  @Column({ default: PersyaratanStatus.WAITING_UPLOAD })
+  status: PersyaratanStatus;
 
   @Column({ type: 'text', nullable: true })
   file_path: string;

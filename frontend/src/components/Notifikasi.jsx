@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Bell, Mail, Smartphone, CheckCircle2 } from "lucide-react";
 
 function Notifikasi({ settings = {}, onChange }) {
@@ -66,5 +66,10 @@ function Notifikasi({ settings = {}, onChange }) {
         </div>
     );
 }
+
+Notifikasi.propTypes = {
+    settings: PropTypes.object,
+    onChange: PropTypes.func,
+};
 
 export default Notifikasi;

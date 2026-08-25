@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import PageState from "./ui/PageState";
 
 function EmptyState({
@@ -17,6 +17,13 @@ function EmptyState({
         />
     );
 }
+
+EmptyState.propTypes = {
+    icon: PropTypes.node,
+    title: PropTypes.node,
+    description: PropTypes.node,
+    className: PropTypes.string,
+};
 
 export default EmptyState;
 

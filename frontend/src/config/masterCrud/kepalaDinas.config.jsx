@@ -1,7 +1,5 @@
 ﻿// src/config/masterCrud/kepalaDinas.config.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
 import {
     Briefcase,
     Database,

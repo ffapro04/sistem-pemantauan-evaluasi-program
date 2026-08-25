@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import React from "react";
+﻿import React from "react";
+import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { ArrowUpRight, MapPinned, School, UsersRound } from "lucide-react";
 
@@ -22,6 +22,13 @@ function StatItem({ label, value, helper, icon: Icon }) {
         </div>
     );
 }
+
+StatItem.propTypes = {
+    label: PropTypes.string.isRequired,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    helper: PropTypes.node,
+    icon: PropTypes.elementType.isRequired,
+};
 
 function OnboardingHero({ image, stats, selectedWilayah }) {
     const selectedAreaName =
@@ -167,5 +174,19 @@ function OnboardingHero({ image, stats, selectedWilayah }) {
         </section>
     );
 }
+
+OnboardingHero.propTypes = {
+    image: PropTypes.string.isRequired,
+    stats: PropTypes.shape({
+        totalWilayah: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        totalSekolah: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        filteredSekolah: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        totalGuru: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        totalSiswa: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    }).isRequired,
+    selectedWilayah: PropTypes.shape({
+        nama_wilayah: PropTypes.string,
+    }),
+};
 
 export default OnboardingHero;

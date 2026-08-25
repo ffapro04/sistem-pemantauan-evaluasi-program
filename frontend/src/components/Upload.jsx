@@ -1,11 +1,12 @@
-﻿/* eslint-disable react/prop-types */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import {
   Upload as UploadIcon,
   X,
   FileCheck,
   AlertCircle,
 } from "lucide-react";
+import AppIconButton from "./ui/AppIconButton";
 
 const DEFAULT_MAX_SIZE = 100 * 1024 * 1024;
 
@@ -277,18 +278,37 @@ const Upload = ({
         />
 
         {activeFile && !disabled && (
-          <button
-            type="button"
+          <AppIconButton
+            icon={X}
+            iconSize={12}
+            strokeWidth={3}
             onClick={handleRemove}
-            className="absolute -right-2 -top-2 z-20 rounded-full bg-red-500 p-1.5 text-white shadow-lg transition-all hover:bg-red-600"
             title="Hapus file"
-          >
-            <X size={12} strokeWidth={3} />
-          </button>
+            ariaLabel="Hapus file"
+            variant="danger"
+            size="auto"
+            className="!absolute !-right-2 !-top-2 !z-20 !rounded-full !border-transparent !bg-red-500 !p-1.5 !text-white shadow-lg hover:!bg-red-600"
+          />
         )}
       </div>
     </div>
   );
+};
+
+Upload.propTypes = {
+  label: PropTypes.node,
+  file: PropTypes.oneOfType([PropTypes.instanceOf(File), PropTypes.string]),
+  existingUrl: PropTypes.string,
+  existingName: PropTypes.string,
+  previewAsImage: PropTypes.bool,
+  onFileSelect: PropTypes.func,
+  required: PropTypes.bool,
+  disabled: PropTypes.bool,
+  className: PropTypes.string,
+  accept: PropTypes.string,
+  maxSize: PropTypes.number,
+  buttonText: PropTypes.node,
+  helperText: PropTypes.node,
 };
 
 export default Upload;

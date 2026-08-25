@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useState, useCallback } from "react";
 import { Search as SearchIcon, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -94,3 +94,15 @@ export default function Search({
     </div>
   );
 }
+
+Search.propTypes = {
+  placeholder: PropTypes.string,
+  className: PropTypes.string,
+  variant: PropTypes.string,
+  data: PropTypes.array,
+  keys: PropTypes.arrayOf(PropTypes.string),
+  onResult: PropTypes.func,
+  onSearch: PropTypes.func,
+  value: PropTypes.string,
+  onChange: PropTypes.func,
+};

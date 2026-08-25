@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import Sidebar from "../Sidebar";
 import PageWrapper from "../PageWrapper";
 import AppPanel from "./AppPanel";
@@ -113,3 +113,21 @@ export default function PageShell({
     </PageWrapper>
   );
 }
+
+PageShell.propTypes = {
+  children: PropTypes.node,
+  title: PropTypes.node,
+  highlight: PropTypes.node,
+  subtitle: PropTypes.node,
+  action: PropTypes.node,
+  backAction: PropTypes.shape({
+    onClick: PropTypes.func,
+    icon: PropTypes.oneOfType([PropTypes.element, PropTypes.elementType]),
+    label: PropTypes.node,
+  }),
+  withSidebar: PropTypes.bool,
+  frame: PropTypes.bool,
+  className: PropTypes.string,
+  mainClassName: PropTypes.string,
+  contentClassName: PropTypes.string,
+};

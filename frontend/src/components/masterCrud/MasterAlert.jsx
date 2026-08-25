@@ -1,9 +1,9 @@
 ﻿// src/components/masterCrud/MasterAlert.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
+import PropTypes from "prop-types";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, XCircle } from "lucide-react";
+import AppButton from "../ui/AppButton";
 
 export default function MasterAlert({ note, setNote }) {
     return (
@@ -36,16 +36,26 @@ export default function MasterAlert({ note, setNote }) {
                             {note.message}
                         </p>
 
-                        <button
+                        <AppButton
                             type="button"
                             onClick={() => setNote({ show: false, type: null, message: "" })}
-                            className="mt-3 w-full rounded-xl bg-slate-950 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-[#0AC4E0] active:scale-95"
+                            variant="primary"
+                            className="mt-3 w-full"
                         >
                             Mengerti
-                        </button>
+                        </AppButton>
                     </div>
                 </motion.div>
             )}
         </AnimatePresence>
     );
 }
+
+MasterAlert.propTypes = {
+    note: PropTypes.shape({
+        show: PropTypes.bool,
+        type: PropTypes.string,
+        message: PropTypes.node,
+    }),
+    setNote: PropTypes.func.isRequired,
+};

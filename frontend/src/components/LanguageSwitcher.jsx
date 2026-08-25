@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React, { useEffect, useState } from "react";
+import PropTypes from "prop-types";
 import {
     getUiLanguage,
     saveUiLanguage,
@@ -85,6 +85,14 @@ function LanguageSwitcher({
         </div>
     );
 }
+
+LanguageSwitcher.propTypes = {
+    value: PropTypes.string,
+    language: PropTypes.string,
+    onChange: PropTypes.func,
+    setLanguage: PropTypes.func,
+    className: PropTypes.string,
+};
 
 export default LanguageSwitcher;
 

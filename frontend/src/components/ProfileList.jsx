@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Award, Building2, MapPin, School } from "lucide-react";
 import Card from "./Card";
 import EmptyState from "./EmptyState";
@@ -99,7 +99,7 @@ function ProfileList({
                                     <div className="flex items-center gap-1.5 rounded-lg border border-[#0AC4E0]/15 bg-[#0AC4E0]/10 px-2.5 py-2">
                                         <Award size={10} className="shrink-0 text-[#0AC4E0]" />
 
-                                        <span className="truncate text-[10px] font-bold text-[#0891b2]">
+                                        <span className="truncate text-[10px] font-bold text-[#0899B0]">
                                             {badgeLabel} {badgeValue}
                                         </span>
                                     </div>
@@ -118,5 +118,20 @@ function ProfileList({
         </Card>
     );
 }
+
+ProfileList.propTypes = {
+    title: PropTypes.string,
+    subtitle: PropTypes.string,
+    items: PropTypes.array,
+    countLabel: PropTypes.string,
+    className: PropTypes.string,
+    getTitle: PropTypes.func,
+    getImage: PropTypes.func,
+    getMeta: PropTypes.func,
+    getLocation: PropTypes.func,
+    getBadge: PropTypes.func,
+    metaLabel: PropTypes.string,
+    badgeLabel: PropTypes.string,
+};
 
 export default ProfileList;

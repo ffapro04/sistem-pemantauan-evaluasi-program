@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Briefcase } from "lucide-react";
 
 function VendorEmptyState({
@@ -19,5 +19,10 @@ function VendorEmptyState({
         </div>
     );
 }
+
+VendorEmptyState.propTypes = {
+    title: PropTypes.node,
+    description: PropTypes.node,
+};
 
 export default VendorEmptyState;

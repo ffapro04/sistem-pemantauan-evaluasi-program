@@ -1,5 +1,5 @@
-﻿/* eslint-disable react/prop-types */
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
     Plus,
     Trash2,
@@ -57,6 +57,10 @@ function FieldLabel({ children }) {
     );
 }
 
+FieldLabel.propTypes = {
+    children: PropTypes.node,
+};
+
 function TextInput({ value, onChange, placeholder, type = "text" }) {
     return (
         <input
@@ -69,6 +73,13 @@ function TextInput({ value, onChange, placeholder, type = "text" }) {
     );
 }
 
+TextInput.propTypes = {
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func.isRequired,
+    placeholder: PropTypes.string,
+    type: PropTypes.string,
+};
+
 function TextArea({ value, onChange, placeholder }) {
     return (
         <textarea
@@ -80,6 +91,12 @@ function TextArea({ value, onChange, placeholder }) {
         />
     );
 }
+
+TextArea.propTypes = {
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func.isRequired,
+    placeholder: PropTypes.string,
+};
 
 function SmallButton({ children, onClick, variant = "primary", disabled = false }) {
     const variants = {
@@ -101,6 +118,13 @@ function SmallButton({ children, onClick, variant = "primary", disabled = false 
         </button>
     );
 }
+
+SmallButton.propTypes = {
+    children: PropTypes.node,
+    onClick: PropTypes.func,
+    variant: PropTypes.oneOf(["primary", "cyan", "amber", "danger", "slate"]),
+    disabled: PropTypes.bool,
+};
 
 function RequirementList({
     title,
@@ -208,6 +232,20 @@ function RequirementList({
     );
 }
 
+RequirementList.propTypes = {
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    tone: PropTypes.oneOf(["cyan", "amber"]),
+    requirements: PropTypes.arrayOf(
+        PropTypes.shape({
+            nama: PropTypes.string,
+            tipe: PropTypes.string,
+            deskripsi: PropTypes.string,
+        }),
+    ),
+    onChange: PropTypes.func.isRequired,
+};
+
 function SectionHeader({ icon, title, subtitle, tone = "cyan", right }) {
     const isAmber = tone === "amber";
 
@@ -237,6 +275,14 @@ function SectionHeader({ icon, title, subtitle, tone = "cyan", right }) {
         </div>
     );
 }
+
+SectionHeader.propTypes = {
+    icon: PropTypes.node,
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    tone: PropTypes.oneOf(["cyan", "amber"]),
+    right: PropTypes.node,
+};
 
 function PhaseEditor({ fase, phaseIndex, fases, setFases }) {
     const phaseNumber = phaseIndex + 1;
@@ -564,6 +610,40 @@ function PhaseEditor({ fase, phaseIndex, fases, setFases }) {
     );
 }
 
+const requirementShape = PropTypes.shape({
+    nama: PropTypes.string,
+    tipe: PropTypes.string,
+    deskripsi: PropTypes.string,
+});
+
+PhaseEditor.propTypes = {
+    fase: PropTypes.shape({
+        nama_fase: PropTypes.string,
+        deskripsi: PropTypes.string,
+        termin: PropTypes.arrayOf(
+            PropTypes.shape({
+                nama_termin: PropTypes.string,
+                deskripsi: PropTypes.string,
+                jumlah_pembayaran: PropTypes.oneOfType([
+                    PropTypes.string,
+                    PropTypes.number,
+                ]),
+                persyaratan: PropTypes.arrayOf(requirementShape),
+            }),
+        ),
+        kegiatans: PropTypes.arrayOf(
+            PropTypes.shape({
+                nama_kegiatans: PropTypes.string,
+                deskripsi: PropTypes.string,
+                persyaratan: PropTypes.arrayOf(requirementShape),
+            }),
+        ),
+    }).isRequired,
+    phaseIndex: PropTypes.number.isRequired,
+    fases: PropTypes.array.isRequired,
+    setFases: PropTypes.func.isRequired,
+};
+
 function PhaseNavigation({ fases, activePhase, setActivePhase, addFase, removeFase }) {
     return (
         <aside className="rounded-[30px] border border-white bg-white p-4 shadow-[0_20px_65px_rgba(15,23,42,0.08)]">
@@ -631,6 +711,14 @@ function PhaseNavigation({ fases, activePhase, setActivePhase, addFase, removeFa
         </aside>
     );
 }
+
+PhaseNavigation.propTypes = {
+    fases: PropTypes.array.isRequired,
+    activePhase: PropTypes.number.isRequired,
+    setActivePhase: PropTypes.func.isRequired,
+    addFase: PropTypes.func.isRequired,
+    removeFase: PropTypes.func.isRequired,
+};
 
 function WorkflowBuilder({ fases, setFases }) {
     const [activePhase, setActivePhase] = useState(0);
@@ -783,5 +871,10 @@ function WorkflowBuilder({ fases, setFases }) {
         </section>
     );
 }
+
+WorkflowBuilder.propTypes = {
+    fases: PropTypes.array.isRequired,
+    setFases: PropTypes.func.isRequired,
+};
 
 export default WorkflowBuilder;

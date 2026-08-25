@@ -31,12 +31,13 @@ import {
     PageWrapper,
     Input,
 } from "../common";
+import AppButton from "../ui/AppButton";
+import AppIconButton from "../ui/AppIconButton";
 import { normalizeTerminChatMessage } from "../../utils/chatIdentity";
 import { getAuthToken } from "../../utils/authSession";
-import { buildFileUrl } from "../../utils/fileUrl";
+import { buildFileUrl, resolveViewableFileUrl } from "../../utils/fileUrl";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const STATUS_STYLE = {
     APPROVED: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -1336,7 +1337,7 @@ function VendorProgramDetailPage({
         });
     };
 
-    const openFile = (file) => {
+    const openFile = async (file) => {
         const url = getFileUrl(file);
 
         if (!url) {
@@ -1344,7 +1345,15 @@ function VendorProgramDetailPage({
             return;
         }
 
-        window.open(url, "_blank", "noopener,noreferrer");
+        const newTab = window.open("", "_blank", "noopener,noreferrer");
+
+        try {
+            const viewableUrl = await resolveViewableFileUrl(url);
+            if (newTab) newTab.location.href = viewableUrl;
+        } catch {
+            newTab?.close();
+            toast.error("Gagal membuka dokumen.");
+        }
     };
 
     // Vendor hanya bisa LIHAT komentar (read-only), tidak bisa tambah
@@ -1825,13 +1834,14 @@ function VendorProgramDetailPage({
                         Data program tidak tersedia atau sudah dihapus.
                     </p>
 
-                    <button
+                    <AppButton
                         type="button"
                         onClick={() => navigate(backPath)}
-                        className="mt-5 rounded-2xl bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-widest text-white"
+                        variant="primary"
+                        className="mt-5"
                     >
                         Kembali
-                    </button>
+                    </AppButton>
                 </div>
             </PageWrapper>
         );
@@ -1885,32 +1895,37 @@ function VendorProgramDetailPage({
                         </div>
 
                         <div className="flex shrink-0 items-center gap-3">
-                            <button
+                            <AppIconButton
                                 type="button"
                                 onClick={fetchProgramDetail}
-                                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-100 bg-cyan-50 text-[#0AC4E0] transition hover:bg-white"
+                                icon={<RefreshCcw size={15} />}
+                                variant="primary"
+                                size="lg"
                                 title="Refresh"
-                            >
-                                <RefreshCcw size={15} />
-                            </button>
+                                className="!h-11 !w-11 !rounded-2xl !border-cyan-100 !bg-cyan-50 !text-[#0AC4E0] hover:!bg-white hover:!text-[#0AC4E0]"
+                            />
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={() => handleOpenChat()}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-cyan-100 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-widest text-[#0A9FBA] transition hover:bg-cyan-50"
+                                icon={<MessageSquare size={15} />}
+                                variant="secondary"
+                                size="md"
+                                className="!rounded-2xl !border-cyan-100 !bg-white !text-[#0A9FBA] hover:!border-cyan-100 hover:!bg-cyan-50 hover:!text-[#0A9FBA]"
                             >
-                                <MessageSquare size={15} />
                                 Chat Koordinasi
-                            </button>
+                            </AppButton>
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={() => navigate(listPath)}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-[#0AC4E0] px-4 py-3 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_14px_28px_rgba(10,196,224,0.22)] transition hover:bg-[#08AFC7]"
+                                icon={<FolderOpen size={15} />}
+                                variant="accent"
+                                size="md"
+                                className="!rounded-2xl hover:!bg-[#08AFC7]"
                             >
-                                <FolderOpen size={15} />
                                 Daftar Program
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
                 </header>
@@ -3320,28 +3335,25 @@ function UploadEvidenceModal({
                 </div>
 
                 <div className="mt-5 flex items-center justify-end gap-3">
-                    <button
+                    <AppButton
                         type="button"
                         onClick={closeUploadModal}
                         disabled={uploadingEvidence}
-                        className="rounded-2xl border border-slate-100 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        variant="secondary"
                     >
                         Batal
-                    </button>
+                    </AppButton>
 
-                    <button
+                    <AppButton
                         type="button"
                         onClick={submitUpload}
                         disabled={uploadingEvidence}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0] disabled:cursor-wait disabled:bg-slate-400"
+                        loading={uploadingEvidence}
+                        icon={<UploadCloud size={14} />}
+                        variant="primary"
                     >
-                        {uploadingEvidence ? (
-                            <RefreshCcw size={14} className="animate-spin" />
-                        ) : (
-                            <UploadCloud size={14} />
-                        )}
                         {uploadingEvidence ? "Mengunggah..." : "Kirim ke HO"}
-                    </button>
+                    </AppButton>
                 </div>
             </div>
         </div>
@@ -3566,13 +3578,14 @@ function VendorChatDrawer({
                             className="!rounded-2xl !border-none !bg-white !px-4 !py-3 !text-[12px] !font-semibold"
                         />
 
-                        <button
+                        <AppButton
                             type="button"
                             onClick={handleSendChat}
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-[#0AC4E0]"
-                        >
-                            <Send size={16} />
-                        </button>
+                            variant="primary"
+                            size="icon"
+                            icon={<Send size={16} />}
+                            className="!h-11 !w-11 shrink-0 !rounded-2xl"
+                        />
                     </div>
                 </div>
             </div>

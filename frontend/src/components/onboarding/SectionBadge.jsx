@@ -1,6 +1,6 @@
 ﻿/* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React from "react";
+import PropTypes from "prop-types";
 
 function SectionBadge({ icon: Icon, children, className = "" }) {
     return (
@@ -14,5 +14,11 @@ function SectionBadge({ icon: Icon, children, className = "" }) {
         </div>
     );
 }
+
+SectionBadge.propTypes = {
+    icon: PropTypes.elementType,
+    children: PropTypes.node,
+    className: PropTypes.string,
+};
 
 export default SectionBadge;

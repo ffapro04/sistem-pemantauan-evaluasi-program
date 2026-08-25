@@ -4,6 +4,7 @@ import {
   HttpException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -34,6 +35,8 @@ type VendorDocumentMap = Partial<Record<VendorDocumentField, string>>;
 
 @Injectable()
 export class VendorService {
+  private readonly logger = new Logger(VendorService.name);
+
   constructor(
     @InjectRepository(Vendor)
     private vendorRepo: Repository<Vendor>,
@@ -75,7 +78,7 @@ export class VendorService {
 
     if (!currentUser?.id_user) {
       return uploadItems.reduce<VendorDocumentMap>((result, item) => {
-        console.warn(
+        this.logger.warn(
           `VENDOR_DOCUMENT_FALLBACK_NO_USER:${String(item.fieldName)}:${item.file?.originalname}`,
         );
         result[item.fieldName] = item.file?.originalname || '';
@@ -104,7 +107,7 @@ export class VendorService {
       }, {});
     } catch (error) {
       return uploadItems.reduce<VendorDocumentMap>((result, item) => {
-        console.warn(
+        this.logger.warn(
           `VENDOR_DOCUMENT_DRIVE_FALLBACK:${String(item.fieldName)}:${(error as Error)?.message || error}`,
         );
         result[item.fieldName] = item.file?.originalname || '';
@@ -200,7 +203,7 @@ export class VendorService {
 
       return await this.vendorRepo.save(vendorBaru);
     } catch (error) {
-      console.error('ERROR_CREATE_VENDOR:', error?.message || error);
+      this.logger.error('ERROR_CREATE_VENDOR:', error?.message || error);
 
       if (error instanceof HttpException) {
         throw error;
@@ -638,7 +641,7 @@ export class VendorService {
 
       return await this.findOne(id);
     } catch (error) {
-      console.error('ERROR_UPDATE_VENDOR:', error?.message || error);
+      this.logger.error('ERROR_UPDATE_VENDOR:', error?.message || error);
 
       if (error instanceof HttpException) {
         throw error;

@@ -17,6 +17,8 @@ import {
     FileText,
     Layers3,
     Lock,
+    Maximize2,
+    Minimize2,
     MessageSquare,
     RefreshCcw,
     Send,
@@ -34,14 +36,14 @@ import {
     Button,
     Input,
 } from "../common";
+import AppButton from "../ui/AppButton";
 
 import { canHoAccessSchool } from "../../utils/hoAccess";
 import { normalizeTerminChatMessage } from "../../utils/chatIdentity";
 import { getAuthToken } from "../../utils/authSession";
-import { buildFileUrl } from "../../utils/fileUrl";
+import { buildFileUrl, resolveViewableFileUrl, revokeBlobUrl } from "../../utils/fileUrl";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 
 const STATUS_STYLE = {
     APPROVED: "border-emerald-100 bg-emerald-50 text-emerald-600",
@@ -1940,7 +1942,7 @@ function DetailProgramPage({
         return grouped;
     };
 
-    const openFile = (file) => {
+    const openFile = async (file) => {
         const url = getFileUrl(file);
 
         if (!url) {
@@ -1948,7 +1950,15 @@ function DetailProgramPage({
             return;
         }
 
-        window.open(url, "_blank", "noopener,noreferrer");
+        const newTab = window.open("", "_blank", "noopener,noreferrer");
+
+        try {
+            const viewableUrl = await resolveViewableFileUrl(url);
+            if (newTab) newTab.location.href = viewableUrl;
+        } catch {
+            newTab?.close();
+            toast.error("Gagal membuka dokumen.");
+        }
     };
 
     // â”€â”€â”€ COMMENT FUNCTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2356,13 +2366,14 @@ function DetailProgramPage({
                         Data program tidak tersedia atau sudah dihapus.
                     </p>
 
-                    <button
+                    <AppButton
                         type="button"
                         onClick={() => navigate(backPath)}
-                        className="mt-5 rounded-2xl bg-slate-950 px-5 py-3 text-xs font-black uppercase tracking-widest text-white"
+                        variant="primary"
+                        className="mt-5"
                     >
                         Kembali
-                    </button>
+                    </AppButton>
                 </div>
             </PageWrapper>
         );
@@ -2872,13 +2883,14 @@ function ChatDrawer({
                             className="!rounded-2xl !border-none !bg-white !px-4 !py-3 !text-[12px] !font-semibold"
                         />
 
-                        <button
+                        <AppButton
                             type="button"
                             onClick={sendMessage}
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white transition hover:bg-[#0AC4E0]"
-                        >
-                            <Send size={16} />
-                        </button>
+                            variant="primary"
+                            size="icon"
+                            icon={<Send size={16} />}
+                            className="!h-11 !w-11 shrink-0 !rounded-2xl"
+                        />
                     </div>
                 </div>
             </div>
@@ -3897,13 +3909,16 @@ function CommentDrawer({ open, row, comments, commentText, setCommentText, comme
                             rows={3}
                             className="flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 focus:border-violet-300 focus:outline-none"
                         />
-                        <button
+                        <AppButton
+                            type="button"
                             onClick={onSubmit}
                             disabled={loading || !commentText.trim()}
-                            className="flex h-12 w-12 shrink-0 items-center justify-center self-end rounded-xl bg-violet-500 text-white shadow hover:bg-violet-600 disabled:opacity-40"
-                        >
-                            {loading ? <RefreshCcw size={16} className="animate-spin" /> : <Send size={16} />}
-                        </button>
+                            loading={loading}
+                            icon={<Send size={16} />}
+                            variant="primary"
+                            size="icon"
+                            className="!h-12 !w-12 shrink-0 self-end !rounded-xl !bg-violet-500 shadow hover:!bg-violet-600"
+                        />
                     </div>
                 </div>
             </div>
@@ -4020,11 +4035,51 @@ function EvidenceReviewModal({
     onReject,
     onApprove,
 }) {
+    // Documents proxied through our backend need a Bearer token a plain
+    // <img>/<iframe> src can never carry, so the URL is resolved to a local
+    // blob: URL first. Hooks must run unconditionally, so this happens
+    // before the `!reviewModal` early return below.
+    const fileUrl = getFileUrl(reviewModal?.evidence?.file);
+
+    const [viewableUrl, setViewableUrl] = useState(null);
+    const [previewError, setPreviewError] = useState(false);
+    const [resolvingPreview, setResolvingPreview] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setPreviewError(false);
+        setViewableUrl(null);
+        setIsExpanded(false);
+
+        if (!fileUrl) return undefined;
+
+        setResolvingPreview(true);
+
+        resolveViewableFileUrl(fileUrl)
+            .then((resolved) => {
+                if (!cancelled) setViewableUrl(resolved);
+            })
+            .catch(() => {
+                if (!cancelled) setPreviewError(true);
+            })
+            .finally(() => {
+                if (!cancelled) setResolvingPreview(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [fileUrl]);
+
+    useEffect(() => {
+        return () => revokeBlobUrl(viewableUrl);
+    }, [viewableUrl]);
+
     if (!reviewModal) return null;
 
     const { row, evidence, locked } = reviewModal;
 
-    const fileUrl = getFileUrl(evidence?.file);
     const fileName = evidence?.fileName || evidence?.file || "Belum ada file";
     const lowerFile = String(fileName || "").toLowerCase();
 
@@ -4055,7 +4110,11 @@ function EvidenceReviewModal({
 
     return (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-sm">
-            <div className="flex max-h-[92vh] w-full max-w-[880px] flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_35px_90px_rgba(15,23,42,0.28)]">
+            <div
+                className={`flex flex-col overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-[0_35px_90px_rgba(15,23,42,0.28)] transition-[max-width,max-height] duration-200 ${
+                    isExpanded ? "max-h-[96vh] w-full max-w-[96vw]" : "max-h-[92vh] w-full max-w-[880px]"
+                }`}
+            >
                 <div className="shrink-0 border-b border-slate-100 px-5 py-4">
                     <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
@@ -4077,19 +4136,41 @@ function EvidenceReviewModal({
                 </div>
 
                 <div className="simple-scroll min-h-0 flex-1 overflow-y-auto p-5">
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
+                    <div
+                        className={`grid grid-cols-1 gap-4 ${
+                            isExpanded ? "" : "lg:grid-cols-[1fr_260px]"
+                        }`}
+                    >
                         <div className="overflow-hidden rounded-[1.5rem] border border-slate-100 bg-slate-50">
-                            <div className="border-b border-slate-100 bg-white px-4 py-3">
-                                <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
-                                    Preview File
-                                </p>
+                            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
+                                <div className="min-w-0">
+                                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">
+                                        Preview File
+                                    </p>
 
-                                <p className="mt-1 truncate text-[12px] font-black text-slate-800">
-                                    {fileName}
-                                </p>
+                                    <p className="mt-1 truncate text-[12px] font-black text-slate-800">
+                                        {fileName}
+                                    </p>
+                                </div>
+
+                                {(isImage || isPdf) && !previewError && !resolvingPreview && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsExpanded((prev) => !prev)}
+                                        className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest text-slate-500 transition hover:border-[#0AC4E0] hover:text-[#0AC4E0]"
+                                        title={isExpanded ? "Perkecil preview" : "Perbesar preview"}
+                                    >
+                                        {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+                                        {isExpanded ? "Perkecil" : "Perbesar"}
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="flex min-h-[420px] items-center justify-center bg-slate-50 p-4">
+                            <div
+                                className={`flex items-center justify-center bg-slate-50 p-4 ${
+                                    isExpanded ? "min-h-[70vh]" : "min-h-[420px]"
+                                }`}
+                            >
                                 {!fileUrl ? (
                                     <div className="text-center">
                                         <FileText size={38} className="mx-auto text-slate-300" />
@@ -4102,17 +4183,42 @@ function EvidenceReviewModal({
                                             Dokumen ini belum diupload oleh vendor/narasumber.
                                         </p>
                                     </div>
+                                ) : resolvingPreview ? (
+                                    <div className="text-center">
+                                        <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-[#0AC4E0]/25 border-t-[#0AC4E0]" />
+
+                                        <p className="mt-4 text-[11px] font-black uppercase tracking-widest text-slate-400">
+                                            Memuat dokumen
+                                        </p>
+                                    </div>
+                                ) : previewError ? (
+                                    <div className="text-center">
+                                        <FileText size={38} className="mx-auto text-rose-300" />
+
+                                        <h4 className="mt-4 text-[15px] font-black text-slate-900">
+                                            Gagal memuat dokumen
+                                        </h4>
+
+                                        <p className="mt-2 max-w-[320px] text-[11px] font-semibold leading-relaxed text-slate-400">
+                                            Dokumen tidak bisa diambil dari penyimpanan. Coba lagi
+                                            beberapa saat lagi.
+                                        </p>
+                                    </div>
                                 ) : isImage ? (
                                     <img
-                                        src={fileUrl}
+                                        src={viewableUrl}
                                         alt={evidence?.name || "Preview dokumen"}
-                                        className="max-h-[560px] w-full rounded-[1.2rem] object-contain"
+                                        className={`w-full rounded-[1.2rem] object-contain ${
+                                            isExpanded ? "max-h-[85vh]" : "max-h-[560px]"
+                                        }`}
                                     />
                                 ) : isPdf ? (
                                     <iframe
-                                        src={fileUrl}
+                                        src={viewableUrl}
                                         title={evidence?.name || "Preview PDF"}
-                                        className="h-[560px] w-full rounded-[1.2rem] border border-slate-100 bg-white"
+                                        className={`w-full rounded-[1.2rem] border border-slate-100 bg-white ${
+                                            isExpanded ? "h-[85vh]" : "h-[560px]"
+                                        }`}
                                     />
                                 ) : (
                                     <div className="text-center">
@@ -4127,16 +4233,21 @@ function EvidenceReviewModal({
                                             Buka file di tab baru untuk melihat dokumen.
                                         </p>
 
-                                        <button
+                                        <AppButton
                                             type="button"
-                                            onClick={() =>
-                                                window.open(fileUrl, "_blank", "noopener,noreferrer")
-                                            }
-                                            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-white transition hover:bg-[#0AC4E0]"
+                                            onClick={() => {
+                                                if (viewableUrl) {
+                                                    window.open(viewableUrl, "_blank", "noopener,noreferrer");
+                                                }
+                                            }}
+                                            disabled={!viewableUrl}
+                                            icon={<Eye size={13} />}
+                                            variant="primary"
+                                            size="sm"
+                                            className="mt-4"
                                         >
-                                            <Eye size={13} />
                                             Buka File
-                                        </button>
+                                        </AppButton>
                                     </div>
                                 )}
                             </div>
@@ -4210,35 +4321,39 @@ function EvidenceReviewModal({
 
                 <div className="shrink-0 border-t border-slate-100 bg-slate-50 px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
-                        <button
+                        <AppButton
                             type="button"
                             onClick={onClose}
-                            className="inline-flex items-center gap-2 rounded-2xl border border-slate-100 bg-white px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition hover:text-slate-800"
+                            icon={<ArrowLeft size={14} />}
+                            variant="secondary"
+                            size="sm"
                         >
-                            <ArrowLeft size={14} />
                             Back
-                        </button>
+                        </AppButton>
 
                         <div className="flex items-center gap-2">
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={onReject}
                                 disabled={!canValidate}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-rose-500 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                icon={<X size={14} />}
+                                variant="danger"
+                                size="sm"
                             >
-                                <X size={14} />
                                 {rejectLabel}
-                            </button>
+                            </AppButton>
 
-                            <button
+                            <AppButton
                                 type="button"
                                 onClick={onApprove}
                                 disabled={!canValidate}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-500 px-5 py-3 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                icon={<CheckCircle2 size={14} />}
+                                variant="primary"
+                                size="sm"
+                                className="!bg-emerald-500 hover:!bg-emerald-600"
                             >
-                                <CheckCircle2 size={14} />
                                 {approveLabel}
-                            </button>
+                            </AppButton>
                         </div>
                     </div>
                 </div>

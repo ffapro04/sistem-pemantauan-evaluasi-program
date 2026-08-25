@@ -5,14 +5,14 @@ import {
   Controller,
   Delete,
   Get,
-  Headers,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -20,6 +20,7 @@ import { memoryStorage } from 'multer';
 import { VendorService } from './vendor.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { JwtAuthGuard } from '../auth/jwt/jwt-auth-guard';
 
 export type VendorDocumentFiles = {
   npwp_file?: Express.Multer.File[];
@@ -85,48 +86,30 @@ const vendorDocumentInterceptor = FileFieldsInterceptor(
 export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
 
-  private decodeToken(authHeader?: string): {
+  // Sumber identitas user tunggal: req.user, sudah diverifikasi tanda
+  // tangannya oleh JwtStrategy (lewat JwtAuthGuard) — tidak ada lagi decode
+  // token manual tanpa verifikasi di sini.
+  private extractUser(req: any): {
     id_user: number | null;
     id_role: number | null;
   } {
-    if (!authHeader) {
-      return {
-        id_user: null,
-        id_role: null,
-      };
-    }
+    const user = req?.user?.user ?? req?.user;
 
-    const token = authHeader.split(' ')[1];
-
-    if (!token) {
-      throw new UnauthorizedException('Format token tidak valid');
-    }
-
-    try {
-      const payloadJson = Buffer.from(
-        token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'),
-        'base64',
-      ).toString('utf-8');
-
-      const payload = JSON.parse(payloadJson);
-
-      return {
-        id_user: Number(payload.sub || payload.id_user || payload.id || 0) || null,
-        id_role: payload.id_role ? Number(payload.id_role) : null,
-      };
-    } catch {
-      throw new UnauthorizedException('Token tidak valid');
-    }
+    return {
+      id_user: Number(user?.id_user || user?.sub || user?.id || 0) || null,
+      id_role: user?.id_role ? Number(user.id_role) : null,
+    };
   }
 
   @Post()
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(vendorDocumentInterceptor)
   create(
     @Body() createVendorDto: CreateVendorDto,
     @UploadedFiles() files: VendorDocumentFiles,
-    @Headers('authorization') authHeader?: string,
+    @Req() req: any,
   ) {
-    const currentUser = this.decodeToken(authHeader);
+    const currentUser = this.extractUser(req);
     return this.vendorService.create(createVendorDto, files, currentUser);
   }
 
@@ -146,14 +129,15 @@ export class VendorController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
   @UseInterceptors(vendorDocumentInterceptor)
   update(
     @Param('id') id: string,
     @Body() updateVendorDto: UpdateVendorDto,
     @UploadedFiles() files: VendorDocumentFiles,
-    @Headers('authorization') authHeader?: string,
+    @Req() req: any,
   ) {
-    const currentUser = this.decodeToken(authHeader);
+    const currentUser = this.extractUser(req);
     return this.vendorService.update(+id, updateVendorDto, files, currentUser);
   }
 

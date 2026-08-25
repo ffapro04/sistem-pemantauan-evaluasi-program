@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Loader2, Save } from "lucide-react";
 import Button from "./Button";
 
@@ -41,5 +41,15 @@ function ActionFooter({
         </footer>
     );
 }
+
+ActionFooter.propTypes = {
+    cancelText: PropTypes.string,
+    submitText: PropTypes.string,
+    loadingText: PropTypes.string,
+    loading: PropTypes.bool,
+    showCancel: PropTypes.bool,
+    onCancel: PropTypes.func,
+    onSubmit: PropTypes.func,
+};
 
 export default ActionFooter;

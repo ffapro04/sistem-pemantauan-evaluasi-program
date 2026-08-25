@@ -1,7 +1,5 @@
 ﻿// src/config/masterCrud/pengurus.config.jsx
 
-/* eslint-disable react/prop-types */
-import React from "react";
 import {
     Briefcase,
     Database,
@@ -19,11 +17,7 @@ const ROLE_ADMIN = 1;
 const ROLE_PENGURUS = 2;
 const MASTER_AUTH_KEY = "Y4y4s4n4str4";
 
-const API_BASE_URL = (
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-    ""
-).replace(/\/$/, "");
+import { API_BASE_URL } from "../apiBase.js";
 
 const getUserPhotoUrl = (fotoProfile) => {
     if (!fotoProfile) return "";

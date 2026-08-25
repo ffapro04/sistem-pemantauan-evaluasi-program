@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import Label from "./Label";
 
 function FormField({ label, children, className = "", required = false }) {
@@ -14,5 +14,12 @@ function FormField({ label, children, className = "", required = false }) {
         </div>
     );
 }
+
+FormField.propTypes = {
+    label: PropTypes.node,
+    children: PropTypes.node,
+    className: PropTypes.string,
+    required: PropTypes.bool,
+};
 
 export default FormField;

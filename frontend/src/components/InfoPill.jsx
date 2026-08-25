@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 
 function InfoPill({ icon, text, className = "" }) {
     return (
@@ -13,5 +13,11 @@ function InfoPill({ icon, text, className = "" }) {
         </div>
     );
 }
+
+InfoPill.propTypes = {
+    icon: PropTypes.node,
+    text: PropTypes.node,
+    className: PropTypes.string,
+};
 
 export default InfoPill;

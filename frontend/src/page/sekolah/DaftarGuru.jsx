@@ -25,13 +25,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Dropdown from "../../components/Dropdown";
 import MasterPageShell from "../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../components/masterCrud/MasterAlert";
+import AppButton from "../../components/ui/AppButton";
 import { showConfirmDialog } from "../../utils/popup";
 
-const BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as BASE_URL } from "../../config/apiBase.js";
+import { getAuthToken } from "../../utils/authSession";
 
 function decodeUser() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     if (!token) return null;
 
     try {
@@ -42,7 +43,7 @@ function decodeUser() {
 }
 
 function getAuthHeaders() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -653,46 +654,54 @@ export default function DaftarGuru() {
             }
             action={
                 <div className="flex flex-wrap items-center gap-3">
-                    <button
+                    <AppButton
                         type="button"
                         onClick={fetchData}
-                        className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 shadow-sm transition-all hover:text-slate-700 active:scale-95"
+                        icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}
+                        variant="secondary"
+                        size="sm"
+                        className="!rounded-full"
                     >
-                        <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                         Refresh
-                    </button>
+                    </AppButton>
 
                     {isOperator && activeTab === "guru" && (
-                        <button
+                        <AppButton
                             type="button"
                             onClick={handleCreateGuru}
-                            className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                            icon={<Plus size={12} />}
+                            variant="accent"
+                            size="sm"
+                            className="!rounded-full hover:!bg-cyan-500"
                         >
-                            <Plus size={12} />
                             Tambah Guru
-                        </button>
+                        </AppButton>
                     )}
 
                     {isOperator && activeTab === "kepala-sekolah" && !kepalaSekolah && (
-                        <button
+                        <AppButton
                             type="button"
                             onClick={handleCreateKepsek}
-                            className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                            icon={<Plus size={12} />}
+                            variant="accent"
+                            size="sm"
+                            className="!rounded-full hover:!bg-cyan-500"
                         >
-                            <Plus size={12} />
                             Tambah Kepala Sekolah
-                        </button>
+                        </AppButton>
                     )}
 
                     {isOperator && activeTab === "kepala-sekolah" && kepalaSekolah && (
-                        <button
+                        <AppButton
                             type="button"
                             onClick={handleEditKepsek}
-                            className="flex items-center gap-2 rounded-full bg-[#0AC4E0] px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                            icon={<Pencil size={12} />}
+                            variant="accent"
+                            size="sm"
+                            className="!rounded-full hover:!bg-cyan-500"
                         >
-                            <Pencil size={12} />
                             Edit Akun
-                        </button>
+                        </AppButton>
                     )}
                 </div>
             }
@@ -760,14 +769,15 @@ export default function DaftarGuru() {
                                 </div>
 
                                 {isOperator && (
-                                    <button
+                                    <AppButton
                                         type="button"
                                         onClick={handleCreateKepsek}
-                                        className="mt-2 flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                                        icon={<Plus size={13} />}
+                                        variant="accent"
+                                        className="!rounded-full hover:!bg-cyan-500"
                                     >
-                                        <Plus size={13} />
                                         Tambah Kepala Sekolah
-                                    </button>
+                                    </AppButton>
                                 )}
                             </div>
                         ) : (
@@ -882,14 +892,15 @@ export default function DaftarGuru() {
                         </div>
 
                         {isOperator && (
-                            <button
+                            <AppButton
                                 type="button"
-                                        onClick={handleCreateGuru}
-                                className="mt-2 flex items-center gap-2 rounded-full bg-[#0AC4E0] px-6 py-3 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-all hover:bg-cyan-500 active:scale-95"
+                                onClick={handleCreateGuru}
+                                icon={<Plus size={13} />}
+                                variant="accent"
+                                className="!rounded-full hover:!bg-cyan-500"
                             >
-                                <Plus size={13} />
                                 Tambah Guru
-                            </button>
+                            </AppButton>
                         )}
                     </div>
                 ) : (
@@ -963,13 +974,15 @@ export default function DaftarGuru() {
                                         />
 
                                         {hasActiveFilter && (
-                                            <button
+                                            <AppButton
                                                 type="button"
                                                 onClick={resetFilters}
-                                                className="shrink-0 rounded-xl border border-slate-100 bg-slate-50 px-4 text-[9px] font-black uppercase tracking-widest text-slate-400 transition hover:border-[#0AC4E0]/30 hover:bg-cyan-50 hover:text-[#0AC4E0]"
+                                                variant="secondary"
+                                                size="sm"
+                                                className="shrink-0 !border-slate-100 !bg-slate-50 !text-slate-400 hover:!border-[#0AC4E0]/30 hover:!bg-cyan-50 hover:!text-[#0AC4E0]"
                                             >
                                                 Reset
-                                            </button>
+                                            </AppButton>
                                         )}
                                     </div>
                                 </div>

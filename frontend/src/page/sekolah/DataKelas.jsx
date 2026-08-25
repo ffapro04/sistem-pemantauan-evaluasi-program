@@ -2,6 +2,7 @@
 import { jwtDecode } from "jwt-decode";
 import MasterReadPage from "../../components/masterCrud/MasterReadPage";
 import { kelasConfig } from "../../config/masterCrud/kelas.config";
+import { getAuthToken } from "../../utils/authSession";
 
 const getCurrentUser = () => {
     try {
@@ -11,7 +12,7 @@ const getCurrentUser = () => {
             return userFromStorage;
         }
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return {};
 
         return jwtDecode(token);

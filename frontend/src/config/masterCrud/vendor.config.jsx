@@ -1,6 +1,4 @@
-﻿/* eslint-disable react/prop-types */
-import React from "react";
-import {
+﻿import {
     Building2,
     Database,
     FileText,

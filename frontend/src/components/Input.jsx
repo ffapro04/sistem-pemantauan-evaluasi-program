@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function Input({
   type = "text",
   placeholder = "",
@@ -36,4 +37,12 @@ export default function Input({
     />
   );
 }
+
+Input.propTypes = {
+  type: PropTypes.string,
+  placeholder: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  className: PropTypes.string,
+};
 

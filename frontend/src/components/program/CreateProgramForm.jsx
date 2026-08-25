@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -38,9 +38,8 @@ import {
 } from "../../utils/hoAccess";
 import { getAuthToken } from "../../utils/authSession";
 
+import { API_BASE_URL } from "../../config/apiBase.js";
 const DEFAULT_STATUS_PROGRAM = "Approval";
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 const PROGRAM_DRAFT_DB_NAME = "sme_program_drafts";
 const PROGRAM_DRAFT_DB_VERSION = 1;
 const PROGRAM_DRAFT_FILE_STORE = "program_files";
@@ -1749,7 +1748,7 @@ function CreateProgramForm({
                                         saveProgram();
                                     }}
                                     disabled={loading || draftRestoring}
-                                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0AC4E0] px-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_32px_rgba(10,196,224,0.28)] transition hover:bg-[#08B7D1] disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0AC4E0] px-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_32px_rgba(10,196,224,0.28)] transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {loading || draftRestoring ? (
                                         <>
@@ -1772,7 +1771,7 @@ function CreateProgramForm({
                         <div className="absolute inset-x-0 top-0 h-2 bg-[#0AC4E0]" />
 
                         <div className="p-7">
-                            <div className="mb-5 inline-flex rounded-full border border-[#0AC4E0]/20 bg-[#E9FBFF] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#078EA3]">
+                            <div className="mb-5 inline-flex rounded-full border border-[#0AC4E0]/20 bg-[#EEF5FF] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#0899B0]">
                                 Penyimpanan Dokumen
                             </div>
 
@@ -1784,8 +1783,8 @@ function CreateProgramForm({
                                 {driveGuardMessage}
                             </p>
 
-                            <div className="mt-5 rounded-[1.25rem] border border-cyan-100 bg-[#F6FDFF] px-5 py-4">
-                                <p className="text-sm font-bold leading-6 text-[#5F7E86]">
+                            <div className="mt-5 rounded-[1.25rem] border border-cyan-100 bg-[#EEF5FF] px-5 py-4">
+                                <p className="text-sm font-bold leading-6 text-[#64748B]">
                                     Draft program akan disimpan otomatis sebelum kamu diarahkan ke Google. Setelah tautan berhasil, kamu bisa langsung menerbitkan program atau lanjut edit dulu.
                                 </p>
                             </div>
@@ -1802,7 +1801,7 @@ function CreateProgramForm({
                                 <button
                                     type="button"
                                     onClick={handleOpenAccountSettingsFromGuard}
-                                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-cyan-100 bg-[#F6FDFF] px-5 text-xs font-black uppercase tracking-widest text-[#078EA3] transition hover:bg-[#E9FBFF]"
+                                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-cyan-100 bg-[#EEF5FF] px-5 text-xs font-black uppercase tracking-widest text-[#0899B0] transition hover:bg-[#EEF5FF]"
                                 >
                                     Simpan Draft & Buka Pengaturan
                                 </button>
@@ -1811,7 +1810,7 @@ function CreateProgramForm({
                                     type="button"
                                     onClick={handleConnectDriveFromGuard}
                                     disabled={driveGuardLoading}
-                                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0AC4E0] px-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_32px_rgba(10,196,224,0.28)] transition hover:bg-[#08B7D1] disabled:cursor-not-allowed disabled:opacity-60"
+                                    className="inline-flex h-11 items-center justify-center rounded-2xl bg-[#0AC4E0] px-5 text-xs font-black uppercase tracking-widest text-white shadow-[0_14px_32px_rgba(10,196,224,0.28)] transition hover:bg-[#0899B0] disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     {driveGuardLoading ? (
                                         <>
@@ -2377,8 +2376,8 @@ function WorkflowFaseStep({
     return (
         <div className="space-y-5">
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_auto]">
-                <div className="rounded-[1.4rem] border border-cyan-100 bg-[#F6FDFF] p-5 shadow-[0_16px_35px_rgba(10,196,224,0.10)]">
-                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#078EA3]">
+                <div className="rounded-[1.4rem] border border-cyan-100 bg-[#EEF5FF] p-5 shadow-[0_16px_35px_rgba(10,196,224,0.10)]">
+                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#0899B0]">
                         Blueprint Progress Program
                     </p>
                     <h2 className="mt-2 text-[22px] font-black leading-tight text-slate-950">
@@ -2404,7 +2403,7 @@ function WorkflowFaseStep({
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 rounded-[1.2rem] border border-cyan-100 bg-[#F6FDFF] p-2">
+            <div className="flex flex-wrap items-center gap-2 rounded-[1.2rem] border border-cyan-100 bg-[#EEF5FF] p-2">
                 {fases.map((period, index) => {
                     const error = validateFase(period, kategori);
                     const active = activeFaseIndex === index;
@@ -2707,7 +2706,7 @@ function WorkflowFaseStep({
                             <button
                                 type="button"
                                 onClick={addAktivitas}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_10px_24px_rgba(10,196,224,0.20)] transition hover:bg-[#08B7D1]"
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#0AC4E0] px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white shadow-[0_10px_24px_rgba(10,196,224,0.20)] transition hover:bg-[#0899B0]"
                             >
                                 <Plus size={11} />
                                 Tambah Aktivitas

@@ -569,7 +569,7 @@ export class AssessmentGuruService {
         role: 'guru',
         type: 'guru-access',
       },
-      process.env.JWT_SECRET || 'secretkey',
+      process.env.JWT_SECRET,
       { expiresIn: '30d' },
     );
 

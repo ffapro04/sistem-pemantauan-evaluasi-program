@@ -1,9 +1,10 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import { getAuthToken } from "../../utils/authSession";
 
 import {
     AlertTriangle,
@@ -36,7 +37,7 @@ import astraLogo from "../../assets/img/logo-astra.png";
 import satuIndonesiaLogo from "../../assets/img/satu_indonesia.png";
 import INDONESIA_HOLIDAY_EVENTS from "../../data/indonesiaHolidayEvents";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 const AgendaFullCalendar = lazy(() => import("./AgendaFullCalendar"));
 
 const AGENDA_LOGO_PATHS = {
@@ -295,7 +296,7 @@ function buildDateTime(dateKey, timeValue, fallbackTime = "00:00") {
 }
 
 function getCurrentUserFromToken() {
-    const token = localStorage.getItem("token");
+    const token = getAuthToken();
 
     if (!token) return null;
 
@@ -996,6 +997,15 @@ function SummaryCard({ label, value, helper, icon, active = false, onClick }) {
     );
 }
 
+SummaryCard.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.node,
+    helper: PropTypes.node,
+    icon: PropTypes.node,
+    active: PropTypes.bool,
+    onClick: PropTypes.func,
+};
+
 function FilterGroup({ title, children, tone = "cyan" }) {
     const toneClass = tone === "amber" ? "text-amber-500" : tone === "dark" ? "text-slate-500" : "text-[#0AC4E0]";
 
@@ -1008,6 +1018,12 @@ function FilterGroup({ title, children, tone = "cyan" }) {
         </div>
     );
 }
+
+FilterGroup.propTypes = {
+    title: PropTypes.node,
+    children: PropTypes.node,
+    tone: PropTypes.oneOf(["cyan", "amber", "dark"]),
+};
 
 function FilterButton({ active, children, onClick, tone = "cyan" }) {
     const activeClass =
@@ -1030,6 +1046,13 @@ function FilterButton({ active, children, onClick, tone = "cyan" }) {
         </button>
     );
 }
+
+FilterButton.propTypes = {
+    active: PropTypes.bool,
+    children: PropTypes.node,
+    onClick: PropTypes.func,
+    tone: PropTypes.oneOf(["cyan", "amber", "dark"]),
+};
 
 function AgendaFilterSelect({ label, value, onChange, options, tone = "cyan" }) {
     const accentClass =
@@ -1054,6 +1077,19 @@ function AgendaFilterSelect({ label, value, onChange, options, tone = "cyan" }) 
         </div>
     );
 }
+
+AgendaFilterSelect.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onChange: PropTypes.func,
+    options: PropTypes.arrayOf(
+        PropTypes.shape({
+            value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            label: PropTypes.node,
+        }),
+    ),
+    tone: PropTypes.oneOf(["cyan", "amber", "dark"]),
+};
 
 function EventList({ events, onOpen, canManageCOE, onEditCOE, onDoneCOE, onDeleteCOE }) {
     if (!events.length) {
@@ -1212,6 +1248,15 @@ function EventList({ events, onOpen, canManageCOE, onEditCOE, onDoneCOE, onDelet
     );
 }
 
+EventList.propTypes = {
+    events: PropTypes.arrayOf(PropTypes.object).isRequired,
+    onOpen: PropTypes.func,
+    canManageCOE: PropTypes.bool,
+    onEditCOE: PropTypes.func,
+    onDoneCOE: PropTypes.func,
+    onDeleteCOE: PropTypes.func,
+};
+
 function AgendaLogoSlot({ src, label, align = "left" }) {
     return (
         <div className={`flex min-h-[72px] items-center ${align === "right" ? "justify-end text-right" : "justify-start text-left"}`}>
@@ -1232,6 +1277,12 @@ function AgendaLogoSlot({ src, label, align = "left" }) {
         </div>
     );
 }
+
+AgendaLogoSlot.propTypes = {
+    src: PropTypes.string,
+    label: PropTypes.string,
+    align: PropTypes.oneOf(["left", "right"]),
+};
 
 function getEventJenjangLabel(event) {
     const targets = Array.isArray(event?.jenjangTargets)
@@ -1591,6 +1642,10 @@ function PersonaCell({ event }) {
 }
 
 
+PersonaCell.propTypes = {
+    event: PropTypes.object,
+};
+
 function AgendaMetaItem({ icon: Icon, label, value, children }) {
     return (
         <div className="min-w-0 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
@@ -1606,6 +1661,13 @@ function AgendaMetaItem({ icon: Icon, label, value, children }) {
         </div>
     );
 }
+
+AgendaMetaItem.propTypes = {
+    icon: PropTypes.elementType.isRequired,
+    label: PropTypes.node,
+    value: PropTypes.node,
+    children: PropTypes.node,
+};
 
 function AgendaDetailCard({
     event,
@@ -1751,6 +1813,14 @@ function AgendaDetailCard({
         </article>
     );
 }
+
+AgendaDetailCard.propTypes = {
+    event: PropTypes.object.isRequired,
+    canManageCOE: PropTypes.bool,
+    onEditCOE: PropTypes.func,
+    onDoneCOE: PropTypes.func,
+    onDeleteCOE: PropTypes.func,
+};
 
 function CompactAgendaDetail({
     event,
@@ -1904,6 +1974,14 @@ function CompactAgendaDetail({
     );
 }
 
+CompactAgendaDetail.propTypes = {
+    event: PropTypes.object.isRequired,
+    canManageCOE: PropTypes.bool,
+    onEditCOE: PropTypes.func,
+    onDoneCOE: PropTypes.func,
+    onDeleteCOE: PropTypes.func,
+};
+
 function AgendaDaySection({
     title,
     events,
@@ -2010,6 +2088,19 @@ function AgendaDaySection({
         </section>
     );
 }
+
+AgendaDaySection.propTypes = {
+    title: PropTypes.node,
+    events: PropTypes.arrayOf(PropTypes.object).isRequired,
+    total: PropTypes.number,
+    emptyText: PropTypes.node,
+    type: PropTypes.string,
+    onOpen: PropTypes.func,
+    canManageCOE: PropTypes.bool,
+    onEditCOE: PropTypes.func,
+    onDoneCOE: PropTypes.func,
+    onDeleteCOE: PropTypes.func,
+};
 
 function COEFormModal({
     open,
@@ -2371,6 +2462,19 @@ function COEFormModal({
     );
 }
 
+COEFormModal.propTypes = {
+    open: PropTypes.bool,
+    mode: PropTypes.string,
+    formData: PropTypes.object,
+    setFormData: PropTypes.func,
+    onClose: PropTypes.func,
+    onSubmit: PropTypes.func,
+    mentionOptions: PropTypes.array,
+    mentionLoading: PropTypes.bool,
+    pilarOptions: PropTypes.array,
+    jenjangOptions: PropTypes.array,
+};
+
 export default function AgendaCalendarBase({
     roleScope = "ADMIN",
     lockedBidang = null,
@@ -2454,7 +2558,7 @@ export default function AgendaCalendarBase({
     }, [showProgram, showAssessment, showCOE, showHoliday]);
 
     const getAuthHeaders = () => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
 
         if (!token) {
             navigate("/login");
@@ -3448,7 +3552,7 @@ export default function AgendaCalendarBase({
                     border-radius: 999px;
                     background: #E0F7FB;
                     padding: 3px 8px;
-                    color: #0891B2;
+                    color: #0AC4E0;
                     font-size: 9px;
                     font-weight: 900;
                     text-decoration: none;
@@ -3827,3 +3931,22 @@ export default function AgendaCalendarBase({
         </>
     );
 }
+
+AgendaCalendarBase.propTypes = {
+    roleScope: PropTypes.string,
+    lockedBidang: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    title: PropTypes.string,
+    subtitle: PropTypes.string,
+    canManageCOE: PropTypes.bool,
+    showProgram: PropTypes.bool,
+    showFase: PropTypes.bool,
+    showAssessment: PropTypes.bool,
+    showCOE: PropTypes.bool,
+    showHoliday: PropTypes.bool,
+    fetchProgramsFn: PropTypes.func,
+    fetchAssessmentsFn: PropTypes.func,
+    fetchCoeFn: PropTypes.func,
+    buildProgramPath: PropTypes.func,
+    buildAssessmentPath: PropTypes.func,
+    initialFilter: PropTypes.string,
+};

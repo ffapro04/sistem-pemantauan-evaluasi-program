@@ -1,4 +1,5 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
+
 export default function Label({
   text,
   htmlFor,
@@ -25,4 +26,11 @@ export default function Label({
     </label>
   );
 }
+
+Label.propTypes = {
+  text: PropTypes.node,
+  htmlFor: PropTypes.string,
+  required: PropTypes.bool,
+  className: PropTypes.string,
+};
 

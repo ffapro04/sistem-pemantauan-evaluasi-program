@@ -24,15 +24,16 @@ import { EmailService } from './email.service';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const jwtSecret =
-          configService.get<string>('JWT_SECRET') ||
-          process.env.JWT_SECRET ||
-          'SECRET_KEY';
+        const jwtSecret = configService.get<string>('JWT_SECRET');
+
+        if (!jwtSecret) {
+          throw new Error(
+            'JWT_SECRET tidak ditemukan di environment. Set JWT_SECRET sebelum menjalankan aplikasi.',
+          );
+        }
 
         const jwtExpiresIn =
-          configService.get<string>('JWT_EXPIRES_IN') ||
-          process.env.JWT_EXPIRES_IN ||
-          '1d';
+          configService.get<string>('JWT_EXPIRES_IN') || '1d';
 
         return {
           secret: jwtSecret,

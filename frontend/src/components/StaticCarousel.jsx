@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useState } from "react";
 
 export default function StaticCarousel({ slides }) {
@@ -36,4 +36,14 @@ export default function StaticCarousel({ slides }) {
     </div>
   );
 }
+
+StaticCarousel.propTypes = {
+  slides: PropTypes.arrayOf(
+    PropTypes.shape({
+      title: PropTypes.node,
+      description: PropTypes.node,
+      icon: PropTypes.node,
+    }),
+  ).isRequired,
+};
 

@@ -22,8 +22,7 @@ import PageWrapper from "../PageWrapper";
 import Dropdown from "../Dropdown";
 import { getAuthToken } from "../../utils/authSession";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 const ROWS_PER_PAGE = 5;
 
 const JENIS_OPTIONS = [
@@ -374,7 +373,7 @@ function StatCard({ label, value, helper, icon }) {
                     </p>
                 )}
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#E9FBFF] text-[#0AC4E0]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EEF5FF] text-[#0AC4E0]">
                 {icon}
             </div>
         </div>
@@ -689,7 +688,7 @@ export default function DaftarProgramPage({ lockedBidang = null }) {
                                 type="button"
                                 onClick={fetchData}
                                 disabled={refreshing}
-                                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-[#E9FBFF] px-4 text-[10px] font-black uppercase tracking-widest text-[#078EA3] shadow-[0_10px_22px_rgba(10,196,224,0.12)] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-60"
+                                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-100 bg-[#EEF5FF] px-4 text-[10px] font-black uppercase tracking-widest text-[#0899B0] shadow-[0_10px_22px_rgba(10,196,224,0.12)] transition hover:bg-[#0AC4E0] hover:text-white disabled:opacity-60"
                             >
                                 <RefreshCcw
                                     size={14}

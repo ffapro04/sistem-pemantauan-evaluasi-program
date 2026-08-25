@@ -1,6 +1,6 @@
 // src/components/masterCrud/MasterPageShell.jsx
 
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import PageShell from "../ui/PageShell";
@@ -41,3 +41,15 @@ export default function MasterPageShell({
         </PageShell>
     );
 }
+
+MasterPageShell.propTypes = {
+    title: PropTypes.node,
+    highlight: PropTypes.node,
+    subtitle: PropTypes.node,
+    children: PropTypes.node,
+    action: PropTypes.node,
+    backPath: PropTypes.string,
+    backLabel: PropTypes.string,
+    className: PropTypes.string,
+    contentClassName: PropTypes.string,
+};

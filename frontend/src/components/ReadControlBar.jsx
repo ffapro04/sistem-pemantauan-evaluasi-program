@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { ClipboardCheck } from "lucide-react";
 import Search from "./Search";
 import Dropdown from "./Dropdown";
@@ -44,5 +44,15 @@ function ReadControlBar({
         </div>
     );
 }
+
+ReadControlBar.propTypes = {
+    total: PropTypes.number,
+    search: PropTypes.string,
+    onSearchChange: PropTypes.func,
+    filterValue: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    onFilterChange: PropTypes.func,
+    filterOptions: PropTypes.array,
+    placeholder: PropTypes.string,
+};
 
 export default ReadControlBar;

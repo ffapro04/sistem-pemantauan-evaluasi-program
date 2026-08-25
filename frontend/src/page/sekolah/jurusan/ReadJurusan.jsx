@@ -1,6 +1,7 @@
 ﻿import { jwtDecode } from "jwt-decode";
 import { MasterReadPage } from "../../../components/masterCrud";
 import { jurusanConfig } from "../../../config/masterCrud/jurusan.config";
+import { getAuthToken } from "../../../utils/authSession";
 
 const getCurrentUser = () => {
     try {
@@ -10,7 +11,7 @@ const getCurrentUser = () => {
             return userFromStorage;
         }
 
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return {};
 
         return jwtDecode(token);

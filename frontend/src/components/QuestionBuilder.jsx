@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { motion } from "framer-motion";
 import { Plus, Trash2 } from "lucide-react";
 import Button from "./Button";
@@ -59,6 +59,27 @@ function QuestionBuilder({
         </section>
     );
 }
+
+QuestionBuilder.propTypes = {
+    title: PropTypes.node,
+    badge: PropTypes.node,
+    questions: PropTypes.arrayOf(
+        PropTypes.shape({
+            question: PropTypes.string,
+            options: PropTypes.arrayOf(PropTypes.string),
+        }),
+    ),
+    questionLabel: PropTypes.string,
+    questionPlaceholder: PropTypes.string,
+    optionLabel: PropTypes.string,
+    optionPlaceholder: PropTypes.string,
+    itemLabel: PropTypes.string,
+    addText: PropTypes.string,
+    onAdd: PropTypes.func,
+    onRemove: PropTypes.func,
+    onQuestionChange: PropTypes.func,
+    onOptionChange: PropTypes.func,
+};
 
 function QuestionCard({
     index,
@@ -144,5 +165,21 @@ function QuestionCard({
         </motion.div>
     );
 }
+
+QuestionCard.propTypes = {
+    index: PropTypes.number.isRequired,
+    item: PropTypes.shape({
+        question: PropTypes.string,
+        options: PropTypes.arrayOf(PropTypes.string),
+    }).isRequired,
+    itemLabel: PropTypes.string,
+    questionLabel: PropTypes.string,
+    questionPlaceholder: PropTypes.string,
+    optionLabel: PropTypes.string,
+    optionPlaceholder: PropTypes.string,
+    onRemove: PropTypes.func.isRequired,
+    onQuestionChange: PropTypes.func.isRequired,
+    onOptionChange: PropTypes.func.isRequired,
+};
 
 export default QuestionBuilder;

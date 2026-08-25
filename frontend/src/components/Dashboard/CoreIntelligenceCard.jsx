@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import {
     AlertCircle,
     Bot,
@@ -268,6 +268,12 @@ function InsightPill({ label, value, color }) {
     );
 }
 
+InsightPill.propTypes = {
+    label: PropTypes.node,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    color: PropTypes.string,
+};
+
 function InsightList({ title, icon, items, color }) {
     return (
         <div className="rounded-[1.4rem] border border-slate-100 bg-white p-5 shadow-sm">
@@ -301,6 +307,13 @@ function InsightList({ title, icon, items, color }) {
         </div>
     );
 }
+
+InsightList.propTypes = {
+    title: PropTypes.node,
+    icon: PropTypes.node,
+    items: PropTypes.arrayOf(PropTypes.node),
+    color: PropTypes.string,
+};
 
 export default function CoreIntelligenceCard({
     programs = [],
@@ -449,3 +462,11 @@ export default function CoreIntelligenceCard({
         </section>
     );
 }
+
+CoreIntelligenceCard.propTypes = {
+    programs: PropTypes.array,
+    assessments: PropTypes.array,
+    schools: PropTypes.array,
+    vendors: PropTypes.array,
+    teachers: PropTypes.array,
+};

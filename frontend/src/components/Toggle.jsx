@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import AppSwitch from "./ui/AppSwitch";
 
 export default function Toggle({ checked, onChange }) {
@@ -12,3 +12,8 @@ export default function Toggle({ checked, onChange }) {
     />
   );
 }
+
+Toggle.propTypes = {
+  checked: PropTypes.bool,
+  onChange: PropTypes.func,
+};

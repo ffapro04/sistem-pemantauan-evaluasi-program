@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import {
     Calendar as CalendarIcon,
@@ -14,6 +14,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 
 import Sidebar from "./Sidebar";
 import PageWrapper from "./PageWrapper";
+import { getAuthToken } from "../utils/authSession";
 
 const PROGRAM_STATUSES = [
     "Approval",
@@ -79,7 +80,7 @@ function CalendarOfEventBase({
             try {
                 setLoading(true);
 
-                const token = localStorage.getItem("token");
+                const token = getAuthToken();
 
                 const res = await fetch(
                     `/program?kategori=${kategori}`,
@@ -303,6 +304,30 @@ function CalendarOfEventBase({
     );
 }
 
+CalendarOfEventBase.propTypes = {
+    kategori: PropTypes.string,
+    title: PropTypes.string,
+    titleAccent: PropTypes.string,
+    subtitle: PropTypes.string,
+    agendaBadge: PropTypes.string,
+    footerTitle: PropTypes.string,
+    footerDescription: PropTypes.string,
+    emptyText: PropTypes.string,
+    maxAgenda: PropTypes.number,
+};
+
+const EVENT_SHAPE = PropTypes.shape({
+    id: PropTypes.string,
+    title: PropTypes.string,
+    start: PropTypes.string,
+    extendedProps: PropTypes.shape({
+        category: PropTypes.string,
+        tahapProgram: PropTypes.string,
+        sekolah: PropTypes.string,
+        raw: PropTypes.object,
+    }),
+});
+
 function LegendStatus({ status }) {
     const style = STATUS_STYLE[status];
 
@@ -319,6 +344,10 @@ function LegendStatus({ status }) {
         </div>
     );
 }
+
+LegendStatus.propTypes = {
+    status: PropTypes.string.isRequired,
+};
 
 function StatusCounterCard({ status, total }) {
     const style = STATUS_STYLE[status];
@@ -337,6 +366,11 @@ function StatusCounterCard({ status, total }) {
         </div>
     );
 }
+
+StatusCounterCard.propTypes = {
+    status: PropTypes.string.isRequired,
+    total: PropTypes.number.isRequired,
+};
 
 function AgendaCard({ event, selected, onClick }) {
     const status = event.extendedProps.tahapProgram;
@@ -391,6 +425,12 @@ function AgendaCard({ event, selected, onClick }) {
     );
 }
 
+AgendaCard.propTypes = {
+    event: EVENT_SHAPE.isRequired,
+    selected: PropTypes.bool,
+    onClick: PropTypes.func,
+};
+
 function SelectedAgenda({ event }) {
     if (!event) {
         return (
@@ -441,6 +481,10 @@ function SelectedAgenda({ event }) {
     );
 }
 
+SelectedAgenda.propTypes = {
+    event: EVENT_SHAPE,
+};
+
 function InfoPill({ label, value }) {
     return (
         <div className="min-w-0 rounded-2xl bg-slate-50 px-3 py-3">
@@ -452,6 +496,11 @@ function InfoPill({ label, value }) {
         </div>
     );
 }
+
+InfoPill.propTypes = {
+    label: PropTypes.string,
+    value: PropTypes.node,
+};
 
 function LoadingState() {
     return (
@@ -474,6 +523,10 @@ function EmptyState({ text }) {
         </div>
     );
 }
+
+EmptyState.propTypes = {
+    text: PropTypes.string,
+};
 
 function CalendarPageStyle() {
     return (

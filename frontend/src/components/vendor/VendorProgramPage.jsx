@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import { RefreshCcw, Search, BriefcaseBusiness } from "lucide-react";
+import { getAuthToken } from "../../utils/authSession";
 import { toast } from "react-toastify";
 
 import {
@@ -15,8 +16,7 @@ import VendorProgramStats from "./VendorProgramStats";
 import VendorProgramTable from "./VendorProgramTable";
 import VendorEmptyState from "./VendorEmptyState";
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL } from "../../config/apiBase.js";
 const ROWS_PER_PAGE = 3;
 
 function normalizeArray(payload) {
@@ -46,7 +46,7 @@ function VendorProgramPage({
     }, []);
 
     const getTokenPayload = () => {
-        const token = localStorage.getItem("token");
+        const token = getAuthToken();
         if (!token) return null;
 
         try {
@@ -198,7 +198,7 @@ function VendorProgramPage({
         setLoading(true);
 
         try {
-            const token = localStorage.getItem("token");
+            const token = getAuthToken();
             const headers = { Authorization: `Bearer ${token}` };
             const payload = getTokenPayload();
 

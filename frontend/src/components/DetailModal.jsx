@@ -1,6 +1,7 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { X } from "lucide-react";
 import Button from "./Button";
+import AppIconButton from "./ui/AppIconButton";
 
 function DetailModal({
     open = true,
@@ -51,12 +52,15 @@ function DetailModal({
                         </div>
                     </div>
 
-                    <button
+                    <AppIconButton
+                        icon={X}
+                        iconSize={18}
                         onClick={onClose}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                    >
-                        <X size={18} />
-                    </button>
+                        ariaLabel={closeText}
+                        variant="gray"
+                        size="lg"
+                        className="!rounded-xl !border-slate-200 !bg-slate-50 !text-slate-400 hover:!border-red-200 hover:!bg-red-50 hover:!text-red-500"
+                    />
                 </div>
 
                 <div className="custom-scrollbar max-h-[60vh] flex-1 overflow-y-auto bg-slate-50/50 p-8">
@@ -78,5 +82,18 @@ function DetailModal({
         </div>
     );
 }
+
+DetailModal.propTypes = {
+    open: PropTypes.bool,
+    onClose: PropTypes.func,
+    icon: PropTypes.node,
+    eyebrow: PropTypes.node,
+    title: PropTypes.node,
+    subtitle: PropTypes.node,
+    children: PropTypes.node,
+    footerLeft: PropTypes.node,
+    closeText: PropTypes.node,
+    className: PropTypes.string,
+};
 
 export default DetailModal;

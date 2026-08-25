@@ -1,5 +1,6 @@
-﻿/* eslint-disable react/prop-types */
-export default function AuthBox({ 
+﻿import PropTypes from "prop-types";
+
+export default function AuthBox({
   leftContent, 
   rightContent,
   rightContentClassName = "bg-gradient-to-br from-gray-900 to-blue-900"
@@ -22,4 +23,10 @@ export default function AuthBox({
     </div>
   );
 }
+
+AuthBox.propTypes = {
+  leftContent: PropTypes.node,
+  rightContent: PropTypes.node,
+  rightContentClassName: PropTypes.string,
+};
 

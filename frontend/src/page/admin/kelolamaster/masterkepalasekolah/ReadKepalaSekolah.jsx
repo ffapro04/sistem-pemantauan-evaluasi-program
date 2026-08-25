@@ -14,14 +14,15 @@ import {
 
 import MasterPageShell from "../../../../components/masterCrud/MasterPageShell";
 import MasterAlert from "../../../../components/masterCrud/MasterAlert";
+import AppButton from "../../../../components/ui/AppButton";
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
+import { API_BASE_URL as BASE_URL } from "../../../../config/apiBase.js";
+import { getAuthToken } from "../../../../utils/authSession";
 
 const PAGE_SIZE = 10;
 
 function getAuthHeaders() {
-  const token = localStorage.getItem("token");
+  const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -150,14 +151,16 @@ export default function ReadKepalaSekolah() {
       highlight="Kepala Sekolah"
       subtitle="Admin hanya dapat melihat akun Kepala Sekolah"
       action={
-        <button
+        <AppButton
           type="button"
           onClick={fetchData}
-          className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 shadow-sm transition-all hover:text-slate-700 active:scale-95"
+          icon={<RefreshCw size={12} className={loading ? "animate-spin" : ""} />}
+          variant="secondary"
+          size="sm"
+          className="!rounded-full"
         >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
           Refresh
-        </button>
+        </AppButton>
       }
     >
       <MasterAlert note={note} setNote={setNote} />
@@ -320,27 +323,31 @@ export default function ReadKepalaSekolah() {
                   </p>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <AppButton
                       type="button"
                       disabled={safePage <= 1}
                       onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                      className="h-9 rounded-xl border border-slate-100 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                      variant="secondary"
+                      size="sm"
+                      className="!border-slate-100 !text-slate-500 hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                     >
                       Prev
-                    </button>
+                    </AppButton>
 
                     <div className="rounded-xl bg-white px-3 py-2 text-[10px] font-black text-slate-600 ring-1 ring-slate-100">
                       {safePage} / {totalPage}
                     </div>
 
-                    <button
+                    <AppButton
                       type="button"
                       disabled={safePage >= totalPage}
                       onClick={() => setPage((prev) => Math.min(totalPage, prev + 1))}
-                      className="h-9 rounded-xl border border-slate-100 bg-white px-3 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all hover:border-cyan-100 hover:text-[#0AC4E0] disabled:cursor-not-allowed disabled:opacity-40"
+                      variant="secondary"
+                      size="sm"
+                      className="!border-slate-100 !text-slate-500 hover:!border-cyan-100 hover:!text-[#0AC4E0]"
                     >
                       Next
-                    </button>
+                    </AppButton>
                   </div>
                 </div>
               )}

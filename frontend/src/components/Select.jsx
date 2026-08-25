@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import Dropdown from "./Dropdown";
 
 function Select({
@@ -41,5 +41,22 @@ function Select({
     </div>
   );
 }
+
+Select.propTypes = {
+  name: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func,
+  options: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      label: PropTypes.node,
+    }),
+  ),
+  placeholder: PropTypes.string,
+  icon: PropTypes.elementType,
+  required: PropTypes.bool,
+  className: PropTypes.string,
+};
 
 export default Select;

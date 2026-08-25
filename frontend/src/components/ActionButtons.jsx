@@ -1,4 +1,4 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import { Edit3, Power, PowerOff, Eye, Send, Trash2 } from "lucide-react";
 import AppIconButton from "./ui/AppIconButton";
 
@@ -12,6 +12,11 @@ function ActionButtons({ children, className = "" }) {
     </div>
   );
 }
+
+ActionButtons.propTypes = {
+  children: PropTypes.node,
+  className: PropTypes.string,
+};
 
 /**
  * ActionIcon - Versi Modern & Minimalis
@@ -28,6 +33,13 @@ const ActionIcon = ({ icon: Icon, onClick, variant = "primary", title }) => (
   />
 );
 
+ActionIcon.propTypes = {
+  icon: PropTypes.elementType,
+  onClick: PropTypes.func,
+  variant: PropTypes.oneOf(["primary", "gray", "warning", "danger", "success"]),
+  title: PropTypes.string,
+};
+
 export const EditButton = ({ onClick }) => (
   <ActionIcon
     icon={Edit3}
@@ -36,6 +48,10 @@ export const EditButton = ({ onClick }) => (
     title="Edit Data"
   />
 );
+
+EditButton.propTypes = {
+  onClick: PropTypes.func,
+};
 
 export const DetailButton = ({ onClick }) => (
   <ActionIcon
@@ -46,6 +62,10 @@ export const DetailButton = ({ onClick }) => (
   />
 );
 
+DetailButton.propTypes = {
+  onClick: PropTypes.func,
+};
+
 export const SendButton = ({ onClick }) => (
   <ActionIcon
     icon={Send}
@@ -54,6 +74,10 @@ export const SendButton = ({ onClick }) => (
     title="Kirim Data"
   />
 );
+
+SendButton.propTypes = {
+  onClick: PropTypes.func,
+};
 
 export const DeleteButton = ({ onClick }) => (
   <ActionIcon
@@ -64,6 +88,10 @@ export const DeleteButton = ({ onClick }) => (
   />
 );
 
+DeleteButton.propTypes = {
+  onClick: PropTypes.func,
+};
+
 export const ToggleStatusButton = ({ isActive, onClick }) => (
   <ActionIcon
     icon={isActive ? PowerOff : Power}
@@ -72,5 +100,10 @@ export const ToggleStatusButton = ({ isActive, onClick }) => (
     title={isActive ? "Non-aktifkan" : "Aktifkan"}
   />
 );
+
+ToggleStatusButton.propTypes = {
+  isActive: PropTypes.bool,
+  onClick: PropTypes.func,
+};
 
 export default ActionButtons;

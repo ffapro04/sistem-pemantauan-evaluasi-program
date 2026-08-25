@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { useEffect } from "react";
 import { useMap } from "react-leaflet";
 
@@ -20,5 +20,10 @@ function MapController({ center, zoom }) {
 
     return null;
 }
+
+MapController.propTypes = {
+    center: PropTypes.arrayOf(PropTypes.number),
+    zoom: PropTypes.number,
+};
 
 export default MapController;

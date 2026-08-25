@@ -1,7 +1,7 @@
 ﻿// src/components/masterCrud/MasterFormPage.jsx
 
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
@@ -491,9 +491,7 @@ export default function MasterFormPage({ config, mode = "create" }) {
                 headers:
                     payload instanceof FormData
                         ? {
-                            Authorization: `Bearer ${localStorage.getItem(
-                                "token",
-                            )}`,
+                            Authorization: `Bearer ${getAuthToken()}`,
                         }
                         : getTokenHeader(),
             });
@@ -744,3 +742,8 @@ export default function MasterFormPage({ config, mode = "create" }) {
         </MasterPageShell>
     );
 }
+
+MasterFormPage.propTypes = {
+    config: PropTypes.object.isRequired,
+    mode: PropTypes.oneOf(["create", "edit"]),
+};

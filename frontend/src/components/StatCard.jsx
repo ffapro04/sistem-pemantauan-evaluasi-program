@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import Card from "./Card";
 
 function StatCard({
@@ -45,5 +45,14 @@ function StatCard({
         </Card>
     );
 }
+
+StatCard.propTypes = {
+    icon: PropTypes.node,
+    label: PropTypes.node,
+    value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    desc: PropTypes.node,
+    color: PropTypes.string,
+    className: PropTypes.string,
+};
 
 export default StatCard;

@@ -1,4 +1,4 @@
-﻿/* eslint-disable react/prop-types */
+﻿import PropTypes from "prop-types";
 import { Languages, CheckCircle2 } from "lucide-react";
 
 function Bahasa({ selected = "id", onChange }) {
@@ -58,5 +58,10 @@ function Bahasa({ selected = "id", onChange }) {
         </div>
     );
 }
+
+Bahasa.propTypes = {
+    selected: PropTypes.string,
+    onChange: PropTypes.func,
+};
 
 export default Bahasa;

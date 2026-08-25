@@ -1,8 +1,8 @@
 ﻿// src/components/masterCrud/MasterDetailPage.jsx
 
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -155,6 +155,12 @@ const DetailBadge = ({ item, data, context }) => {
     );
 };
 
+DetailBadge.propTypes = {
+    item: PropTypes.object.isRequired,
+    data: PropTypes.any,
+    context: PropTypes.object,
+};
+
 const HeaderLogo = ({ image, initial, title, icon: AvatarIcon }) => {
     const safeImage = getSafeImage(image);
 
@@ -175,6 +181,13 @@ const HeaderLogo = ({ image, initial, title, icon: AvatarIcon }) => {
             )}
         </div>
     );
+};
+
+HeaderLogo.propTypes = {
+    image: PropTypes.string,
+    initial: PropTypes.string,
+    title: PropTypes.node,
+    icon: PropTypes.elementType,
 };
 
 const DetailRecordItem = ({ item, data, context }) => {
@@ -205,6 +218,12 @@ const DetailRecordItem = ({ item, data, context }) => {
             </p>
         </div>
     );
+};
+
+DetailRecordItem.propTypes = {
+    item: PropTypes.object.isRequired,
+    data: PropTypes.any,
+    context: PropTypes.object,
 };
 
 export default function MasterDetailPage({ config }) {
@@ -572,3 +591,7 @@ export default function MasterDetailPage({ config }) {
         </MasterPageShell>
     );
 }
+
+MasterDetailPage.propTypes = {
+    config: PropTypes.object.isRequired,
+};
